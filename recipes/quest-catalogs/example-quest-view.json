@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "player": {
+    "name": "Tugcow",
+    "discord": null
+  },
+  "created_at": "2026-07-01T22:00:00Z",
+  "picker_version": 1,
+  "quests": [
+    {
+      "quest_id": "punchwood",
+      "name": "Punchwood",
+      "category": "Smoke test",
+      "coopable": false,
+      "requirements": "Punch a bush or tree with your bare hands (unarmed — fists only).\nEvidence captures automatically the moment your fist connects.",
+      "reward": "1 Splinter",
+      "evidence": {
+        "screenshots": 1,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": null,
+      "bot_command": "/comfy test summons_type:Punchwood image:",
+      "auto_checked": false,
+      "venue": "in_game",
+      "trigger": {
+        "event": "hit",
+        "target": "tree_or_bush",
+        "weapon_skill": "Unarmed"
+      },
+      "guild": "Test",
+      "era": 17
+    },
+    {
+      "quest_id": "neck_romancer",
+      "name": "Neck Romancer",
+      "category": "Smoke test",
+      "coopable": false,
+      "requirements": "Kill a Neck with your bare fists (unarmed).\nEvidence captures automatically: first punch, then the kill.",
+      "reward": "1 Neck Tail (emotional)",
+      "evidence": {
+        "screenshots": 2,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": null,
+      "bot_command": "/comfy test summons_type:Neck Romancer image: image2:",
+      "auto_checked": false,
+      "venue": "in_game",
+      "trigger": {
+        "event": "kill",
+        "target": "Neck",
+        "weapon_skill": "Unarmed",
+        "shots": [
+          "on_first_hit",
+          "on_death"
+        ]
+      },
+      "guild": "Test",
+      "era": 17
+    },
+    {
+      "quest_id": "air_drop",
+      "name": "Air Drop",
+      "category": "General summons",
+      "coopable": false,
+      "requirements": "Kill a Deathsquito with a thrown Spear\n📸 Deathsquito while holding a Spear\n📸 Kiling Deathsquito, no longer holding Spear",
+      "reward": null,
+      "evidence": {
+        "screenshots": 2,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": null,
+      "bot_command": "/slayer summons summons_type:Air Drop image: image2:",
+      "auto_checked": false,
+      "venue": "in_game",
+      "trigger": null,
+      "guild": "Slayers",
+      "era": 17
+    },
+    {
+      "quest_id": "angler",
+      "name": "Angler",
+      "name_note": null,
+      "category": "Nature Badges",
+      "coopable": false,
+      "requirements": "Collect one of each fish species (12 total) and build a display for your collection in a location of your choosing, using item stands and signs with each species' name to label them.",
+      "reward": null,
+      "evidence": {
+        "screenshots": 1,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": "Screenshot of Finished Display",
+      "bot_command": "/ranger badge badge_name:Angler image:",
+      "auto_checked": false,
+      "venue": "in_game",
+      "trigger": null,
+      "guild": "Rangers",
+      "era": 17
+    },
+    {
+      "quest_id": "animal_care",
+      "name": "Animal Care",
+      "name_note": null,
+      "category": "IRL Badges",
+      "coopable": false,
+      "requirements": "Post a photo of yourself feeding, grooming, walking, or offering aid to an animal.",
+      "reward": null,
+      "evidence": {
+        "screenshots": 1,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": "Photo with handmade sign showing your name & \"era 17\" visible",
+      "bot_command": "/ranger badge badge_name:Animal Care image:",
+      "auto_checked": false,
+      "venue": "irl",
+      "trigger": null,
+      "guild": "Rangers",
+      "era": 17
+    }
+  ]
+}
