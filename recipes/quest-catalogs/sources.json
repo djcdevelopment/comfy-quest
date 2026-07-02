@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "slayers-summons",
+      "guild": "Slayers",
+      "era": 17,
+      "adapter": "sheet-xlsx",
+      "path": "../../data/raw/slayer-guild-tracker.xlsx",
+      "tab": "Summons list for bot",
+      "url": "https://docs.google.com/spreadsheets/d/1Xij6i1JIUT8iAdVgMDuwy9JzZGvMaU0xv85pSJZmElM",
+      "retrieved": "2026-07-01",
+      "output": "../../data/processed/quest-catalog-slayers.json"
+    },
+    {
+      "id": "rangers-tracker",
+      "guild": "Rangers",
+      "era": 17,
+      "adapter": "ranger-xlsx",
+      "path": "../../data/raw/ranger-guild-tracker.xlsx",
+      "url": "https://docs.google.com/spreadsheets/d/1iRH4C7ml1sJIiX_O175pBhP0m78sWjBM9-i37DWtCdc",
+      "retrieved": "2026-07-01",
+      "output": "../../data/processed/quest-catalog-rangers.json"
+    },
+    {
+      "id": "rangers-example",
+      "guild": "Rangers",
+      "era": 17,
+      "adapter": "gm-template",
+      "path": "gm-template-example.json",
+      "output": null,
+      "enabled": false,
+      "note": "Fork test: enable once Mistral fills a template. gm-template validates and passes through."
+    },
+    {
+      "id": "discord-channel-export",
+      "guild": null,
+      "era": null,
+      "adapter": "discord-export",
+      "path": null,
+      "output": null,
+      "enabled": false,
+      "note": "Reserved seam for the absorption engine: harvest quests straight from a Discord channel export. Not implemented."
+    }
+  ]
+}
