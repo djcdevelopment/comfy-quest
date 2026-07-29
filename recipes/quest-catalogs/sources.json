@@ -30,7 +30,7 @@
       "path": "gm-template-example.json",
       "output": null,
       "enabled": false,
-      "note": "Fork test: enable once Mistral fills a template. gm-template validates and passes through."
+      "note": "gm-template-example.json is not yet written. Writing it is Community Workbench first task QP-1; gm-template validates and passes through once the file exists."
     },
     {
       "id": "discord-channel-export",
