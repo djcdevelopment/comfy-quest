@@ -2,7 +2,9 @@
 
 `quest-view.json` is the per-player dataset: the quests one player chose to track. The
 picker page writes it; the player drops it into
-`Valheim/BepInEx/config/comfy-control/quest-view.json`; the mod displays it.
+`Valheim/BepInEx/config/comfy-network-sense/quest-view.json`; the mod displays it.
+(The old `comfy-control/` path from the pruned control-surface era is stale — the live mod
+reads `comfy-network-sense/`; a file in the old location fails silently.)
 
 It is deliberately **self-contained**: each entry carries the full quest (plus its guild
 and era), so the mod never needs the catalogs, the tracker, or the network. Delete the

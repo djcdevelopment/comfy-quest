@@ -192,7 +192,7 @@ PAGE = """<!DOCTYPE html>
   <label>Discord <span class="opt">(optional)</span> <input type="text" id="discord" placeholder="username"></label>
   <span id="savednote"></span>
   <button class="savebtn" id="save" disabled>Save quest-view.json</button>
-  <div class="hint">Drop the saved file into <b>Valheim/BepInEx/config/comfy-control/quest-view.json</b> &#8212;
+  <div class="hint">Drop the saved file into <b>Valheim/BepInEx/config/comfy-network-sense/quest-view.json</b> &#8212;
     the in-game quest log (F7) shows exactly what you picked. Your selection stays saved in this page.</div>
 </footer>
 <script>
