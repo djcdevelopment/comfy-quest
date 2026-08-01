@@ -1,0 +1,477 @@
+{
+  "Component": "MonsterAI",
+  "Source": "assembly_valheim.dll (Steam client install, extracted 2026-08-01)",
+  "InheritanceChain": [
+    "MonsterAI",
+    "BaseAI",
+    "UnityEngine.MonoBehaviour"
+  ],
+  "Interfaces": [],
+  "LifecycleMethods": [
+    "Awake",
+    "Start"
+  ],
+  "TunableFields": [
+    {
+      "Name": "m_onConsumedItem",
+      "Type": "Action\u00601",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_alertRange",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleeIfHurtWhenTargetCantBeReached",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleeUnreachableSinceAttacking",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleeUnreachableSinceHurt",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleeIfNotAlerted",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleeIfLowHealth",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleeTimeSinceHurt",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleeInLava",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleePheromoneMin",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fleePheromoneMax",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_circulateWhileCharging",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_circulateWhileChargingFlying",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_enableHuntPlayer",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_attackPlayerObjects",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_privateAreaTriggerTreshold",
+      "Type": "int",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_interceptTimeMax",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_interceptTimeMin",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_maxChaseDistance",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_minAttackInterval",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_circleTargetInterval",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_circleTargetDuration",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_circleTargetDistance",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_sleeping",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_wakeupRange",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_noiseWakeup",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_maxNoiseWakeupRange",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_wakeupEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_sleepEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_wakeUpDelayMin",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_wakeUpDelayMax",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_fallAsleepDistance",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_avoidLand",
+      "Type": "bool",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_consumeItems",
+      "Type": "List\u00601",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_consumeRange",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_consumeSearchRange",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_consumeSearchInterval",
+      "Type": "float",
+      "DeclaredBy": "MonsterAI"
+    },
+    {
+      "Name": "m_onBecameAggravated",
+      "Type": "Action\u00601",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_viewRange",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_viewAngle",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_hearRange",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_mistVision",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_alertedEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_idleSound",
+      "Type": "EffectList",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_idleSoundInterval",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_idleSoundChance",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_pathAgentType",
+      "Type": "AgentType",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_moveMinAngle",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_smoothMovement",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_serpentMovement",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_serpentTurnRadius",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_jumpInterval",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_randomCircleInterval",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_randomMoveInterval",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_randomMoveRange",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_randomFly",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_chanceToTakeoff",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_chanceToLand",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_groundDuration",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_airDuration",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_maxLandAltitude",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_takeoffTime",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_flyAltitudeMin",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_flyAltitudeMax",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_flyAbsMinAltitude",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_avoidFire",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_afraidOfFire",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_avoidWater",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_avoidLava",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_skipLavaTargets",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_avoidLavaFlee",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_aggravatable",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_passiveAggresive",
+      "Type": "bool",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_spawnMessage",
+      "Type": "string",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_deathMessage",
+      "Type": "string",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_alertedMessage",
+      "Type": "string",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_fleeRange",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_fleeAngle",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    },
+    {
+      "Name": "m_fleeInterval",
+      "Type": "float",
+      "DeclaredBy": "BaseAI"
+    }
+  ],
+  "ZdoFields": [
+    {
+      "Key": "DespawnInDay",
+      "Access": "read",
+      "ValueType": "bool",
+      "Method": "Awake"
+    },
+    {
+      "Key": "DespawnInDay",
+      "Access": "write",
+      "ValueType": "bool",
+      "Method": "SetDespawnInDay"
+    },
+    {
+      "Key": "DespawnInDay",
+      "Access": "read",
+      "ValueType": "bool",
+      "Method": "DespawnInDay"
+    },
+    {
+      "Key": "EventCreature",
+      "Access": "read",
+      "ValueType": "bool",
+      "Method": "Awake"
+    },
+    {
+      "Key": "EventCreature",
+      "Access": "write",
+      "ValueType": "bool",
+      "Method": "SetEventCreature"
+    },
+    {
+      "Key": "EventCreature",
+      "Access": "read",
+      "ValueType": "bool",
+      "Method": "IsEventCreature"
+    },
+    {
+      "Key": "sleeping",
+      "Access": "read",
+      "ValueType": "bool",
+      "Method": "Awake"
+    },
+    {
+      "Key": "sleeping",
+      "Access": "write",
+      "ValueType": "bool",
+      "Method": "Wakeup"
+    },
+    {
+      "Key": "sleeping",
+      "Access": "write",
+      "ValueType": "bool",
+      "Method": "Sleep"
+    }
+  ],
+  "InstanceRpcs": [
+    {
+      "Name": "RPC_Wakeup",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_Sleep",
+      "RegisteredIn": "Awake"
+    }
+  ]
+}

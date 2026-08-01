@@ -1,0 +1,298 @@
+{
+  "Component": "Piece",
+  "Source": "assembly_valheim.dll (Steam client install, extracted 2026-08-01)",
+  "InheritanceChain": [
+    "Piece",
+    "StaticTarget",
+    "UnityEngine.MonoBehaviour"
+  ],
+  "Interfaces": [
+    "IPlaced"
+  ],
+  "LifecycleMethods": [
+    "Awake",
+    "OnDestroy"
+  ],
+  "TunableFields": [
+    {
+      "Name": "m_targetNonPlayerBuilt",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_icon",
+      "Type": "Sprite",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_name",
+      "Type": "string",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_description",
+      "Type": "string",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_enabled",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_category",
+      "Type": "PieceCategory",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_isUpgrade",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_comfort",
+      "Type": "int",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_comfortGroup",
+      "Type": "ComfortGroup",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_comfortObject",
+      "Type": "GameObject",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_groundPiece",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_allowAltGroundPlacement",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_groundOnly",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_cultivatedGroundOnly",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_waterPiece",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_clipGround",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_clipEverything",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_noInWater",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_notOnWood",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_notOnTiltingSurface",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_inCeilingOnly",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_notOnFloor",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_noClipping",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_onlyInTeleportArea",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_allowedInDungeons",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_spaceRequirement",
+      "Type": "float",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_repairPiece",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_removePiece",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_canRotate",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_randomInitBuildRotation",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_canBeRemoved",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_canRockJade",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_allowRotatedOverlap",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_vegetationGroundOnly",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_blockingPieces",
+      "Type": "List\u00601",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_blockRadius",
+      "Type": "float",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_mustConnectTo",
+      "Type": "ZNetView",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_connectRadius",
+      "Type": "float",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_mustBeAboveConnected",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_noVines",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_extraPlacementDistance",
+      "Type": "int",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_onlyInBiome",
+      "Type": "Biome",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_harvest",
+      "Type": "bool",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_harvestRadius",
+      "Type": "float",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_harvestRadiusMaxLevel",
+      "Type": "float",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_placeEffect",
+      "Type": "EffectList",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_dlc",
+      "Type": "string",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_craftingStation",
+      "Type": "CraftingStation",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_returnResourceHeightOffset",
+      "Type": "float",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_resources",
+      "Type": "Requirement[]",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_destroyedLootPrefab",
+      "Type": "GameObject",
+      "DeclaredBy": "Piece"
+    },
+    {
+      "Name": "m_primaryTarget",
+      "Type": "bool",
+      "DeclaredBy": "StaticTarget"
+    },
+    {
+      "Name": "m_randomTarget",
+      "Type": "bool",
+      "DeclaredBy": "StaticTarget"
+    }
+  ],
+  "ZdoFields": [
+    {
+      "Key": "creator",
+      "Access": "read",
+      "ValueType": "long",
+      "Method": "Awake"
+    },
+    {
+      "Key": "creator",
+      "Access": "write",
+      "ValueType": "long",
+      "Method": "SetCreator"
+    }
+  ],
+  "InstanceRpcs": []
+}

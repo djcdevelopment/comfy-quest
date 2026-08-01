@@ -1,0 +1,258 @@
+{
+  "Component": "WearNTear",
+  "Source": "assembly_valheim.dll (Steam client install, extracted 2026-08-01)",
+  "InheritanceChain": [
+    "WearNTear",
+    "UnityEngine.MonoBehaviour"
+  ],
+  "Interfaces": [
+    "IDestructible"
+  ],
+  "LifecycleMethods": [
+    "Awake",
+    "Start",
+    "OnDestroy"
+  ],
+  "TunableFields": [
+    {
+      "Name": "m_onDestroyed",
+      "Type": "Action",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_onDamaged",
+      "Type": "Action",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_new",
+      "Type": "GameObject",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_worn",
+      "Type": "GameObject",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_broken",
+      "Type": "GameObject",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_wet",
+      "Type": "GameObject",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_noRoofWear",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_noSupportWear",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_ashDamageImmune",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_ashDamageResist",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_burnable",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_materialType",
+      "Type": "MaterialType",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_supports",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_comOffset",
+      "Type": "Vector3",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_forceCorrectCOMCalculation",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_staticPosition",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_nonSolidRenderers",
+      "Type": "List\u00601",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_health",
+      "Type": "float",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_damages",
+      "Type": "DamageModifiers",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_minToolTier",
+      "Type": "int",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_hitNoise",
+      "Type": "float",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_destroyNoise",
+      "Type": "float",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_triggerPrivateArea",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_destroyedEffect",
+      "Type": "EffectList",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_hitEffect",
+      "Type": "EffectList",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_switchEffect",
+      "Type": "EffectList",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_autoCreateFragments",
+      "Type": "bool",
+      "DeclaredBy": "WearNTear"
+    },
+    {
+      "Name": "m_fragmentRoots",
+      "Type": "GameObject[]",
+      "DeclaredBy": "WearNTear"
+    }
+  ],
+  "ZdoFields": [
+    {
+      "Key": "health",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "Awake"
+    },
+    {
+      "Key": "health",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "Awake"
+    },
+    {
+      "Key": "health",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "Repair"
+    },
+    {
+      "Key": "health",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "RPC_Repair"
+    },
+    {
+      "Key": "health",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "RPC_Damage"
+    },
+    {
+      "Key": "health",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "ApplyDamage"
+    },
+    {
+      "Key": "health",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "ApplyDamage"
+    },
+    {
+      "Key": "health",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "Destroy"
+    },
+    {
+      "Key": "support",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "GetSupport"
+    },
+    {
+      "Key": "support",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "UpdateWear"
+    },
+    {
+      "Key": "support",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "UpdateSupport"
+    },
+    {
+      "Key": "support",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "Destroy"
+    }
+  ],
+  "InstanceRpcs": [
+    {
+      "Name": "RPC_Damage",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_Remove",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_Repair",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_HealthChanged",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_ClearCachedSupport",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_CreateFragments",
+      "RegisteredIn": "Awake"
+    }
+  ]
+}

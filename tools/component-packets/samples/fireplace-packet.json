@@ -1,0 +1,348 @@
+{
+  "Component": "Fireplace",
+  "Source": "assembly_valheim.dll (Steam client install, extracted 2026-08-01)",
+  "InheritanceChain": [
+    "Fireplace",
+    "UnityEngine.MonoBehaviour"
+  ],
+  "Interfaces": [
+    "Hoverable",
+    "Interactable",
+    "IHasHoverMenu"
+  ],
+  "LifecycleMethods": [
+    "Awake",
+    "Start"
+  ],
+  "TunableFields": [
+    {
+      "Name": "m_name",
+      "Type": "string",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_startFuel",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_maxFuel",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_secPerFuel",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_infiniteFuel",
+      "Type": "bool",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_disableCoverCheck",
+      "Type": "bool",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_checkTerrainOffset",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_coverCheckOffset",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_holdRepeatInterval",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_halfThreshold",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_canTurnOff",
+      "Type": "bool",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_canRefill",
+      "Type": "bool",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_lowWetOverHalf",
+      "Type": "bool",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_enabledObject",
+      "Type": "GameObject",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_enabledObjectLow",
+      "Type": "GameObject",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_enabledObjectHigh",
+      "Type": "GameObject",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_fullObject",
+      "Type": "GameObject",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_halfObject",
+      "Type": "GameObject",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_emptyObject",
+      "Type": "GameObject",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_playerBaseObject",
+      "Type": "GameObject",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_fuelItem",
+      "Type": "ItemDrop",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_smokeSpawner",
+      "Type": "SmokeSpawner",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_fuelAddedEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_toggleOnEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_fireworksMaxRandomAngle",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_fireworkItemList",
+      "Type": "FireworkItem[]",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_igniteInterval",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_igniteChance",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_igniteSpread",
+      "Type": "int",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_igniteCapsuleRadius",
+      "Type": "float",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_igniteCapsuleStart",
+      "Type": "Vector3",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_igniteCapsuleEnd",
+      "Type": "Vector3",
+      "DeclaredBy": "Fireplace"
+    },
+    {
+      "Name": "m_firePrefab",
+      "Type": "GameObject",
+      "DeclaredBy": "Fireplace"
+    }
+  ],
+  "ZdoFields": [
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "Awake"
+    },
+    {
+      "Key": "fuel",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "Awake"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "UpdateFireplace"
+    },
+    {
+      "Key": "fuel",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "UpdateFireplace"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "UpdateState"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "GetHoverText"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "AddFuel"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "Interact"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "UseItem"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "RPC_AddFuel"
+    },
+    {
+      "Key": "fuel",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "RPC_AddFuel"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "RPC_AddFuelAmount"
+    },
+    {
+      "Key": "fuel",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "RPC_AddFuelAmount"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "SetFuel"
+    },
+    {
+      "Key": "fuel",
+      "Access": "write",
+      "ValueType": "float",
+      "Method": "RPC_SetFuelAmount"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "IsBurning"
+    },
+    {
+      "Key": "fuel",
+      "Access": "read",
+      "ValueType": "float",
+      "Method": "CanUseItems"
+    },
+    {
+      "Key": "lastTime",
+      "Access": "read",
+      "ValueType": "long",
+      "Method": "GetTimeSinceLastUpdate"
+    },
+    {
+      "Key": "lastTime",
+      "Access": "write",
+      "ValueType": "long",
+      "Method": "GetTimeSinceLastUpdate"
+    },
+    {
+      "Key": "state",
+      "Access": "read",
+      "ValueType": "int",
+      "Method": "UpdateFireplace"
+    },
+    {
+      "Key": "state",
+      "Access": "read",
+      "ValueType": "int",
+      "Method": "UpdateState"
+    },
+    {
+      "Key": "state",
+      "Access": "read",
+      "ValueType": "int",
+      "Method": "RPC_ToggleOn"
+    },
+    {
+      "Key": "state",
+      "Access": "write",
+      "ValueType": "int",
+      "Method": "RPC_ToggleOn"
+    },
+    {
+      "Key": "state",
+      "Access": "read",
+      "ValueType": "int",
+      "Method": "IsBurning"
+    }
+  ],
+  "InstanceRpcs": [
+    {
+      "Name": "RPC_AddFuel",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_AddFuelAmount",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_SetFuelAmount",
+      "RegisteredIn": "Awake"
+    },
+    {
+      "Name": "RPC_ToggleOn",
+      "RegisteredIn": "Awake"
+    }
+  ]
+}

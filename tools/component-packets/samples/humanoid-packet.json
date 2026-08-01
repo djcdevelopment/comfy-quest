@@ -1,0 +1,494 @@
+{
+  "Component": "Humanoid",
+  "Source": "assembly_valheim.dll (Steam client install, extracted 2026-08-01)",
+  "InheritanceChain": [
+    "Humanoid",
+    "Character",
+    "UnityEngine.MonoBehaviour"
+  ],
+  "Interfaces": [],
+  "LifecycleMethods": [
+    "Awake",
+    "Start",
+    "OnDestroy"
+  ],
+  "TunableFields": [
+    {
+      "Name": "m_blockStaminaDrain",
+      "Type": "float",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_perfectBlockStaminaDrain",
+      "Type": "float",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_perfectBlockStatusEffect",
+      "Type": "StatusEffect",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_defaultItems",
+      "Type": "GameObject[]",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_randomWeapon",
+      "Type": "GameObject[]",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_randomArmor",
+      "Type": "GameObject[]",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_randomShield",
+      "Type": "GameObject[]",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_randomSets",
+      "Type": "ItemSet[]",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_randomItems",
+      "Type": "RandomItem[]",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_unarmedWeapon",
+      "Type": "ItemDrop",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_pickupEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_dropEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_consumeItemEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_equipEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_perfectBlockEffect",
+      "Type": "EffectList",
+      "DeclaredBy": "Humanoid"
+    },
+    {
+      "Name": "m_nViewOverride",
+      "Type": "ZNetView",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_onDamaged",
+      "Type": "Action\u00602",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_onDeath",
+      "Type": "Action",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_onLevelSet",
+      "Type": "Action\u00601",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_onLand",
+      "Type": "Action\u00601",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_name",
+      "Type": "string",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_group",
+      "Type": "string",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_faction",
+      "Type": "Faction",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_boss",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_dontHideBossHud",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_bossEvent",
+      "Type": "string",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_defeatSetGlobalKey",
+      "Type": "string",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_aiSkipTarget",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_crouchSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_walkSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_speed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_turnSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_runSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_runTurnSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_flySlowSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_flyFastSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_flyTurnSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_acceleration",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_jumpForce",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_jumpForceForward",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_jumpForceTiredFactor",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_airControl",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_canSwim",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_swimDepth",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_swimSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_swimTurnSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_swimAcceleration",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_groundTilt",
+      "Type": "GroundTiltType",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_groundTiltSpeed",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_flying",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_jumpStaminaUsage",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_disableWhileSleeping",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_eye",
+      "Type": "Transform",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_hitEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_critHitEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_backstabHitEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_deathEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_waterEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_tarEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_slideEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_jumpEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_flyingContinuousEffect",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_pheromoneLoveEffect",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_useAltStatusEffectScaling",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_tolerateWater",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_tolerateFire",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_tolerateSmoke",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_tolerateTar",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_health",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_regenAllHPTime",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_damageModifiers",
+      "Type": "DamageModifiers",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_weakSpots",
+      "Type": "WeakSpot[]",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_staggerWhenBlocked",
+      "Type": "bool",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_staggerDamageFactor",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_enemyAdrenalineMultiplier",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_heatBuildupBase",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_heatCooldownBase",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_heatBuildupWater",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_heatWaterTouchMultiplier",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_lavaDamageTickInterval",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_heatLevelFirstDamageThreshold",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_lavaFirstDamage",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_lavaFullDamage",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_lavaAirDamageHeight",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_dayHeatGainRunning",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_dayHeatGainStill",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_dayHeatEquipmentStop",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_lavaSlowMax",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_lavaSlowHeight",
+      "Type": "float",
+      "DeclaredBy": "Character"
+    },
+    {
+      "Name": "m_lavaHeatEffects",
+      "Type": "EffectList",
+      "DeclaredBy": "Character"
+    }
+  ],
+  "ZdoFields": [
+    {
+      "Key": "IsBlocking",
+      "Access": "read",
+      "ValueType": "bool",
+      "Method": "IsBlocking"
+    },
+    {
+      "Key": "IsBlocking",
+      "Access": "write",
+      "ValueType": "bool",
+      "Method": "UpdateBlock"
+    },
+    {
+      "Key": "seed",
+      "Access": "read",
+      "ValueType": "int",
+      "Method": "Awake"
+    },
+    {
+      "Key": "seed",
+      "Access": "write",
+      "ValueType": "int",
+      "Method": "Awake"
+    }
+  ],
+  "InstanceRpcs": []
+}
