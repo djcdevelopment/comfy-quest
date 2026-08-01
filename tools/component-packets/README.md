@@ -23,6 +23,10 @@ A packet contains, for one component:
 # 1. Extract a packet (defaults to the Steam install path for the dll)
 dotnet run -- "C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\assembly_valheim.dll" Fireplace
 
+# 1b. Or sweep the whole assembly: every MonoBehaviour-derived component plus
+#     global cross-indexes (ZDO key -> readers/writers, RPC name -> registrars)
+dotnet run -- "<dll>" --all valheim-component-atlas.json
+
 # 2. Draft the description column with any LLM — see annotation-prompt.md —
 #    then human-review the rows the model flagged with "(?)".
 
@@ -48,7 +52,10 @@ Two provenance levels are mixed in a dictionary and must stay labeled:
 `samples/` holds packets, reviewed-pending annotations, and assembled
 dictionaries for `Piece`, `WearNTear`, `Humanoid` (+`Character`), and
 `MonsterAI` (+`BaseAI`), plus a packet-only `Fireplace` (the code-level lesson
-example). Extracted 2026-08-01; regenerate after game patches.
+example), and `valheim-component-atlas.json` — the `--all` sweep: 336
+components, 194 ZDO keys, 119 RPC names with global cross-indexes, the
+LLM-queryable reference the guide draws from. Extracted 2026-08-01; regenerate
+after game patches.
 
 ## Known limits / next steps
 
