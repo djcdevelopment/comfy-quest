@@ -31,13 +31,26 @@ OUT = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Core", "LabGalleryP
 PREVIEW = os.path.join(HERE, "samples", "gallery-plan.png")
 
 # --- dimensions, in metres -------------------------------------------------------
-RING_RADIUS = 46.0     # far enough that eight monuments do not crowd each other
+RING_RADIUS = 38.0     # 30 m of arc between monuments — room to breathe, short spokes
 RUNE_WIDTH = 9.0       # a rune reads from the centre of the ring at this size
 RUNE_HEIGHT = 11.0
 RUNE_BASE_Y = 0.5      # lifted clear of ground clutter
 BEAM_LENGTH = 2.0      # a wood beam is 2 m; segments are cut into this many
-STATION_INSET = 11.0   # station sits between the monument and the centre
+STATION_INSET = 6.5    # station stands on the same pad as its monument, in front of it
 RACK_RADIUS = 6.0      # armoury ring, close enough to spawn to be unmissable
+
+# --- the platform ---------------------------------------------------------------
+# Valheim ground is not flat, and 89 beams on a hillside is how this reads as broken
+# rather than impressive. So the gallery brings its own floor.
+#
+# NOT a disc: a 38 m disc is roughly 1,100 tiles of which most are never walked on.
+# A plaza, eight spokes and eight pads is a fraction of that and looks deliberate —
+# a ritual floor rather than a car park. The shape also tells you where to go.
+TILE = 2.0             # wood_floor is 2x2 m
+PLAZA_RADIUS = 9.0
+SPOKE_HALF_WIDTH = 2.0
+PAD_HALF_WIDTH = 7.0   # wide enough to carry a 9 m rune with a margin
+PAD_DEPTH = 9.0        # from just behind the monument to just in front of the station
 
 ORDER = ["Combat", "Harvest", "Inventory", "Building", "Crafting", "Progression",
          "World", "Social"]
@@ -157,6 +170,37 @@ for i, (item, note) in enumerate(ARMOURY):
     })
 
 
+def platform_tiles(monuments):
+    """Grid cells that need a floor: plaza, spokes out to each pad, pads under each
+    monument. Deduped, because spokes and pads overlap where they meet."""
+    tiles = set()
+    reach = RING_RADIUS + PAD_DEPTH
+    steps = int(reach / TILE) + 2
+    rays = [(math.sin(math.radians(m["angle"])), math.cos(math.radians(m["angle"])))
+            for m in monuments]
+
+    for i in range(-steps, steps + 1):
+        for j in range(-steps, steps + 1):
+            x, z = i * TILE, j * TILE
+            r = math.hypot(x, z)
+            if r <= PLAZA_RADIUS:
+                tiles.add((x, z))
+                continue
+            for sx, sz in rays:
+                along = x * sx + z * sz              # distance along the ray
+                across = abs(x * sz - z * sx)        # perpendicular offset
+                if along <= 0:
+                    continue
+                # spoke
+                if across <= SPOKE_HALF_WIDTH and along <= RING_RADIUS - PAD_DEPTH / 2:
+                    tiles.add((x, z)); break
+                # pad
+                if (across <= PAD_HALF_WIDTH
+                        and abs(along - RING_RADIUS + PAD_DEPTH / 2 - 1.0) <= PAD_DEPTH / 2):
+                    tiles.add((x, z)); break
+    return sorted(tiles)
+
+
 def cs(text):
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -206,6 +250,15 @@ for m in monuments:
     lines.append("      },")
     lines.append("    },")
 
+tiles = platform_tiles(monuments)
+lines += ["  };", "",
+          "  /// <summary>Floor tiles, 2 m apart, relative to the gallery origin. The",
+          "  /// builder picks ONE world height for the whole platform — the highest ground",
+          "  /// under the footprint plus a clearance — so the floor is level even where the",
+          "  /// terrain is not, and drops supports wherever the gap is worth hiding.</summary>",
+          "  public static readonly float[,] PlatformTiles = {"]
+for x, z in tiles:
+    lines.append(f"    {{ {x}f, {z}f }},")
 lines += ["  };", "", "  public static readonly RackItem[] Armoury = {"]
 for r in rack:
     lines.append(f"    new RackItem {{ Item = {cs(r['item'])}, Note = {cs(r['note'])}, "
@@ -216,7 +269,8 @@ os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
     fh.write("\n".join(lines))
 print(f"  {OUT}")
-print(f"  8 monuments, {total_beams} beams, {len(rack)} armoury stands")
+print(f"  8 monuments, {total_beams} beams, {len(rack)} armoury stands, "
+      f"{len(tiles)} floor tiles")
 
 # --- preview ---------------------------------------------------------------------
 try:
@@ -240,6 +294,12 @@ COLOURS = {
     "World": (117, 194, 235), "Social": (194, 168, 240),
 }
 
+for x, z in tiles:
+    px, pz = to_px(x, z)
+    half = TILE / SPAN * PX / 2
+    d.rectangle([px - half, pz - half, px + half, pz + half],
+                fill=(31, 26, 20), outline=(46, 38, 29))
+
 d.ellipse([*to_px(-RING_RADIUS, RING_RADIUS), *to_px(RING_RADIUS, -RING_RADIUS)],
           outline=(38, 50, 55))
 d.ellipse([*to_px(-RACK_RADIUS, RACK_RADIUS), *to_px(RACK_RADIUS, -RACK_RADIUS)],
@@ -259,7 +319,8 @@ for r in rack:
     px, pz = to_px(r["x"], r["z"])
     d.rectangle([px - 2, pz - 2, px + 2, pz + 2], fill=(200, 200, 190))
 d.text((PX / 2 - 26, PX / 2 - 4), "armoury", fill=(150, 168, 165))
-d.text((12, PX - 22), f"gallery plan · {SPAN:.0f} m across · {total_beams} beams",
+d.text((12, PX - 22),
+       f"gallery plan · {SPAN:.0f} m across · {total_beams} beams · {len(tiles)} floor tiles",
        fill=(120, 140, 138))
 
 os.makedirs(os.path.dirname(PREVIEW), exist_ok=True)

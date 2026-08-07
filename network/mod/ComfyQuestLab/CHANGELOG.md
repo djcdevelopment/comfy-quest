@@ -97,6 +97,21 @@ three tools that keep them honest. Nothing is published and there is no download
 - Console: `questlab_help`, `questlab_panel`, `questlab_seams`, `questlab_clear`.
 - Panel anchored away from the top-left corner, which ComfyNetworkSense's debug HUD owns.
 
+- **The gallery, laid out** (`Core/LabGalleryPlan.g.cs` — planned, not yet built in
+  game). A student should get value two minutes after downloading, not after an hour of
+  hunting Greylings and crafting a bow, so the Tome brings its own ground: eight rune
+  monuments on a 38 m ring, a practice station on each pad, and an armoury at the centre
+  carrying a bow *and* arrows for it.
+  The monuments are raised from logs, cut from the **same** segment table that draws the
+  14-pixel glyphs — one shape at two scales, so a monument cannot differ from the page it
+  belongs to. All eight were rebuilt face-on from the beam data alone to prove the shape
+  survives being chopped into 2 m lengths. It does.
+  On a raised platform rather than bare terrain, because Valheim ground is not flat and
+  89 beams on a hillside is how this reads as broken rather than impressive. A plaza,
+  eight spokes and eight pads — 499 tiles rather than the ~1,100 a solid disc would need,
+  and shaped so the floor itself tells you where to walk. Every station and all 89 beam
+  footings verified to land on a tile.
+
 **Not here yet:** the journal (a stub that shows the seam roster); `lab_setup`; and
 JSONL persistence. `GameplayEventTypes` is
 not linked — it shares a file with a 353-line Unity-dependent class and needs extracting
