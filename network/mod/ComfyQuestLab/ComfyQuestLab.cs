@@ -207,12 +207,16 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       // The other world-changing lane. Same rule as the gallery: it only ever moves
       // when somebody types one of these, and check comes before build, always.
       new Terminal.ConsoleCommand("questlab_blueprint",
-          "build a PlanBuild .blueprint file: questlab_blueprint <list|check|build|clear> [name]",
+          "build a PlanBuild .blueprint file: questlab_blueprint <list|check|build|clear> "
+          + "[name] — build <name> sky raises it overhead with a portal pair bound to "
+          + "the blueprint's name, ground door at your crosshair",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "list";
             string name = args.Length >= 3 ? args[2] : null;
+            bool sky = args.Length >= 4
+                && string.Equals(args[3], "sky", StringComparison.OrdinalIgnoreCase);
             if (verb == "build") {
-              StartCoroutine(_blueprints.Build(this, name));
+              StartCoroutine(_blueprints.Build(this, name, sky));
             } else if (verb == "clear") {
               Report(_blueprints.Clear(name));
             } else if (verb == "check") {
@@ -249,7 +253,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
     sb.AppendLine("  questlab_clear   empty the live view");
     sb.AppendLine("  questlab_gallery check | build | clear   raise the practice ground");
-    sb.AppendLine("  questlab_blueprint list | check <n> | build <n> | clear [n]   build a .blueprint file");
+    sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");
     sb.AppendLine("  questlab_prefabs <name>   search what this game build has; dump writes the catalog");
     sb.AppendLine("Hit a tree or a bush with the panel open — harvest is the wired category.");
     return sb.ToString().TrimEnd();
