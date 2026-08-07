@@ -336,6 +336,58 @@ public sealed class LabBlueprintBuilder {
     }
   }
 
+  // ---- count -----------------------------------------------------------------------
+
+  /// <summary>What is actually standing, per prefab — the non-destructive half of the
+  /// mark-sweep. Exists because "the build looks wrong" has two very different causes:
+  /// pieces that never placed (count low, log has the failures) and pieces you cannot
+  /// see (count full — go look again). Same loaded-zones caveat as clear.</summary>
+  public string Count(string name) {
+    if (ZNetScene.instance == null || ZDOMan.instance == null) {
+      return "not in a world yet.";
+    }
+    string wanted = string.IsNullOrEmpty(name) ? null : CanonicalName(name);
+
+    var byName = new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
+    try {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        string m = LabMarks.BlueprintName(zdo);
+        if (m.Length == 0) continue;
+        if (wanted != null && !string.Equals(m, wanted, StringComparison.OrdinalIgnoreCase)) {
+          continue;
+        }
+        Dictionary<string, int> prefabs;
+        if (!byName.TryGetValue(m, out prefabs)) {
+          prefabs = new Dictionary<string, int>(StringComparer.Ordinal);
+          byName[m] = prefabs;
+        }
+        GameObject pf = ZNetScene.instance.GetPrefab(zdo.GetPrefab());
+        string pfName = pf != null ? pf.name : ("#" + zdo.GetPrefab());
+        int c;
+        prefabs.TryGetValue(pfName, out c);
+        prefabs[pfName] = c + 1;
+      }
+    } catch (Exception ex) {
+      return "could not read the ZDO table on this game build: " + ex.Message;
+    }
+
+    if (byName.Count == 0) {
+      return "no blueprint-built pieces in the loaded area. Only loaded zones are "
+          + "counted — stand near the build.";
+    }
+    var sb = new StringBuilder();
+    foreach (KeyValuePair<string, Dictionary<string, int>> kv in byName) {
+      int total = 0;
+      foreach (int c in kv.Value.Values) total += c;
+      sb.AppendLine(kv.Key + ": " + total + " piece(s) standing in loaded zones");
+      foreach (KeyValuePair<string, int> p in kv.Value) {
+        sb.AppendLine("  " + p.Key + " " + p.Value);
+      }
+    }
+    sb.Append("Loaded zones only — stand near the build for a true count.");
+    return sb.ToString().TrimEnd();
+  }
+
   // ---- clear -----------------------------------------------------------------------
 
   /// <summary>Mark-sweep over the loaded ZDO table. This is the fix the gallery's

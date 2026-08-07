@@ -151,9 +151,33 @@ PAGE = """<!DOCTYPE html>
   .hint { flex-basis: 100%; color: var(--dim); font-size: 12px; }
   .hint b { color: var(--mid); }
   #savednote { color: var(--green); font-size: 12.5px; }
+  .gateway-topbar { position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(11,16,19,.92); backdrop-filter: blur(14px); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; }
+  .gateway-topbar .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 12px 20px; max-width: 1400px; margin: 0 auto; }
+  .gateway-topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; color: #fff; }
+  .gateway-topbar .mark { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; background: rgba(255,255,255,.1); font-size: 12px; }
+  .gateway-topbar nav { display: flex; gap: 16px; overflow-x: auto; }
+  .gateway-topbar nav a { color: rgba(255,255,255,.7); text-decoration: none; white-space: nowrap; }
+  .gateway-topbar nav a:hover { color: #fff; }
+  .gateway-topbar nav a[aria-current="page"] { color: #fff; font-weight: 600; }
 </style>
 </head>
 <body>
+<div class="gateway-topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand"><span class="mark">LJ</span><span>Valheim volunteer roadmap</span></div>
+    <nav aria-label="Gateway surfaces">
+      <a href="/roadmap">Roadmap</a>
+      <a href="/community">Community</a>
+      <a href="/workbench">Workbench</a>
+      <a href="/questpicker" aria-current="page">Quest Picker</a>
+      <a href="/steward">Steward</a>
+      <a href="/questlab">Quest Lab</a>
+      <a href="/networksense">NetworkSense</a>
+      <a href="/events">Events</a>
+      <a href="/testing">Testing</a>
+    </nav>
+  </div>
+</div>
 <header>
   <div class="title">Comfy Quest Picker</div>
   <div class="trackpill" id="trackpill"><span class="dot"></span><span id="trackcount">0 tracked</span></div>

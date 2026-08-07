@@ -181,6 +181,14 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
           "what the quest lab can do right now: questlab_help",
           delegate { Report(Help()); });
 
+      new Terminal.ConsoleCommand("lab_setup",
+          "set up the lab practice area and read the welcome note: lab_setup",
+          delegate {
+            StartCoroutine(_gallery.Build(this));
+            Report("Quest lab setup started! The gallery is being raised.");
+            Report("Press F6 to open the console. Learn the spells at djcdevelopment.github.io/baseline/questlab/");
+          });
+
       new Terminal.ConsoleCommand("questlab_panel",
           "open or close the lab console: questlab_panel",
           delegate { _panel.Toggle(); Report("quest lab panel " + (_panel.IsOpen ? "open" : "closed")); });
@@ -261,6 +269,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   static string Help() {
     var sb = new StringBuilder();
     sb.AppendLine("ComfyQuestLab " + PluginVersion + " — learn what the game can trigger a quest on.");
+    sb.AppendLine("  lab_setup        set up the practice area (do this first)");
     sb.AppendLine("  questlab_panel   open the live event console (" + LabConfig.PanelShortcut.Value + ")");
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
     sb.AppendLine("  questlab_clear   empty the live view");
