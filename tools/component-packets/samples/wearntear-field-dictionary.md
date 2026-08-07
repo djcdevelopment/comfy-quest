@@ -16,8 +16,8 @@ for editing; entries marked `(?)` are low-confidence guesses - verify before pub
 | `m_worn` | GameObject | The visual model representing the damaged state. |
 | `m_broken` | GameObject | The visual model representing the nearly broken state. |
 | `m_wet` | GameObject | Visual model overlay applied when the piece is wet. |
-| `m_noRoofWear` | bool | Disables deterioration when exposed to rain without roof cover. |
-| `m_noSupportWear` | bool | Disables damage and collapse caused by lack of structural support. |
+| `m_noRoofWear` | bool | **ENABLES** rain deterioration when not under a roof — the name reads as a disable and is not one. `UpdateWear` reaches the rain damage only when this is true. Set `false` to weatherproof a piece. |
+| `m_noSupportWear` | bool | **ENABLES** damage and collapse from lack of structural support — the name reads as a disable and is not one. `UpdateWear` runs the support check only when this is true. Set `false` to let a piece stand unsupported. |
 | `m_ashDamageImmune` | bool | Makes this piece immune to Ashlands environmental fire damage. (?) |
 | `m_ashDamageResist` | bool | Gives this piece resistance to Ashlands environmental damage. (?) |
 | `m_burnable` | bool | Enables this piece to catch fire and take burn damage. |

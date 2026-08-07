@@ -320,7 +320,10 @@ public sealed class LabGalleryBuilder {
   ///
   /// Support wear is switched off on everything placed. A platform standing clear of the
   /// ground has nothing holding it up as far as the game is concerned, and would begin
-  /// collapsing within minutes — which is a spectacular way to lose a student.</summary>
+  /// collapsing within minutes — which is a spectacular way to lose a student.
+  ///
+  /// "Off" is false on both wear flags. See the note at the assignment: they are opt-ins
+  /// wearing a name that reads like an opt-out.</summary>
   GameObject Place(string prefabName, Vector3 position, Quaternion rotation) {
     try {
       GameObject prefab = ZNetScene.instance.GetPrefab(prefabName);
@@ -334,13 +337,18 @@ public sealed class LabGalleryBuilder {
         return null;
       }
 
-      // Switch support wear off for this instance. GalleryStructurePatches does the same
-      // thing on every later rebuild, but it cannot help here: it runs from Awake, during
-      // the Instantiate above, before the ZDO below has been recorded as ours.
+      // FALSE switches the wear OFF. Both fields are opt-INS despite the "no" in their
+      // names — WearNTear.UpdateWear reaches its support check and its rain damage only
+      // when the matching flag is true. Setting them true, which reads correctly and is
+      // what this did at first, arms exactly the decay it was meant to prevent.
+      //
+      // GalleryStructurePatches does the same on every later rebuild, but it cannot help
+      // here: it runs from Awake, during the Instantiate above, before the ZDO below has
+      // been marked as ours.
       var wear = go.GetComponent<WearNTear>();
       if (wear != null) {
-        wear.m_noSupportWear = true;
-        wear.m_noRoofWear = true;
+        wear.m_noSupportWear = false;
+        wear.m_noRoofWear = false;
       }
 
       var piece = go.GetComponent<Piece>();

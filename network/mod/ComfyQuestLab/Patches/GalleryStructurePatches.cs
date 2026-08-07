@@ -10,14 +10,20 @@ using HarmonyLib;
 /// and teaches nothing, it only stops the practice ground from falling on a student. The
 /// roster answers "what can a quest be bound to", and this would be a wrong answer.
 ///
-/// The component atlas is the reason the patch is needed at all. WearNTear carries
-/// m_noSupportWear and m_noRoofWear as TunableFields — plain fields on the component
-/// instance — while only "health" and "support" appear in its ZdoFields. So switching
-/// support wear off at placement time lasts exactly as long as that one instance does.
-/// ZNetScene rebuilds a piece from its ZDO every time its zone reloads, and the rebuilt
-/// instance carries the prefab's value (false). A gallery is 76 m across and can sit tens
-/// of metres up, which means it spans several zones and starts reloading the moment its
-/// builder walks or looks around: pieces come back unsupported and collapse.
+/// FALSE is off, on both flags. They are opt-INS whatever the "no" in the names suggests:
+/// in the shipped WearNTear.UpdateWear the support check sits behind a `brfalse` on
+/// m_noSupportWear and the rain damage behind a `brfalse` on m_noRoofWear, so the damage
+/// is only ever reached when the flag is TRUE. The atlas annotation says "disables" for
+/// both, which is backwards, and believing it cost two rounds of watching a gallery come
+/// down faster each time. Read the IL, not the field name.
+///
+/// The component atlas is the reason the patch is needed at all. WearNTear carries both
+/// flags as TunableFields — plain fields on the component instance — while only "health"
+/// and "support" appear in its ZdoFields. So switching wear off at placement time lasts
+/// exactly as long as that one instance does. ZNetScene rebuilds a piece from its ZDO
+/// every time its zone reloads, and the rebuilt instance comes back carrying the prefab's
+/// value. A gallery is 76 m across and can sit tens of metres up, so it spans several
+/// zones and starts reloading the moment its builder walks or looks around.
 ///
 /// Re-applying the flags in Awake is the durable form of the same intent. Raising m_health
 /// instead would not help — it is a TunableField too, and would only slow the fall.
@@ -58,8 +64,8 @@ public static class GalleryStructurePatches {
       if (zdo == null || !LabGalleryBuilder.IsGalleryPiece(zdo)) {
         return;
       }
-      __instance.m_noSupportWear = true;
-      __instance.m_noRoofWear = true;
+      __instance.m_noSupportWear = false;
+      __instance.m_noRoofWear = false;
     } catch (Exception) {
       // One piece failing to opt out is not worth a log line that would repeat on every
       // zone load for the life of the session.
