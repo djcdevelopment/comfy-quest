@@ -41,15 +41,20 @@ book and you have learned the console. Turning to a page also lights that rune i
 console, because the next thing anyone does after reading "punch a tree" is punch a
 tree.
 
-Open the console and punch a tree. You should see:
+Open the live view and punch a tree. You should see:
 
 ```
-14:22:07  harvest  TreeBase.Damage
-          Beech1 (tree)   skill Unarmed
-          -> lab only: nothing in the shipping mod hooks this yet
+[rune]  14:22:07  striking a standing tree
+        Beech1 (tree)   skill Unarmed
+        -> nothing binds a quest to this yet
 ```
 
 That third line is the point of the whole tool.
+
+Note what is *not* there: no method name, no talk of hooks. **You do not need to know how
+a spell works in order to cast one.** The method name is the thing's *true name* and it
+is one toggle away in the Spellbook — because knowing a true name is what lets you
+command a thing, which here means writing code against it.
 
 ## Reading a row
 
@@ -57,9 +62,9 @@ Every event ends in one of three verdicts:
 
 | Verdict | Means |
 | --- | --- |
-| **a quest can fire on this today** | The shipping mod hooks it and a trigger matches. Exactly one seam qualifies right now: `Character.OnDeath`. |
-| **emits an event, but no quest trigger matches it yet** | Real event, no way to build on it. `Character.Damage` emits `first_hit`; the evaluator matches `kill` only. |
-| **lab only** | Nothing in the shipping mod hooks it. Most of the game. |
+| **a quest can be bound to this today** | Exactly one thing qualifies right now: a creature dying. |
+| **the world speaks, but no quest is listening yet** | It really happens and you can watch it — striking a living thing does — but nothing will carry it into a quest. |
+| **nothing binds a quest to this yet** | Most of the game. |
 
 The full picture, with all 91 seams:
 [`tools/component-packets/EVENT-ATLAS.md`](../../../tools/component-packets/EVENT-ATLAS.md).

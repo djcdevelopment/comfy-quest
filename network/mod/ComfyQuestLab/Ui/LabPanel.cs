@@ -31,6 +31,7 @@ public sealed class LabPanel {
   string _journalCategory = LabCategory.Harvest;   // where a new builder starts
   string _filterText = string.Empty;
   bool _paused;
+  bool _showTrueNames;
   Tab _tab = Tab.Console;
 
   enum Tab { Console, Spellbook }
@@ -153,7 +154,7 @@ public sealed class LabPanel {
         GUILayout.BeginHorizontal();
         GUILayout.Label(new GUIContent(LabRunes.For(row.Category)),
             GUILayout.Width(18f), GUILayout.Height(18f));
-        GUILayout.Label(row.At + "  " + row.Seam);
+        GUILayout.Label(row.At + "  " + LabSpellNames.For(row.Seam));
         GUILayout.EndHorizontal();
         GUILayout.Label("        " + row.Target + "   " + row.Detail);
         GUILayout.Label("        " + UsabilityLine(row.Usability));
@@ -182,11 +183,11 @@ public sealed class LabPanel {
   static string UsabilityLine(string usability) {
     switch (usability) {
       case LabUsability.Today:
-        return "-> a quest can fire on this today";
+        return "-> a quest can be bound to this today";
       case LabUsability.ProducesEventNoTrigger:
-        return "-> emits an event, but no quest trigger matches it yet";
+        return "-> the world speaks, but no quest is listening yet";
       default:
-        return "-> lab only: nothing in the shipping mod hooks this yet";
+        return "-> nothing binds a quest to this yet";
     }
   }
 
@@ -236,9 +237,27 @@ public sealed class LabPanel {
     }
 
     GUILayout.Space(8f);
-    GUILayout.Label("What the world answers to  ·  [x] = this lab will show it to you");
-    foreach (string seam in current.Seams) {
-      GUILayout.Label("  " + seam);
+    GUILayout.BeginHorizontal();
+    GUILayout.Label("What the world answers to");
+    GUILayout.FlexibleSpace();
+    // You do not need a thing's true name to see it happen — only to command it. So the
+    // method names are here, and they are not in your way until you ask.
+    _showTrueNames = GUILayout.Toggle(_showTrueNames, "true names", GUI.skin.button,
+        GUILayout.Width(96f));
+    GUILayout.EndHorizontal();
+
+    foreach (LabJournal.Spell spell in current.Spells) {
+      Color before = GUI.color;
+      if (!spell.Bound) {
+        GUI.color = new Color(1f, 1f, 1f, 0.45f);
+      }
+      GUILayout.Label("  " + (spell.Bound ? "*" : "-") + "  " + spell.Name);
+      GUILayout.Label("        " + spell.Verdict
+          + (spell.Bound ? string.Empty : "  ·  this tome cannot witness it yet"));
+      if (_showTrueNames) {
+        GUILayout.Label("        true name: " + spell.TrueName);
+      }
+      GUI.color = before;
     }
 
     GUILayout.Space(8f);

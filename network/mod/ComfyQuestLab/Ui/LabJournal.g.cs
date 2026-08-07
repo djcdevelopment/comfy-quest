@@ -9,9 +9,13 @@ namespace ComfyQuestLab;
 
 using System.Collections.Generic;
 
-/// <summary>One page per category: what it covers, something to go and do, and the
-/// thing that would otherwise cost an hour. Seam lists come from the atlas, so a page
-/// cannot promise something the game does not have.</summary>
+/// <summary>The tome. One page per school: what it covers, something to go and try,
+/// and the thing that would otherwise cost an hour.
+///
+/// Every spell listed is something the world genuinely answers to — the list is
+/// joined from the atlas at generation time, so a page cannot name something the game
+/// does not do. Spells this build can witness are listed first, because those are the
+/// ones a student can go and see.</summary>
 public static class LabJournal {
   public sealed class Page {
     public string Category;
@@ -19,10 +23,23 @@ public static class LabJournal {
     public string[] What;
     public string[] Try;
     public string[] Watch;
-    /// <summary>"[x] TreeBase.Damage — quests can use this". The [x] means this
-    /// build hooks it; [ ] means the seam exists in the game and the lab is not
-    /// showing it to you.</summary>
-    public string[] Seams;
+    public Spell[] Spells;
+  }
+
+  /// <summary>One thing the world answers to.
+  ///
+  /// <see cref="Name"/> is what it is, in words. <see cref="TrueName"/> is the method
+  /// a mod would have to reach for — shown only when asked, because a student does not
+  /// need to know how a spell works in order to cast one. Knowing a thing's true name
+  /// is what gives you power over it, and here that is not a metaphor: the true name
+  /// is literally what you would write code against.</summary>
+  public sealed class Spell {
+    public string Name;
+    public string TrueName;
+    public string Verdict;
+    /// <summary>True when this build will show it to you. False means the world does
+    /// this and the tome cannot yet witness it.</summary>
+    public bool Bound;
   }
 
   public static readonly List<Page> Pages = new List<Page> {
@@ -32,19 +49,19 @@ public static class LabJournal {
       What = new[] { "Hitting things, and things dying. The only category with any ground a quest", "can stand on today — and the only place you can see all three verdicts side", "by side, which is the fastest way to understand what they mean." },
       Try = new[] { "Find a Greyling and hit it once, then finish it.", "You get two kinds of row: the hits, and the death." },
       Watch = new[] { "The hits and the kill get DIFFERENT verdicts, and that is the whole lesson.", "The kill says a quest can fire on it. The hits say they emit an event that no", "quest trigger matches — real, visible, and unusable. If you want a quest that", "fires on a hit rather than a kill, nothing today will run it." },
-      Seams = new[] {
-        "[ ] Character.AddStaggerDamage — not wired to quests",
-        "[ ] Character.BlockAttack — not wired to quests",
-        "[x] Character.Damage — fires, but no trigger matches",
-        "[ ] Character.Heal — not wired to quests",
-        "[x] Character.OnDeath — quests can use this",
-        "[x] Character.RPC_Damage — fires, but no trigger matches",
-        "[ ] Character.RPC_Heal — not wired to quests",
-        "[ ] Character.RPC_Stagger — not wired to quests",
-        "[ ] Character.SetHealth — not wired to quests",
-        "[x] Character.Stagger — not wired to quests",
-        "[ ] Humanoid.BlockAttack — not wired to quests",
-        "[x] Player.OnDeath — not wired to quests",
+      Spells = new[] {
+        new Spell { Name = "a creature dies", TrueName = "Character.OnDeath", Verdict = "a quest can be bound to this", Bound = true },
+        new Spell { Name = "a creature is staggered", TrueName = "Character.Stagger", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "striking a living thing", TrueName = "Character.Damage", Verdict = "the world speaks, but no quest is listening", Bound = true },
+        new Spell { Name = "striking a living thing, when the server carries the blow", TrueName = "Character.RPC_Damage", Verdict = "the world speaks, but no quest is listening", Bound = true },
+        new Spell { Name = "you die", TrueName = "Player.OnDeath", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "a blow being blocked", TrueName = "Character.BlockAttack", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a blow blocked by something carrying a shield", TrueName = "Humanoid.BlockAttack", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a creature is staggered, server-carried", TrueName = "Character.RPC_Stagger", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "health set outright, rather than damaged or healed", TrueName = "Character.SetHealth", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "something being healed", TrueName = "Character.Heal", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "something being healed, server-carried", TrueName = "Character.RPC_Heal", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "stagger building up on a creature", TrueName = "Character.AddStaggerDamage", Verdict = "no quest can be bound to this yet", Bound = false },
       },
     },
     new Page {
@@ -53,20 +70,20 @@ public static class LabJournal {
       What = new[] { "Chopping trees, breaking bushes and rocks, picking berries. The first thing", "most people try, and the reason this lab exists: hitting a bush used to fire", "a quest, and the mod that could do it was retired." },
       Try = new[] { "Punch a tree with bare fists, then punch a raspberry bush, then pick one.", "Three rows, and the third is a different shape from the first two." },
       Watch = new[] { "A standing tree and a felled trunk are different things to the game, so they", "are different rows. And picking a berry is not damage at all — it is an", "interact. Nobody guesses that, and a quest written as though picking were", "hitting would never fire." },
-      Seams = new[] {
-        "[x] Destructible.Damage — not wired to quests",
-        "[ ] Destructible.RPC_Damage — not wired to quests",
-        "[ ] MineRock.Damage — not wired to quests",
-        "[ ] MineRock5.Damage — not wired to quests",
-        "[ ] MineRock5.RPC_Damage — not wired to quests",
-        "[x] Pickable.Interact — not wired to quests",
-        "[ ] Pickable.RPC_Pick — not wired to quests",
-        "[ ] Pickable.RPC_SetPicked — not wired to quests",
-        "[ ] Pickable.SetPicked — not wired to quests",
-        "[x] TreeBase.Damage — not wired to quests",
-        "[ ] TreeBase.RPC_Damage — not wired to quests",
-        "[x] TreeLog.Damage — not wired to quests",
-        "[ ] TreeLog.RPC_Damage — not wired to quests",
+      Spells = new[] {
+        new Spell { Name = "picking a berry, mushroom or flower", TrueName = "Pickable.Interact", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "striking a bush, or other breakable scenery", TrueName = "Destructible.Damage", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "striking a fallen trunk", TrueName = "TreeLog.Damage", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "striking a standing tree", TrueName = "TreeBase.Damage", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "a picked thing marked as taken", TrueName = "Pickable.SetPicked", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a picked thing marked as taken, server-carried", TrueName = "Pickable.RPC_SetPicked", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "something being picked, server-carried", TrueName = "Pickable.RPC_Pick", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "striking a fallen trunk, server-carried", TrueName = "TreeLog.RPC_Damage", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "striking a large rock or ore vein", TrueName = "MineRock5.Damage", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "striking a large rock, server-carried", TrueName = "MineRock5.RPC_Damage", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "striking a rock or ore vein", TrueName = "MineRock.Damage", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "striking a standing tree, server-carried", TrueName = "TreeBase.RPC_Damage", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "striking breakable scenery, server-carried", TrueName = "Destructible.RPC_Damage", Verdict = "no quest can be bound to this yet", Bound = false },
       },
     },
     new Page {
@@ -75,20 +92,20 @@ public static class LabJournal {
       What = new[] { "Picking things up, equipping them, eating them, emptying chests. The largest", "group of seams in the game and the noisiest, because the game moves items", "around constantly for reasons that have nothing to do with you." },
       Try = new[] { "Drop something and pick it back up, then equip a weapon and eat food.", "Then open a chest and take everything." },
       Watch = new[] { "The lab watches what you DID, not every time the item list changed. Adding an", "item internally happens on crafting, on stacking, on moving between chests —", "a quest built on that would fire constantly and mean nothing. It is left", "alone on purpose, and you can see it listed as available in the atlas if you", "disagree." },
-      Seams = new[] {
-        "[ ] Container.RPC_RequestTakeAll — not wired to quests",
-        "[x] Container.TakeAll — not wired to quests",
-        "[x] Humanoid.ConsumeItem — not wired to quests",
-        "[ ] Humanoid.DropItem — not wired to quests",
-        "[x] Humanoid.EquipItem — not wired to quests",
-        "[x] Humanoid.Pickup — not wired to quests",
-        "[ ] Humanoid.UnequipItem — not wired to quests",
-        "[ ] Inventory.AddItem — not wired to quests",
-        "[ ] Inventory.RemoveItem — not wired to quests",
-        "[ ] ItemDrop.DropItem — not wired to quests",
-        "[ ] ItemDrop.Pickup — not wired to quests",
-        "[ ] ItemDrop.RPC_RequestOwn — not wired to quests",
-        "[ ] Player.ConsumeItem — not wired to quests",
+      Spells = new[] {
+        new Spell { Name = "eating or drinking", TrueName = "Humanoid.ConsumeItem", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "emptying a chest", TrueName = "Container.TakeAll", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "picking something up off the ground", TrueName = "Humanoid.Pickup", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "putting something in your hands", TrueName = "Humanoid.EquipItem", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "an item landing on the ground", TrueName = "ItemDrop.DropItem", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "an item on the ground being taken", TrueName = "ItemDrop.Pickup", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "anything at all entering your pack, including shuffles you did not cause", TrueName = "Inventory.AddItem", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "anything at all leaving your pack", TrueName = "Inventory.RemoveItem", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "claiming a dropped item before taking it", TrueName = "ItemDrop.RPC_RequestOwn", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "dropping something", TrueName = "Humanoid.DropItem", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "eating or drinking, as a player", TrueName = "Player.ConsumeItem", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "emptying a chest, server-carried", TrueName = "Container.RPC_RequestTakeAll", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "putting something away", TrueName = "Humanoid.UnequipItem", Verdict = "no quest can be bound to this yet", Bound = false },
       },
     },
     new Page {
@@ -97,16 +114,16 @@ public static class LabJournal {
       What = new[] { "Placing pieces, repairing them, taking them down, and structures breaking.", "The category a settlement steward actually wants: build a longhouse, repair", "the dock, keep the walls up." },
       Try = new[] { "Place a workbench, hit it with a hammer to repair it, then remove it.", "If something of yours is damaged, let it break and watch that row too." },
       Watch = new[] { "Placing is something YOU do; breaking is something that HAPPENS. So breaking", "is reported whoever caused it, and the row says whether it was you. That", "distinction is what lets a 'defend the base' quest work at all." },
-      Seams = new[] {
-        "[x] Player.PlacePiece — not wired to quests",
-        "[x] Player.RemovePiece — not wired to quests",
-        "[x] Player.Repair — not wired to quests",
-        "[ ] WearNTear.ApplyDamage — not wired to quests",
-        "[x] WearNTear.Destroy — not wired to quests",
-        "[ ] WearNTear.RPC_Remove — not wired to quests",
-        "[ ] WearNTear.RPC_Repair — not wired to quests",
-        "[ ] WearNTear.Remove — not wired to quests",
-        "[ ] WearNTear.Repair — not wired to quests",
+      Spells = new[] {
+        new Spell { Name = "a structure breaking", TrueName = "WearNTear.Destroy", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "placing a piece of building", TrueName = "Player.PlacePiece", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "repairing something with a hammer", TrueName = "Player.Repair", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "taking a piece back down", TrueName = "Player.RemovePiece", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "a structure being repaired", TrueName = "WearNTear.Repair", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a structure being repaired, server-carried", TrueName = "WearNTear.RPC_Repair", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a structure being taken away", TrueName = "WearNTear.Remove", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a structure being taken away, server-carried", TrueName = "WearNTear.RPC_Remove", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a structure taking damage", TrueName = "WearNTear.ApplyDamage", Verdict = "no quest can be bound to this yet", Bound = false },
       },
     },
     new Page {
@@ -115,18 +132,18 @@ public static class LabJournal {
       What = new[] { "Making things at a bench, and feeding the machines that make things —", "smelters, kilns, cooking stations. Two different acts that people tend to", "lump together." },
       Try = new[] { "Craft anything at a workbench. Then put ore and coal into a smelter.", "Notice they are separate rows with separate names." },
       Watch = new[] { "The craft is reported by the crafting WINDOW, not by your character. That is", "genuinely surprising and it is why searching for a 'player crafts' event", "turns up nothing and people conclude crafting cannot be tracked. It can." },
-      Seams = new[] {
-        "[ ] CookingStation.RPC_AddFuel — not wired to quests",
-        "[ ] CookingStation.RPC_AddItem — not wired to quests",
-        "[ ] CookingStation.RPC_RemoveDoneItem — not wired to quests",
-        "[ ] Fermenter.RPC_AddItem — not wired to quests",
-        "[x] InventoryGui.DoCrafting — not wired to quests",
-        "[ ] InventoryGui.OnCraftPressed — not wired to quests",
-        "[x] Smelter.OnAddFuel — not wired to quests",
-        "[x] Smelter.OnAddOre — not wired to quests",
-        "[ ] Smelter.RPC_AddFuel — not wired to quests",
-        "[ ] Smelter.RPC_AddOre — not wired to quests",
-        "[ ] Smelter.Spawn — not wired to quests",
+      Spells = new[] {
+        new Spell { Name = "crafting something at a bench", TrueName = "InventoryGui.DoCrafting", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "feeding coal or wood to a smelter", TrueName = "Smelter.OnAddFuel", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "feeding ore to a smelter or kiln", TrueName = "Smelter.OnAddOre", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "a smelter finishing something", TrueName = "Smelter.Spawn", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "feeding a cooking station", TrueName = "CookingStation.RPC_AddFuel", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "fuel reaching the smelter, server-carried", TrueName = "Smelter.RPC_AddFuel", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "ore reaching the smelter, server-carried", TrueName = "Smelter.RPC_AddOre", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "pressing the craft button", TrueName = "InventoryGui.OnCraftPressed", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "putting food on a cooking station", TrueName = "CookingStation.RPC_AddItem", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "starting a fermenter", TrueName = "Fermenter.RPC_AddItem", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "taking cooked food off", TrueName = "CookingStation.RPC_RemoveDoneItem", Verdict = "no quest can be bound to this yet", Bound = false },
       },
     },
     new Page {
@@ -135,17 +152,17 @@ public static class LabJournal {
       What = new[] { "Skills going up, stamina being spent, and dying. The category people ask for", "by name and then cannot find, because the names they ask for do not exist." },
       Try = new[] { "Swing an axe at a tree a few times until the skill-up message appears.", "You will see the skill row fire at the same moment." },
       Watch = new[] { "There is an event for 'a skill went up'. There is no event for 'my skill is", "level 30' — that is a question you can ask, not something the game announces.", "A quest can fire on the first and cannot on the second, and that difference", "catches everybody once.", "Stamina is off by default. It fires when you run, so it buries everything." },
-      Seams = new[] {
-        "[ ] Player.AddStamina — not wired to quests",
-        "[x] Player.OnDeath — not wired to quests",
-        "[ ] Player.RaiseSkill — not wired to quests",
-        "[ ] Player.SetMaxHealth — not wired to quests",
-        "[x] Player.UseStamina — not wired to quests",
-        "[ ] Skills.CheatRaiseSkill — not wired to quests",
-        "[ ] Skills.GetSkillLevel — not wired to quests",
-        "[ ] Skills.LowerAllSkills — not wired to quests",
-        "[ ] Skills.OnDeath — not wired to quests",
-        "[x] Skills.RaiseSkill — not wired to quests",
+      Spells = new[] {
+        new Spell { Name = "a skill going up", TrueName = "Skills.RaiseSkill", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "spending stamina", TrueName = "Player.UseStamina", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "you die", TrueName = "Player.OnDeath", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "a skill going up, asked for by you", TrueName = "Player.RaiseSkill", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a skill raised by console command", TrueName = "Skills.CheatRaiseSkill", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "asking what a skill stands at — a question, not something that happens", TrueName = "Skills.GetSkillLevel", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "regaining stamina", TrueName = "Player.AddStamina", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "skills being lost, as on death", TrueName = "Skills.LowerAllSkills", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "your maximum health changing", TrueName = "Player.SetMaxHealth", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "your skills taking the death penalty", TrueName = "Skills.OnDeath", Verdict = "no quest can be bound to this yet", Bound = false },
       },
     },
     new Page {
@@ -154,12 +171,12 @@ public static class LabJournal {
       What = new[] { "Moving through the world, and the world itself changing state. Small, and it", "contains the most interesting seam nobody has used." },
       Try = new[] { "Take a portal.", "If you are on a world where a boss has been killed, that already fired." },
       Watch = new[] { "Valheim keeps a short list of world-wide flags — which bosses are dead, and", "so what the world allows. That is the nearest thing the game has to a", "server-wide event, which makes it the obvious foundation for a guild-scale", "quest, and nothing has ever built on it." },
-      Seams = new[] {
-        "[x] Player.TeleportTo — not wired to quests",
-        "[ ] WorldGenerator.GetBiome — not wired to quests",
-        "[ ] ZoneSystem.RPC_SetGlobalKey — not wired to quests",
-        "[ ] ZoneSystem.RemoveGlobalKey — not wired to quests",
-        "[x] ZoneSystem.SetGlobalKey — not wired to quests",
+      Spells = new[] {
+        new Spell { Name = "the world recording something, as when a boss falls", TrueName = "ZoneSystem.SetGlobalKey", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "travelling by portal", TrueName = "Player.TeleportTo", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "asking which biome a place is — a question, not something that happens", TrueName = "WorldGenerator.GetBiome", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "the world forgetting something", TrueName = "ZoneSystem.RemoveGlobalKey", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "the world recording something, server-carried", TrueName = "ZoneSystem.RPC_SetGlobalKey", Verdict = "no quest can be bound to this yet", Bound = false },
       },
     },
     new Page {
@@ -168,12 +185,12 @@ public static class LabJournal {
       What = new[] { "Talking, and writing on signs. The quietest category and the one with the", "most room, because it needs nothing from combat at all." },
       Try = new[] { "Say something in chat, then place a sign and write on it." },
       Watch = new[] { "A quest that completes when somebody writes a particular sign, or says a", "phrase somewhere specific, is entirely possible and nobody has written one.", "Community rituals tend to look far more like this than like killing things —", "which is worth remembering when the combat seams are the ones that work." },
-      Seams = new[] {
-        "[ ] Chat.OnNewChatMessage — not wired to quests",
-        "[ ] Chat.RPC_ChatMessage — not wired to quests",
-        "[x] Chat.SendText — not wired to quests",
-        "[x] Sign.SetText — not wired to quests",
-        "[ ] Talker.Say — not wired to quests",
+      Spells = new[] {
+        new Spell { Name = "writing on a sign", TrueName = "Sign.SetText", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "you saying something", TrueName = "Chat.SendText", Verdict = "no quest can be bound to this yet", Bound = true },
+        new Spell { Name = "a message appearing in the chat window", TrueName = "Chat.OnNewChatMessage", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "a message reaching everyone, server-carried", TrueName = "Chat.RPC_ChatMessage", Verdict = "no quest can be bound to this yet", Bound = false },
+        new Spell { Name = "something speaking aloud", TrueName = "Talker.Say", Verdict = "no quest can be bound to this yet", Bound = false },
       },
     },
   };

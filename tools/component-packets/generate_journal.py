@@ -39,7 +39,9 @@ ORDER = ["combat", "harvest", "inventory", "building", "crafting", "progression"
          "world", "social"]
 
 atlas = json.load(open(ATLAS, encoding="utf-8"))
-pages = json.load(open(PAGES, encoding="utf-8"))["pages"]
+_doc = json.load(open(PAGES, encoding="utf-8"))
+pages = _doc["pages"]
+incantations = _doc["incantations"]
 
 # Which seams this build actually hooks, read from the patch sources rather than
 # assumed — the same source of truth check_lab_patches.py uses.
@@ -56,10 +58,10 @@ for s in atlas["Seams"]:
     seams_by_cat.setdefault(s["Category"], {})[s["Id"]] = s["QuestUsable"]
 
 VERDICT_SHORT = {
-    "today": "quests can use this",
-    "produces-event-no-trigger": "fires, but no trigger matches",
-    "lab-candidate": "not wired to quests",
-    "not-patchable": "not reachable",
+    "today": "a quest can be bound to this",
+    "produces-event-no-trigger": "the world speaks, but no quest is listening",
+    "lab-candidate": "no quest can be bound to this yet",
+    "not-patchable": "beyond reach",
 }
 
 
@@ -79,9 +81,13 @@ lines = [
     "",
     "using System.Collections.Generic;",
     "",
-    "/// <summary>One page per category: what it covers, something to go and do, and the",
-    "/// thing that would otherwise cost an hour. Seam lists come from the atlas, so a page",
-    "/// cannot promise something the game does not have.</summary>",
+    "/// <summary>The tome. One page per school: what it covers, something to go and try,",
+    "/// and the thing that would otherwise cost an hour.",
+    "///",
+    "/// Every spell listed is something the world genuinely answers to — the list is",
+    "/// joined from the atlas at generation time, so a page cannot name something the game",
+    "/// does not do. Spells this build can witness are listed first, because those are the",
+    "/// ones a student can go and see.</summary>",
     "public static class LabJournal {",
     "  public sealed class Page {",
     "    public string Category;",
@@ -89,10 +95,23 @@ lines = [
     "    public string[] What;",
     "    public string[] Try;",
     "    public string[] Watch;",
-    "    /// <summary>\"[x] TreeBase.Damage — quests can use this\". The [x] means this",
-    "    /// build hooks it; [ ] means the seam exists in the game and the lab is not",
-    "    /// showing it to you.</summary>",
-    "    public string[] Seams;",
+    "    public Spell[] Spells;",
+    "  }",
+    "",
+    "  /// <summary>One thing the world answers to.",
+    "  ///",
+    "  /// <see cref=\"Name\"/> is what it is, in words. <see cref=\"TrueName\"/> is the method",
+    "  /// a mod would have to reach for — shown only when asked, because a student does not",
+    "  /// need to know how a spell works in order to cast one. Knowing a thing's true name",
+    "  /// is what gives you power over it, and here that is not a metaphor: the true name",
+    "  /// is literally what you would write code against.</summary>",
+    "  public sealed class Spell {",
+    "    public string Name;",
+    "    public string TrueName;",
+    "    public string Verdict;",
+    "    /// <summary>True when this build will show it to you. False means the world does",
+    "    /// this and the tome cannot yet witness it.</summary>",
+    "    public bool Bound;",
     "  }",
     "",
     "  public static readonly List<Page> Pages = new List<Page> {",
@@ -104,9 +123,9 @@ for cat in ORDER:
     seams = seams_by_cat.get(cat, {})
     total_seams += len(seams)
     rows = []
-    for seam_id in sorted(seams):
-        mark = "[x]" if seam_id in hooked else "[ ]"
-        rows.append(f"{mark} {seam_id} — {VERDICT_SHORT[seams[seam_id]]}")
+    for seam_id in sorted(seams, key=lambda s: (s not in hooked, incantations.get(s, s))):
+        rows.append((incantations.get(seam_id, seam_id), seam_id,
+                     VERDICT_SHORT[seams[seam_id]], seam_id in hooked))
 
     lines.append("    new Page {")
     lines.append(f"      Category = {CATEGORY_CONST[cat]},")
@@ -114,10 +133,10 @@ for cat in ORDER:
     for field, key in (("What", "what"), ("Try", "try"), ("Watch", "watch")):
         body = ", ".join(cs(l) for l in page[key])
         lines.append(f"      {field} = new[] {{ {body} }},")
-    seam_body = ",\n        ".join(cs(r) for r in rows) if rows else ""
-    lines.append("      Seams = new[] {")
-    if seam_body:
-        lines.append("        " + seam_body + ",")
+    lines.append("      Spells = new[] {")
+    for name, true_name, verdict, bound in rows:
+        lines.append(f"        new Spell {{ Name = {cs(name)}, TrueName = {cs(true_name)}, "
+                     f"Verdict = {cs(verdict)}, Bound = {str(bound).lower()} }},")
     lines.append("      },")
     lines.append("    },")
 
@@ -141,4 +160,4 @@ with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
     fh.write("\n".join(lines))
 
 print(f"  {OUT}")
-print(f"  {len(ORDER)} pages, {total_seams} seams listed, {len(hooked)} hooked by this build")
+print(f"  {len(ORDER)} pages, {total_seams} spells named, {len(hooked)} bound by this build")
