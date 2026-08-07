@@ -1,0 +1,112 @@
+{
+  "schema": "comfy-known-hooks/v1",
+  "_what_this_is": [
+    "Which Valheim methods a Baseline mod actually Harmony-patches today, and what",
+    "event each patch produces. The event atlas joins this in so a seam can say",
+    "whether a quest can fire on it, instead of leaving the reader to guess.",
+    "",
+    "Every row was read from the named source file, not remembered. When a patch",
+    "moves, update the source reference in the same commit -- a stale row here is",
+    "worse than a missing one, because the atlas presents it as fact."
+  ],
+  "mods": {
+    "ComfyNetworkSense": {
+      "state": "shipping",
+      "note": "The production telemetry mod. Hooks exactly three Character methods."
+    },
+    "ComfyControlSurface": {
+      "state": "retired",
+      "note": "Pruned 2026-07-21, preserved in the public comfy archive. Its harvest hooks are the proof that tree/bush triggers work; they are not installed today."
+    }
+  },
+  "hooks": [
+    {
+      "type": "Character",
+      "method": "Damage",
+      "parameters": ["HitData"],
+      "kind": "postfix",
+      "mod": "ComfyNetworkSense",
+      "source": "network/mod/ComfyNetworkSense/Patches/GameplayEventPatches.cs:26",
+      "produces": ["first_hit"],
+      "note": "Client-owned melee. Paired with RPC_Damage so both ownership paths are seen."
+    },
+    {
+      "type": "Character",
+      "method": "RPC_Damage",
+      "parameters": ["Int64", "HitData"],
+      "kind": "postfix",
+      "mod": "ComfyNetworkSense",
+      "source": "network/mod/ComfyNetworkSense/Patches/GameplayEventPatches.cs:26",
+      "produces": ["first_hit"],
+      "note": "Server-routed damage. First player-attributed hit inside a 30s window."
+    },
+    {
+      "type": "Character",
+      "method": "OnDeath",
+      "parameters": [],
+      "kind": "postfix",
+      "mod": "ComfyNetworkSense",
+      "source": "network/mod/ComfyNetworkSense/Patches/GameplayEventPatches.cs:26",
+      "produces": ["killing_blow", "weapon_used", "quest_completed"],
+      "note": "The reliable kill signal. IsDead() is still false at a Damage postfix, proven live -- which is why the retired mod's IsDead()-at-damage approach was replaced."
+    },
+    {
+      "type": "TreeBase",
+      "method": "Damage",
+      "parameters": ["HitData"],
+      "kind": "postfix",
+      "mod": "ComfyControlSurface",
+      "source": "comfy/handoffs/comfy-control-surface/Patches/QuestTriggerPatches.cs:17",
+      "produces": ["hit:tree"],
+      "note": "Retired. Fed OnLocalPlayerHit(\"tree\", name, hit)."
+    },
+    {
+      "type": "TreeLog",
+      "method": "Damage",
+      "parameters": ["HitData"],
+      "kind": "postfix",
+      "mod": "ComfyControlSurface",
+      "source": "comfy/handoffs/comfy-control-surface/Patches/QuestTriggerPatches.cs:18",
+      "produces": ["hit:tree"],
+      "note": "Retired. A felled trunk is a separate type from a standing tree."
+    },
+    {
+      "type": "Destructible",
+      "method": "Damage",
+      "parameters": ["HitData"],
+      "kind": "postfix",
+      "mod": "ComfyControlSurface",
+      "source": "comfy/handoffs/comfy-control-surface/Patches/QuestTriggerPatches.cs:19",
+      "produces": ["hit:destructible"],
+      "note": "Retired. This is the bush. isBush = name contains 'bush' or 'shrub'."
+    },
+    {
+      "type": "GameCamera",
+      "method": "UpdateMouseCapture",
+      "parameters": [],
+      "kind": "postfix",
+      "mod": "ComfyNetworkSense",
+      "source": "network/mod/ComfyNetworkSense/Patches/PanelInputPatches.cs:14",
+      "produces": [],
+      "note": "UI plumbing, not a gameplay seam. Listed so the atlas does not report it as unhooked."
+    },
+    {
+      "type": "Character",
+      "method": "TakeInput",
+      "parameters": [],
+      "kind": "postfix",
+      "mod": "ComfyNetworkSense",
+      "source": "network/mod/ComfyNetworkSense/Patches/PanelInputPatches.cs:20",
+      "produces": [],
+      "note": "UI plumbing. Forces false while a panel is open so clicks do not swing a weapon."
+    }
+  ],
+  "evaluator": {
+    "_note": "What QuestTriggerEvaluator will actually match, as of the read below.",
+    "source": "network/mod/ComfyNetworkSense/Core/Services/QuestTriggerEvaluator.cs:59",
+    "matches_trigger_events": ["kill"],
+    "parsed_but_dead": ["hit"],
+    "dead_targets": ["tree_or_bush", "tree", "bush"],
+    "note": "TrackedQuest and QuestViewLoader parse the hit vocabulary; the evaluator hard-gates on kill, so authoring a hit quest today produces no error and no event."
+  }
+}

@@ -9,15 +9,20 @@ using Mono.Cecil.Cil;
 //   dotnet run -- <dll> <ComponentName> [out.json]   one packet
 //   dotnet run -- <dll> --all [atlas.json]           every MonoBehaviour-derived
 //                                                    type + global ZDO/RPC indexes
+//   dotnet run -- <dll> --events [atlas.json]        quest-trigger seams, categorised,
+//                                                    joined against known-hooks.json
 
 string assemblyPath = args.Length > 0
     ? args[0]
     : @"C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\assembly_valheim.dll";
 string targetTypeName = args.Length > 1 ? args[1] : "Fireplace";
 bool sweep = targetTypeName == "--all";
+bool events = targetTypeName == "--events";
 string outputPath = args.Length > 2
     ? args[2]
-    : sweep ? "valheim-component-atlas.json" : $"{targetTypeName.ToLowerInvariant()}-packet.json";
+    : sweep ? "valheim-component-atlas.json"
+    : events ? "valheim-event-atlas.json"
+    : $"{targetTypeName.ToLowerInvariant()}-packet.json";
 
 var module = ModuleDefinition.ReadModule(assemblyPath);
 
@@ -46,6 +51,12 @@ if (zdoVarsType != null)
 Console.WriteLine($"ZDOVars map: {zdoVarKeys.Count} keys");
 
 var jsonOpts = new JsonSerializerOptions { WriteIndented = true };
+
+if (events)
+{
+    EmitEventAtlas();
+    return;
+}
 
 if (!sweep)
 {
@@ -103,6 +114,167 @@ var atlas = new
 File.WriteAllText(outputPath, JsonSerializer.Serialize(atlas, jsonOpts));
 Console.WriteLine($"Wrote {outputPath}: {components.Count} components, " +
                   $"{zdoIndex.Count} ZDO keys indexed, {rpcIndex.Count} RPC names");
+
+// --- events: quest-trigger seams, categorised, joined against known-hooks.json ---
+//
+// What is VERIFIED here is read straight from the assembly: the type exists, the
+// method exists, its signature, whether it has a body a Harmony postfix could attach
+// to. What is DERIVED is the category and the usability verdict -- those come from the
+// rule table below, which is a judgement about what a quest builder would want, not a
+// fact about the game. Both are labelled per row, per the confidence contract in
+// docs/guides/custom-fields/STARTHERE.md.
+void EmitEventAtlas()
+{
+    // (category, declaring types, method names). A seam matches when both sides hit.
+    // Type matters as much as the method: Character.Damage is combat, TreeBase.Damage
+    // is harvest, and calling both "Damage" is exactly the confusion this table exists
+    // to remove.
+    var rules = new (string Category, string[] Types, string[] Methods)[]
+    {
+        ("combat", ["Character", "Humanoid", "Player"],
+            ["Damage", "RPC_Damage", "OnDeath", "RPC_Stagger", "Stagger", "Heal", "RPC_Heal",
+             "BlockAttack", "RPC_DamageText", "SetHealth", "AddStaggerDamage"]),
+        ("harvest", ["TreeBase", "TreeLog", "Destructible", "MineRock", "MineRock5", "Pickable"],
+            ["Damage", "RPC_Damage", "RPC_Pick", "Pick", "Interact", "RPC_SetPicked", "SetPicked"]),
+        ("inventory", ["Humanoid", "Player", "Inventory", "ItemDrop", "Container"],
+            ["Pickup", "AddItem", "RemoveItem", "EquipItem", "UnequipItem", "RPC_AddItem",
+             "RPC_RequestOwn", "TakeAll", "RPC_RequestTakeAll", "DropItem", "ConsumeItem"]),
+        ("building", ["Player", "Piece", "WearNTear"],
+            ["PlacePiece", "RPC_MakePiece", "Repair", "RPC_Repair", "RPC_Remove", "Remove",
+             "Destroy", "ApplyDamage", "RemovePiece"]),
+        ("crafting", ["InventoryGui", "CraftingStation", "Smelter", "Fermenter", "CookingStation"],
+            ["DoCrafting", "OnCraftPressed", "RPC_AddOre", "RPC_AddFuel", "Spawn", "RPC_AddItem",
+             "RPC_RemoveDoneItem", "OnAddOre", "OnAddFuel"]),
+        ("progression", ["Skills", "Player"],
+            ["RaiseSkill", "ModifyRaiseSkill", "GetSkillLevel", "UseStamina", "AddStamina",
+             "OnDeath", "SetMaxHealth", "LowerAllSkills", "CheatRaiseSkill"]),
+        ("world", ["Player", "ZoneSystem", "Game", "WorldGenerator"],
+            ["TeleportTo", "RPC_TeleportTo", "SetGlobalKey", "RPC_SetGlobalKey", "GetBiome",
+             "RemoveGlobalKey"]),
+        ("social", ["Chat", "Sign", "Talker"],
+            ["SendText", "RPC_ChatMessage", "Say", "SetText", "RPC_SetText", "OnNewChatMessage"]),
+    };
+
+    // known-hooks.json sits next to this source; dotnet run's cwd is the caller's.
+    var hookCandidates = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), "known-hooks.json"),
+        Path.Combine(Directory.GetCurrentDirectory(), "tools", "component-packets", "known-hooks.json"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "known-hooks.json"),
+    };
+    string? hooksPath = hookCandidates.FirstOrDefault(File.Exists);
+    var hooked = new Dictionary<string, (string Mod, string State, string[] Produces, string Source)>(StringComparer.Ordinal);
+    string evaluatorMatches = "unknown";
+    if (hooksPath != null)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(hooksPath));
+        var mods = doc.RootElement.GetProperty("mods");
+        foreach (var h in doc.RootElement.GetProperty("hooks").EnumerateArray())
+        {
+            string mod = h.GetProperty("mod").GetString()!;
+            string state = mods.TryGetProperty(mod, out var m) ? m.GetProperty("state").GetString()! : "unknown";
+            hooked[$"{h.GetProperty("type").GetString()}.{h.GetProperty("method").GetString()}"] =
+                (mod, state,
+                 h.GetProperty("produces").EnumerateArray().Select(p => p.GetString()!).ToArray(),
+                 h.GetProperty("source").GetString()!);
+        }
+        evaluatorMatches = string.Join(",", doc.RootElement.GetProperty("evaluator")
+            .GetProperty("matches_trigger_events").EnumerateArray().Select(e => e.GetString()));
+        Console.WriteLine($"known-hooks.json: {hooked.Count} hooks from {hooksPath}");
+    }
+    else
+    {
+        Console.WriteLine("! known-hooks.json not found — every seam will read as unhooked.");
+    }
+
+    var seams = new List<Seam>();
+    var unmatched = new List<string>();
+
+    foreach (var (category, typeNames, methodNames) in rules)
+    {
+        foreach (var typeName in typeNames)
+        {
+            var type = module.Types.FirstOrDefault(t => t.Name == typeName);
+            if (type == null) { unmatched.Add($"{category}: type {typeName} not in assembly"); continue; }
+
+            foreach (var methodName in methodNames)
+            {
+                var overloads = type.Methods.Where(m => m.Name == methodName).ToList();
+                if (overloads.Count == 0) continue;   // a rule may legitimately over-reach
+
+                foreach (var method in overloads)
+                {
+                    string id = $"{typeName}.{methodName}";
+                    hooked.TryGetValue(id, out var hook);
+                    bool patchable = method.HasBody && !method.IsAbstract;
+
+                    // Derived, not read: a seam is usable by a quest today only when the
+                    // shipping mod hooks it AND the evaluator matches something it produces.
+                    string usable =
+                        !patchable ? "not-patchable"
+                        : hook.Mod == null ? "lab-candidate"
+                        : hook.State != "shipping" ? "lab-candidate"
+                        : hook.Produces.Length == 0 ? "lab-candidate"
+                        : hook.Produces.Any(p => p == "quest_completed") ? "today"
+                        : "produces-event-no-trigger";
+
+                    seams.Add(new Seam(
+                        id,
+                        typeName,
+                        methodName,
+                        $"{Short(method.ReturnType)} {methodName}({string.Join(", ", method.Parameters.Select(p => Short(p.ParameterType)))})",
+                        method.IsPublic ? "public" : method.IsFamily ? "protected" : method.IsAssembly ? "internal" : "private",
+                        method.IsStatic,
+                        method.IsVirtual,
+                        patchable,
+                        category,
+                        "verified:assembly",
+                        "derived:rule-table",
+                        hook.Mod,
+                        hook.State,
+                        hook.Produces ?? [],
+                        hook.Source,
+                        usable));
+                }
+            }
+        }
+    }
+
+    seams.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
+    var byCategory = seams.GroupBy(s => s.Category)
+        .ToDictionary(g => g.Key, g => new
+        {
+            Seams = g.Count(),
+            Patchable = g.Count(s => s.Patchable),
+            HookedToday = g.Count(s => s.HookedByState == "shipping"),
+            QuestUsableToday = g.Count(s => s.QuestUsable == "today"),
+        });
+
+    var atlas = new
+    {
+        Schema = "comfy-event-atlas/v1",
+        Source = $"assembly_valheim.dll (Steam client install, extracted {DateTime.Now:yyyy-MM-dd})",
+        Assembly = assemblyPath,
+        KnownHooks = hooksPath,
+        EvaluatorMatchesTriggerEvents = evaluatorMatches,
+        Provenance = new
+        {
+            Verified = "type, method, signature, visibility, and whether a body exists — read from the assembly",
+            Derived = "category and quest_usable — applied from the rule table in Program.cs, a judgement not a fact",
+        },
+        SeamCount = seams.Count,
+        Categories = byCategory,
+        RulesThatMatchedNothing = unmatched,
+        Seams = seams,
+    };
+    File.WriteAllText(outputPath, JsonSerializer.Serialize(atlas, jsonOpts));
+
+    Console.WriteLine($"Wrote {outputPath}: {seams.Count} seams across {byCategory.Count} categories");
+    foreach (var (cat, stats) in byCategory.OrderBy(k => k.Key))
+        Console.WriteLine($"  {cat,-12} {stats.Seams,3} seams  {stats.Patchable,3} patchable  " +
+                          $"{stats.HookedToday,2} hooked  {stats.QuestUsableToday,2} quest-usable today");
+    foreach (var u in unmatched) Console.WriteLine($"  ! {u}");
+}
 
 bool DerivesFromMonoBehaviour(TypeDefinition type)
 {
@@ -222,8 +394,26 @@ Packet AnalyzeType(TypeDefinition target)
 static string Short(TypeReference t) => t.Name switch
 {
     "Single" => "float", "Int32" => "int", "Int64" => "long", "Boolean" => "bool",
-    "String" => "string", "Double" => "double", _ => t.Name
+    "String" => "string", "Double" => "double", "Void" => "void", _ => t.Name
 };
+
+record Seam(
+    string Id,
+    string DeclaringType,
+    string Method,
+    string Signature,
+    string Visibility,
+    bool IsStatic,
+    bool IsVirtual,
+    bool Patchable,
+    string Category,
+    string ExistenceProvenance,
+    string CategoryProvenance,
+    string? HookedBy,
+    string? HookedByState,
+    string[] Produces,
+    string? HookSource,
+    string QuestUsable);
 
 record FieldInfo(string Name, string Type, string DeclaredBy);
 record ZdoAccess(string Key, string Access, string ValueType, string Method);
