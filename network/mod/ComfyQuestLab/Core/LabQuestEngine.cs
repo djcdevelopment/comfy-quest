@@ -51,6 +51,26 @@ public static class LabQuestEngine {
   /// detail goes to <see cref="LastReport"/> and the log, because a multi-line block pushed
   /// through MessageHud is unreadable.</summary>
   public static string Reload() {
+    // Wrapped whole, and this is not belt-and-braces: Awake calls Reload, so anything that
+    // escapes here costs the entire mod rather than the quest lane -- no console, no panel, no
+    // seams, on a plugin whose whole job is to be the thing that does not break your game. The
+    // file a creator hand-edited is the least trustworthy input in the build, and it is read
+    // before there is any UI to report a failure through.
+    try {
+      return ReloadCore();
+    } catch (Exception ex) {
+      _set = new LabQuestSet();
+      _evaluator = new QuestTriggerEvaluator(CooldownSeconds());
+      _lastReport = new List<string> {
+        "the quest lane failed to load: " + ex.Message,
+        "The rest of the lab is unaffected. Fix the file and run lab_reload.",
+      };
+      ComfyQuestLab.LogInfo("[quests] reload failed: " + ex);
+      return "quest reload failed — see the Quests tab.";
+    }
+  }
+
+  static string ReloadCore() {
     LabQuestSet previous = _set;
     var report = new List<string>();
 
