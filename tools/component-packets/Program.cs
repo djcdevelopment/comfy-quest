@@ -11,6 +11,15 @@ using Mono.Cecil.Cil;
 //                                                    type + global ZDO/RPC indexes
 //   dotnet run -- <dll> --events [atlas.json]        quest-trigger seams, categorised,
 //                                                    joined against known-hooks.json
+//   dotnet run -- <dll> --field <Type>.<field>       who reads/writes one field, and the
+//                                                    branch each reader takes on it
+//
+// --field answers "what does this flag actually DO", which the packet cannot: a packet
+// reports that m_noSupportWear exists and is a bool. It took a gallery collapsing three
+// times to find out that WearNTear.UpdateWear only reaches its support damage when that
+// flag is TRUE -- the field is an opt-in wearing a name that reads like an opt-out, and
+// the hand-written annotation over it said "Disables". Shapes are extracted and reliable;
+// behaviour is narrated and is not. This mode reads the branch instead.
 
 string assemblyPath = args.Length > 0
     ? args[0]
@@ -18,6 +27,7 @@ string assemblyPath = args.Length > 0
 string targetTypeName = args.Length > 1 ? args[1] : "Fireplace";
 bool sweep = targetTypeName == "--all";
 bool events = targetTypeName == "--events";
+bool fieldProbe = targetTypeName == "--field";
 string outputPath = args.Length > 2
     ? args[2]
     : sweep ? "valheim-component-atlas.json"
@@ -55,6 +65,12 @@ var jsonOpts = new JsonSerializerOptions { WriteIndented = true };
 if (events)
 {
     EmitEventAtlas();
+    return;
+}
+
+if (fieldProbe)
+{
+    ProbeField(args.Length > 2 ? args[2] : "");
     return;
 }
 
@@ -114,6 +130,99 @@ var atlas = new
 File.WriteAllText(outputPath, JsonSerializer.Serialize(atlas, jsonOpts));
 Console.WriteLine($"Wrote {outputPath}: {components.Count} components, " +
                   $"{zdoIndex.Count} ZDO keys indexed, {rpcIndex.Count} RPC names");
+
+// --- field probe: what does one field actually gate? ---
+//
+// Prints every read of the field and, where the read is immediately branched on, the
+// block of IL that branch skips. That block IS the answer: if the damage only sits on one
+// side of a `brfalse`, then the flag is an opt-in no matter what its name says.
+void ProbeField(string spec)
+{
+    int dot = spec.LastIndexOf('.');
+    if (dot <= 0)
+    {
+        Console.WriteLine("usage: --field <Type>.<field>    e.g. --field WearNTear.m_noSupportWear");
+        return;
+    }
+    string typeName = spec[..dot];
+    string fieldName = spec[(dot + 1)..];
+
+    var probeType = module.Types.FirstOrDefault(t => t.Name == typeName);
+    if (probeType == null) { Console.WriteLine($"Type '{typeName}' not found."); return; }
+
+    var probeField = probeType.Fields.FirstOrDefault(f => f.Name == fieldName);
+    if (probeField == null)
+    {
+        Console.WriteLine($"Field '{fieldName}' not found on {typeName}. It has:");
+        foreach (var f in probeType.Fields.OrderBy(f => f.Name, StringComparer.Ordinal))
+            Console.WriteLine($"  {f.Name} : {Short(f.FieldType)}");
+        return;
+    }
+
+    Console.WriteLine($"{typeName}.{fieldName} : {Short(probeField.FieldType)}");
+    Console.WriteLine();
+
+    var writers = new SortedSet<string>(StringComparer.Ordinal);
+    var reads = new List<string>();
+
+    foreach (var m in probeType.Methods)
+    {
+        if (!m.HasBody) continue;
+        var instrs = m.Body.Instructions;
+        for (int i = 0; i < instrs.Count; i++)
+        {
+            if (instrs[i].Operand is not FieldReference fr || fr.Name != fieldName) continue;
+            var op = instrs[i].OpCode;
+            if (op == OpCodes.Stfld || op == OpCodes.Stsfld) { writers.Add(m.Name); continue; }
+            if (op != OpCodes.Ldfld && op != OpCodes.Ldflda && op != OpCodes.Ldsfld) continue;
+            reads.Add(DescribeRead(m, i, fieldName));
+        }
+    }
+
+    Console.WriteLine(writers.Count == 0
+        ? "written by: nothing in this type -- it is set on the prefab, in the inspector"
+        : "written by: " + string.Join(", ", writers));
+    Console.WriteLine();
+    if (reads.Count == 0) { Console.WriteLine("read by: nothing -- this field is inert here"); return; }
+    Console.WriteLine("read by:");
+    foreach (var r in reads) Console.WriteLine(r);
+}
+
+string DescribeRead(MethodDefinition m, int index, string fieldName)
+{
+    var instrs = m.Body.Instructions;
+    var instr = instrs[index];
+    var next = index + 1 < instrs.Count ? instrs[index + 1] : null;
+    var sb = new System.Text.StringBuilder();
+    sb.Append($"  {m.Name} @ IL_{instr.Offset:x4}");
+
+    bool skipOnFalse = next != null && (next.OpCode == OpCodes.Brfalse || next.OpCode == OpCodes.Brfalse_S);
+    bool skipOnTrue = next != null && (next.OpCode == OpCodes.Brtrue || next.OpCode == OpCodes.Brtrue_S);
+    if ((!skipOnFalse && !skipOnTrue) || next!.Operand is not Instruction target)
+    {
+        sb.Append("   value used in an expression, not branched on directly");
+        return sb.ToString();
+    }
+
+    sb.AppendLine($"   {(skipOnFalse ? "FALSE" : "TRUE")} jumps past IL_{target.Offset:x4}, skipping:");
+    int shown = 0;
+    for (var cursor = next.Next; cursor != null && cursor.Offset < target.Offset; cursor = cursor.Next)
+    {
+        if (shown++ == 14) { sb.AppendLine("        ... (truncated)"); break; }
+        string operand = cursor.Operand switch
+        {
+            FieldReference f => f.Name,
+            MethodReference mr => mr.Name,
+            Instruction ins => $"IL_{ins.Offset:x4}",
+            string s => "\"" + s + "\"",
+            null => "",
+            _ => cursor.Operand.ToString() ?? ""
+        };
+        sb.AppendLine($"        {cursor.OpCode,-12} {operand}");
+    }
+    sb.Append($"      => that block runs ONLY when {fieldName} is {(skipOnFalse ? "TRUE" : "FALSE")}");
+    return sb.ToString();
+}
 
 // --- events: quest-trigger seams, categorised, joined against known-hooks.json ---
 //

@@ -27,6 +27,10 @@ dotnet run -- "C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Dat
 #     global cross-indexes (ZDO key -> readers/writers, RPC name -> registrars)
 dotnet run -- "<dll>" --all valheim-component-atlas.json
 
+# 1c. Or ask what one field actually GATES: every read of it, and the block of
+#     IL each branch skips. Use this before believing any description of a flag.
+dotnet run -- "<dll>" --field WearNTear.m_noSupportWear
+
 # 2. Draft the description column with any LLM — see annotation-prompt.md —
 #    then human-review the rows the model flagged with "(?)".
 
@@ -46,6 +50,18 @@ Two provenance levels are mixed in a dictionary and must stay labeled:
   mechanically from the assembly by this tool.
 - Descriptions: **drafted** — LLM output for a human editor. `(?)` marks the
   model's own low-confidence guesses; they are the review queue.
+
+A drafted description can be confidently, unmarked, and exactly **backwards**.
+`WearNTear.m_noSupportWear` was annotated "Disables damage and collapse caused
+by lack of structural support". It does the opposite: `UpdateWear` reaches the
+support damage only when the flag is `true`, so it is an opt-in wearing a name
+that reads like an opt-out. Nothing carried a `(?)`, because the model was not
+unsure — it was wrong, and the name agreed with it. That cost three rounds of a
+gallery falling down before anyone read the branch.
+
+So: a negated boolean name (`m_no*`) is a coin flip on polarity, and the
+description is not a tiebreaker. Run `--field <Type>.<name>` and read the IL
+before writing behaviour into a dictionary, or before setting the flag in a mod.
 
 ## Samples
 
