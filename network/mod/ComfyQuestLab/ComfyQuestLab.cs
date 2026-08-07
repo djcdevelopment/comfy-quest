@@ -63,7 +63,10 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     }
 
     _harmony = new Harmony(PluginGuid);
+    CombatPatches.Apply(_harmony);
     HarvestPatches.Apply(_harmony);
+    InventoryPatches.Apply(_harmony);
+    ProgressionPatches.Apply(_harmony);
     LabPanelInputPatches.Apply(_harmony);
 
     RegisterConsoleCommands();
@@ -226,6 +229,7 @@ public static class LabConfig {
   public static ConfigEntry<KeyboardShortcut> PanelShortcut { get; private set; }
   public static ConfigEntry<int> ConsoleRows { get; private set; }
   public static ConfigEntry<bool> VerboseLogging { get; private set; }
+  public static ConfigEntry<bool> ObserveStamina { get; private set; }
 
   public static void Bind(ConfigFile config) {
     Enabled =
@@ -261,5 +265,16 @@ public static class LabConfig {
             false,
             "Default OFF. ON = every observed event is also written to the BepInEx log. "
             + "Useful when you want a transcript to paste into a thread; noisy in combat.");
+
+    ObserveStamina =
+        config.Bind(
+            "Lab",
+            "observeStamina",
+            false,
+            "Default OFF, and read once at startup rather than live. Player.UseStamina "
+            + "fires on nearly every action including running, so it drowns the console. "
+            + "Turn it on to see the shape of a stamina event, then turn it off again. "
+            + "Changing this needs a game restart, because it decides whether the patch "
+            + "is applied at all.");
   }
 }

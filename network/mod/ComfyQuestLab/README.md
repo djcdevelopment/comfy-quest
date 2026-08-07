@@ -5,9 +5,10 @@
 Install it on your own world, hit something, and watch the game tell you what it just
 did — and whether a quest could actually fire on it.
 
-> **Scaffold.** The console works and the harvest category is wired end to end. Seven of
-> the eight categories are not hooked yet, the journal is a stub, and there is no
-> download. This README describes what is here, not what is planned.
+> **Scaffold.** The console works and four of the eight categories are wired — harvest,
+> combat, inventory and progression. Building, crafting, world and social are not hooked
+> yet, the journal is a stub, and there is no download. Nothing here has been verified in
+> game. This README describes what is here, not what is planned.
 
 ## Why this exists
 
@@ -78,8 +79,10 @@ and pausing drops nothing — the ring keeps collecting behind it.
 | `panelShortcut` | `F6` | F7 is taken by the retired control surface. `None` = console commands only. |
 | `consoleRows` | `18` | Rows on screen; the ring holds 8× that so you can scroll back. |
 | `verboseLogging` | `false` | Also write every event to the BepInEx log. Noisy in combat, good for pasting into a thread. |
+| `observeStamina` | `false` | `Player.UseStamina` fires on nearly every action including running. Turn it on to see the shape, then off again. **Needs a restart** — it decides whether the patch applies at all. |
 
-All hot-reloadable — every read is live, so `Config.Reload()` lands on the next frame.
+Hot-reloadable except `observeStamina` — every other read is live, so `Config.Reload()`
+lands on the next frame.
 
 ## For the next person to work on it
 
