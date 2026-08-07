@@ -1,0 +1,423 @@
+namespace ComfyQuestLab;
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+
+using HarmonyLib;
+
+using UnityEngine;
+
+/// <summary>Builds a PlanBuild-format blueprint in the world, and takes it down again.
+///
+/// Like the gallery, this changes the world and therefore only ever moves when a person
+/// types a command. Unlike the gallery, the structure is not compiled in: blueprints are
+/// .blueprint files in the mod's config directory, which is what lets a community
+/// blueprint — or an offline generator's Fallingwater — reach the world without anyone
+/// rebuilding a DLL.
+///
+/// Four commands, in the order you should use them:
+///
+///   list    what is in the blueprints directory.
+///   check   parse one file, resolve every prefab it names, place nothing. A blueprint
+///           downloaded from the internet is exactly the input to distrust; build
+///           refuses to run past a failed check.
+///   build   raise it at your feet, spread across frames so the game does not hitch.
+///   clear   take it down. No manifest: every piece carries the blueprint's name in its
+///           own ZDO, and clear sweeps the loaded ZDO table for that mark. Ids are
+///           session-scoped; the mark is not — this survives any number of restarts.
+///
+/// Placement is origin-relative at the player's position with one ground sample: a house
+/// keeps its own internal levels, so the blueprint's lowest piece is set just above the
+/// ground under your feet and everything else rides at its authored offset. On a slope
+/// that means buried or floating edges — pick flat ground.</summary>
+public sealed class LabBlueprintBuilder {
+  const float GroundClearance = 0.3f;
+
+  static readonly AccessTools.FieldRef<ZDOMan, Dictionary<ZDOID, ZDO>> _objectsByIdRef =
+      AccessTools.FieldRefAccess<ZDOMan, Dictionary<ZDOID, ZDO>>("m_objectsByID");
+
+  bool _running;
+
+  public bool IsRunning { get { return _running; } }
+
+  static string BlueprintsDir {
+    get {
+      return Path.Combine(BepInEx.Paths.ConfigPath,
+          Path.Combine("comfy-quest-lab", "blueprints"));
+    }
+  }
+
+  // ---- list ------------------------------------------------------------------------
+
+  public string List() {
+    try {
+      if (!Directory.Exists(BlueprintsDir)) {
+        Directory.CreateDirectory(BlueprintsDir);
+        return "no blueprints yet. Drop .blueprint files (PlanBuild format) into\n  "
+            + BlueprintsDir;
+      }
+      string[] files = Directory.GetFiles(BlueprintsDir, "*.blueprint");
+      if (files.Length == 0) {
+        return "no blueprints yet. Drop .blueprint files (PlanBuild format) into\n  "
+            + BlueprintsDir;
+      }
+      Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+      var sb = new StringBuilder();
+      sb.AppendLine(files.Length + " blueprint(s) in " + BlueprintsDir + ":");
+      foreach (string f in files) {
+        sb.AppendLine("  " + Path.GetFileNameWithoutExtension(f));
+      }
+      sb.Append("questlab_blueprint check <name> comes before build, always.");
+      return sb.ToString();
+    } catch (Exception ex) {
+      return "could not list blueprints: " + ex.Message;
+    }
+  }
+
+  // ---- check -----------------------------------------------------------------------
+
+  public string Check(string name) {
+    BlueprintFile bp;
+    List<string> problems;
+    string fail = Load(name, out bp, out problems);
+    if (fail != null) {
+      return fail;
+    }
+    if (ZNetScene.instance == null) {
+      return "not in a world yet — load a world first.";
+    }
+
+    List<string> missing;
+    Dictionary<string, GameObject> prefabs = ResolvePrefabs(bp, out missing);
+
+    var sb = new StringBuilder();
+    sb.AppendLine("blueprint check — " + CanonicalName(name)
+        + (bp.Name != null ? " (\"" + bp.Name + "\")" : ""));
+    sb.AppendLine("  " + bp.BuildablePieceCount + " buildable piece(s), "
+        + prefabs.Count + " distinct prefab(s), footprint "
+        + (bp.MaxX - bp.MinX).ToString("0.#") + " x " + (bp.MaxZ - bp.MinZ).ToString("0.#")
+        + " m, " + (bp.MaxY - bp.MinY).ToString("0.#") + " m tall.");
+    if (bp.ScaleRejectedCount > 0) {
+      sb.AppendLine("  " + bp.ScaleRejectedCount + " piece(s) carry a non-unit scale and "
+          + "will be SKIPPED — vanilla pieces do not scale, and a silently unscaled "
+          + "piece is a wrong building.");
+    }
+    if (bp.SnapPointCount > 0 || bp.TerrainOpCount > 0) {
+      sb.AppendLine("  ignoring " + bp.SnapPointCount + " snap point(s) and "
+          + bp.TerrainOpCount + " terrain op(s) — the lab does not shape terrain.");
+    }
+    foreach (string p in problems) {
+      sb.AppendLine("  parse: " + p);
+    }
+    if (missing.Count > 0) {
+      sb.AppendLine("MISSING (this game build has no prefab by these names):");
+      foreach (string m in missing) {
+        sb.AppendLine("  " + m);
+      }
+      sb.AppendLine("Find the right name with: questlab_prefabs <part of the name>");
+      sb.Append("Not ready — build will refuse until the names resolve.");
+    } else {
+      sb.Append("Ready. questlab_blueprint build " + CanonicalName(name));
+    }
+    return sb.ToString();
+  }
+
+  // ---- build -----------------------------------------------------------------------
+
+  public IEnumerator Build(MonoBehaviour host, string name) {
+    if (_running) {
+      Report("already building.");
+      yield break;
+    }
+
+    BlueprintFile bp;
+    List<string> problems;
+    string fail = Load(name, out bp, out problems);
+    if (fail != null) {
+      Report(fail);
+      yield break;
+    }
+    Player player = Player.m_localPlayer;
+    if (player == null || ZNetScene.instance == null) {
+      Report("not in a world yet.");
+      yield break;
+    }
+
+    List<string> missing;
+    Dictionary<string, GameObject> prefabs = ResolvePrefabs(bp, out missing);
+    if (missing.Count > 0) {
+      // check exists so a guess never reaches the world; build inherits that refusal
+      // rather than trusting whoever skipped a step.
+      Report("refusing to build: " + missing.Count + " prefab name(s) do not resolve. "
+          + "Run questlab_blueprint check " + CanonicalName(name) + " for the list.");
+      yield break;
+    }
+
+    _running = true;
+    string mark = CanonicalName(name);
+    Vector3 origin = player.transform.position;
+
+    // One ground sample, at the origin. A house is not the gallery's platform: it keeps
+    // its own internal levels, so leveling to the highest ground under the footprint
+    // would hoist the whole building by the tallest bump. The lowest authored piece sits
+    // just above the ground at your feet; a sloped site will bury or float the edges,
+    // and the answer to that is picking flat ground, not per-piece sampling.
+    float ground;
+    if (!TryGroundHeight(origin, out ground)) {
+      ground = origin.y;
+    }
+    float baseY = ground + GroundClearance - bp.MinY;
+
+    int total = bp.BuildablePieceCount;
+    Report("building " + mark + " — " + total + " pieces, "
+        + (bp.MaxX - bp.MinX).ToString("0") + " x " + (bp.MaxZ - bp.MinZ).ToString("0")
+        + " m at your feet. Stand back.");
+
+    int placed = 0;
+    int failed = 0;
+    int attempted = 0;
+    int reportStep = Mathf.Max(1, total / 10);
+    int perFrame = Mathf.Clamp(LabConfig.BlueprintPiecesPerFrame.Value, 1, 200);
+
+    foreach (BpPiece piece in bp.Pieces) {
+      if (piece.ScaleRejected) {
+        continue;
+      }
+      var at = new Vector3(origin.x + piece.PosX, baseY + piece.PosY,
+                           origin.z + piece.PosZ);
+      var rot = new Quaternion(piece.RotX, piece.RotY, piece.RotZ, piece.RotW);
+      // A zero quaternion (all four components 0) is what a hand-edited line produces;
+      // Unity would propagate NaNs through the transform rather than complain.
+      if (rot.x == 0f && rot.y == 0f && rot.z == 0f && rot.w == 0f) {
+        rot = Quaternion.identity;
+      }
+
+      if (Place(prefabs[piece.Prefab], piece.Prefab, at, rot, mark) != null) {
+        placed++;
+      } else {
+        failed++;
+      }
+
+      attempted++;
+      if (attempted % reportStep == 0 && attempted < total) {
+        Report(mark + ": " + attempted + "/" + total);
+      }
+      if (attempted % perFrame == 0) {
+        yield return null;
+      }
+    }
+
+    _running = false;
+    Report(mark + " raised: " + placed + " piece(s)"
+        + (failed > 0 ? ", " + failed + " failed (see the log)" : "")
+        + ". questlab_blueprint clear " + mark + " takes it down.");
+  }
+
+  /// <summary>Instantiate one piece and mark it ours.
+  ///
+  /// Same shape as the gallery's Place, deliberately copied rather than shared: the
+  /// gallery lane is human-verified and stays untouched. The one difference is the mark
+  /// — blueprint pieces carry the blueprint's name so clear can be scoped.
+  ///
+  /// FALSE switches the wear OFF. Both WearNTear flags are opt-INS despite the "no" in
+  /// their names — UpdateWear reaches its support check and its rain damage only when
+  /// the matching flag is true. Setting them true, which reads correctly, arms exactly
+  /// the decay it was meant to prevent; that mistake cost two galleries. The
+  /// KeepStandingPostfix re-applies this on every zone rebuild, but it cannot help at
+  /// placement time: it runs from Awake, during Instantiate, before the ZDO below has
+  /// been marked as ours.</summary>
+  GameObject Place(GameObject prefab, string prefabName, Vector3 position,
+                   Quaternion rotation, string mark) {
+    try {
+      GameObject go = UnityEngine.Object.Instantiate(prefab, position, rotation);
+      if (go == null) {
+        return null;
+      }
+
+      var wear = go.GetComponent<WearNTear>();
+      if (wear != null) {
+        wear.m_noSupportWear = false;
+        wear.m_noRoofWear = false;
+      }
+
+      var piece = go.GetComponent<Piece>();
+      if (piece != null && Player.m_localPlayer != null) {
+        piece.SetCreator(Player.m_localPlayer.GetPlayerID());
+      }
+
+      var view = go.GetComponent<ZNetView>();
+      if (view != null && view.GetZDO() != null) {
+        // Marked before the ZDO is shared, so the piece is identifiable as ours in this
+        // session and every later one. Clear keys off this, never off an id.
+        view.GetZDO().Set(LabMarks.BlueprintMark, mark);
+      }
+      return go;
+    } catch (Exception ex) {
+      LogOnce("could not place " + prefabName + ": " + ex.Message);
+      return null;
+    }
+  }
+
+  // ---- clear -----------------------------------------------------------------------
+
+  /// <summary>Mark-sweep over the loaded ZDO table. This is the fix the gallery's
+  /// session-scoped manifest documents wanting: the mark travels with the piece, so a
+  /// restart costs nothing. Only loaded zones are swept — stand near what you built.</summary>
+  public string Clear(string name) {
+    if (ZNetScene.instance == null || ZDOMan.instance == null) {
+      return "not in a world yet.";
+    }
+
+    string wanted = string.IsNullOrEmpty(name) ? null : CanonicalName(name);
+
+    // Snapshot: the table mutates under us as pieces are destroyed.
+    var candidates = new List<ZDO>();
+    try {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        string m = LabMarks.BlueprintName(zdo);
+        if (m.Length == 0) continue;
+        if (wanted != null && !string.Equals(m, wanted, StringComparison.OrdinalIgnoreCase)) {
+          continue;
+        }
+        candidates.Add(zdo);
+      }
+    } catch (Exception ex) {
+      return "could not read the ZDO table on this game build: " + ex.Message;
+    }
+
+    var removedByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    int removed = 0;
+    foreach (ZDO zdo in candidates) {
+      try {
+        string m = LabMarks.BlueprintName(zdo);
+        ZNetView view = ZNetScene.instance.FindInstance(zdo);
+        if (view != null) {
+          view.ClaimOwnership();
+          view.Destroy();
+        } else {
+          ZDOMan.instance.DestroyZDO(zdo);
+        }
+        removed++;
+        int c;
+        removedByName.TryGetValue(m, out c);
+        removedByName[m] = c + 1;
+      } catch (Exception) {
+        // A piece somebody already broke is not an error worth stopping for.
+      }
+    }
+
+    if (removed == 0) {
+      return wanted == null
+          ? "no blueprint-built pieces in the loaded area."
+          : "no pieces of \"" + wanted + "\" in the loaded area. Only loaded zones are "
+            + "swept — if it stands beyond view distance, walk there and clear again.";
+    }
+    var sb = new StringBuilder();
+    sb.Append("cleared " + removed + " piece(s)");
+    if (wanted == null && removedByName.Count > 1) {
+      sb.Append(" (");
+      bool first = true;
+      foreach (KeyValuePair<string, int> kv in removedByName) {
+        if (!first) sb.Append(", ");
+        sb.Append(kv.Key).Append(": ").Append(kv.Value);
+        first = false;
+      }
+      sb.Append(')');
+    }
+    sb.Append(". Only loaded zones are swept — if part of the build sits beyond view "
+        + "distance, walk there and clear again.");
+    return sb.ToString();
+  }
+
+  // ---- plumbing --------------------------------------------------------------------
+
+  /// <summary>The name the operator typed is the identity: file name, mark value, and
+  /// clear argument all use it lowercased, so the three always agree.</summary>
+  static string CanonicalName(string name) {
+    return (name ?? string.Empty).Trim().ToLowerInvariant();
+  }
+
+  static string Load(string name, out BlueprintFile bp, out List<string> problems) {
+    bp = null;
+    problems = null;
+    string canonical = CanonicalName(name);
+    if (canonical.Length == 0) {
+      return "which one? questlab_blueprint list shows what is available.";
+    }
+    if (canonical.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+        || canonical.Contains("..")) {
+      return "blueprint names are plain file names, no paths.";
+    }
+    string path = Path.Combine(BlueprintsDir, canonical + ".blueprint");
+    if (!File.Exists(path)) {
+      return "no blueprint named \"" + canonical + "\" in " + BlueprintsDir
+          + " — questlab_blueprint list shows what is there.";
+    }
+    string[] lines;
+    try {
+      lines = File.ReadAllLines(path);
+    } catch (Exception ex) {
+      return "could not read " + path + ": " + ex.Message;
+    }
+    if (!BlueprintFile.TryParse(lines, out bp, out problems)) {
+      var sb = new StringBuilder();
+      sb.AppendLine("\"" + canonical + "\" parsed to zero buildable pieces:");
+      foreach (string p in problems) {
+        sb.AppendLine("  " + p);
+      }
+      bp = null;
+      return sb.ToString().TrimEnd();
+    }
+    return null;
+  }
+
+  Dictionary<string, GameObject> ResolvePrefabs(BlueprintFile bp, out List<string> missing) {
+    var prefabs = new Dictionary<string, GameObject>(StringComparer.Ordinal);
+    missing = new List<string>();
+    foreach (BpPiece piece in bp.Pieces) {
+      if (piece.ScaleRejected || prefabs.ContainsKey(piece.Prefab)) {
+        continue;
+      }
+      GameObject prefab = ZNetScene.instance.GetPrefab(piece.Prefab);
+      if (prefab != null) {
+        prefabs[piece.Prefab] = prefab;
+      } else if (!missing.Contains(piece.Prefab)) {
+        missing.Add(piece.Prefab);
+      }
+    }
+    return prefabs;
+  }
+
+  static bool TryGroundHeight(Vector3 at, out float height) {
+    height = at.y;
+    try {
+      if (ZoneSystem.instance == null) {
+        return false;
+      }
+      return ZoneSystem.instance.GetSolidHeight(at, out height);
+    } catch (Exception) {
+      return false;
+    }
+  }
+
+  readonly HashSet<string> _logged = new HashSet<string>();
+
+  void LogOnce(string message) {
+    if (_logged.Add(message)) {
+      ComfyQuestLab.LogInfo("[blueprint] " + message);
+    }
+  }
+
+  static void Report(string message) {
+    ComfyQuestLab.LogInfo("[blueprint] " + message);
+    try {
+      if (MessageHud.instance != null) {
+        MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, message);
+      }
+    } catch (Exception) {
+    }
+  }
+}

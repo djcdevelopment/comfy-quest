@@ -29,7 +29,10 @@ using HarmonyLib;
 /// instead would not help — it is a TunableField too, and would only slow the fall.
 ///
 /// Which pieces are ours is read from a mark in the piece's own ZDO, never from a
-/// remembered id: ZDO ids do not survive a reload, and a gallery is expected to.</summary>
+/// remembered id: ZDO ids do not survive a reload, and a gallery is expected to.
+/// "Ours" now spans both world-changing lanes — gallery and blueprint builds — via
+/// LabMarks.IsLabBuilt, because a blueprint's cantilevers need exactly the same holding
+/// up on zone reload that the gallery's raised platform does.</summary>
 public static class GalleryStructurePatches {
   public static void Apply(Harmony harmony) {
     try {
@@ -61,7 +64,7 @@ public static class GalleryStructurePatches {
         return;
       }
       ZDO zdo = view.GetZDO();
-      if (zdo == null || !LabGalleryBuilder.IsGalleryPiece(zdo)) {
+      if (zdo == null || !LabMarks.IsLabBuilt(zdo)) {
         return;
       }
       __instance.m_noSupportWear = false;

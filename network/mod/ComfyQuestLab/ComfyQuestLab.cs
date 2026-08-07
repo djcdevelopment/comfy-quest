@@ -44,6 +44,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   LabEventRing _ring;
   LabPanel _panel;
   LabGalleryBuilder _gallery;
+  LabBlueprintBuilder _blueprints;
 
   public static LabEventRing Ring { get { return Instance == null ? null : Instance._ring; } }
   public static bool IsPanelOpen { get { return Instance != null && Instance._panel != null && Instance._panel.IsOpen; } }
@@ -56,6 +57,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     _ring = new LabEventRing(LabConfig.ConsoleRows.Value * 8);
     _panel = new LabPanel(_ring);
     _gallery = new LabGalleryBuilder();
+    _blueprints = new LabBlueprintBuilder();
 
     // A dedicated server has no screen and no player to teach. Bail before patching so
     // a server operator who installs this by accident gets a no-op, not a surprise.
@@ -200,6 +202,24 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
             }
           });
 
+      // The other world-changing lane. Same rule as the gallery: it only ever moves
+      // when somebody types one of these, and check comes before build, always.
+      new Terminal.ConsoleCommand("questlab_blueprint",
+          "build a PlanBuild .blueprint file: questlab_blueprint <list|check|build|clear> [name]",
+          delegate (Terminal.ConsoleEventArgs args) {
+            string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "list";
+            string name = args.Length >= 3 ? args[2] : null;
+            if (verb == "build") {
+              StartCoroutine(_blueprints.Build(this, name));
+            } else if (verb == "clear") {
+              Report(_blueprints.Clear(name));
+            } else if (verb == "check") {
+              Report(_blueprints.Check(name));
+            } else {
+              Report(_blueprints.List());
+            }
+          });
+
       new Terminal.ConsoleCommand("questlab_prefabs",
           "search what this game build actually has: questlab_prefabs <part of a name>, "
           + "or questlab_prefabs dump to write the whole catalog to a JSON file",
@@ -227,7 +247,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
     sb.AppendLine("  questlab_clear   empty the live view");
     sb.AppendLine("  questlab_gallery check | build | clear   raise the practice ground");
-    sb.AppendLine("  questlab_prefabs <name>   search what this game build has");
+    sb.AppendLine("  questlab_blueprint list | check <n> | build <n> | clear [n]   build a .blueprint file");
+    sb.AppendLine("  questlab_prefabs <name>   search what this game build has; dump writes the catalog");
     sb.AppendLine("Hit a tree or a bush with the panel open — harvest is the wired category.");
     return sb.ToString().TrimEnd();
   }
@@ -268,6 +289,7 @@ public static class LabConfig {
   public static ConfigEntry<int> ConsoleRows { get; private set; }
   public static ConfigEntry<bool> VerboseLogging { get; private set; }
   public static ConfigEntry<bool> ObserveStamina { get; private set; }
+  public static ConfigEntry<int> BlueprintPiecesPerFrame { get; private set; }
 
   public static void Bind(ConfigFile config) {
     Enabled =
@@ -314,5 +336,15 @@ public static class LabConfig {
             + "Turn it on to see the shape of a stamina event, then turn it off again. "
             + "Changing this needs a game restart, because it decides whether the patch "
             + "is applied at all.");
+
+    BlueprintPiecesPerFrame =
+        config.Bind(
+            "Lab",
+            "blueprintPiecesPerFrame",
+            12,
+            "How many blueprint pieces are placed per frame during questlab_blueprint "
+            + "build. 12 is the rate the 620-piece gallery build proved out. Raise it "
+            + "to build faster at the cost of frame hitches; a 2,000-piece blueprint "
+            + "at 12/frame takes a few seconds. Hot-reloadable; clamped to 1-200.");
   }
 }
