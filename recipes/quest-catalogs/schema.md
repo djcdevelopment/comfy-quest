@@ -62,3 +62,31 @@ configurator: which guild, which source, which adapter) and emits the catalog pl
 **anomalies report**. Anything odd in the source — duplicate bot commands, mismatched
 evidence counts, unparseable rows — lands in the report for the guild to rule on. The
 harvester never silently fixes the guild's content.
+
+## The provenance sidecar
+
+Each harvest also emits `<output>-provenance.json`: the leader-facing record of what
+the adapter actually did. It **never flows into `quest-view.json` or the mod** — it
+exists so `render_provenance.py` can show a leader their artifact's journey
+(`data/processed/provenance-<source-id>.html`).
+
+Shape (schema_version 1):
+- `mode` — `"sheet"` or `"passthrough"` (gm-template has no cells to echo).
+- `source` — the sources.json entry: id, guild, era, adapter, path, tab, url, retrieved.
+- `tabs[]` — per tab read: `tab`, `header_row`, `columns[]`
+  (`{index, letter, header, fields, note}` — which canonical fields each column became),
+  and `rows[]`.
+- `rows[]` — the fate of every row: `{row, outcome, quest_id?, reason?, cells?}`.
+  `row` is always the **1-based spreadsheet row**, so a leader can open their own
+  sheet and find it. `outcome` is one of `quest | skipped | blank | filler | header |
+  banner | section`. `cells` echoes only mapped columns, keyed by spreadsheet letter,
+  verbatim, truncated at 500 chars (`truncated: true` when cut).
+- `anomalies` — the structured anomaly list (below).
+- `counts` — rows_seen / quests / skipped / blank / anomalies. `harvest.py` fails
+  loudly if these disagree with the catalog.
+
+Anomalies are structured objects — `{kind, row, tab, quest_id, quest_name, message}` —
+with `kind` slugs like `skipped_row`, `duplicate_credit`, `credit_mismatch`,
+`evidence_mismatch`, `header_mismatch`, `tbd_status`. The human-readable
+`-anomalies.md` is formatted from this same list (`format_anomaly`), and the
+provenance page joins each anomaly to the row or quest it concerns.

@@ -33,6 +33,17 @@
       "note": "gm-template-example.json is not yet written. Writing it is Community Workbench first task QP-1; gm-template validates and passes through once the file exists."
     },
     {
+      "id": "creator-events-e18",
+      "guild": "Creators",
+      "era": 18,
+      "adapter": "creator-events-xlsx",
+      "path": "../../data/raw/creator-events-tracker.xlsx",
+      "tab": "Events (E18)",
+      "retrieved": "2026-08-01",
+      "output": "../../data/processed/quest-catalog-creator-events.json",
+      "note": "Etheiry pilot: Creator Events Tracker, Guidelines & Schedule (comfy comfy-etheiry-analysis/CreatorStuff)."
+    },
+    {
       "id": "discord-channel-export",
       "guild": null,
       "era": null,

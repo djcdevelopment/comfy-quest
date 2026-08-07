@@ -64,6 +64,23 @@ for i, q in enumerate(quests):
     if trig is not None and not isinstance(trig, dict):
         errors.append(f"{where}: trigger must be null or an object")
 
+# the provenance sidecar is not part of the mod contract, so disagreement is only
+# advice here — harvest.py itself fails loudly on a mismatch at write time
+prov_path = path[: -len(".json")] + "-provenance.json" if path.endswith(".json") else None
+if prov_path and os.path.exists(prov_path):
+    prov = json.load(open(prov_path, encoding="utf-8-sig"))
+    ids = {q.get("quest_id") for q in quests}
+    prov_ids = [r.get("quest_id") for t in prov.get("tabs", [])
+                for r in t.get("rows", []) if r.get("outcome") == "quest"]
+    stray = [i for i in prov_ids if i not in ids]
+    if stray:
+        warnings.append(f"provenance sidecar names quest_id(s) not in the catalog: {stray[:5]}")
+    if prov.get("counts", {}).get("quests") != len(quests):
+        warnings.append(
+            f"provenance sidecar counts {prov.get('counts', {}).get('quests')} quest(s) "
+            f"but the catalog has {len(quests)} — stale sidecar? Re-run harvest.py."
+        )
+
 for e in errors:
     print("X", e)
 for w in warnings:
