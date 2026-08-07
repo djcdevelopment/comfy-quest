@@ -113,7 +113,8 @@ public sealed class LabGalleryBuilder {
       }
       sb.AppendLine("Find the right name with: questlab_prefabs <part of the name>");
     }
-    sb.AppendLine(LabGalleryPlan.PlatformTiles.GetLength(0) + " floor tiles, "
+    sb.AppendLine(LabGalleryPlan.PlatformTiles.Length + " floor tiles, "
+        + LabGalleryPlan.Fixtures.Length + " walls and signs, "
         + CountBeams() + " beams, " + LabGalleryPlan.Armoury.Length + " stands.");
     sb.Append(missing.Count == 0
         ? "Ready. questlab_gallery build"
@@ -180,10 +181,10 @@ public sealed class LabGalleryBuilder {
     // clearance. A level floor on uneven ground is the entire point — sampling per tile
     // would reproduce the hillside the platform exists to hide.
     float top = origin.y;
-    int tiles = LabGalleryPlan.PlatformTiles.GetLength(0);
+    int tiles = LabGalleryPlan.PlatformTiles.Length;
     for (int i = 0; i < tiles; i += 7) {   // every seventh tile is plenty to find the max
-      Vector3 at = origin + new Vector3(LabGalleryPlan.PlatformTiles[i, 0], 0f,
-                                        LabGalleryPlan.PlatformTiles[i, 1]);
+      Vector3 at = origin + new Vector3(LabGalleryPlan.PlatformTiles[i].X, 0f,
+                                        LabGalleryPlan.PlatformTiles[i].Z);
       float ground;
       if (TryGroundHeight(at, out ground) && ground > top) {
         top = ground;
@@ -208,9 +209,12 @@ public sealed class LabGalleryBuilder {
 
     // 1. the floor
     for (int i = 0; i < tiles; i++) {
-      Vector3 at = new Vector3(origin.x + LabGalleryPlan.PlatformTiles[i, 0], floorY,
-                               origin.z + LabGalleryPlan.PlatformTiles[i, 1]);
-      if (Place("wood_floor", at, Quaternion.identity)) {
+      LabGalleryPlan.Tile tile = LabGalleryPlan.PlatformTiles[i];
+      // Drop the slab by its own half-thickness so the walking surface lands ON floorY,
+      // which is what every other position in the plan is measured against.
+      var at = new Vector3(origin.x + tile.X, floorY + SurfaceDrop(tile.Prefab),
+                           origin.z + tile.Z);
+      if (Place(tile.Prefab, at, Quaternion.identity)) {
         placed++;
       }
       if (placed % PiecesPerFrame == 0) {
@@ -241,6 +245,48 @@ public sealed class LabGalleryBuilder {
     // student can actually do from the plaza rather than a thing they read about.
     if (PlacePortal(new Vector3(origin.x - 3.5f, floorY, origin.z), WorldTag, 180f)) {
       placed++;
+    }
+    yield return null;
+
+    // 1c. the halls, and the sign at the mouth of each.
+    //
+    // Two courses of marble a side and no roof: the corridor frames the glyph at its end
+    // without enclosing it, which is the composition — read the sign, walk the throat,
+    // and the rune is the lit thing against open sky.
+    foreach (LabGalleryPlan.Fixture fixture in LabGalleryPlan.Fixtures) {
+      bool panel = fixture.Orient == "panel";
+
+      // Fixture.Y is where the piece's BOTTOM goes for anything standing on the floor: a
+      // marble wall pivots at its centre, so placing it at that height directly buries
+      // half of it, which is why the halls first read waist-high. A panel is the other
+      // case — a slab stood on edge, whose Y is already a centre height and whose local
+      // Y is thickness rather than height, so it takes no lift at all.
+      float lift = panel ? 0f : BaseLift(fixture.Prefab);
+      var fixtureAt = new Vector3(origin.x + fixture.X, floorY + fixture.Y + lift,
+                                  origin.z + fixture.Z);
+
+      Quaternion rot;
+      if (panel) {
+        // Stand the slab up. LookRotation puts local Z on its first argument and local Y
+        // on its second, so aiming Z at world up and Y down the hall's ray turns the
+        // slab's 2 m thickness into the backdrop's depth and its 8x8 face into the wall.
+        Vector3 ray = Quaternion.Euler(0f, fixture.Yaw, 0f) * Vector3.forward;
+        rot = Quaternion.LookRotation(Vector3.up, ray);
+      } else {
+        rot = Quaternion.Euler(0f, fixture.Yaw, 0f);
+      }
+
+      GameObject built = Place(fixture.Prefab, fixtureAt, rot);
+      if (built == null) {
+        continue;
+      }
+      placed++;
+      if (!string.IsNullOrEmpty(fixture.Text)) {
+        WriteSign(built, fixture.Text);
+      }
+      if (placed % PiecesPerFrame == 0) {
+        yield return null;
+      }
     }
     yield return null;
 
@@ -566,7 +612,32 @@ public sealed class LabGalleryBuilder {
   /// not in assembly_valheim.dll, so there is no IL to read. The prefab can answer it
   /// though, at runtime, for nothing. So ask it, and report what it said — a build that
   /// prints "drawing along local Y" can be checked by the person watching it.</summary>
+  readonly Dictionary<string, PieceMetrics> _metrics = new Dictionary<string, PieceMetrics>();
+
+  /// <summary>How far to drop a floor slab so its TOP face lands on the target height.
+  ///
+  /// The plan positions everything else against the walking surface, so the surface has
+  /// to be where the plan thinks it is. wood_floor pivoted at its top face and this was
+  /// free; the marble and stone slabs pivot at their centre, which silently raised the
+  /// surface half a metre under everything standing on it.</summary>
+  float SurfaceDrop(string prefabName) {
+    PieceMetrics m = Measure(prefabName);
+    return m.Size.y <= 0f ? 0f : -(m.Center.y + m.Size.y * 0.5f);
+  }
+
+  /// <summary>How far to lift a piece so its BOTTOM rests on the surface. Zero for a
+  /// prefab that already pivots at its base, half its height for one that pivots at its
+  /// centre — measured either way, so neither has to be assumed.</summary>
+  float BaseLift(string prefabName) {
+    PieceMetrics m = Measure(prefabName);
+    return m.Size.y <= 0f ? 0f : m.Size.y * 0.5f - m.Center.y;
+  }
+
   PieceMetrics Measure(string prefabName) {
+    PieceMetrics cached;
+    if (_metrics.TryGetValue(prefabName, out cached)) {
+      return cached;
+    }
     var fallback = new PieceMetrics { LongAxis = Vector3.forward };
     try {
       GameObject prefab = ZNetScene.instance.GetPrefab(prefabName);
@@ -619,8 +690,11 @@ public sealed class LabGalleryBuilder {
 
       Report(prefabName + " measures " + size.x.ToString("0.00") + " x "
           + size.y.ToString("0.00") + " x " + size.z.ToString("0.00")
-          + " — drawing along local " + named + ".");
-      return new PieceMetrics { LongAxis = axis, Center = local.center, Size = size };
+          + " — drawing along local " + named + ", pivot "
+          + (Mathf.Abs(local.center.y) < 0.05f ? "centre" : "offset") + ".");
+      var measured = new PieceMetrics { LongAxis = axis, Center = local.center, Size = size };
+      _metrics[prefabName] = measured;
+      return measured;
     } catch (Exception ex) {
       LogOnce("could not measure " + prefabName + ": " + ex.Message);
       return fallback;
@@ -665,6 +739,24 @@ public sealed class LabGalleryBuilder {
       // No Save() on ItemDrop — the stack set before the ZDO is shared persists on its own.
     } catch (Exception ex) {
       LogOnce("could not stack a supply drop: " + ex.Message);
+    }
+  }
+
+  /// <summary>Put words on a sign.
+  ///
+  /// The copy is a ZDO string field called "text", which the component atlas reports as a
+  /// plain read/write on Sign — the same shape as the portal pairing tag, so this needs
+  /// no RPC and no guessed signature. Written before the ZDO is shared, so a sign is
+  /// never briefly blank for anyone watching the hall go up.</summary>
+  void WriteSign(GameObject go, string text) {
+    try {
+      var view = go.GetComponent<ZNetView>();
+      if (view == null || view.GetZDO() == null) {
+        return;
+      }
+      view.GetZDO().Set("text", text);
+    } catch (Exception ex) {
+      LogOnce("could not write a sign: " + ex.Message);
     }
   }
 

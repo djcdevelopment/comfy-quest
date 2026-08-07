@@ -219,6 +219,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
               StartCoroutine(_blueprints.Build(this, name, sky));
             } else if (verb == "clear") {
               Report(_blueprints.Clear(name));
+            } else if (verb == "count") {
+              Report(_blueprints.Count(name));
             } else if (verb == "check") {
               Report(_blueprints.Check(name));
             } else {
@@ -236,6 +238,16 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
             } else {
               Report(LabGalleryBuilder.SearchPrefabs(arg));
             }
+          });
+
+      // Lighting is a judgement call about weather nobody can predict, so it is tuned
+      // while looking at the thing rather than by rebuilding the gallery.
+      new Terminal.ConsoleCommand("questlab_runelight",
+          "tune the monument lamps live: questlab_runelight <intensity> [range], "
+          + "or questlab_runelight off | on",
+          delegate (Terminal.ConsoleEventArgs args) {
+            Report(LabRuneLight.Tune(args.Length >= 2 ? args[1] : null,
+                                     args.Length >= 3 ? args[2] : null));
           });
 
       new Terminal.ConsoleCommand("questlab_clear",

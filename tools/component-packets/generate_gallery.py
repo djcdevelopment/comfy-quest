@@ -20,15 +20,18 @@ actually be built.
 Writes network/mod/ComfyQuestLab/Core/LabGalleryPlan.g.cs
       plus a top-down preview PNG next to it when Pillow is available.
 """
+import json
 import math
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 RUNES = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Ui", "LabRunes.cs")
 OUT = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Core", "LabGalleryPlan.g.cs")
 PREVIEW = os.path.join(HERE, "samples", "gallery-plan.png")
+DUMP = os.path.join(HERE, "samples", "prefab-dump.json")
 
 # --- dimensions, in metres -------------------------------------------------------
 RING_RADIUS = 38.0     # 30 m of arc between monuments — room to breathe, short spokes
@@ -84,6 +87,124 @@ ARMOURY = [
 ]
 
 
+# --- palette --------------------------------------------------------------------
+# One place to swap materials. Every name here is cross-checked against a
+# `questlab_prefabs dump` by --prefab-dump, because prefab names are the one thing in
+# this project that is NOT read out of the assembly — the atlas knows which components
+# exist, not which prefabs carry them.
+#
+# Stone underfoot in the plaza, black marble down the halls: the plaza reads as ground
+# you stand on and the halls as something built. The rune strokes stay wood on purpose.
+# A warm lit beam against cold marble is the whole composition — swap "beam" to a marble
+# piece and the glyph stops being the brightest thing at the end of the corridor.
+PALETTE = {
+    "plaza":  "stone_floor_2x2",     # 2x2, verified by snap span
+    "hall":   "blackmarble_floor",   # 2x2
+    "pad":    "blackmarble_floor",
+    "stage":  "blackmarble_floor",   # the rune's own platform, past the hall
+    "panel":  "blackmarble_floor_large",  # 8 x 8 x 2, stood on edge as a backdrop
+    "wall":   "blackmarble_2x2x1",   # 2 wide, 2 tall, 1 thick
+    "column": "blackmarble_column_1",
+    "sign":   "sign",                # ZDO "text" carries the copy
+    "beam":   "wood_beam",           # the strokes; deliberately not marble
+}
+
+# Hall wall height, in courses of PALETTE["wall"] (2 m each). Two courses frames the
+# corridor without roofing it — a 11 m rune still stands 7 m clear above the wall head,
+# which is the shot: you read the sign, then walk toward a lit glyph against open sky.
+WALL_COURSES = 2
+WALL_INSET = 0.5        # wall centre sits this far outside the hall floor edge
+
+# Yaw that turns a wall's 2 m width along the corridor rather than across it. This is
+# the one number here that is a convention rather than a measurement; a wrong guess
+# shows up as every wall rotated a quarter turn, and is fixed by changing this alone.
+WALL_YAW_OFFSET = 90.0
+
+# --- the rune stage --------------------------------------------------------------
+# The rune gets its own platform past the end of the hall, with a gap of open air
+# between it and the pad. Two problems answered at once: a chest or a hearth staged on
+# the pad can no longer stand in front of the glyph, and a backdrop behind and to the
+# sides gives it something black to burn against instead of open sky.
+#
+# The backdrop is blackmarble_floor_large stood on edge — 8 x 8 x 2, so four of them
+# make a 16 m wall where the 2 m blocks would have taken forty. Its thin axis is its
+# local Y, which is what the builder swings onto the hall's ray.
+RUNE_GAP = 4.0              # open air between the pad edge and the stage
+STAGE_DEPTH = 8.0
+STAGE_HALF_WIDTH = 8.0      # 16 m across, a 9 m rune with margin either side
+PANEL = 8.0                 # blackmarble_floor_large face, verified from snap points
+BACKDROP_COLUMNS = 2        # 16 m wide
+BACKDROP_ROWS = 2           # 16 m tall, clears an 11 m rune
+WING_ROWS = 2               # side returns, same height
+
+# Where the rune itself now stands: centred on its own stage rather than on the pad.
+RUNE_RADIUS = RING_RADIUS + RUNE_GAP + STAGE_DEPTH / 2
+
+# One colour per school, and this is the ONLY place it is written down. The plan carries
+# it into the mod, so the rune lamp and the sign heading cannot drift apart.
+SCHOOL_COLOURS = {
+    "Combat":      (1.00, 0.28, 0.22),
+    "Harvest":     (0.45, 0.95, 0.40),
+    "Inventory":   (0.95, 0.78, 0.30),
+    "Building":    (0.98, 0.55, 0.20),
+    "Crafting":    (0.55, 0.80, 1.00),
+    "Progression": (0.80, 0.50, 1.00),
+    "World":       (0.35, 0.90, 0.90),
+    "Social":      (1.00, 0.70, 0.85),
+}
+
+# Exactly one seam in the whole atlas can bind a quest today. Saying so on the sign at
+# the mouth of every hall is the argument the lab exists to make, made before anyone
+# walks in rather than after they have wasted an evening.
+QUEST_USABLE = {"Combat"}
+
+
+def hex_of(rgb):
+    return "#%02x%02x%02x" % tuple(max(0, min(255, int(round(c * 255)))) for c in rgb)
+
+
+def sign_text(category, note):
+    """Copy for the sign at a hall mouth. Unity rich text: the Sign widget takes the
+    same <b>/<color>/<size> tags the rest of the game's UI does, and the string rides
+    to the piece in its own ZDO "text" field, which the component atlas reports as a
+    plain read/write — so there is no RPC signature to guess at."""
+    heading = hex_of(SCHOOL_COLOURS[category])
+    verdict = ("a quest CAN bind here" if category in QUEST_USABLE
+               else "nothing binds a quest here yet")
+    verdict_colour = "#8fdc8f" if category in QUEST_USABLE else "#d08a72"
+    return (f"<size=28><b><color={heading}>{category.upper()}</color></b></size>\n"
+            f"{note}\n"
+            f"<color={verdict_colour}>{verdict}</color>")
+
+
+def validate_against_dump(dump_path):
+    """Fail loudly on a palette name this game build does not have, and check that the
+    pieces we lay on a 2 m grid really are 2 m — snap points are the piece's own
+    statement of its footprint, so this catches a swap to a 4 m slab before 600 pieces
+    go into somebody's world overlapping each other."""
+    data = json.loads(open(dump_path, encoding="utf-8").read())
+    entries = {e["name"]: e for e in data.get("prefabs", [])}
+
+    missing = sorted(v for v in PALETTE.values() if v not in entries)
+    if missing:
+        raise SystemExit(
+            "palette names absent from the prefab dump: " + ", ".join(missing)
+            + " — fix PALETTE before regenerating the plan.")
+
+    for key in ("plaza", "hall", "pad"):
+        snaps = entries[PALETTE[key]].get("snapPoints") or []
+        if not snaps:
+            print(f"  ! {PALETTE[key]} has no snap points — footprint unverified")
+            continue
+        span_x = max(s[0] for s in snaps) - min(s[0] for s in snaps)
+        span_z = max(s[2] for s in snaps) - min(s[2] for s in snaps)
+        if abs(span_x - TILE) > 0.05 or abs(span_z - TILE) > 0.05:
+            raise SystemExit(
+                f"{PALETTE[key]} spans {span_x:.2f} x {span_z:.2f} m, but the plan lays "
+                f"it on a {TILE} m grid — pieces would overlap or leave gaps.")
+    return len(entries)
+
+
 def read_rune_segments(path):
     """Read the same table the UI draws from. Parsing the source rather than
     duplicating the numbers is the whole point: one shape, two scales."""
@@ -103,7 +224,7 @@ def monument_beams(segments, angle_deg):
     The plane faces the centre of the ring, so a student standing at the armoury
     sees all eight runes face-on rather than edge-on."""
     a = math.radians(angle_deg)
-    cx, cz = RING_RADIUS * math.sin(a), RING_RADIUS * math.cos(a)
+    cx, cz = RUNE_RADIUS * math.sin(a), RUNE_RADIUS * math.cos(a)
     # Tangent to the ring: the rune's "across" direction.
     rx, rz = math.sin(a + math.pi / 2), math.cos(a + math.pi / 2)
 
@@ -173,7 +294,7 @@ for i, (item, note) in enumerate(ARMOURY):
 def platform_tiles(monuments):
     """Grid cells that need a floor: plaza, spokes out to each pad, pads under each
     monument. Deduped, because spokes and pads overlap where they meet."""
-    tiles = set()
+    tiles = {}
     reach = RING_RADIUS + PAD_DEPTH
     steps = int(reach / TILE) + 2
     rays = [(math.sin(math.radians(m["angle"])), math.cos(math.radians(m["angle"])))
@@ -184,25 +305,131 @@ def platform_tiles(monuments):
             x, z = i * TILE, j * TILE
             r = math.hypot(x, z)
             if r <= PLAZA_RADIUS:
-                tiles.add((x, z))
+                tiles[(x, z)] = "plaza"
                 continue
             for sx, sz in rays:
                 along = x * sx + z * sz              # distance along the ray
                 across = abs(x * sz - z * sx)        # perpendicular offset
                 if along <= 0:
                     continue
-                # spoke
+                # hall
                 if across <= SPOKE_HALF_WIDTH and along <= RING_RADIUS - PAD_DEPTH / 2:
-                    tiles.add((x, z)); break
+                    tiles.setdefault((x, z), "hall"); break
                 # pad
                 if (across <= PAD_HALF_WIDTH
                         and abs(along - RING_RADIUS + PAD_DEPTH / 2 - 1.0) <= PAD_DEPTH / 2):
-                    tiles.add((x, z)); break
-    return sorted(tiles)
+                    tiles.setdefault((x, z), "pad"); break
+                # the rune's own stage, floating past the pad with a gap of open air
+                if (across <= STAGE_HALF_WIDTH
+                        and RING_RADIUS + RUNE_GAP <= along
+                            <= RING_RADIUS + RUNE_GAP + STAGE_DEPTH):
+                    tiles.setdefault((x, z), "stage"); break
+    return sorted((x, z, kind) for (x, z), kind in tiles.items())
+
+
+def backdrop_panels(monuments):
+    """A black wall behind each rune, and a return down each side.
+
+    blackmarble_floor_large stood on edge. The slab is 8 x 8 with its 2 m thickness on
+    local Y, so the builder turns that thin axis onto the hall's ray and the 8 x 8 face
+    ends up spanning across the hall and straight up — which is why these carry an
+    orientation the builder has to honour rather than a plain yaw."""
+    panels = []
+    back_along = RING_RADIUS + RUNE_GAP + STAGE_DEPTH
+    for m in monuments:
+        th = math.radians(m["angle"])
+        sx, sz = math.sin(th), math.cos(th)
+        px, pz = math.cos(th), -math.sin(th)
+
+        # the wall behind
+        for col in range(BACKDROP_COLUMNS):
+            off = (col - (BACKDROP_COLUMNS - 1) / 2.0) * PANEL
+            for row in range(BACKDROP_ROWS):
+                panels.append({
+                    "prefab": PALETTE["panel"],
+                    "x": round(sx * back_along + px * off, 3),
+                    "y": round(PANEL / 2.0 + row * PANEL, 3),   # centre height
+                    "z": round(sz * back_along + pz * off, 3),
+                    "yaw": round(m["angle"] % 360.0, 3),
+                    "orient": "panel",
+                    "text": "",
+                })
+
+        # the returns, one either side, turned a quarter so they face inward
+        for side in (-1.0, 1.0):
+            off = side * (BACKDROP_COLUMNS * PANEL / 2.0)
+            along = back_along - PANEL / 2.0
+            for row in range(WING_ROWS):
+                panels.append({
+                    "prefab": PALETTE["panel"],
+                    "x": round(sx * along + px * off, 3),
+                    "y": round(PANEL / 2.0 + row * PANEL, 3),
+                    "z": round(sz * along + pz * off, 3),
+                    "yaw": round((m["angle"] + 90.0) % 360.0, 3),
+                    "orient": "panel",
+                    "text": "",
+                })
+    return panels
+
+
+def hall_walls(monuments):
+    """Two courses of marble down each side of each hall, and no roof.
+
+    The corridor is the framing device: from the plaza you see a sign, a throat of black
+    marble, and a lit glyph at the end of it. Roofing that would trade the rune against
+    open sky for a tunnel, which is why WALL_COURSES stops at head height and stays
+    there."""
+    walls = []
+    inner_end = RING_RADIUS - PAD_DEPTH / 2
+    for m in monuments:
+        th = math.radians(m["angle"])
+        sx, sz = math.sin(th), math.cos(th)
+        px, pz = math.cos(th), -math.sin(th)          # across the hall
+        along = PLAZA_RADIUS
+        while along <= inner_end + 1e-6:
+            for side in (-1.0, 1.0):
+                off = side * (SPOKE_HALF_WIDTH + WALL_INSET)
+                x, z = sx * along + px * off, sz * along + pz * off
+                for course in range(WALL_COURSES):
+                    walls.append({
+                        "prefab": PALETTE["wall"],
+                        "x": round(x, 3), "y": round(course * 2.0, 3), "z": round(z, 3),
+                        "yaw": round((m["angle"] + WALL_YAW_OFFSET) % 360.0, 3),
+                        "orient": "",
+                        "text": "",
+                    })
+            along += TILE
+    return walls
+
+
+def hall_signs(monuments):
+    """One sign at each hall mouth, facing back into the plaza so it is read on the way
+    in rather than discovered on the way out."""
+    signs = []
+    for m in monuments:
+        th = math.radians(m["angle"])
+        sx, sz = math.sin(th), math.cos(th)
+        px, pz = math.cos(th), -math.sin(th)
+        along = PLAZA_RADIUS + 1.0
+        off = SPOKE_HALF_WIDTH + WALL_INSET + 0.6      # just outside the wall line
+        signs.append({
+            "prefab": PALETTE["sign"],
+            "x": round(sx * along + px * off, 3),
+            "y": 1.2,
+            "z": round(sz * along + pz * off, 3),
+            "yaw": round((m["angle"] + 180.0) % 360.0, 3),
+            "orient": "",
+            "text": sign_text(m["category"], m["station"]["note"]),
+        })
+    return signs
 
 
 def cs(text):
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    """A C# string literal. Newlines are escaped, not embedded: sign copy is multi-line
+    and a raw newline inside a quoted literal is a compile error, not a formatting
+    quirk."""
+    return ('"' + text.replace("\\", "\\\\").replace('"', '\\"')
+                      .replace("\r", "\\r").replace("\n", "\\n") + '"')
 
 
 lines = [
@@ -223,8 +450,22 @@ lines = [
     "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",
     "  public struct Station { public string Prefab, Kind, Note; public float X, Z; }",
     "  public struct Monument { public string Category; public float Angle, Cx, Cz;",
+    "                           public float R, G, B;",
     "                           public Beam[] Beams; public Station Station; }",
     "  public struct RackItem { public string Item, Note; public float X, Z, Yaw; }",
+    "",
+    "  /// <summary>One floor cell and what to pave it with. Stone in the plaza, black",
+    "  /// marble down the halls — the plaza reads as ground, the halls as built.</summary>",
+    "  public struct Tile { public float X, Z; public string Prefab; }",
+    "",
+    "  /// <summary>Anything standing on the floor that is not a monument: hall walls, and",
+    "  /// the sign at each hall mouth. Text is empty except on signs, where it carries",
+    "  /// Unity rich-text markup into the piece's own ZDO \"text\" field.</summary>",
+    "  /// Orient is \"\" for anything that only needs a yaw, and \"panel\" for a slab",
+    "  /// stood on edge — for those the builder turns the piece's thin axis onto the",
+    "  /// hall's ray, and reads Y as a centre height rather than a base.</summary>",
+    "  public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;",
+    "                          public string Orient, Text; }",
     "",
     f"  public const float RingRadius = {RING_RADIUS}f;",
     f"  public const float RuneHeight = {RUNE_HEIGHT}f;",
@@ -239,6 +480,8 @@ for m in monuments:
     lines.append("    new Monument {")
     lines.append(f"      Category = LabCategory.{m['category']},")
     lines.append(f"      Angle = {m['angle']}f, Cx = {m['cx']}f, Cz = {m['cz']}f,")
+    cr, cg, cb = SCHOOL_COLOURS[m["category"]]
+    lines.append(f"      R = {cr}f, G = {cg}f, B = {cb}f,")
     st = m["station"]
     lines.append(f"      Station = new Station {{ Prefab = {cs(st['prefab'])}, "
                  f"Kind = {cs(st['kind'])}, Note = {cs(st['note'])}, "
@@ -251,26 +494,46 @@ for m in monuments:
     lines.append("    },")
 
 tiles = platform_tiles(monuments)
+fixtures = hall_walls(monuments) + backdrop_panels(monuments) + hall_signs(monuments)
 lines += ["  };", "",
           "  /// <summary>Floor tiles, 2 m apart, relative to the gallery origin. The",
           "  /// builder picks ONE world height for the whole platform — the highest ground",
           "  /// under the footprint plus a clearance — so the floor is level even where the",
           "  /// terrain is not, and drops supports wherever the gap is worth hiding.</summary>",
-          "  public static readonly float[,] PlatformTiles = {"]
-for x, z in tiles:
-    lines.append(f"    {{ {x}f, {z}f }},")
+          "  public static readonly Tile[] PlatformTiles = {"]
+for x, z, kind in tiles:
+    lines.append(f"    new Tile {{ X = {x}f, Z = {z}f, Prefab = {cs(PALETTE[kind])} }},")
+lines += ["  };", "",
+          "  /// <summary>Hall walls and the sign at each hall mouth.</summary>",
+          "  public static readonly Fixture[] Fixtures = {"]
+for f in fixtures:
+    lines.append(f"    new Fixture {{ Prefab = {cs(f['prefab'])}, X = {f['x']}f, "
+                 f"Y = {f['y']}f, Z = {f['z']}f, Yaw = {f['yaw']}f, "
+                 f"Orient = {cs(f['orient'])}, Text = {cs(f['text'])} }},")
 lines += ["  };", "", "  public static readonly RackItem[] Armoury = {"]
 for r in rack:
     lines.append(f"    new RackItem {{ Item = {cs(r['item'])}, Note = {cs(r['note'])}, "
                  f"X = {r['x']}f, Z = {r['z']}f, Yaw = {r['yaw']}f }},")
 lines += ["  };", "}", ""]
 
+dump_path = None
+if "--prefab-dump" in sys.argv:
+    dump_path = sys.argv[sys.argv.index("--prefab-dump") + 1]
+elif os.path.exists(DUMP):
+    dump_path = DUMP
+if dump_path:
+    known = validate_against_dump(dump_path)
+    print(f"  palette checked against {known} prefabs in {os.path.basename(dump_path)}")
+else:
+    print("  ! no prefab dump — palette names are UNVERIFIED; run questlab_prefabs dump")
+
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
     fh.write("\n".join(lines))
 print(f"  {OUT}")
+walls = sum(1 for f in fixtures if not f["text"])
 print(f"  8 monuments, {total_beams} beams, {len(rack)} armoury stands, "
-      f"{len(tiles)} floor tiles")
+      f"{len(tiles)} floor tiles, {walls} wall pieces, {len(fixtures) - walls} signs")
 
 # --- preview ---------------------------------------------------------------------
 try:
@@ -294,11 +557,20 @@ COLOURS = {
     "World": (117, 194, 235), "Social": (194, 168, 240),
 }
 
-for x, z in tiles:
+# Plaza stone reads warmer than the marble halls, so the preview can be checked at a
+# glance for the material split as well as the footprint.
+TILE_FILL = {"plaza": (46, 42, 38), "hall": (22, 20, 26), "pad": (22, 20, 26)}
+for x, z, kind in tiles:
     px, pz = to_px(x, z)
     half = TILE / SPAN * PX / 2
     d.rectangle([px - half, pz - half, px + half, pz + half],
-                fill=(31, 26, 20), outline=(46, 38, 29))
+                fill=TILE_FILL.get(kind, (31, 26, 20)), outline=(46, 38, 29))
+
+for f in fixtures:
+    px, pz = to_px(f["x"], f["z"])
+    r = 2 if f["text"] else 1
+    d.ellipse([px - r, pz - r, px + r, pz + r],
+              fill=(220, 190, 120) if f["text"] else (96, 92, 110))
 
 d.ellipse([*to_px(-RING_RADIUS, RING_RADIUS), *to_px(RING_RADIUS, -RING_RADIUS)],
           outline=(38, 50, 55))

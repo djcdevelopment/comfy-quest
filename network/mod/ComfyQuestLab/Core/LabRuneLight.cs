@@ -1,7 +1,7 @@
 namespace ComfyQuestLab;
 
 using System;
-using System.Collections.Generic;
+using System.Globalization;
 
 using BepInEx.Configuration;
 
@@ -39,22 +39,21 @@ public static class LabRuneLight {
   public static ConfigEntry<float> Intensity;
   public static ConfigEntry<float> Range;
 
-  /// <summary>A colour per school, so a glance across the ring tells you which monument
-  /// you are walking toward before you can read the glyph.</summary>
-  static readonly Dictionary<string, Color> SchoolColours = new Dictionary<string, Color> {
-    { LabCategory.Combat,      new Color(1.00f, 0.28f, 0.22f) },   // ember
-    { LabCategory.Harvest,     new Color(0.45f, 0.95f, 0.40f) },   // green wood
-    { LabCategory.Inventory,   new Color(0.95f, 0.78f, 0.30f) },   // brass
-    { LabCategory.Building,    new Color(0.98f, 0.55f, 0.20f) },   // fired clay
-    { LabCategory.Crafting,    new Color(0.55f, 0.80f, 1.00f) },   // forge-quench blue
-    { LabCategory.Progression, new Color(0.80f, 0.50f, 1.00f) },   // violet
-    { LabCategory.World,       new Color(0.35f, 0.90f, 0.90f) },   // portal cyan
-    { LabCategory.Social,      new Color(1.00f, 0.70f, 0.85f) },   // rose
-  };
-
+  /// <summary>A colour per school, read out of the plan rather than kept here.
+  ///
+  /// The generator writes the same values into the sign heading at each hall mouth, so
+  /// keeping a second copy in the mod would let the lamp and the sign drift apart on any
+  /// day somebody edited one of them. One table, two consumers.</summary>
   public static Color ColourFor(string school) {
-    Color colour;
-    return SchoolColours.TryGetValue(school ?? string.Empty, out colour) ? colour : Color.white;
+    if (string.IsNullOrEmpty(school)) {
+      return Color.white;
+    }
+    foreach (LabGalleryPlan.Monument monument in LabGalleryPlan.Monuments) {
+      if (monument.Category == school) {
+        return new Color(monument.R, monument.G, monument.B);
+      }
+    }
+    return Color.white;
   }
 
   /// <summary>Bound off the plugin's own config file rather than through LabConfig, so
@@ -66,13 +65,99 @@ public static class LabRuneLight {
     Enabled = config.Bind("Gallery", "runeLights", true,
         "Hang a coloured light on each monument, one per school. Client-side only — the "
         + "lamps are not networked and nobody else sees them. Hot-reloadable.");
-    Intensity = config.Bind("Gallery", "runeLightIntensity", 6f,
+    // 40 / 6 is a dialled-in value, not a guess: bright and TIGHT. A long reach lights
+    // the mist between you and the rune instead of the rune, and eight of those overlap
+    // into a white wall in any weather at all. Short range keeps the light out of the fog
+    // volume, and the intensity then buys back a glyph that blazes.
+    Intensity = config.Bind("Gallery", "runeLightIntensity", 40f,
         new ConfigDescription("How bright each monument's lamp burns.",
-            new AcceptableValueRange<float>(0f, 40f)));
-    Range = config.Bind("Gallery", "runeLightRange", 22f,
-        new ConfigDescription("How far each monument's lamp reaches, in metres. A rune is "
-            + "about 11 m of strokes, so below that only part of it lights.",
+            new AcceptableValueRange<float>(0f, 200f)));
+    Range = config.Bind("Gallery", "runeLightRange", 6f,
+        new ConfigDescription("How far each monument's lamp reaches, in metres. Keep this "
+            + "short: reach is what turns light mist into haze.",
             new AcceptableValueRange<float>(1f, 128f)));
+
+    // Retune what is already standing, rather than only what gets built next. A lamp is
+    // a judgement call about light in weather nobody can predict — the useful form of
+    // that knob is one you turn while looking at the thing, not one that needs a rebuild
+    // to take effect.
+    Enabled.SettingChanged += (s, e) => Retune();
+    Intensity.SettingChanged += (s, e) => Retune();
+    Range.SettingChanged += (s, e) => Retune();
+  }
+
+  /// <summary>Re-apply the current settings to every lamp already in the world.
+  ///
+  /// Finds them the same way clear does — WearNTear.GetAllInstances() over loaded pieces,
+  /// filtered by the mark — so it needs no register of live lamps to go stale.</summary>
+  public static int Retune() {
+    int touched = 0;
+    try {
+      foreach (WearNTear wear in WearNTear.GetAllInstances()) {
+        if (wear == null) {
+          continue;
+        }
+        var view = wear.GetComponent<ZNetView>();
+        ZDO zdo = view == null ? null : view.GetZDO();
+        if (zdo == null) {
+          continue;
+        }
+        string school = SchoolOf(zdo);
+        if (school.Length == 0) {
+          continue;
+        }
+        Apply(wear.gameObject, school);
+        touched++;
+      }
+    } catch (Exception) {
+      // Cosmetic. A lamp that will not retune is not worth interrupting anything for.
+    }
+    return touched;
+  }
+
+  /// <summary>Console entry point: read or set the lamps, and retune what is standing.
+  ///
+  /// Values are written back to the config file, so a look dialled in against real
+  /// weather survives a restart instead of being re-guessed every session.</summary>
+  public static string Tune(string intensityArg, string rangeArg) {
+    if (Enabled == null) {
+      return "rune lights are not bound yet — load a world first.";
+    }
+
+    if (string.IsNullOrEmpty(intensityArg)) {
+      return "rune lights " + (Enabled.Value ? "on" : "off")
+           + ", intensity " + Intensity.Value.ToString("0.##")
+           + ", range " + Range.Value.ToString("0.##") + " m. "
+           + "Set with questlab_runelight <intensity> [range], or off | on.";
+    }
+
+    if (string.Equals(intensityArg, "off", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(intensityArg, "on", StringComparison.OrdinalIgnoreCase)) {
+      Enabled.Value = string.Equals(intensityArg, "on", StringComparison.OrdinalIgnoreCase);
+      return "rune lights " + (Enabled.Value ? "on" : "off") + " — " + Retune() + " retuned.";
+    }
+
+    float intensity;
+    if (!float.TryParse(intensityArg, NumberStyles.Float, CultureInfo.InvariantCulture,
+                        out intensity)) {
+      return "not a number: " + intensityArg;
+    }
+    float wanted = intensity;
+    Intensity.Value = Mathf.Clamp(intensity, 0f, 200f);
+    string clamped = Mathf.Abs(wanted - Intensity.Value) > 0.01f
+        ? " (asked for " + wanted.ToString("0.##") + ", capped)"
+        : string.Empty;
+
+    float range;
+    if (!string.IsNullOrEmpty(rangeArg)
+        && float.TryParse(rangeArg, NumberStyles.Float, CultureInfo.InvariantCulture,
+                          out range)) {
+      Range.Value = Mathf.Clamp(range, 1f, 128f);
+    }
+
+    return "intensity " + Intensity.Value.ToString("0.##") + clamped
+         + ", range " + Range.Value.ToString("0.##") + " m — "
+         + Retune() + " lamp(s) retuned.";
   }
 
   /// <summary>Mark a piece as the one carrying this monument's lamp.</summary>
