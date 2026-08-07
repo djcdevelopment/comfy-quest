@@ -1,0 +1,41 @@
+{
+  "events": [
+    {
+      "event_id": "8c9f2a1e-4b7d-4f7e-9a55-0e3d6c2b1f00",
+      "event_type": "quest_completed",
+      "occurred_at": "2026-08-05T21:14:30+00:00",
+      "world_id": "valheim-era16",
+      "region_id": null,
+      "actor_id": "-306950268",
+      "guild_id": null,
+      "source_service": "valheim-mod",
+      "schema_version": 1,
+      "payload": "{\"creature\":\"Neck\",\"weapon\":\"Clubs\",\"ranged\":false,\"quest_id\":\"neck_romancer\",\"guild\":\"Hunters\",\"category\":\"kill\",\"bot_command\":\"/quest submit id:neck_romancer image: participants:\",\"quest_name\":\"Neck Romancer\"}"
+    },
+    {
+      "event_id": "1d2e3f40-5a6b-4c7d-8e9f-a0b1c2d3e4f5",
+      "event_type": "quest_completed",
+      "occurred_at": "2026-08-05T21:20:02+00:00",
+      "world_id": "valheim-era16",
+      "region_id": null,
+      "actor_id": "-306950268",
+      "guild_id": null,
+      "source_service": "valheim-mod",
+      "schema_version": 1,
+      "payload": "{\"creature\":\"Boar\",\"weapon\":\"Bows\",\"ranged\":true,\"quest_id\":\"boar_sniper\",\"guild\":\"Hunters\",\"category\":\"kill\",\"bot_command\":\"/quest submit id:boar_sniper image: participants:\"}"
+    },
+    {
+      "event_id": "77777777-8888-4999-aaaa-bbbbccccdddd",
+      "event_type": "killing_blow",
+      "occurred_at": "2026-08-05T21:21:00+00:00",
+      "world_id": "valheim-era16",
+      "region_id": null,
+      "actor_id": "-306950268",
+      "guild_id": null,
+      "source_service": "valheim-mod",
+      "schema_version": 1,
+      "payload": "{\"creature\":\"Boar\",\"weapon\":\"Bows\",\"ranged\":true}"
+    }
+  ],
+  "count": 3
+}
