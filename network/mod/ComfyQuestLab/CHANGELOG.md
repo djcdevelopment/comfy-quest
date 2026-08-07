@@ -131,6 +131,20 @@ its own partner. And `clear` trusted remembered ZDOIDs, which are session-scoped
 reload it destroyed two unrelated objects and the local player. Pieces now carry a mark in
 their own ZDO and nothing unmarked is ever destroyed.
 
-**Still not verified in game:** no hook has been observed firing — the thing the lab is
-for. Item stands stay bare; `SetVisualItem` is a registered RPC rather than a callable
-method, so the gear is dropped beside them.
+**The first hook fired the same session.** Punching a beech produced, in the live view:
+
+```
+03:50:03  striking a standing tree
+  Beech1 (tree)   skill Unarmed
+  -> nothing binds a quest to this yet
+```
+
+Every layer at once — the harvest seam patched and firing, the plain name from the
+spellbook table, the target resolved to a prefab, the skill, the ring buffer holding, and
+the verdict that is the entire reason the lab exists. Nothing about that line needs
+explaining to a quest builder.
+
+**Still not verified in game:** only harvest has been witnessed. The other seven
+categories are patched but no event from them has been seen. Item stands stay bare;
+`SetVisualItem` is a registered RPC rather than a callable method, so the gear is dropped
+beside them.

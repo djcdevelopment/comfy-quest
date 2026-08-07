@@ -9,14 +9,24 @@ did — and whether a quest could actually fire on it.
 > wired — 28 seams, 27 of which apply by default (`Player.UseStamina` is config-gated).
 > There is no `lab_setup` yet and no download.
 >
-> **Verified in game** (2026-08-07, one session): the gallery builds — platform, spokes,
-> monuments, 620 pieces — the portal pair connects and carries you up to the plaza, and
-> the structure stands instead of decaying.
+> **Verified in game** (2026-08-07, one session). A seam fires and the live view reports
+> it, which is the whole claim:
 >
-> **Not verified in game:** no hook has been observed firing, which is the thing this
-> exists to demonstrate. Item stands stay bare (`SetVisualItem` is a registered RPC, not a
-> callable method; the gear is dropped beside them instead). This README describes what is
-> here, not what is planned.
+> ```
+> 03:50:03  striking a standing tree
+>   Beech1 (tree)   skill Unarmed
+>   -> nothing binds a quest to this yet
+> ```
+>
+> Plain name, resolved target, skill, and the verdict — a builder learns in one glance
+> that the game sees the hit *and* that no quest can be bound to it. The gallery also
+> builds (620 pieces), the ground-to-plaza portal pair connects, and the structure stands
+> rather than decaying.
+>
+> **Not verified in game:** only the harvest category has been observed firing; the other
+> seven are patched but unwitnessed. Item stands stay bare (`SetVisualItem` is a registered
+> RPC, not a callable method; the gear is dropped beside them instead). This README
+> describes what is here, not what is planned.
 
 ## Why this exists
 
