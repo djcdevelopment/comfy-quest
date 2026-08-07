@@ -1,0 +1,83 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>ComfyQuestLab</AssemblyName>
+    <RootNamespace>ComfyQuestLab</RootNamespace>
+    <LangVersion>12</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <PathMap Condition="'$(PathMap)' == ''">$(MSBuildProjectDirectory)=C:\src\ComfyQuestLab</PathMap>
+    <Optimize>true</Optimize>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <ValheimDir Condition="'$(ValheimDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimDir>
+    <PluginOutputPath Condition="'$(PluginOutputPath)' == ''">$(ValheimDir)\BepInEx\plugins</PluginOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(ValheimDir)\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>$(ValheimDir)\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_valheim">
+      <HintPath>$(ValheimDir)\valheim_Data\Managed\assembly_valheim.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ValheimDir)\valheim_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ValheimDir)\valheim_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ValheimDir)\valheim_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(ValheimDir)\valheim_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(ValheimDir)\valheim_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- LINKED, not ProjectReference, and that is the whole point. A quest authored in
+       the lab has to behave identically in the shipping mod, and the only way that is
+       true rather than hoped-for is if both assemblies compile the SAME contract. These
+       three files are already proven linkable - ComfyNetworkSense.Tests links the same
+       set - because they are deliberately Unity-free.
+
+       Both namespaces are ComfyNetworkSense, so the lab refers to the quest types by
+       their real names. That is intentional: if this ever needs an adapter, the
+       contract has drifted and the fix is upstream, not here.
+
+       NOT linked yet: GameplayEventTypes. It shares GameplayEventProducer.cs with a
+       353-line Unity- and BepInEx-dependent class, so linking it would drag the whole
+       producer in. Extracting it to its own file is a small change to the shipping mod
+       and owes a roadmap note; until then the lab declares its own copy in LabEvents
+       and a test will pin the two together. -->
+  <ItemGroup>
+    <Compile Include="..\ComfyNetworkSense\Core\Models\TrackedQuest.cs" Link="Contract\TrackedQuest.cs" />
+    <Compile Include="..\ComfyNetworkSense\Core\Services\QuestViewLoader.cs" Link="Contract\QuestViewLoader.cs" />
+    <Compile Include="..\ComfyNetworkSense\Core\Services\QuestTriggerEvaluator.cs" Link="Contract\QuestTriggerEvaluator.cs" />
+    <None Include="CHANGELOG.md" />
+    <None Include="manifest.json" />
+    <None Include="README.md" />
+  </ItemGroup>
+
+  <!-- Same two guards as ComfyNetworkSense, for the same reason: an unguarded auto-copy
+       once replaced a pinned DLL mid-program. The path must exist AND you must ask. -->
+  <Target Name="CopyAssembly" AfterTargets="Build"
+          Condition="Exists('$(PluginOutputPath)') And '$(ComfyCopyToPlugins)' == 'true'">
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(PluginOutputPath)" />
+  </Target>
+</Project>

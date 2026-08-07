@@ -1,0 +1,8 @@
+{
+  "name": "ComfyQuestLab",
+  "version_number": "0.1.0",
+  "website_url": "https://github.com/djcdevelopment/baseline/tree/main/network/mod/ComfyQuestLab",
+  "author": "djcdevelopment",
+  "description": "A private-world lab for learning what Valheim can trigger a quest on: a live event console that tells you whether a quest could actually fire on what you just did.",
+  "dependencies": [ "denikson-BepInExPack_Valheim-5.4.2202" ]
+}
