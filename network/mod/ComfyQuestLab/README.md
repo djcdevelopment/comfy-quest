@@ -5,10 +5,10 @@
 Install it on your own world, hit something, and watch the game tell you what it just
 did — and whether a quest could actually fire on it.
 
-> **Scaffold.** The console works and four of the eight categories are wired — harvest,
-> combat, inventory and progression. Building, crafting, world and social are not hooked
-> yet, the journal is a stub, and there is no download. Nothing here has been verified in
-> game. This README describes what is here, not what is planned.
+> **Scaffold.** The console works and all eight categories are wired — 28 seams. The
+> journal is still a stub, there is no `lab_setup` yet, and there is no download.
+> **Nothing here has been verified in game.** This README describes what is here, not
+> what is planned.
 
 ## Why this exists
 
@@ -56,8 +56,8 @@ The full picture, with all 91 seams:
 
 ## Filters are the feature
 
-A single fight emits more rows than the window holds. The console opens on **combat +
-harvest** only; every category is one click. There is a text match and a pause button,
+A single fight emits more rows than the window holds, and all eight categories are live.
+The console opens on **combat + harvest** only; every other category is one click. There is a text match and a pause button,
 and pausing drops nothing — the ring keeps collecting behind it.
 
 ## What it will not do
@@ -65,8 +65,13 @@ and pausing drops nothing — the ring keeps collecting behind it.
 - **It never changes the game.** Every hook is a postfix that reads and records. If a
   postfix throws it is swallowed, because a patch that throws takes Valheim's damage path
   with it.
-- **It only reports what *you* did.** A world of creatures fighting each other would bury
-  the console, and a quest can only be about the player anyway.
+- **It mostly reports what *you* did.** Anything driven by a hit is filtered to the local
+  player, because a world of creatures fighting each other buries the console within
+  seconds of a fight starting. Five seams are deliberately *not* filtered, because they
+  are about the world rather than about you: `Character.OnDeath` and `Stagger` (the
+  target is the subject), `WearNTear.Destroy` (a structure breaking matters whoever broke
+  it), `ZoneSystem.SetGlobalKey` (world state, and interesting precisely because someone
+  else may have caused it), and `Sign.SetText`.
 - **It does nothing on a dedicated server.** Detected in `Awake`, before any patch is
   applied.
 - **It is not the shipping mod.** Uninstall it and nothing about your game changes.

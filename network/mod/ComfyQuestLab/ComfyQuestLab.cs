@@ -66,7 +66,11 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     CombatPatches.Apply(_harmony);
     HarvestPatches.Apply(_harmony);
     InventoryPatches.Apply(_harmony);
+    BuildingPatches.Apply(_harmony);
+    CraftingPatches.Apply(_harmony);
     ProgressionPatches.Apply(_harmony);
+    WorldPatches.Apply(_harmony);
+    SocialPatches.Apply(_harmony);
     LabPanelInputPatches.Apply(_harmony);
 
     RegisterConsoleCommands();

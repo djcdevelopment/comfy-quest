@@ -2,8 +2,8 @@
 
 ### Unreleased
 
-**Scaffold.** The project, the console, four of eight hook categories, and the two
-tools that keep them honest. Nothing is published and there is no download.
+**Scaffold.** The project, the console, all eight hook categories, and the two tools
+that keep them honest. Nothing is published and there is no download.
 
 - New mod `ComfyQuestLab`, separate from ComfyNetworkSense on purpose: it hooks far more
   of the game and draws an overlay, and neither of those belongs in a mod that runs
@@ -13,7 +13,7 @@ tools that keep them honest. Nothing is published and there is no download.
   `QuestTriggerEvaluator` compile from ComfyNetworkSense's own source files, the same way
   ComfyNetworkSense.Tests already links them. A quest that behaves one way in the lab
   behaves the same way in the shipping mod because both compile the same bytes.
-- **Four of eight categories wired**, 17 seams:
+- **All eight categories wired**, 28 seams:
   - **harvest** — `TreeBase.Damage`, `TreeLog.Damage`, `Destructible.Damage`,
     `Pickable.Interact`. The first three are what the retired ComfyControlSurface hooked,
     and the reason punching a bush used to fire a quest and no longer does. `TreeLog` is
@@ -29,13 +29,30 @@ tools that keep them honest. Nothing is published and there is no download.
     every internal shuffle, so a quest built on it would fire constantly and mean nothing.
   - **progression** — `Skills.RaiseSkill`, `Player.OnDeath`, and `Player.UseStamina`
     behind its own flag because it fires on nearly every action including running.
+  - **building** — `Player.PlacePiece`, `RemovePiece`, `Repair`, `WearNTear.Destroy`.
+    The player verbs come off `Player` rather than `Piece`: a piece being placed is a
+    consequence, the player placing it is the act. Destroy is not player-filtered, since
+    a structure breaking matters whoever broke it.
+  - **crafting** — `InventoryGui.DoCrafting`, `Smelter.OnAddOre`, `OnAddFuel`. Note where
+    the craft lives: on the *UI* class, not on `Player` or `CraftingStation`. Nobody
+    guesses that, and a builder looking for "Player.Craft" would conclude crafting cannot
+    be hooked at all.
+  - **world** — `Player.TeleportTo`, `ZoneSystem.SetGlobalKey(string)`. Global keys are
+    how Valheim remembers a boss is dead; it is the closest thing to a server-wide
+    progression event and nothing has ever hooked it. Only the string overload is taken —
+    the two enum overloads route into it, so hooking all three would triple-count.
+  - **social** — `Chat.SendText`, `Sign.SetText`. The quiet one with real potential: a
+    quest that completes on writing a sign needs nothing from combat, and community
+    rituals look more like that than like killing things. `Talker.Say` is deliberately
+    skipped — it is the broadcast that results, so taking both double-counts your own
+    messages.
 - **`LabSeamCatalog.g.cs`, generated from the atlas.** A patch names its seam and the
   catalog answers category and usability. Without it every patch file would restate a
   verdict the atlas already knows and the two would drift the first time a hook landed.
   Regenerate with `tools/component-packets/generate_seam_catalog.py`.
 - **`check_lab_patches.py` — the guard that matters.** Harmony resolves
   `AccessTools.Method` at runtime, so a wrong argument list does not fail the build; it
-  returns null and the patch silently never applies. The checker verifies all 17 targets
+  returns null and the patch silently never applies. The checker verifies all 28 targets
   against the atlas headless, and it is a real guard: it rejects wrong arg lists, missing
   parameters, typo'd names, and overloads that do not exist.
 - **Live event console** (F6). Per-category filters defaulting to combat + harvest,
@@ -53,8 +70,8 @@ tools that keep them honest. Nothing is published and there is no download.
 - Console: `questlab_help`, `questlab_panel`, `questlab_seams`, `questlab_clear`.
 - Panel anchored away from the top-left corner, which ComfyNetworkSense's debug HUD owns.
 
-**Not here yet:** building, crafting, world and social categories; the journal (a stub
-that shows the seam roster); `lab_setup`; and JSONL persistence. `GameplayEventTypes` is
+**Not here yet:** the journal (a stub that shows the seam roster); `lab_setup`; and
+JSONL persistence. `GameplayEventTypes` is
 not linked — it shares a file with a 353-line Unity-dependent class and needs extracting
 first.
 
