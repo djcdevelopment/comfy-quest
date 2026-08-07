@@ -43,6 +43,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   Harmony _harmony;
   LabEventRing _ring;
   LabPanel _panel;
+  LabGalleryBuilder _gallery;
 
   public static LabEventRing Ring { get { return Instance == null ? null : Instance._ring; } }
   public static bool IsPanelOpen { get { return Instance != null && Instance._panel != null && Instance._panel.IsOpen; } }
@@ -54,6 +55,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     LabConfig.Bind(Config);
     _ring = new LabEventRing(LabConfig.ConsoleRows.Value * 8);
     _panel = new LabPanel(_ring);
+    _gallery = new LabGalleryBuilder();
 
     // A dedicated server has no screen and no player to teach. Bail before patching so
     // a server operator who installs this by accident gets a no-op, not a surprise.
@@ -180,6 +182,27 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
           "which seams this build hooked, and which it could not: questlab_seams",
           delegate { Report(SeamRoster()); });
 
+      // The gallery is the one thing here that changes the world, so it only ever moves
+      // when somebody types one of these. check first, always.
+      new Terminal.ConsoleCommand("questlab_gallery",
+          "raise the practice gallery: questlab_gallery <check|build|clear>",
+          delegate (Terminal.ConsoleEventArgs args) {
+            string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "check";
+            if (verb == "build") {
+              StartCoroutine(_gallery.Build(this));
+            } else if (verb == "clear") {
+              Report(_gallery.Clear());
+            } else {
+              Report(_gallery.Check());
+            }
+          });
+
+      new Terminal.ConsoleCommand("questlab_prefabs",
+          "search what this game build actually has: questlab_prefabs <part of a name>",
+          delegate (Terminal.ConsoleEventArgs args) {
+            Report(LabGalleryBuilder.SearchPrefabs(args.Length >= 2 ? args[1] : null));
+          });
+
       new Terminal.ConsoleCommand("questlab_clear",
           "empty the event console: questlab_clear",
           delegate { _ring.Clear(); Report("console cleared"); });
@@ -193,7 +216,9 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("ComfyQuestLab " + PluginVersion + " — learn what the game can trigger a quest on.");
     sb.AppendLine("  questlab_panel   open the live event console (" + LabConfig.PanelShortcut.Value + ")");
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
-    sb.AppendLine("  questlab_clear   empty the console");
+    sb.AppendLine("  questlab_clear   empty the live view");
+    sb.AppendLine("  questlab_gallery check | build | clear   raise the practice ground");
+    sb.AppendLine("  questlab_prefabs <name>   search what this game build has");
     sb.AppendLine("Hit a tree or a bush with the panel open — harvest is the wired category.");
     return sb.ToString().TrimEnd();
   }
