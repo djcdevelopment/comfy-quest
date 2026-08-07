@@ -16,6 +16,11 @@ live mod (QuestEvaluatorEnabled) → routed RPC → server POST /valheim/events
         → review_inbox.py    (list/show/accept/reject/needs-info/export)
 ```
 
+To prove it live — the claiming task QB-1 — follow
+[`RUNBOOK-QB-1.md`](RUNBOOK-QB-1.md). It covers the stack, the two config flags
+(one defaults off and fails silently), which creature to kill and why it cannot
+be a tree, and how to tell which half is at fault when nothing arrives.
+
 ## Use
 
 The EventLog is private-plane only (`http://localhost:4002` where the lab
