@@ -65,16 +65,25 @@ public static class LabRuneLight {
     Enabled = config.Bind("Gallery", "runeLights", true,
         "Hang a coloured light on each monument, one per school. Client-side only — the "
         + "lamps are not networked and nobody else sees them. Hot-reloadable.");
-    // 40 / 6 is a dialled-in value, not a guess: bright and TIGHT. A long reach lights
-    // the mist between you and the rune instead of the rune, and eight of those overlap
-    // into a white wall in any weather at all. Short range keeps the light out of the fog
-    // volume, and the intensity then buys back a glyph that blazes.
-    Intensity = config.Bind("Gallery", "runeLightIntensity", 40f,
+    // 3 / 11, dialled in against the marble backdrop rather than guessed.
+    //
+    // This moved a long way and the reason is worth keeping. With the rune standing
+    // against open sky it needed 40 / 6 — bright and tight, because a wide reach lit the
+    // mist between you and the glyph instead of the glyph, and eight of those overlapped
+    // into a white wall in any weather at all. Once each rune got a black backdrop there
+    // was nothing left to out-shine: the panel does the contrast, so the lamp only has to
+    // wash it. A soft, wider light reads better there, and 40 / 6 now blows out.
+    //
+    // The lesson is that this pair is not a property of the lamp, it is a property of
+    // what the rune is seen against. Change the backdrop and expect to retune, live,
+    // with questlab_runelight.
+    Intensity = config.Bind("Gallery", "runeLightIntensity", 3f,
         new ConfigDescription("How bright each monument's lamp burns.",
             new AcceptableValueRange<float>(0f, 200f)));
-    Range = config.Bind("Gallery", "runeLightRange", 6f,
-        new ConfigDescription("How far each monument's lamp reaches, in metres. Keep this "
-            + "short: reach is what turns light mist into haze.",
+    Range = config.Bind("Gallery", "runeLightRange", 11f,
+        new ConfigDescription("How far each monument's lamp reaches, in metres. Against a "
+            + "backdrop this can be generous; against open sky keep it short, because "
+            + "reach is what turns light mist into haze.",
             new AcceptableValueRange<float>(1f, 128f)));
 
     // Retune what is already standing, rather than only what gets built next. A lamp is
