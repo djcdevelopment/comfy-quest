@@ -144,6 +144,27 @@ spellbook table, the target resolved to a prefab, the skill, the ring buffer hol
 the verdict that is the entire reason the lab exists. Nothing about that line needs
 explaining to a quest builder.
 
+**The monuments read as runes, and they are lit.** Two more things the first real look
+found. The beams were being oriented on an assumption — that a wood beam runs along its
+local Z — and 89 of them standing end-on to the glyphs they were drawing looked, in
+Derek's words, like the dots in a connect-the-dots book. The builder now measures the
+prefab's own mesh, picks whichever local axis it is longest on, and swings *that* onto
+each stroke, correcting for a pivot that is not at the mesh's middle. It prints what it
+measured, so the next person can check rather than trust.
+
+Each monument then carries a coloured lamp, one per school. Valheim has no field for
+this — `LightFlicker` and `LightLod` only modulate and cull a light that already exists,
+and just three fields in the assembly hold a `Light` at all — so the lamp is a
+`UnityEngine.Light` the lab hangs itself, which makes it client-side and unsaved, and
+means it needs the same re-application on zone reload that the wear flags needed.
+Intensity, range, and on/off are config; colour is per school.
+
+**Clear now sweeps by mark, not by manifest.** The manifest only ever described the most
+recent build — every build empties it first — so a second gallery orphaned the first
+beyond any reach, and the pieces accumulated to 1527 before anyone noticed a clear
+reporting zero. `WearNTear.GetAllInstances()` enumerates every loaded piece, so the sweep
+finds all lab-marked galleries in any session. It only sees loaded zones, and says so.
+
 **Still not verified in game:** only harvest has been witnessed. The other seven
 categories are patched but no event from them has been seen. Item stands stay bare;
 `SetVisualItem` is a registered RPC rather than a callable method, so the gear is dropped

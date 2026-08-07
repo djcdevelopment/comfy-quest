@@ -79,6 +79,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
     // Not a seam — it holds the gallery up rather than watching anything. See the file.
     GalleryStructurePatches.Apply(_harmony);
+    // Also not a seam: hangs a coloured lamp on each monument. Client-side and cosmetic.
+    RuneLightPatches.Apply(_harmony);
 
     RegisterConsoleCommands();
 

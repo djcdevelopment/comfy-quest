@@ -245,18 +245,47 @@ public sealed class LabGalleryBuilder {
     yield return null;
 
     // 2. the monuments, and the station on each pad
+    //
+    // Which way a beam points is measured off the prefab, never assumed — see Measure.
+    PieceMetrics beamShape = Measure("wood_beam");
     foreach (LabGalleryPlan.Monument monument in LabGalleryPlan.Monuments) {
+      // The lamp hangs on whichever beam lands nearest the middle of the glyph, so one
+      // light covers the whole 11 m of strokes. Tracked as the beams go up rather than
+      // computed afterwards, because the piece that gets marked has to be a real one.
+      var runeCentre = new Vector3(origin.x + monument.Cx,
+                                   floorY + LabGalleryPlan.RuneHeight * 0.5f,
+                                   origin.z + monument.Cz);
+      GameObject lampHost = null;
+      float lampBest = float.MaxValue;
+
       foreach (LabGalleryPlan.Beam beam in monument.Beams) {
         var at = new Vector3(origin.x + beam.X, floorY + beam.Y, origin.z + beam.Z);
-        var along = new Vector3(beam.Dx, beam.Dy, beam.Dz);
-        // A wood beam runs along its local Z, so look down the stroke. Up is world-up
-        // except for a vertical stroke, where any perpendicular will do.
-        Vector3 up = Mathf.Abs(along.y) > 0.95f ? Vector3.forward : Vector3.up;
-        if (Place("wood_beam", at, Quaternion.LookRotation(along, up))) {
+        var along = new Vector3(beam.Dx, beam.Dy, beam.Dz).normalized;
+        // Swing the prefab's own long axis onto the stroke, then back out the offset
+        // between its pivot and the middle of its mesh, so the stroke lands centred where
+        // the plan asked for it rather than hanging off one end.
+        Quaternion rot = Quaternion.FromToRotation(beamShape.LongAxis, along);
+        GameObject piece = Place("wood_beam", at - rot * beamShape.Center, rot);
+        if (piece != null) {
           placed++;
+          float toCentre = (at - runeCentre).sqrMagnitude;
+          if (toCentre < lampBest) {
+            lampBest = toCentre;
+            lampHost = piece;
+          }
         }
         if (placed % PiecesPerFrame == 0) {
           yield return null;
+        }
+      }
+
+      // Mark the lamp beam and light it here as well as in the patch: the patch runs from
+      // Awake, during the Instantiate inside Place, before the mark below exists.
+      if (lampHost != null) {
+        var lampView = lampHost.GetComponent<ZNetView>();
+        if (lampView != null && lampView.GetZDO() != null) {
+          LabRuneLight.Mark(lampView.GetZDO(), monument.Category);
+          LabRuneLight.Apply(lampHost, monument.Category);
         }
       }
 
@@ -375,19 +404,67 @@ public sealed class LabGalleryBuilder {
 
   // ---- clear -----------------------------------------------------------------------
 
+  /// <summary>Take the gallery down — every gallery, not just the last one.
+  ///
+  /// The manifest cannot be the answer here and never could. Every build begins by
+  /// emptying it and rewrites it at the end, so it only ever describes the most recent
+  /// gallery; the moment a second one went up the first became unreachable, and clear
+  /// could not have found it however hard it tried. What that looks like from inside the
+  /// world is 1500 pieces of accumulated scaffolding and a clear that reports zero.
+  ///
+  /// So the mark leads and the manifest follows. WearNTear.GetAllInstances() enumerates
+  /// every loaded piece, and every gallery piece has a WearNTear, so a sweep finds all of
+  /// them in any session no matter which build placed them. The manifest is still worth
+  /// consulting afterwards for marked pieces sitting in zones that are not loaded.
+  ///
+  /// Blueprint pieces are deliberately not touched: this asks IsGalleryPiece, not
+  /// LabMarks.IsLabBuilt, so clearing a gallery never takes somebody's blueprint with it.</summary>
   public string Clear() {
     if (ZNetScene.instance == null) {
       return "not in a world yet.";
     }
-    LoadManifestIfEmpty();
-    if (_placed.Count == 0) {
-      return "nothing recorded to clear. The manifest is written at build time; if you "
-           + "built on another character or wiped it, take the pieces down by hand.";
+
+    // Collect first, destroy second. Destroying while walking the instance list mutates
+    // the thing being walked.
+    var doomed = new List<ZNetView>();
+    var swept = new HashSet<ZDOID>();
+    try {
+      foreach (WearNTear wear in WearNTear.GetAllInstances()) {
+        if (wear == null) {
+          continue;
+        }
+        var view = wear.GetComponent<ZNetView>();
+        ZDO zdo = view == null ? null : view.GetZDO();
+        if (zdo == null || !IsGalleryPiece(zdo)) {
+          continue;
+        }
+        doomed.Add(view);
+        swept.Add(zdo.m_uid);
+      }
+    } catch (Exception ex) {
+      LogOnce("could not sweep loaded pieces: " + ex.Message);
     }
 
     int removed = 0;
+    foreach (ZNetView view in doomed) {
+      try {
+        if (view == null) {
+          continue;
+        }
+        view.ClaimOwnership();
+        view.Destroy();
+        removed++;
+      } catch (Exception) {
+        // A piece somebody already broke is not an error worth stopping for.
+      }
+    }
+
+    LoadManifestIfEmpty();
     int notOurs = 0;
     foreach (ZDOID id in _placed) {
+      if (swept.Contains(id)) {
+        continue;
+      }
       try {
         ZDO zdo = ZDOMan.instance.GetZDO(id);
         if (zdo == null) {
@@ -417,13 +494,18 @@ public sealed class LabGalleryBuilder {
     _placed.Clear();
     SaveManifest();
 
-    if (notOurs > 0) {
-      return "cleared " + removed + " piece(s), and left " + notOurs + " alone: the "
-           + "manifest named ids that now belong to something else, which is what happens "
-           + "to a manifest across a reload. Any gallery still standing has to come down "
-           + "by hand this time.";
+    if (removed == 0) {
+      return "no gallery pieces are loaded here. The sweep only sees zones the game has "
+           + "loaded, so stand in the gallery and run this again.";
     }
-    return "cleared " + removed + " piece(s).";
+    return "cleared " + removed + " piece(s)"
+         + (notOurs > 0
+            ? ", and left " + notOurs + " manifest entr" + (notOurs == 1 ? "y" : "ies")
+              + " alone — those ids belong to something else now, which is what happens to "
+              + "a manifest across a reload"
+            : string.Empty)
+         + ". Anything still standing is in a zone that is not loaded: walk toward it and "
+         + "run this again.";
   }
 
   // ---- manifest --------------------------------------------------------------------
@@ -463,6 +545,87 @@ public sealed class LabGalleryBuilder {
   }
 
   // ---- plumbing --------------------------------------------------------------------
+
+  /// <summary>What a prefab is actually shaped like: which of its local axes the mesh is
+  /// longest on, and where that mesh sits relative to the pivot.</summary>
+  struct PieceMetrics {
+    public Vector3 LongAxis;
+    public Vector3 Center;
+    public Vector3 Size;
+  }
+
+  /// <summary>Measure a prefab instead of assuming how it is built.
+  ///
+  /// The monuments first came out looking like the dots in a connect-the-dots book. The
+  /// orientation was a guess — the code took it as read that a wood beam runs along its
+  /// local Z and aimed that down each stroke. A 2 m beam whose mesh actually runs along a
+  /// different axis stands end-on to the rune it is drawing, and 89 of them read as a
+  /// scatter of points rather than eight glyphs.
+  ///
+  /// The component atlas cannot answer this one: mesh extents live in the asset bundles,
+  /// not in assembly_valheim.dll, so there is no IL to read. The prefab can answer it
+  /// though, at runtime, for nothing. So ask it, and report what it said — a build that
+  /// prints "drawing along local Y" can be checked by the person watching it.</summary>
+  PieceMetrics Measure(string prefabName) {
+    var fallback = new PieceMetrics { LongAxis = Vector3.forward };
+    try {
+      GameObject prefab = ZNetScene.instance.GetPrefab(prefabName);
+      if (prefab == null) {
+        return fallback;
+      }
+
+      bool any = false;
+      Bounds local = default;
+      foreach (MeshFilter filter in prefab.GetComponentsInChildren<MeshFilter>(true)) {
+        Mesh mesh = filter.sharedMesh;
+        if (mesh == null) {
+          continue;
+        }
+        Bounds mb = mesh.bounds;
+        // All eight corners, each carried into the prefab root's frame, so that a rotated
+        // child cannot quietly stretch the box along an axis the mesh does not use.
+        for (int i = 0; i < 8; i++) {
+          var corner = new Vector3(
+              (i & 1) == 0 ? mb.min.x : mb.max.x,
+              (i & 2) == 0 ? mb.min.y : mb.max.y,
+              (i & 4) == 0 ? mb.min.z : mb.max.z);
+          Vector3 inRoot =
+              prefab.transform.InverseTransformPoint(filter.transform.TransformPoint(corner));
+          if (!any) {
+            local = new Bounds(inRoot, Vector3.zero);
+            any = true;
+          } else {
+            local.Encapsulate(inRoot);
+          }
+        }
+      }
+      if (!any) {
+        return fallback;
+      }
+
+      Vector3 size = local.size;
+      Vector3 axis;
+      string named;
+      if (size.x >= size.y && size.x >= size.z) {
+        axis = Vector3.right;
+        named = "X";
+      } else if (size.y >= size.z) {
+        axis = Vector3.up;
+        named = "Y";
+      } else {
+        axis = Vector3.forward;
+        named = "Z";
+      }
+
+      Report(prefabName + " measures " + size.x.ToString("0.00") + " x "
+          + size.y.ToString("0.00") + " x " + size.z.ToString("0.00")
+          + " — drawing along local " + named + ".");
+      return new PieceMetrics { LongAxis = axis, Center = local.center, Size = size };
+    } catch (Exception ex) {
+      LogOnce("could not measure " + prefabName + ": " + ex.Message);
+      return fallback;
+    }
+  }
 
   static bool TryGroundHeight(Vector3 at, out float height) {
     height = at.y;

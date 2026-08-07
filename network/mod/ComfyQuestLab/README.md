@@ -21,7 +21,8 @@ did — and whether a quest could actually fire on it.
 > Plain name, resolved target, skill, and the verdict — a builder learns in one glance
 > that the game sees the hit *and* that no quest can be bound to it. The gallery also
 > builds (620 pieces), the ground-to-plaza portal pair connects, and the structure stands
-> rather than decaying.
+> rather than decaying. The monuments read as their glyphs, each lit in its school's
+> colour.
 >
 > **Not verified in game:** only the harvest category has been observed firing; the other
 > seven are patched but unwitnessed. Item stands stay bare (`SetVisualItem` is a registered
