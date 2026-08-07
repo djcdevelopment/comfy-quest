@@ -16,9 +16,11 @@ site is flat ground.
 Prefab names are guesses until proven: `--prefab-dump <path>` cross-checks the
 palette against a `questlab_prefabs dump` JSON and fails loudly on a miss, and
 the in-game `questlab_blueprint check` gates the build regardless. Piece
-pivots are assumed bottom-center for walls and center for floor slabs — the
-first build verifies both, and a wrong guess shows up as a uniform 1-2 m
-offset fixable in one constant.
+pivots are MEASURED, not assumed: the 2026-08-07 dump's snap points showed the
+stone pieces pivot at their centers (stone_wall_2x1 snaps at y -0.5..+0.5)
+while crystal_wall_1x1 pivots at its bottom (y 0..1) — the original
+bottom-pivot assumption would have sunk every stone course half a metre. The
+LIFT table below encodes what the dump said.
 
 Usage:
     python tools/blueprints/generate_fallingwater.py [--out PATH] [--stats]
@@ -42,12 +44,26 @@ from blueprint_lib import Blueprint, Piece, write_blueprint, yaw_quat  # noqa: E
 # Valheim's palette distance; crystal_wall_1x1 (Mistlands) is the only
 # continuous-glazing piece in the vanilla game; darkwood reads Cherokee red.
 PALETTE = {
-    "slab": "stone_floor_2x2",       # 2x2 m floor/roof plate
+    "slab": "stone_floor_2x2",       # 2x2 m floor/roof plate, 1 m thick
     "wall": "stone_wall_2x1",        # 2 w x 1 h
     "wall_big": "stone_wall_4x2",    # 4 w x 2 h, core shell
     "arch": "stone_arch",            # applied opening detail on the core
     "glass": "crystal_wall_1x1",     # 1 x 1 m glazing
     "trim": "darkwood_beam",         # 2 m horizontal accent
+}
+
+# Pivot lift: what to ADD to a piece's intended BASE height to get the pivot
+# height the blueprint must carry. Measured from the prefab dump's snap
+# points (comfy-prefab-dump/v1, game 0.221.12): stone pieces pivot at their
+# center, crystal at its bottom, beams a quarter up. A slab's "base" is one
+# metre below the walking level it provides, so its entry nets to level-0.5.
+LIFT = {
+    "slab": 0.5,        # 1 m thick, center pivot: base + 0.5 = pivot
+    "wall": 0.5,        # 1 m tall, center pivot
+    "wall_big": 1.0,    # 2 m tall, center pivot
+    "arch": 0.5,
+    "glass": 0.0,       # bottom pivot — the lone exception
+    "trim": 0.25,
 }
 
 
@@ -93,48 +109,51 @@ class Build:
 
 
 def emit_slab(b, mass, x0, x1, z0, z1, y):
-    """Floor/roof plates: 2 m tiles, centers on the half-grid."""
+    """Floor/roof plates: 2 m tiles, centers on the half-grid. `y` is the
+    walking level the slab provides — its 1 m body hangs below that."""
+    pivot = y - 1 + LIFT["slab"]
     for x in range(x0, x1, 2):
         for z in range(z0, z1, 2):
-            b.add(mass, PALETTE["slab"], x + 1, y, z + 1)
+            b.add(mass, PALETTE["slab"], x + 1, pivot, z + 1)
 
 
-def emit_wall_x(b, mass, prefab, x0, x1, z, y0, courses, course_h=1, seg=2):
-    """A wall running east-west at fixed z, courses stacked upward."""
+def emit_wall_x(b, mass, kind, x0, x1, z, y0, courses, course_h=1, seg=2):
+    """A wall running east-west at fixed z, courses stacked up from base y0."""
     for c in range(courses):
         for x in range(x0, x1, seg):
-            b.add(mass, prefab, x + seg / 2, y0 + c * course_h, z, yaw=0)
+            b.add(mass, PALETTE[kind], x + seg / 2,
+                  y0 + c * course_h + LIFT[kind], z, yaw=0)
 
 
-def emit_wall_z(b, mass, prefab, z0, z1, x, y0, courses, course_h=1, seg=2):
+def emit_wall_z(b, mass, kind, z0, z1, x, y0, courses, course_h=1, seg=2):
     """A wall running north-south at fixed x."""
     for c in range(courses):
         for z in range(z0, z1, seg):
-            b.add(mass, prefab, x, y0 + c * course_h, z + seg / 2, yaw=90)
+            b.add(mass, PALETTE[kind], x,
+                  y0 + c * course_h + LIFT[kind], z + seg / 2, yaw=90)
 
 
 def emit_glass_x(b, x0, x1, z, y0):
     for c in range(2):
         for x in range(x0, x1):
-            b.add("glass", PALETTE["glass"], x + 0.5, y0 + c, z, yaw=0)
+            b.add("glass", PALETTE["glass"], x + 0.5, y0 + c + LIFT["glass"], z, yaw=0)
 
 
 def emit_glass_z(b, z0, z1, x, y0):
     for c in range(2):
         for z in range(z0, z1):
-            b.add("glass", PALETTE["glass"], x, y0 + c, z + 0.5, yaw=90)
+            b.add("glass", PALETTE["glass"], x, y0 + c + LIFT["glass"], z + 0.5, yaw=90)
 
 
 def emit_volume(b, p, volume, floor_y):
     """One storey: stone on north and west, parapet-plus-glass on south and
     east — the orientation that gives the terraces their open faces."""
     x0, x1, z0, z1 = volume
-    wall = PALETTE["wall"]
-    emit_wall_x(b, "stone", wall, x0, x1, z1, floor_y, p.storey)          # north
-    emit_wall_z(b, "stone", wall, z0, z1, x0, floor_y, p.storey)          # west
-    emit_wall_x(b, "parapet", wall, x0, x1, z0, floor_y, p.parapet_h)     # south
+    emit_wall_x(b, "stone", "wall", x0, x1, z1, floor_y, p.storey)          # north
+    emit_wall_z(b, "stone", "wall", z0, z1, x0, floor_y, p.storey)          # west
+    emit_wall_x(b, "parapet", "wall", x0, x1, z0, floor_y, p.parapet_h)     # south
     emit_glass_x(b, x0, x1, z0, floor_y + p.parapet_h)
-    emit_wall_z(b, "parapet", wall, z0, z1, x1, floor_y, p.parapet_h)     # east
+    emit_wall_z(b, "parapet", "wall", z0, z1, x1, floor_y, p.parapet_h)     # east
     emit_glass_z(b, z0, z1, x1, floor_y + p.parapet_h)
 
 
@@ -142,13 +161,12 @@ def emit_tray_parapet(b, p, tray, volume):
     """1 m band on every tray edge not already claimed by the volume above it."""
     x0, x1, z0, z1, y = tray
     vx0, vx1, vz0, vz1 = volume
-    wall = PALETTE["wall"]
-    emit_wall_x(b, "parapet", wall, x0, x1, z0, y, p.parapet_h)                 # south
+    emit_wall_x(b, "parapet", "wall", x0, x1, z0, y, p.parapet_h)               # south
     if x0 < vx0:
-        emit_wall_x(b, "parapet", wall, x0, vx0, z1, y, p.parapet_h)            # north gap
-        emit_wall_z(b, "parapet", wall, z0, z1, x0, y, p.parapet_h)             # west
+        emit_wall_x(b, "parapet", "wall", x0, vx0, z1, y, p.parapet_h)          # north gap
+        emit_wall_z(b, "parapet", "wall", z0, z1, x0, y, p.parapet_h)           # west
     if z0 < vz0:
-        emit_wall_z(b, "parapet", wall, z0, vz0, x1, y, p.parapet_h)            # east gap
+        emit_wall_z(b, "parapet", "wall", z0, vz0, x1, y, p.parapet_h)          # east gap
 
 
 def emit_core(b, p):
@@ -157,13 +175,13 @@ def emit_core(b, p):
     opening read (cutting real holes in 4 m pieces buys nothing at this
     scale)."""
     x0, x1, z0, z1 = p.core
-    big = PALETTE["wall_big"]
-    emit_wall_x(b, "core", big, x0, x1, z1, 0, p.core_top // 2, course_h=2, seg=4)
-    emit_wall_x(b, "core", big, x0, x1, z0, 0, p.core_top // 2, course_h=2, seg=4)
-    emit_wall_z(b, "core", big, z0, z1, x0, 0, p.core_top // 2, course_h=2, seg=4)
-    emit_wall_z(b, "core", big, z0, z1, x1, 0, p.core_top // 2, course_h=2, seg=4)
+    emit_wall_x(b, "core", "wall_big", x0, x1, z1, 0, p.core_top // 2, course_h=2, seg=4)
+    emit_wall_x(b, "core", "wall_big", x0, x1, z0, 0, p.core_top // 2, course_h=2, seg=4)
+    emit_wall_z(b, "core", "wall_big", z0, z1, x0, 0, p.core_top // 2, course_h=2, seg=4)
+    emit_wall_z(b, "core", "wall_big", z0, z1, x1, 0, p.core_top // 2, course_h=2, seg=4)
     for storey_y in (0, 3, 6):
-        b.add("core", PALETTE["arch"], x0, storey_y, (z0 + z1) / 2, yaw=90)
+        b.add("core", PALETTE["arch"], x0, storey_y + LIFT["arch"],
+              (z0 + z1) / 2, yaw=90)
     emit_slab(b, "core", x0, x1, z0, z1, p.core_top)                            # chimney cap
 
 
@@ -172,14 +190,16 @@ def emit_trellis(b, p):
     x0 = p.main_tray[0] + 1
     for x in range(x0, p.main_volume[0], 2):
         for z in range(p.main_tray[2], -1, 2):
-            b.add("trellis", PALETTE["trim"], x, p.trellis_y, z + 1, yaw=90)
+            b.add("trellis", PALETTE["trim"], x, p.trellis_y + LIFT["trim"],
+                  z + 1, yaw=90)
 
 
 def emit_trim(b, p):
     """Darkwood caps along the south parapet tops — the Cherokee-red line."""
     for (x0, x1, z0, _z1, y) in (p.main_tray, p.l2_tray, p.l3_tray):
         for x in range(x0, x1, 2):
-            b.add("trim", PALETTE["trim"], x + 1, y + p.parapet_h, z0, yaw=0)
+            b.add("trim", PALETTE["trim"], x + 1, y + p.parapet_h + LIFT["trim"],
+                  z0, yaw=0)
 
 
 def generate(p=None):
@@ -203,10 +223,10 @@ def generate(p=None):
         emit_slab(b, "roof", l3x1, vx1, vz0, vz1, p.l3_tray[4])
     rx0, rx1, rz0, rz1 = p.l3_volume
     emit_slab(b, "roof", rx0, rx1, rz0, rz1, p.roof_y)
-    emit_wall_x(b, "roof", PALETTE["wall"], rx0, rx1, rz0, p.roof_y, 1)
-    emit_wall_x(b, "roof", PALETTE["wall"], rx0, rx1, rz1, p.roof_y, 1)
-    emit_wall_z(b, "roof", PALETTE["wall"], rz0, rz1, rx0, p.roof_y, 1)
-    emit_wall_z(b, "roof", PALETTE["wall"], rz0, rz1, rx1, p.roof_y, 1)
+    emit_wall_x(b, "roof", "wall", rx0, rx1, rz0, p.roof_y, 1)
+    emit_wall_x(b, "roof", "wall", rx0, rx1, rz1, p.roof_y, 1)
+    emit_wall_z(b, "roof", "wall", rz0, rz1, rx0, p.roof_y, 1)
+    emit_wall_z(b, "roof", "wall", rz0, rz1, rx1, p.roof_y, 1)
 
     emit_core(b, p)
     emit_trellis(b, p)

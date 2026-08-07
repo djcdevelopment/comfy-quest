@@ -90,10 +90,12 @@ class FallingwaterBlueprint(unittest.TestCase):
         self.assertAlmostEqual(x1 - x0, width, delta=2.0)
         self.assertAlmostEqual(z1 - z0, depth, delta=2.0)
 
-    def test_nothing_below_origin(self):
-        # MinY = 0 keeps the ground-snap in LabBlueprintBuilder trivial: the
-        # lowest authored piece IS the ground line.
-        self.assertGreaterEqual(min(p.y for p in self.bp.pieces), 0.0)
+    def test_nothing_below_slab_body(self):
+        # Level 0 is the authored ground line; the main slab's 1 m body hangs
+        # below it with a center pivot at -0.5 (measured from the prefab
+        # dump's snap points). The builder's ground snap subtracts MinY, so
+        # anything deeper than that pivot is a mass leaking downward.
+        self.assertGreaterEqual(min(p.y for p in self.bp.pieces), -0.5)
 
     def test_rotations_are_unit_yaw_quaternions(self):
         for p in self.bp.pieces:
