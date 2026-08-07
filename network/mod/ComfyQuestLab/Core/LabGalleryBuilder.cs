@@ -29,6 +29,16 @@ public sealed class LabGalleryBuilder {
   const int PiecesPerFrame = 12;
   const float PlatformClearance = 0.6f;   // floor sits this far above the highest ground
 
+  /// <summary>Portal tags. Two portals sharing a tag connect to each other; the pairing
+  /// is a plain ZDO string field, per the component atlas.</summary>
+  const string GalleryTag = "gallery";
+  const string WorldTag = "gallery world";
+
+  /// <summary>Materials, so the gallery can be extended, repaired, or stair-cased by
+  /// hand. Stacks rather than singles — a student who wants to build should not have to
+  /// go logging first.</summary>
+  static readonly string[] Supplies = { "Wood", "Wood", "FineWood", "RoundLog", "Stone" };
+
   readonly List<ZDOID> _placed = new List<ZDOID>();
   bool _running;
 
@@ -172,6 +182,36 @@ public sealed class LabGalleryBuilder {
       }
     }
 
+    // 1b. a way up.
+    //
+    // The floor levels to the HIGHEST ground under the footprint, which is what makes it
+    // level — and on any ground with a rise in it you end up standing underneath your own
+    // gallery. That is exactly what the first real build did.
+    //
+    // A portal pair rather than stairs: it is instant, it is the right idiom for a tome,
+    // and taking it fires Player.TeleportTo — a World-school spell — so the first thing
+    // anyone does in the gallery already makes the live view move.
+    //
+    // The pairing is a ZDO string field called "tag", read straight out of the component
+    // atlas, so there is no RPC signature to guess at here.
+    Vector3 arrival = origin + new Vector3(2f, 0f, 0f);
+    float arrivalGround;
+    if (TryGroundHeight(arrival, out arrivalGround)) {
+      arrival.y = arrivalGround;
+    }
+    if (PlacePortal(arrival, GalleryTag, 0f)) {
+      placed++;
+    }
+    if (PlacePortal(new Vector3(origin.x + 3.5f, floorY, origin.z), GalleryTag, 180f)) {
+      placed++;
+    }
+    // The far end of the World school's own portal, so "take a portal" is a thing a
+    // student can actually do from the plaza rather than a thing they read about.
+    if (PlacePortal(new Vector3(origin.x - 3.5f, floorY, origin.z), WorldTag, 180f)) {
+      placed++;
+    }
+    yield return null;
+
     // 2. the monuments, and the station on each pad
     foreach (LabGalleryPlan.Monument monument in LabGalleryPlan.Monuments) {
       foreach (LabGalleryPlan.Beam beam in monument.Beams) {
@@ -190,8 +230,12 @@ public sealed class LabGalleryBuilder {
 
       var stationAt = new Vector3(origin.x + monument.Station.X, floorY,
                                   origin.z + monument.Station.Z);
-      if (Place(monument.Station.Prefab, stationAt, Quaternion.identity)) {
+      GameObject station = Place(monument.Station.Prefab, stationAt, Quaternion.identity);
+      if (station != null) {
         placed++;
+        if (monument.Station.Prefab == "portal_wood") {
+          TagPortal(station, WorldTag);
+        }
       }
       yield return null;
     }
@@ -217,6 +261,20 @@ public sealed class LabGalleryBuilder {
                               origin.z + item.Z * 0.82f);
       if (Place(item.Item, loose, Quaternion.identity) != null) {
         placed++;
+      }
+      yield return null;
+    }
+
+    // Materials, so the gallery can be extended or repaired by hand without a
+    // logging trip first.
+    for (int i = 0; i < Supplies.Length; i++) {
+      float a = 2f * Mathf.PI * i / Supplies.Length;
+      var at = new Vector3(origin.x + Mathf.Sin(a) * 3.0f, floorY + 0.4f,
+                           origin.z + Mathf.Cos(a) * 3.0f);
+      GameObject drop = Place(Supplies[i], at, Quaternion.identity);
+      if (drop != null) {
+        placed++;
+        SetStack(drop, 50);
       }
       yield return null;
     }
@@ -352,6 +410,47 @@ public sealed class LabGalleryBuilder {
       return ZoneSystem.instance.GetSolidHeight(at, out height);
     } catch (Exception) {
       return false;
+    }
+  }
+
+  /// <summary>Place a portal and tag it. Two portals with the same tag connect.
+  ///
+  /// The tag is a ZDO string field ("tag"), which the component atlas reports directly —
+  /// so this needs no RPC and no guessed signature. Written before the ZDO is shared so
+  /// the pairing is there from the first frame.</summary>
+  bool PlacePortal(Vector3 at, string tag, float yaw) {
+    GameObject go = Place("portal_wood", at, Quaternion.Euler(0f, yaw, 0f));
+    if (go == null) {
+      return false;
+    }
+    TagPortal(go, tag);
+    return true;
+  }
+
+  /// <summary>Make a dropped item a stack rather than a single. Best effort: if the
+  /// field shape differs on a game build, one log is worth more than a crash.</summary>
+  void SetStack(GameObject go, int count) {
+    try {
+      var drop = go.GetComponent<ItemDrop>();
+      if (drop == null || drop.m_itemData == null) {
+        return;
+      }
+      drop.m_itemData.m_stack = Mathf.Min(count, drop.m_itemData.m_shared.m_maxStackSize);
+      // No Save() on ItemDrop — the stack set before the ZDO is shared persists on its own.
+    } catch (Exception ex) {
+      LogOnce("could not stack a supply drop: " + ex.Message);
+    }
+  }
+
+  void TagPortal(GameObject go, string tag) {
+    try {
+      var view = go.GetComponent<ZNetView>();
+      if (view == null || view.GetZDO() == null) {
+        return;
+      }
+      view.GetZDO().Set("tag", tag);
+    } catch (Exception ex) {
+      LogOnce("could not tag a portal: " + ex.Message);
     }
   }
 
