@@ -25,8 +25,10 @@ using UnityEngine;
 /// csproj), so a quest that behaves one way here behaves the same way there. That is
 /// the only promise the lab makes, and it is the one that matters.
 ///
-/// Scaffold status: the harvest category is wired end to end as the worked example.
-/// The other seven categories in the atlas are not hooked yet.</summary>
+/// Status: all eight atlas categories are hooked — 28 seams. What differs between them is
+/// not whether the lab sees them but whether a quest can be BOUND to them: QuestTriggerEvaluator
+/// matches kill triggers only, so combat is the one school that can fire a quest today. The
+/// lab's job is to make that distinction visible rather than to hide it.</summary>
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 public sealed class ComfyQuestLab : BaseUnityPlugin {
   public const string PluginGuid = "djcdevelopment.valheim.comfyquestlab";
@@ -84,8 +86,16 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
     RegisterConsoleCommands();
 
+    // Load quests now rather than at first kill, mirroring ComfyNetworkSense's LoadQuestView():
+    // a malformed file should be visible when somebody launches, not twenty minutes later when
+    // a quest they were counting on quietly does not fire. The world does not exist yet, so the
+    // catalog advisories stay silent until the first lab_reload — by design, see LabWorldFacts.
+    LabQuestEngine.Reload();
+
     LogInfo("quest lab " + PluginVersion + " (" + ReleaseId + ") — "
-        + LabPatching.AppliedCount + "/" + LabPatching.Outcomes.Count + " seams hooked. "
+        + LabPatching.AppliedCount + "/" + LabPatching.Outcomes.Count + " seams hooked, "
+        + LabQuestEngine.Set.Quests.Count + " quests loaded ("
+        + LabQuestEngine.Set.ArmedCount + " armed). "
         + "Type questlab_help in the console (F5).");
   }
 
@@ -184,9 +194,30 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       new Terminal.ConsoleCommand("lab_setup",
           "set up the lab practice area and read the welcome note: lab_setup",
           delegate {
+            // Seed before the gallery, and synchronously: the starter file is the thing a
+            // creator opens next, so it should exist by the time the console stops talking.
+            string seeded = LabQuestSeed.EnsureSeeded(LabQuestEngine.QuestDir);
+            if (seeded != null) {
+              Report(seeded);
+              LabQuestEngine.Reload();
+            }
+
             StartCoroutine(_gallery.Build(this));
             Report("Quest lab setup started! The gallery is being raised.");
-            Report("Press F6 to open the console. Learn the spells at djcdevelopment.github.io/baseline/questlab/");
+            Report("Press " + LabConfig.PanelShortcut.Value + " to open the lab console. "
+                + "Learn the spells at djcdevelopment.github.io/baseline/questlab/");
+          });
+
+      new Terminal.ConsoleCommand("lab_reload",
+          "re-read your quest files and say what changed: lab_reload",
+          delegate {
+            string summary = LabQuestEngine.Reload();
+            Report(summary);
+            // One row in the event console so somebody watching it notices; the detail is
+            // in the Quests tab, where it stays put instead of scrolling away.
+            Observe(new LabEvent(LabCategory.Combat, "quest.reloaded",
+                LabQuestEngine.Set.Quests.Count + " quests",
+                LabQuestEngine.Set.ArmedCount + " armed", LabUsability.Today));
           });
 
       new Terminal.ConsoleCommand("questlab_panel",
@@ -270,6 +301,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     var sb = new StringBuilder();
     sb.AppendLine("ComfyQuestLab " + PluginVersion + " — learn what the game can trigger a quest on.");
     sb.AppendLine("  lab_setup        set up the practice area (do this first)");
+    sb.AppendLine("  lab_reload       re-read your quest files and say what changed");
     sb.AppendLine("  questlab_panel   open the live event console (" + LabConfig.PanelShortcut.Value + ")");
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
     sb.AppendLine("  questlab_clear   empty the live view");
@@ -287,14 +319,15 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     foreach (LabPatching.Outcome o in outcomes) {
       sb.AppendLine("  " + (o.Applied ? "[x] " : "[ ] ") + o.Label + (o.Applied ? string.Empty : " — " + o.Detail));
     }
-    sb.AppendLine("Seven of the eight atlas categories are not wired yet; harvest is the worked example.");
+    sb.AppendLine("All eight atlas categories are hooked. Being hooked is not the same as being "
+        + "bindable: only a kill can fire a quest today, which is what the Quests tab explains.");
     return sb.ToString().TrimEnd();
   }
 
   /// <summary>Say something to the player and the log at once. The shipping mod uses
   /// MessageHud the same way; a console command that only writes to a log file is a
   /// command a builder will assume did nothing.</summary>
-  static void Report(string message) {
+  public static void Report(string message) {
     LogInfo(message);
     try {
       if (MessageHud.instance != null) {
@@ -317,6 +350,8 @@ public static class LabConfig {
   public static ConfigEntry<bool> VerboseLogging { get; private set; }
   public static ConfigEntry<bool> ObserveStamina { get; private set; }
   public static ConfigEntry<int> BlueprintPiecesPerFrame { get; private set; }
+  public static ConfigEntry<bool> QuestsEnabled { get; private set; }
+  public static ConfigEntry<float> QuestCooldownSeconds { get; private set; }
 
   public static void Bind(ConfigFile config) {
     Enabled =
@@ -373,5 +408,29 @@ public static class LabConfig {
             + "build. 12 is the rate the 620-piece gallery build proved out. Raise it "
             + "to build faster at the cost of frame hitches; a 2,000-piece blueprint "
             + "at 12/frame takes a few seconds. Hot-reloadable; clamped to 1-200.");
+
+    QuestsEnabled =
+        config.Bind(
+            "Quests",
+            "questsEnabled",
+            true,
+            "Whether the lab evaluates your quest files against what you kill. OFF = files "
+            + "are still loaded and still shown in the Quests tab, but nothing fires. Turn it "
+            + "off to prove that a quest firing is what you think it is.");
+
+    QuestCooldownSeconds =
+        config.Bind(
+            "Quests",
+            "questCooldownSeconds",
+            60f,
+            new ConfigDescription(
+                "How long one quest waits before it can fire again. 60 matches the shipping "
+                + "mod's constructor default, so what you see here is what a player would see. "
+                + "Drop it to 0 while authoring — retesting an edit should not cost a minute.",
+                new AcceptableValueRange<float>(0f, 3600f)));
+
+    // Retune the live evaluator rather than only the next reload, for the same reason the
+    // rune lamps do it: a knob about timing is one you turn while watching the thing.
+    QuestCooldownSeconds.SettingChanged += (s, e) => LabQuestEngine.RetuneCooldown();
   }
 }

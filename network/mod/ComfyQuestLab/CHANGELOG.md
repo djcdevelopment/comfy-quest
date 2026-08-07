@@ -172,3 +172,69 @@ finds all lab-marked galleries in any session. It only sees loaded zones, and sa
 categories are patched but no event from them has been seen. Item stands stay bare;
 `SetVisualItem` is a registered RPC rather than a callable method, so the gear is dropped
 beside them.
+
+**The lab can read a quest now — and say when it never could.**
+
+The csproj had linked `TrackedQuest`, `QuestViewLoader` and `QuestTriggerEvaluator` from the
+beginning so the contract would compile identically. Nothing called them. The lab could show
+what the game said and had no idea what a quest was.
+
+- **`LabQuestSet`** folds `QuestViewLoader.Parse` over each file in
+  `BepInEx/config/comfy-quest-lab/quests/*.json` **independently**. `Parse`, never `Load`:
+  `Load` keeps one slot of static state and clears the whole tracked set on any exception, so
+  three good drafts plus one typo'd draft would leave a creator with zero quests and one
+  message. Per-file parsing means a bad file loses only itself.
+- **Armed state is the evaluator, dry-fired**, not a predicate restating its rules. A quest's
+  own filters are echoed back at a throwaway zero-cooldown `QuestTriggerEvaluator`;
+  `CreatureMatches(filter, filter)` is a substring of itself and `ranged: true` satisfies both
+  states of `TriggerProjectile`, so an empty result means no kill can *ever* fire that quest.
+  Zero duplicated matching logic and nothing to drift. When a quest is not armed, one ablation
+  — the same quest with the verb forced to `kill` — decides whether the verb was the only
+  obstacle, so the panel can name the creator's actual trigger instead of shrugging.
+- **The verdict is the point, not a caveat.** `QuestTriggerEvaluator` matches `kill` only, so
+  of eight hooked schools exactly one can have a quest bound to it. A `hit` trigger parses
+  cleanly, errors nowhere, and can never fire. The **Quests tab** says which, and why, per
+  quest.
+- **`lab_reload`** re-reads and **diffs by name** — `+ neck_romancer`, `~ punchwood (trigger
+  changed)`, `= 3 unchanged`. "Reloaded" alone never tells a creator the file they just saved
+  is the file the lab just read. It also builds a fresh evaluator, dropping cooldowns: a
+  deliberate divergence from the shipping mod's session-long 60 s, because waiting a minute to
+  retest an edit is precisely the flow `lab_reload` exists to protect.
+- **The seed is a lesson, not a template.** `lab_setup` writes `starter.json` — only into an
+  empty folder, never overwriting — holding `neck_romancer` (armed) beside `punchwood` (`hit`,
+  silently unfireable). A test parses that exact string through the real contract and asserts
+  both verdicts, so it goes red the day either side moves. Reading about the trap in a README
+  teaches far less than opening the file it happens in.
+- **`LabQuestAdvisor`** takes the world as injected facts rather than looking it up, so every
+  advisory has a test and none of them guess during `Awake` before `ZNetScene` exists. It
+  catches a mistyped `weapon_skill` with the nearest real one, a target in no catalog,
+  `projectile: true` on a melee-only skill (Spears excluded — a thrown spear is genuinely
+  ranged), a duplicate `quest_id`, and `shots`, which carry no behaviour.
+- Contract messages are passed through **untouched**, with the lab's remedy appended as a
+  separate sentence. Rewording them is how the lab would start lying about the shipping mod.
+- The regex parser can silently yield fewer quests than were written, so parsed count is
+  compared against `"quest_id"` occurrences — the one check that notices a trailing comma.
+
+**A real bug, found while wiring it.** `CombatPatches.Describe` returned the GameObject name
+and the comment above it promised `QuestTriggerEvaluator` "does a case-insensitive substring
+against exactly this". It does not: the shipping mod hands the evaluator the creature's
+`m_name`, a localization token. `Neck` and `Boar` survived by luck; `Greydwarf_Elite` against
+`$enemy_greydwarfbrute` shares nothing, so a builder who typed what the console showed them
+got a quest that parsed, errored nowhere, and could never fire. The console now shows the
+matchable name and adds the prefab name beside it **only when they disagree**, and the advisor
+names the real string. `LabKillWatch` mirrors the producer's rule with the source line cited.
+
+- **`LabKillWatch`** is the lab's own last-hit window (15 s, 256 entries, matching the
+  producer's constants). `Character.OnDeath` carries no `HitData` and `IsDead()` is still false
+  in a damage postfix, so the three strings the evaluator needs can only be recorded at hit
+  time and consumed at death. Attribution is implicit and load-bearing: entries are only ever
+  written when the local player landed the hit, so no entry means no evaluation, and the
+  unfiltered `OnDeath` row stays unfiltered.
+- Console: `lab_reload` added; `lab_setup` now seeds before raising the gallery.
+- Config `[Quests]`: `questsEnabled`, and `questCooldownSeconds` wired to `SettingChanged` so
+  it retunes the live evaluator — the second reactive knob in the mod, following the rune lamps.
+- **Stale claims corrected.** `questlab_seams` and the class doc both still said seven of the
+  eight categories were unwired. All eight are hooked; what differs is whether a quest can be
+  *bound*, which is now what they say.
+
+231 tests pass, 28 of them new.

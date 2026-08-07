@@ -34,20 +34,31 @@ public static class CombatPatches {
 
   static void DamagePostfix(Character __instance, HitData __0) {
     LabObserve.PlayerHit("Character.Damage", __0, Describe(__instance), null);
+    LabKillWatch.RecordPlayerHit(__instance, __0, UnityEngine.Time.realtimeSinceStartup);
   }
 
   static void RpcDamagePostfix(Character __instance, HitData __1) {
     LabObserve.PlayerHit("Character.RPC_Damage", __1, Describe(__instance), null);
+    LabKillWatch.RecordPlayerHit(__instance, __1, UnityEngine.Time.realtimeSinceStartup);
   }
 
   /// <summary>The kill. Not filtered through PlayerHit because OnDeath carries no
-  /// HitData — attribution is the shipping mod's job, via a last-hit window, and
-  /// duplicating that here would teach a builder a rule the real mod does not use.</summary>
+  /// HitData — no weapon, no skill, no attacker. Attribution comes from the last-hit
+  /// window in LabKillWatch, which is the same shape the shipping mod's producer uses,
+  /// so a builder learns the rule the real mod actually applies.
+  ///
+  /// Note this is deliberately NOT filtered to the local player: every creature's death
+  /// is worth showing, because here the target is the subject. The quest lane is filtered
+  /// by construction instead — LabKillWatch only ever holds hits the player landed.</summary>
   static void OnDeathPostfix(Character __instance) {
     if (__instance == null || __instance.IsPlayer()) {
       return;   // the player dying is progression, not a kill
     }
     LabObserve.Seam("Character.OnDeath", Describe(__instance), "died");
+
+    // After the seam row on purpose, so a quest firing reads as a consequence of the
+    // kill immediately above it rather than as an unrelated event.
+    LabQuestEngine.OnKill(__instance);
   }
 
   static void StaggerPostfix(Character __instance) {
@@ -57,13 +68,19 @@ public static class CombatPatches {
     LabObserve.Seam("Character.Stagger", Describe(__instance), "staggered");
   }
 
-  /// <summary>The name a quest would actually match on. QuestTriggerEvaluator does a
-  /// case-insensitive substring against exactly this, with (Clone) stripped — so what
-  /// the console shows is what a builder should type into trigger.target.</summary>
+  /// <summary>The name a quest would actually match on — which is NOT the prefab name.
+  ///
+  /// This used to return the GameObject name and claim the matcher compared against it.
+  /// It does not: the shipping mod hands QuestTriggerEvaluator the creature's m_name, a
+  /// localization token. For Neck and Boar the token contains the prefab name and the
+  /// claim held by luck; for Greydwarf_Elite the token is $enemy_greydwarfbrute and the
+  /// two share nothing, so a builder who typed what the console showed them got a quest
+  /// that parsed, errored nowhere, and could never fire.
+  ///
+  /// Now it shows the matchable name, and adds the prefab name beside it only when they
+  /// disagree — so the console is honest about which of the two to type without adding
+  /// noise to the creatures where it never mattered.</summary>
   static string Describe(Character character) {
-    if (character == null) {
-      return "unknown";
-    }
-    return LabObserve.Clean(character.name);
+    return LabKillWatch.DisplayName(character);
   }
 }

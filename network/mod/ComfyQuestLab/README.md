@@ -5,10 +5,10 @@
 Install it on your own world, hit something, and watch the game tell you what it just
 did — and whether a quest could actually fire on it.
 
-> **Scaffold.** The live view and the spellbook both work, and all eight schools are
-> wired — 28 seams, 27 of which apply by default (`Player.UseStamina` is config-gated).
-> `lab_setup` raises the practice gallery and points at the tome; it is the one command
-> a newcomer needs.
+> **Scaffold.** The live view, the spellbook and the quest lane all work, and all eight
+> schools are wired — 28 seams, 27 of which apply by default (`Player.UseStamina` is
+> config-gated). `lab_setup` raises the practice gallery and writes a starter quest file;
+> it is the one command a newcomer needs.
 >
 > **Verified in game** (2026-08-07, one session). A seam fires and the live view reports
 > it, which is the whole claim:
@@ -46,10 +46,15 @@ this?*
 
 | | |
 | --- | --- |
+| `lab_setup` | raise the practice gallery and write you a starter quest file. Do this first. |
 | **F6** | open the console (or `questlab_panel`) |
+| `lab_reload` | re-read your quest files and say what changed |
 | `questlab_help` | what this build can do |
 | `questlab_seams` | which seams hooked on your game version, and which didn't |
 | `questlab_clear` | empty the console |
+
+`lab_setup` is typed into **Valheim's** console, which is **F5**. **F6** opens the lab's own
+panel. Two different keys, and mixing them up is the most common first stumble.
 
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Every page lists what the world answers to in that school and marks
@@ -88,6 +93,50 @@ Every event ends in one of three verdicts:
 
 The full picture, with all 91 seams:
 [`tools/component-packets/EVENT-ATLAS.md`](../../../tools/component-packets/EVENT-ATLAS.md).
+
+## Writing a quest
+
+`lab_setup` writes `BepInEx/config/comfy-quest-lab/quests/starter.json` — but only into an
+empty folder, so it never overwrites your work. Edit it, run `lab_reload`, and the **Quests**
+tab tells you what changed and what will fire.
+
+Each file is a **whole `quest-view.json`**, not a fragment. That is deliberate: any file in
+that folder can be copied byte-for-byte to `BepInEx/config/comfy-network-sense/quest-view.json`
+and the shipping mod accepts it unchanged. Several files sit side by side, and one that will
+not parse costs only its own quests.
+
+The starter file holds two quests that disagree with each other on purpose:
+
+| | |
+| --- | --- |
+| `neck_romancer` — `kill` / `Neck` | **armed.** Kill a Neck and watch the console. |
+| `punchwood` — `hit` / `tree_or_bush` | **not armed**, and nothing errors. |
+
+That second one is the whole lesson. `QuestTriggerEvaluator` matches `kill` triggers only,
+so a `hit` quest parses cleanly, reports no problem, and can never fire. All eight schools
+are *hooked*; exactly one can have a quest *bound* to it. The Quests tab names which, and why.
+
+The tab also shows **the last kill the matcher was given** — creature, skill, melee or ranged
+— which is what turns "why didn't it fire" from a guess into a read.
+
+### The name a quest matches on is not the prefab name
+
+The matcher compares against the creature's `m_name`, a localization token. For `Neck` the
+token contains the prefab name and typing the obvious thing works. For `Greydwarf_Elite` the
+token is `$enemy_greydwarfbrute` — they share nothing, so that quest never fires and never
+errors. The console now shows both names whenever they disagree, and the Quests tab says so
+outright.
+
+## Config — `[Quests]`
+
+| Key | Default | |
+| --- | --- | --- |
+| `questsEnabled` | `true` | OFF still loads and shows your files; nothing fires. Useful to prove a firing is what you think it is. |
+| `questCooldownSeconds` | `60` | Matches the shipping mod's default, so what you see is what a player sees. Drop it to `0` while authoring. |
+
+`lab_reload` always clears cooldowns outright — a deliberate divergence from the shipping mod,
+where they persist for the session. Waiting a minute to retest an edit is exactly the flow
+`lab_reload` exists to protect.
 
 ## Filters are the feature
 
@@ -130,6 +179,22 @@ lands on the next frame.
 `QuestTriggerEvaluator` compile from ComfyNetworkSense's own files (see the csproj), so a
 quest behaves identically in both. If you ever need an adapter between them, the contract
 has drifted and the fix is upstream.
+
+**Armed state is not a predicate — it is the evaluator.** `LabQuestSet.ProbeArmed` dry-fires
+a throwaway `QuestTriggerEvaluator` with a quest's own filters echoed back at it. A mirror
+predicate restating the matcher's rules is the thing that drifts silently, and "fires here
+means fires there" is the only promise the lab makes. If the evaluator gains a lane, this
+answer changes with it for free.
+
+**`LabQuestSet`, `LabQuestAdvisor` and `LabQuestSeed` are Unity-free and linked into
+ComfyNetworkSense.Tests**, so the logic a creator depends on is provable in seconds without a
+game install. `LabQuestSet.Build` takes file *contents*, not paths, for exactly that reason —
+keep disk IO in `LabQuestEngine`. `LabQuestAdvisor` takes world facts as injected delegates
+so every advisory has a test and none of them guess during `Awake`, before `ZNetScene` exists.
+
+**`LabKillWatch` holds a deliberate copy** of `GameplayEventProducer.NormalizeCreatureName`.
+Extracting that rule into a Unity-free helper both mods can share is the right fix and is a
+change to the shipping mod, so it owes its own note.
 
 **Adding a category** is the shape of
 [`Patches/HarvestPatches.cs`](Patches/HarvestPatches.cs): one `LabPatching.TryPatch` per

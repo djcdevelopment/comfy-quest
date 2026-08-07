@@ -28,13 +28,14 @@ public sealed class LabPanel {
   Rect _window = new Rect(120f, 140f, 620f, 500f);
   Vector2 _scroll;
   Vector2 _journalScroll;
+  Vector2 _questScroll;
   string _journalCategory = LabCategory.Harvest;   // where a new builder starts
   string _filterText = string.Empty;
   bool _paused;
   bool _showTrueNames;
   Tab _tab = Tab.Console;
 
-  enum Tab { Console, Spellbook }
+  enum Tab { Console, Spellbook, Quests }
 
   /// <summary>One rune, used as a toggle. The same call renders a spellbook tab and a
   /// console filter, which is the whole reason the runes exist: learning the book
@@ -81,8 +82,10 @@ public sealed class LabPanel {
 
     if (_tab == Tab.Console) {
       DrawConsole();
-    } else {
+    } else if (_tab == Tab.Spellbook) {
       DrawSpellbook();
+    } else {
+      DrawQuests();
     }
 
     // Drag by the title bar, same as every other panel here.
@@ -96,6 +99,9 @@ public sealed class LabPanel {
     }
     if (GUILayout.Toggle(_tab == Tab.Spellbook, "Spellbook", GUI.skin.button)) {
       _tab = Tab.Spellbook;
+    }
+    if (GUILayout.Toggle(_tab == Tab.Quests, "Quests", GUI.skin.button)) {
+      _tab = Tab.Quests;
     }
     GUILayout.FlexibleSpace();
     GUILayout.Label(_ring.Count + " held · " + _ring.TotalSeen + " seen");
@@ -189,6 +195,96 @@ public sealed class LabPanel {
       default:
         return "-> nothing binds a quest to this yet";
     }
+  }
+
+  /// <summary>Your quest files, and what the lab thinks of them.
+  ///
+  /// A tab rather than rows in the console, because this is standing state: a validation
+  /// problem persists until somebody fixes it, and the ring holds ConsoleRows * 8 events
+  /// filtered by category — one fight would scroll a roster away and a filter toggle would
+  /// hide it. Only the moments (a reload, a firing) go in the console.
+  ///
+  /// The line that earns its place here is "last kill" below: it shows the three strings the
+  /// matcher was actually handed, which turns "why didn't my quest fire" from a guess into
+  /// a read.</summary>
+  void DrawQuests() {
+    LabQuestSet set = LabQuestEngine.Set;
+
+    GUILayout.BeginHorizontal();
+    GUILayout.Label(set.Quests.Count + " loaded · " + set.ArmedCount + " armed");
+    GUILayout.FlexibleSpace();
+    if (GUILayout.Button("Reload", GUILayout.Width(70f))) {
+      ComfyQuestLab.Report(LabQuestEngine.Reload());
+    }
+    GUILayout.EndHorizontal();
+
+    GUILayout.Label("from " + LabQuestEngine.QuestDir);
+
+    string lastKill = LabQuestEngine.LastKillLine;
+    GUILayout.Label("last kill the matcher was given: "
+        + (string.IsNullOrEmpty(lastKill) ? "none yet" : lastKill));
+
+    if (!LabConfig.QuestsEnabled.Value) {
+      GUILayout.Label("questsEnabled is OFF — files are loaded, but nothing will fire.");
+    }
+
+    GUILayout.Space(4f);
+    _questScroll = GUILayout.BeginScrollView(_questScroll);
+
+    if (set.Quests.Count == 0 && set.Errors.Count == 0) {
+      GUILayout.Label("No quest files yet. Run lab_setup for a starter one, or drop a");
+      GUILayout.Label("quest-view.json into the folder above and run lab_reload.");
+    }
+
+    string file = null;
+    foreach (LabQuest quest in set.Quests) {
+      if (quest.SourceFile != file) {
+        file = quest.SourceFile;
+        GUILayout.Space(6f);
+        GUILayout.Label(file);
+      }
+
+      Color before = GUI.color;
+      // The same dimming the spellbook uses for a seam it cannot witness: real, but not
+      // available to you. A creator should be able to tell at a glance without reading.
+      if (!quest.IsArmed) {
+        GUI.color = new Color(1f, 1f, 1f, 0.45f);
+      }
+
+      GUILayout.Label("  " + (quest.IsArmed ? "*" : "-") + "  " + quest.Quest.Name
+          + "  (" + quest.QuestId + ")");
+      GUILayout.Label("        -> " + quest.ArmedLine());
+
+      if (quest.IsArmed) {
+        double cooldown = LabQuestEngine.CooldownRemaining(quest.QuestId);
+        GUILayout.Label("        fired " + quest.Fires
+            + (quest.Fires == 1 ? " time" : " times") + " since the last reload"
+            + (cooldown > 0.0
+                ? "  ·  re-arms in " + Mathf.CeilToInt((float) cooldown) + "s"
+                : string.Empty));
+      }
+
+      foreach (string note in quest.Advisories) {
+        GUILayout.Label("        ! " + note);
+      }
+
+      GUI.color = before;
+    }
+
+    if (set.Errors.Count > 0) {
+      GUILayout.Space(8f);
+      GUILayout.Label("Files that would not load");
+      foreach (LabQuestFileError error in set.Errors) {
+        GUILayout.Label("  " + error.SourceFile);
+        // The contract's own sentence first, then ours. Keeping them apart is the point:
+        // a creator can tell which half came from the thing that will actually run their
+        // quest, and the lab never gets to paraphrase that half.
+        GUILayout.Label("      " + error.ContractMessage);
+        GUILayout.Label("      " + error.Remedy);
+      }
+    }
+
+    GUILayout.EndScrollView();
   }
 
   /// <summary>The spellbook. Eight runes, each a school of things the world will answer
