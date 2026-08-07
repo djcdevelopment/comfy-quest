@@ -201,9 +201,15 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
           });
 
       new Terminal.ConsoleCommand("questlab_prefabs",
-          "search what this game build actually has: questlab_prefabs <part of a name>",
+          "search what this game build actually has: questlab_prefabs <part of a name>, "
+          + "or questlab_prefabs dump to write the whole catalog to a JSON file",
           delegate (Terminal.ConsoleEventArgs args) {
-            Report(LabGalleryBuilder.SearchPrefabs(args.Length >= 2 ? args[1] : null));
+            string arg = args.Length >= 2 ? args[1] : null;
+            if (string.Equals(arg, "dump", StringComparison.OrdinalIgnoreCase)) {
+              Report(LabPrefabDump.Write());
+            } else {
+              Report(LabGalleryBuilder.SearchPrefabs(arg));
+            }
           });
 
       new Terminal.ConsoleCommand("questlab_clear",
