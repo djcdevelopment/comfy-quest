@@ -25,7 +25,7 @@ public sealed class LabPanel {
   readonly LabEventRing _ring;
   readonly HashSet<string> _visible = new HashSet<string>(LabCategory.DefaultVisible);
 
-  Rect _window = new Rect(120f, 140f, 620f, 460f);
+  Rect _window = new Rect(120f, 140f, 620f, 500f);
   Vector2 _scroll;
   Vector2 _journalScroll;
   string _journalCategory = LabCategory.Harvest;   // where a new builder starts
@@ -33,7 +33,20 @@ public sealed class LabPanel {
   bool _paused;
   Tab _tab = Tab.Console;
 
-  enum Tab { Console, Journal }
+  enum Tab { Console, Spellbook }
+
+  /// <summary>One rune, used as a toggle. The same call renders a spellbook tab and a
+  /// console filter, which is the whole reason the runes exist: learning the book
+  /// teaches the console for free, because the mark is the same mark.</summary>
+  static bool RuneToggle(bool on, string category, string label, float width) {
+    Color previous = GUI.color;
+    // A rune that is switched off is still legible, just quiet.
+    GUI.color = on ? Color.white : new Color(1f, 1f, 1f, 0.45f);
+    bool now = GUILayout.Toggle(on, new GUIContent(" " + label, LabRunes.For(category)),
+        GUI.skin.button, GUILayout.Width(width), GUILayout.Height(24f));
+    GUI.color = previous;
+    return now;
+  }
 
   public bool IsOpen { get; private set; }
 
@@ -68,7 +81,7 @@ public sealed class LabPanel {
     if (_tab == Tab.Console) {
       DrawConsole();
     } else {
-      DrawJournal();
+      DrawSpellbook();
     }
 
     // Drag by the title bar, same as every other panel here.
@@ -77,11 +90,11 @@ public sealed class LabPanel {
 
   void DrawTabs() {
     GUILayout.BeginHorizontal();
-    if (GUILayout.Toggle(_tab == Tab.Console, "Console", GUI.skin.button)) {
+    if (GUILayout.Toggle(_tab == Tab.Console, "What just happened", GUI.skin.button)) {
       _tab = Tab.Console;
     }
-    if (GUILayout.Toggle(_tab == Tab.Journal, "Journal", GUI.skin.button)) {
-      _tab = Tab.Journal;
+    if (GUILayout.Toggle(_tab == Tab.Spellbook, "Spellbook", GUI.skin.button)) {
+      _tab = Tab.Spellbook;
     }
     GUILayout.FlexibleSpace();
     GUILayout.Label(_ring.Count + " held · " + _ring.TotalSeen + " seen");
@@ -89,20 +102,22 @@ public sealed class LabPanel {
   }
 
   void DrawConsole() {
-    // --- filters -------------------------------------------------------------------
-    GUILayout.BeginHorizontal();
-    foreach (string category in LabCategory.All) {
-      bool on = _visible.Contains(category);
-      bool now = GUILayout.Toggle(on, category, GUI.skin.button);
-      if (now != on) {
-        if (now) {
-          _visible.Add(category);
-        } else {
-          _visible.Remove(category);
+    // --- filters: the same runes as the spellbook, doing the filtering -------------
+    for (int row = 0; row < 2; row++) {
+      GUILayout.BeginHorizontal();
+      for (int i = row * 4; i < (row + 1) * 4 && i < LabCategory.All.Length; i++) {
+        string category = LabCategory.All[i];
+        bool on = _visible.Contains(category);
+        if (RuneToggle(on, category, LabJournal.For(category).Title, 138f) != on) {
+          if (on) {
+            _visible.Remove(category);
+          } else {
+            _visible.Add(category);
+          }
         }
       }
+      GUILayout.EndHorizontal();
     }
-    GUILayout.EndHorizontal();
 
     GUILayout.BeginHorizontal();
     GUILayout.Label("match", GUILayout.Width(42f));
@@ -135,7 +150,11 @@ public sealed class LabPanel {
       GUILayout.Label(EmptyMessage());
     } else {
       foreach (LabEvent row in rows) {
-        GUILayout.Label(row.At + "  " + row.Category + "  " + row.Seam);
+        GUILayout.BeginHorizontal();
+        GUILayout.Label(new GUIContent(LabRunes.For(row.Category)),
+            GUILayout.Width(18f), GUILayout.Height(18f));
+        GUILayout.Label(row.At + "  " + row.Seam);
+        GUILayout.EndHorizontal();
         GUILayout.Label("        " + row.Target + "   " + row.Detail);
         GUILayout.Label("        " + UsabilityLine(row.Usability));
         GUILayout.Space(3f);
@@ -152,9 +171,10 @@ public sealed class LabPanel {
       return "Nothing matches \"" + _filterText + "\" in the categories you have on.";
     }
     if (_ring.TotalSeen == 0) {
-      return "Nothing yet. Hit a tree or a bush — harvest is the wired category in this build.";
+      return "Nothing yet. Punch a tree, or open the Spellbook and pick a rune to see what to try.";
     }
-    return "Nothing in these categories. " + _ring.TotalSeen + " events have fired overall; widen the filter.";
+    return "Nothing under these runes. " + _ring.TotalSeen
+        + " have fired overall — light another rune above.";
   }
 
   /// <summary>The honest answer to "can I build a quest on what I just saw?", spelled
@@ -170,32 +190,41 @@ public sealed class LabPanel {
     }
   }
 
-  /// <summary>One page per category. Picking a page also turns that category on in the
-  /// console, because the next thing anyone does after reading "punch a tree" is go and
-  /// punch a tree, and finding the row filtered out would be a silly way to lose them.</summary>
-  void DrawJournal() {
-    GUILayout.BeginHorizontal();
-    foreach (LabJournal.Page page in LabJournal.Pages) {
-      bool selected = _journalCategory == page.Category;
-      if (GUILayout.Toggle(selected, page.Title, GUI.skin.button) && !selected) {
-        _journalCategory = page.Category;
-        _visible.Add(page.Category);
+  /// <summary>The spellbook. Eight runes, each a school of things the world will answer
+  /// to — what it covers, something to go and try, and the trap.
+  ///
+  /// Turning to a page also lights that rune in the console, because the next thing
+  /// anyone does after reading "punch a tree" is punch a tree, and finding the row
+  /// filtered out would be a silly way to lose them.</summary>
+  void DrawSpellbook() {
+    for (int row = 0; row < 2; row++) {
+      GUILayout.BeginHorizontal();
+      for (int i = row * 4; i < (row + 1) * 4 && i < LabCategory.All.Length; i++) {
+        string category = LabCategory.All[i];
+        bool selected = _journalCategory == category;
+        if (RuneToggle(selected, category, LabJournal.For(category).Title, 138f) && !selected) {
+          _journalCategory = category;
+          _visible.Add(category);
+        }
       }
+      GUILayout.EndHorizontal();
     }
-    GUILayout.EndHorizontal();
     GUILayout.Space(6f);
 
     LabJournal.Page current = LabJournal.For(_journalCategory);
     _journalScroll = GUILayout.BeginScrollView(_journalScroll);
 
+    Color previous = GUI.color;
+    GUI.color = LabRunes.ColorFor(current.Category);
     GUILayout.Label(current.Title);
+    GUI.color = previous;
     GUILayout.Space(4f);
     foreach (string line in current.What) {
       GUILayout.Label(line);
     }
 
     GUILayout.Space(8f);
-    GUILayout.Label("Try this");
+    GUILayout.Label("Go and try");
     foreach (string line in current.Try) {
       GUILayout.Label("  " + line);
     }
@@ -207,14 +236,14 @@ public sealed class LabPanel {
     }
 
     GUILayout.Space(8f);
-    GUILayout.Label("Seams in the game  ·  [x] = this lab shows it to you");
+    GUILayout.Label("What the world answers to  ·  [x] = this lab will show it to you");
     foreach (string seam in current.Seams) {
       GUILayout.Label("  " + seam);
     }
 
     GUILayout.Space(8f);
-    GUILayout.Label("This build hooked " + LabPatching.AppliedCount + " of "
-        + LabPatching.Outcomes.Count + " seams it tried.");
+    GUILayout.Label("Bound " + LabPatching.AppliedCount + " of "
+        + LabPatching.Outcomes.Count + " seams this build reached for.");
     foreach (LabPatching.Outcome outcome in LabPatching.Outcomes) {
       if (!outcome.Applied) {
         GUILayout.Label("  unavailable: " + outcome.Label + " — " + outcome.Detail);

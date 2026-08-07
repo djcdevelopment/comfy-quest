@@ -5,7 +5,7 @@
 Install it on your own world, hit something, and watch the game tell you what it just
 did — and whether a quest could actually fire on it.
 
-> **Scaffold.** The console and the journal both work, and all eight categories are
+> **Scaffold.** The live view and the spellbook both work, and all eight schools are
 > wired — 28 seams. There is no `lab_setup` yet and no download.
 > **Nothing here has been verified in game.** This README describes what is here, not
 > what is planned.
@@ -31,9 +31,15 @@ this?*
 | `questlab_seams` | which seams hooked on your game version, and which didn't |
 | `questlab_clear` | empty the console |
 
-The **Journal** tab has a page per category: what it covers, something to go and do, and
-the trap. Every page lists the seams the game has and marks which ones this build shows
-you — so you can tell "Valheim can do this" from "the lab will show it to you".
+The **Spellbook** tab is a page per rune: what that school covers, something to go and
+try, and the trap. Every page lists what the world answers to in that school and marks
+which ones this build will show you — so you can tell "Valheim can do this" from "the lab
+will show it to you".
+
+Each category has a rune, and **the same rune is its filter in the live view**. Learn the
+book and you have learned the console. Turning to a page also lights that rune in the
+console, because the next thing anyone does after reading "punch a tree" is punch a
+tree.
 
 Open the console and punch a tree. You should see:
 
