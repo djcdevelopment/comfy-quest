@@ -42,6 +42,31 @@ public sealed class LabGalleryBuilder {
   readonly List<ZDOID> _placed = new List<ZDOID>();
   bool _running;
 
+  /// <summary>A mark every gallery piece carries in its own ZDO.
+  ///
+  /// A ZDOID cannot answer "is this ours". ZDO ids are session-scoped: the manifest
+  /// written while raising a gallery records ids from that session, and after a reload
+  /// those same numbers belong to entirely unrelated objects. Trusting them across a
+  /// restart is how a "clear" ends up destroying somebody's player.
+  ///
+  /// The mark travels with the object instead, saved in the world like any other ZDO
+  /// field — the same mechanism the portals use for their pairing tag, so it is a proven
+  /// shape rather than a guessed one. It answers the question in any session.</summary>
+  const string GalleryMark = "comfyQuestLabGallery";
+
+  /// <summary>Is this object part of a gallery the Tome raised? Used both to decide what
+  /// clear may destroy and to keep support wear off after a zone reload.</summary>
+  public static bool IsGalleryPiece(ZDO zdo) {
+    if (zdo == null) {
+      return false;
+    }
+    try {
+      return zdo.GetString(GalleryMark, string.Empty).Length > 0;
+    } catch (Exception) {
+      return false;
+    }
+  }
+
   public bool IsRunning { get { return _running; } }
 
   static string ManifestPath {
@@ -168,6 +193,17 @@ public sealed class LabGalleryBuilder {
     Report("raising the gallery — floor at " + (floorY - origin.y).ToString("0.0")
         + " m above you. Stand back.");
 
+    // Where the ground-level portal goes, sampled NOW — before a single floor tile
+    // exists. TryGroundHeight asks for the SOLID height, which counts placed pieces and
+    // not just terrain, so asking after the floor is down returns the top of the deck and
+    // puts the "ground" portal on the platform beside its own partner. That is exactly
+    // what the first build did: two portals up top, none to walk to.
+    Vector3 arrival = origin + new Vector3(2f, 0f, 0f);
+    float arrivalGround;
+    if (TryGroundHeight(arrival, out arrivalGround)) {
+      arrival.y = arrivalGround;
+    }
+
     int placed = 0;
 
     // 1. the floor
@@ -193,12 +229,8 @@ public sealed class LabGalleryBuilder {
     // anyone does in the gallery already makes the live view move.
     //
     // The pairing is a ZDO string field called "tag", read straight out of the component
-    // atlas, so there is no RPC signature to guess at here.
-    Vector3 arrival = origin + new Vector3(2f, 0f, 0f);
-    float arrivalGround;
-    if (TryGroundHeight(arrival, out arrivalGround)) {
-      arrival.y = arrivalGround;
-    }
+    // atlas, so there is no RPC signature to guess at here. The arrival position was
+    // sampled before the floor went down — see above.
     if (PlacePortal(arrival, GalleryTag, 0f)) {
       placed++;
     }
@@ -302,6 +334,9 @@ public sealed class LabGalleryBuilder {
         return null;
       }
 
+      // Switch support wear off for this instance. GalleryStructurePatches does the same
+      // thing on every later rebuild, but it cannot help here: it runs from Awake, during
+      // the Instantiate above, before the ZDO below has been recorded as ours.
       var wear = go.GetComponent<WearNTear>();
       if (wear != null) {
         wear.m_noSupportWear = true;
@@ -317,7 +352,11 @@ public sealed class LabGalleryBuilder {
 
       var view = go.GetComponent<ZNetView>();
       if (view != null && view.GetZDO() != null) {
-        _placed.Add(view.GetZDO().m_uid);
+        ZDO zdo = view.GetZDO();
+        // Mark it before the ZDO is shared, so the piece is identifiable as ours in this
+        // session and every later one. Everything else keys off this, not off the id.
+        zdo.Set(GalleryMark, "1");
+        _placed.Add(zdo.m_uid);
       }
       return go;
     } catch (Exception ex) {
@@ -339,10 +378,19 @@ public sealed class LabGalleryBuilder {
     }
 
     int removed = 0;
+    int notOurs = 0;
     foreach (ZDOID id in _placed) {
       try {
         ZDO zdo = ZDOMan.instance.GetZDO(id);
         if (zdo == null) {
+          continue;
+        }
+        // The id on its own is not proof of anything. ZDO ids are session-scoped, so a
+        // recorded id can resolve after a reload to an entirely unrelated object — a
+        // tree, a boat, a player. Only the mark the piece carries decides, and anything
+        // without it is left alone. Destroying by id cost somebody their session once.
+        if (!IsGalleryPiece(zdo)) {
+          notOurs++;
           continue;
         }
         ZNetView view = ZNetScene.instance.FindInstance(zdo);
@@ -360,6 +408,13 @@ public sealed class LabGalleryBuilder {
     }
     _placed.Clear();
     SaveManifest();
+
+    if (notOurs > 0) {
+      return "cleared " + removed + " piece(s), and left " + notOurs + " alone: the "
+           + "manifest named ids that now belong to something else, which is what happens "
+           + "to a manifest across a reload. Any gallery still standing has to come down "
+           + "by hand this time.";
+    }
     return "cleared " + removed + " piece(s).";
   }
 

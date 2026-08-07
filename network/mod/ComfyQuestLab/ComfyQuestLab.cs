@@ -75,6 +75,9 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     SocialPatches.Apply(_harmony);
     LabPanelInputPatches.Apply(_harmony);
 
+    // Not a seam — it holds the gallery up rather than watching anything. See the file.
+    GalleryStructurePatches.Apply(_harmony);
+
     RegisterConsoleCommands();
 
     LogInfo("quest lab " + PluginVersion + " (" + ReleaseId + ") — "
