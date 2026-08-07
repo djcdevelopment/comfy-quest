@@ -10,24 +10,50 @@ ComfyNetworkSense installed, and about two minutes in a Meadows world.
 
 ---
 
-## Read this first: it is a kill, not a harvest
+## Read this first: punchwood worked once, and the port deferred it
 
-The trigger cannot be punching a bush or a tree, and it is worth knowing why before you
-stand in a forest wondering what is broken.
+Hitting a bush **did** trigger a quest — that was the first-ever test, and it was an
+`attack`/`hit` trigger, not a kill. It is not in the current mod, and that is a
+deliberate deferral rather than a limitation.
 
-The producer's hooks are Harmony patches on **`Character`**
-(`network/mod/ComfyNetworkSense/Patches/GameplayEventPatches.cs:26` — `OnCreatureDamaged`,
-`OnCreatureDied`). In Valheim a tree is a `TreeBase`/`TreeLog`, a bush is a
-`Destructible`/`Pickable`, a rock is a `MineRock`. **None of them are `Character`**, so
-hitting one does not fire the hook at all — no event, no error, nothing in the log.
-Supporting it would mean adding a destructible hook to the mod, which is production
-code changed to make a test convenient, and a `network/` commit that then owes the
-roadmap-note ceremony. Not worth it for a one-off proof.
+The retired `ComfyControlSurface` carried three trigger buckets
+(`docs/quest-vertical-slice-architecture.md:171-174`): `hit` against world targets such
+as trees and bushes, `kill` against creatures, and two-shot `on_first_hit` → `on_death`
+sequences. The `hit` bucket was three Harmony postfixes in a 2.4 KB file
+(`comfy/handoffs/comfy-control-surface/Patches/QuestTriggerPatches.cs`):
 
-The punchable substitute is a **Greyling**: the weakest thing in the game, dies to bare
-fists in a few hits, and `greyling_cull` is already authored in the staged quest-view
-with no weapon or projectile constraint. If you can spawn, you never have to look for
-one at all — see step 3.
+| Patched method | Call |
+| --- | --- |
+| `TreeBase.Damage` | `OnLocalPlayerHit("tree", name, hit)` |
+| `TreeLog.Damage` | `OnLocalPlayerHit("tree", name, hit)` |
+| `Destructible.Damage` | `OnLocalPlayerHit("destructible", name, hit)` — a bush |
+
+feeding `QuestTriggerService.OnLocalPlayerHit`, which gated on
+`TriggerEvent == "hit"` (`QuestTriggerService.cs:142,159`).
+
+The port to ComfyNetworkSense kept only the creature path, and says so in its own source
+(`QuestTriggerEvaluator.cs:15-17`):
+
+> `on_first_hit` is preserved on the model as informational, and hit-on-world-object
+> ("hit") triggers (punchwood) are a deferred increment (the current seam only hooks
+> creatures), so this evaluator matches `kill` triggers only.
+
+So **today** the seam hooks `Character` only
+(`Patches/GameplayEventPatches.cs:26`), and a tree is a `TreeBase`, a bush a
+`Destructible`, a rock a `MineRock`. Hitting one fires nothing — no event, no error,
+nothing in the log. That silence is the deferral, not a bug.
+
+**Two ways to run QB-1, and the choice is real:**
+
+- **Greyling, today, no code change.** The weakest thing in the game, dies to bare
+  fists, and `greyling_cull` is already authored in the staged quest-view with no weapon
+  or projectile constraint. With `spawn Greyling 1` you never look for one. This is what
+  the rest of this runbook assumes.
+- **Restore punchwood first.** Three postfixes, an `OnLocalPlayerHit` entry point, and a
+  `hit` branch in the evaluator, all specified byte-exact by the archive. It is a
+  `network/` change, so it owes a roadmap note and a mod rebuild — but it closes a named
+  deferred increment rather than adding scaffolding for a test, and the quest vertical
+  slice will want it regardless.
 
 ---
 
@@ -129,6 +155,7 @@ Work down the path; each step tells you which half is at fault.
 | Symptom | Where to look |
 | --- | --- |
 | No `[gp] quest complete` line | `questEvaluatorEnabled` is still `false`, or the creature name did not substring-match, or you are inside the 60s cooldown |
+| Nothing at all when hitting a tree, bush or rock | Expected today — punchwood is a deferred increment, see the top of this runbook. Not a bug and not a config problem |
 | Log line fires but `/events` stays empty | Transport: the routed RPC or the gateway's `POST /valheim/events`. Check the gateway can reach `ServiceUrls__EventLog` (`http://eventlog:4002`) |
 | Row exists but the review record is thin | Expected. ADR 0018 — the EventLog row *is* the evidence. There is no screenshot, trace, or position in this contract, and that is the decision, not a gap |
 | Row exists but has no `quest_name` | You are on a mod build older than `468e9d1`. The gateway forwards only the payload, so `quest_name` has to be *in* it |
