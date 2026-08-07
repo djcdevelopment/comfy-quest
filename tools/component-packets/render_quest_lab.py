@@ -121,6 +121,20 @@ html = [
     '.spell-verdict { font-size: 0.85rem; color: var(--muted); text-align: right; }',
     '.verdict-today { color: var(--green); }',
     '.bound-badge { display: inline-block; background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase; margin-left: 0.5rem; }',
+    '.start { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; }',
+    '.start h2 { margin-top: 0; font-size: 1.5rem; }',
+    'ol.steps { margin: 0; padding-left: 1.3rem; }',
+    'ol.steps > li { margin-bottom: 1rem; }',
+    'ol.steps > li > strong { display: block; }',
+    'ol.steps p { margin: .25rem 0 0; color: var(--muted); font-size: .95rem; }',
+    'kbd { font-family: var(--mono); font-size: .85rem; background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: .1rem .4rem; color: var(--ink); }',
+    'code { font-family: var(--mono); font-size: .9rem; color: var(--wood); }',
+    '.cta { display: inline-block; margin-bottom: 1.25rem; background: var(--wood); color: #1a1206; font-weight: 700; text-decoration: none; padding: .6rem 1.1rem; border-radius: 8px; }',
+    '.cta:hover { filter: brightness(1.08); }',
+    '.note { border-left: 3px solid var(--wood); background: var(--panel-2); padding: .85rem 1rem; border-radius: 0 8px 8px 0; margin: 1.25rem 0 0; color: var(--muted); font-size: .95rem; }',
+    '.note strong { color: var(--ink); }',
+    '.watch { color: var(--muted); font-size: .95rem; border-left: 3px solid var(--line); padding-left: .9rem; margin: 1rem 0 0; }',
+    '.watch strong { color: var(--ink); }',
     '</style>',
     '</head><body>',
     '<div class="topbar"><div class="topbar-inner">',
@@ -138,7 +152,47 @@ html = [
     '</nav></div></div>',
     '<div class="wrap">',
     '<h1>The Quest Lab Tome</h1>',
-    '<p class="intro">This is the web-facing version of the in-game spellbook. It lists every spell the world genuinely answers to, categorized by rune school. Spells marked with a badge are ones this build can witness in-game today.</p>'
+    '<p class="intro">This is the web-facing version of the in-game spellbook. It lists every spell the world genuinely answers to, categorized by rune school. Spells marked with a badge are ones this build can witness in-game today.</p>',
+
+    # Onboarding. The tome taught eight schools and 78 spells and never once said how to
+    # get the mod -- a reader who wanted to try it had nowhere to go from here.
+    '<div class="start">',
+    '<h2>Start here</h2>',
+    '<a class="cta" href="/workbench/downloads/quest-lab">Download the Quest Lab</a>',
+    '<ol class="steps">',
+    '<li><strong>Install BepInEx on your Valheim client.</strong>',
+    '<p>The lab is a BepInEx plugin. If you already run mods, you have this.</p></li>',
+    '<li><strong>Drop <code>ComfyQuestLab.dll</code> into <code>BepInEx/plugins</code>.</strong>',
+    '<p>That is the whole install. The zip also carries a README and a default config.</p></li>',
+    '<li><strong>Launch a private, single-player world.</strong>',
+    '<p>The lab is client-only and does nothing at all on a dedicated server. Nothing '
+    'it does touches anyone else, and uninstalling it changes nothing about your game.</p></li>',
+    '<li><strong>Press <kbd>F5</kbd> and type <code>lab_setup</code>.</strong>',
+    '<p>This raises the practice gallery &mdash; eight rune monuments, a station under each, '
+    'and an armoury &mdash; and writes you a starter quest file.</p></li>',
+    '<li><strong>Press <kbd>F6</kbd> to open the lab panel.</strong>',
+    '<p><kbd>F5</kbd> is Valheim&rsquo;s console, where you type commands. <kbd>F6</kbd> is the '
+    'lab&rsquo;s own window. Two different keys, and mixing them up is the usual first stumble.</p></li>',
+    '<li><strong>Edit <code>BepInEx/config/comfy-quest-lab/quests/starter.json</code>, then '
+    'run <code>lab_reload</code>.</strong>',
+    '<p>No restart. The <em>Quests</em> tab names what changed, what will fire, and what '
+    'cannot &mdash; and shows the last kill the matcher was actually handed, which is how you '
+    'find out why something did not fire.</p></li>',
+    '</ol>',
+
+    '<p class="note"><strong>The starter file holds two quests that disagree on purpose.</strong> '
+    '<code>neck_romancer</code> is armed: kill a Neck and it fires. <code>punchwood</code> is not, '
+    'and nothing errors to tell you &mdash; a <code>hit</code> trigger parses perfectly and can '
+    'never fire, because only a creature kill can complete a quest today. All eight schools below '
+    'are <em>hooked</em>, meaning the lab can show you every one of them. Exactly one can have a '
+    'quest <em>bound</em> to it. Knowing which is which is the entire reason this tool exists, and '
+    'the verdict on every row below is the honest answer.</p>',
+
+    '<p class="note"><strong>Each school&rsquo;s rune is also its filter.</strong> The mark beside '
+    'each heading is the same mark you click in the lab&rsquo;s console to show or hide that '
+    'school &mdash; so learning the book teaches the console for free. One fight emits more rows '
+    'than the window holds, which is why the filters matter.</p>',
+    '</div>',
 ]
 
 for cat in ORDER:
@@ -152,11 +206,21 @@ for cat in ORDER:
     html.append(f'<div class="school">')
     html.append(f'<div class="school-header">{render_svg(cat)}<h2>{page["title"]}</h2></div>')
     
+    # These fields are line-WRAPPED prose, not lists of items. Joining them with ", "
+    # inserted a comma at every wrap point ("The first thing, most people try, and the
+    # reason this lab exists"), which read as a garbled list. A space rejoins the
+    # sentence the way the author wrote it.
     html.append('<div style="margin-bottom: 1.5rem">')
     if "what" in page:
-        html.append(f'<p><strong>What it covers:</strong> {", ".join(page["what"])}</p>')
+        html.append(f'<p><strong>What it covers:</strong> {" ".join(page["what"])}</p>')
     if "try" in page:
-        html.append(f'<p><strong>Go and try:</strong> {", ".join(page["try"])}</p>')
+        html.append(f'<p><strong>Go and try:</strong> {" ".join(page["try"])}</p>')
+    # "watch" is the trap for this school -- the sentence that saves somebody an hour,
+    # e.g. that picking a berry is an interact and not damage at all. It was in
+    # journal-pages.json and in the in-game spellbook, and the web tome silently dropped
+    # it: the single most valuable paragraph per school, missing from the public page.
+    if "watch" in page:
+        html.append(f'<p class="watch"><strong>Worth knowing:</strong> {" ".join(page["watch"])}</p>')
     html.append('</div>')
     
     html.append('<ul class="spell-list">')
