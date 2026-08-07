@@ -117,5 +117,20 @@ JSONL persistence. `GameplayEventTypes` is
 not linked — it shares a file with a 353-line Unity-dependent class and needs extracting
 first.
 
-**Not verified in game.** Everything above is compile- and atlas-verified only. No hook
-has been observed firing.
+**Verified in game 2026-08-07.** The gallery builds and *stands*: 620 pieces, platform
+35 m up, the portal pair connecting ground to plaza. Getting there took three rounds
+against one root cause. `WearNTear.m_noSupportWear` and `m_noRoofWear` are opt-**ins** —
+`UpdateWear` reaches each damage path only when its flag is `true` — so setting them true,
+which is what the field names and the atlas annotation both suggested, armed exactly the
+decay they were meant to prevent. `tools/component-packets --field` exists now so the next
+flag gets read rather than guessed.
+
+Two other things that session: the ground portal was sampled with `GetSolidHeight` *after*
+the floor was laid, so it found the deck it had just built and landed on the roof beside
+its own partner. And `clear` trusted remembered ZDOIDs, which are session-scoped — after a
+reload it destroyed two unrelated objects and the local player. Pieces now carry a mark in
+their own ZDO and nothing unmarked is ever destroyed.
+
+**Still not verified in game:** no hook has been observed firing — the thing the lab is
+for. Item stands stay bare; `SetVisualItem` is a registered RPC rather than a callable
+method, so the gear is dropped beside them.
