@@ -112,10 +112,13 @@ three tools that keep them honest. Nothing is published and there is no download
   and shaped so the floor itself tells you where to walk. Every station and all 89 beam
   footings verified to land on a tile.
 
-**Not here yet:** the journal (a stub that shows the seam roster); `lab_setup`; and
-JSONL persistence. `GameplayEventTypes` is
-not linked — it shares a file with a 353-line Unity-dependent class and needs extracting
-first.
+**`lab_setup` landed** — one command that raises the practice gallery and points at the
+tome, so a newcomer needs no other instruction. It is a front door onto
+`questlab_gallery build` rather than a separate mechanism.
+
+**Not here yet:** the journal (a stub that shows the seam roster); and JSONL persistence.
+`GameplayEventTypes` is not linked — it shares a file with a 353-line Unity-dependent
+class and needs extracting first.
 
 **Verified in game 2026-08-07.** The gallery builds and *stands*: 620 pieces, platform
 35 m up, the portal pair connecting ground to plaza. Getting there took three rounds

@@ -7,7 +7,8 @@ did — and whether a quest could actually fire on it.
 
 > **Scaffold.** The live view and the spellbook both work, and all eight schools are
 > wired — 28 seams, 27 of which apply by default (`Player.UseStamina` is config-gated).
-> There is no `lab_setup` yet and no download.
+> `lab_setup` raises the practice gallery and points at the tome; it is the one command
+> a newcomer needs.
 >
 > **Verified in game** (2026-08-07, one session). A seam fires and the live view reports
 > it, which is the whole claim:
