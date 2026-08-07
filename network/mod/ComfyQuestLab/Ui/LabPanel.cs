@@ -27,6 +27,8 @@ public sealed class LabPanel {
 
   Rect _window = new Rect(120f, 140f, 620f, 460f);
   Vector2 _scroll;
+  Vector2 _journalScroll;
+  string _journalCategory = LabCategory.Harvest;   // where a new builder starts
   string _filterText = string.Empty;
   bool _paused;
   Tab _tab = Tab.Console;
@@ -168,18 +170,57 @@ public sealed class LabPanel {
     }
   }
 
+  /// <summary>One page per category. Picking a page also turns that category on in the
+  /// console, because the next thing anyone does after reading "punch a tree" is go and
+  /// punch a tree, and finding the row filtered out would be a silly way to lose them.</summary>
   void DrawJournal() {
-    GUILayout.Label("Journal");
-    GUILayout.Space(4f);
-    GUILayout.Label("One page per category, generated from the event atlas, each with an");
-    GUILayout.Label("exercise you can run with lab_setup. Not written yet — this build is");
-    GUILayout.Label("the scaffold, and the console tab is the part that works.");
-    GUILayout.Space(8f);
-    GUILayout.Label("Seams hooked on this game build: "
-        + LabPatching.AppliedCount + "/" + LabPatching.Outcomes.Count);
-    foreach (LabPatching.Outcome outcome in LabPatching.Outcomes) {
-      GUILayout.Label((outcome.Applied ? "  [x] " : "  [ ] ") + outcome.Label
-          + (outcome.Applied ? string.Empty : "  — " + outcome.Detail));
+    GUILayout.BeginHorizontal();
+    foreach (LabJournal.Page page in LabJournal.Pages) {
+      bool selected = _journalCategory == page.Category;
+      if (GUILayout.Toggle(selected, page.Title, GUI.skin.button) && !selected) {
+        _journalCategory = page.Category;
+        _visible.Add(page.Category);
+      }
     }
+    GUILayout.EndHorizontal();
+    GUILayout.Space(6f);
+
+    LabJournal.Page current = LabJournal.For(_journalCategory);
+    _journalScroll = GUILayout.BeginScrollView(_journalScroll);
+
+    GUILayout.Label(current.Title);
+    GUILayout.Space(4f);
+    foreach (string line in current.What) {
+      GUILayout.Label(line);
+    }
+
+    GUILayout.Space(8f);
+    GUILayout.Label("Try this");
+    foreach (string line in current.Try) {
+      GUILayout.Label("  " + line);
+    }
+
+    GUILayout.Space(8f);
+    GUILayout.Label("Worth knowing");
+    foreach (string line in current.Watch) {
+      GUILayout.Label("  " + line);
+    }
+
+    GUILayout.Space(8f);
+    GUILayout.Label("Seams in the game  ·  [x] = this lab shows it to you");
+    foreach (string seam in current.Seams) {
+      GUILayout.Label("  " + seam);
+    }
+
+    GUILayout.Space(8f);
+    GUILayout.Label("This build hooked " + LabPatching.AppliedCount + " of "
+        + LabPatching.Outcomes.Count + " seams it tried.");
+    foreach (LabPatching.Outcome outcome in LabPatching.Outcomes) {
+      if (!outcome.Applied) {
+        GUILayout.Label("  unavailable: " + outcome.Label + " — " + outcome.Detail);
+      }
+    }
+
+    GUILayout.EndScrollView();
   }
 }

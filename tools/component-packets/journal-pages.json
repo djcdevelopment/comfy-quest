@@ -1,0 +1,157 @@
+{
+  "schema": "comfy-lab-journal/v1",
+  "_what_this_is": [
+    "The human half of the in-game journal. One entry per event-atlas category:",
+    "what it covers, something to go and do, and the thing that will otherwise",
+    "cost somebody an hour.",
+    "",
+    "The seam lists are NOT here — those are joined in from the atlas at generation",
+    "time, so a page cannot claim a seam the extractor does not see. This file is",
+    "the drafted half of the confidence contract; the atlas is the verified half.",
+    "",
+    "Written for somebody who plays Valheim and does not write C#. If a sentence",
+    "needs the reader to know what a Harmony postfix is, rewrite the sentence."
+  ],
+  "pages": {
+    "combat": {
+      "title": "Combat",
+      "what": [
+        "Hitting things, and things dying. The only category with any ground a quest",
+        "can stand on today — and the only place you can see all three verdicts side",
+        "by side, which is the fastest way to understand what they mean."
+      ],
+      "try": [
+        "Find a Greyling and hit it once, then finish it.",
+        "You get two kinds of row: the hits, and the death."
+      ],
+      "watch": [
+        "The hits and the kill get DIFFERENT verdicts, and that is the whole lesson.",
+        "The kill says a quest can fire on it. The hits say they emit an event that no",
+        "quest trigger matches — real, visible, and unusable. If you want a quest that",
+        "fires on a hit rather than a kill, nothing today will run it."
+      ]
+    },
+    "harvest": {
+      "title": "Harvest",
+      "what": [
+        "Chopping trees, breaking bushes and rocks, picking berries. The first thing",
+        "most people try, and the reason this lab exists: hitting a bush used to fire",
+        "a quest, and the mod that could do it was retired."
+      ],
+      "try": [
+        "Punch a tree with bare fists, then punch a raspberry bush, then pick one.",
+        "Three rows, and the third is a different shape from the first two."
+      ],
+      "watch": [
+        "A standing tree and a felled trunk are different things to the game, so they",
+        "are different rows. And picking a berry is not damage at all — it is an",
+        "interact. Nobody guesses that, and a quest written as though picking were",
+        "hitting would never fire."
+      ]
+    },
+    "inventory": {
+      "title": "Inventory",
+      "what": [
+        "Picking things up, equipping them, eating them, emptying chests. The largest",
+        "group of seams in the game and the noisiest, because the game moves items",
+        "around constantly for reasons that have nothing to do with you."
+      ],
+      "try": [
+        "Drop something and pick it back up, then equip a weapon and eat food.",
+        "Then open a chest and take everything."
+      ],
+      "watch": [
+        "The lab watches what you DID, not every time the item list changed. Adding an",
+        "item internally happens on crafting, on stacking, on moving between chests —",
+        "a quest built on that would fire constantly and mean nothing. It is left",
+        "alone on purpose, and you can see it listed as available in the atlas if you",
+        "disagree."
+      ]
+    },
+    "building": {
+      "title": "Building",
+      "what": [
+        "Placing pieces, repairing them, taking them down, and structures breaking.",
+        "The category a settlement steward actually wants: build a longhouse, repair",
+        "the dock, keep the walls up."
+      ],
+      "try": [
+        "Place a workbench, hit it with a hammer to repair it, then remove it.",
+        "If something of yours is damaged, let it break and watch that row too."
+      ],
+      "watch": [
+        "Placing is something YOU do; breaking is something that HAPPENS. So breaking",
+        "is reported whoever caused it, and the row says whether it was you. That",
+        "distinction is what lets a 'defend the base' quest work at all."
+      ]
+    },
+    "crafting": {
+      "title": "Crafting",
+      "what": [
+        "Making things at a bench, and feeding the machines that make things —",
+        "smelters, kilns, cooking stations. Two different acts that people tend to",
+        "lump together."
+      ],
+      "try": [
+        "Craft anything at a workbench. Then put ore and coal into a smelter.",
+        "Notice they are separate rows with separate names."
+      ],
+      "watch": [
+        "The craft is reported by the crafting WINDOW, not by your character. That is",
+        "genuinely surprising and it is why searching for a 'player crafts' event",
+        "turns up nothing and people conclude crafting cannot be tracked. It can."
+      ]
+    },
+    "progression": {
+      "title": "Progression",
+      "what": [
+        "Skills going up, stamina being spent, and dying. The category people ask for",
+        "by name and then cannot find, because the names they ask for do not exist."
+      ],
+      "try": [
+        "Swing an axe at a tree a few times until the skill-up message appears.",
+        "You will see the skill row fire at the same moment."
+      ],
+      "watch": [
+        "There is an event for 'a skill went up'. There is no event for 'my skill is",
+        "level 30' — that is a question you can ask, not something the game announces.",
+        "A quest can fire on the first and cannot on the second, and that difference",
+        "catches everybody once.",
+        "Stamina is off by default. It fires when you run, so it buries everything."
+      ]
+    },
+    "world": {
+      "title": "World",
+      "what": [
+        "Moving through the world, and the world itself changing state. Small, and it",
+        "contains the most interesting seam nobody has used."
+      ],
+      "try": [
+        "Take a portal.",
+        "If you are on a world where a boss has been killed, that already fired."
+      ],
+      "watch": [
+        "Valheim keeps a short list of world-wide flags — which bosses are dead, and",
+        "so what the world allows. That is the nearest thing the game has to a",
+        "server-wide event, which makes it the obvious foundation for a guild-scale",
+        "quest, and nothing has ever built on it."
+      ]
+    },
+    "social": {
+      "title": "Social",
+      "what": [
+        "Talking, and writing on signs. The quietest category and the one with the",
+        "most room, because it needs nothing from combat at all."
+      ],
+      "try": [
+        "Say something in chat, then place a sign and write on it."
+      ],
+      "watch": [
+        "A quest that completes when somebody writes a particular sign, or says a",
+        "phrase somewhere specific, is entirely possible and nobody has written one.",
+        "Community rituals tend to look far more like this than like killing things —",
+        "which is worth remembering when the combat seams are the ones that work."
+      ]
+    }
+  }
+}

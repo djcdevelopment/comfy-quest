@@ -5,8 +5,8 @@
 Install it on your own world, hit something, and watch the game tell you what it just
 did — and whether a quest could actually fire on it.
 
-> **Scaffold.** The console works and all eight categories are wired — 28 seams. The
-> journal is still a stub, there is no `lab_setup` yet, and there is no download.
+> **Scaffold.** The console and the journal both work, and all eight categories are
+> wired — 28 seams. There is no `lab_setup` yet and no download.
 > **Nothing here has been verified in game.** This README describes what is here, not
 > what is planned.
 
@@ -30,6 +30,10 @@ this?*
 | `questlab_help` | what this build can do |
 | `questlab_seams` | which seams hooked on your game version, and which didn't |
 | `questlab_clear` | empty the console |
+
+The **Journal** tab has a page per category: what it covers, something to go and do, and
+the trap. Every page lists the seams the game has and marks which ones this build shows
+you — so you can tell "Valheim can do this" from "the lab will show it to you".
 
 Open the console and punch a tree. You should see:
 
