@@ -103,8 +103,9 @@ Every event ends in one of three verdicts:
 The full picture—91 atlas rows, 90 exact signatures, and 77 method IDs:
 [`tools/component-packets/EVENT-ATLAS.md`](../../../tools/component-packets/EVENT-ATLAS.md).
 Its generated capability manifest classifies every exact signature and names 34 stable
-creator-event candidates. Those are classifications, not runtime promises: this scaffold
-still binds only `kill` until the shared evaluator and witnessed integrations land.
+creator-event candidates. Those are classifications, not runtime promises: the shared
+evaluator accepts all 34 (plus the schema-1 `hit` alias), while this scaffold's quest
+engine still forwards only `kill` until normalized, witnessed integrations land.
 
 ## Writing a quest
 
@@ -129,9 +130,11 @@ The starter file holds two quests that disagree with each other on purpose:
 schools. The gallery's stations are placed once; this is how you get another one after you've
 killed, chopped or otherwise consumed the first.
 
-That second one is the whole lesson. `QuestTriggerEvaluator` matches `kill` triggers only,
-so a `hit` quest parses cleanly, reports no problem, and can never fire. All eight schools
-are *hooked*; exactly one can have a quest *bound* to it. The Quests tab names which, and why.
+That second one is the current runtime lesson. The shared evaluator understands every safe
+catalog event and retains `hit` as a compatibility alias, but the lab engine still forwards
+only witnessed kills. A `hit` quest therefore parses cleanly and is contract-bindable without
+yet firing in game. All eight schools are *hooked*; exactly one currently reaches the quest
+engine. The Quests tab names which, and why.
 
 The tab also shows **the last kill the matcher was given** — creature, skill, melee or ranged
 — which is what turns "why didn't it fire" from a guess into a read.

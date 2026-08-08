@@ -287,6 +287,7 @@ public sealed class LabQuestSet {
       TriggerWeaponSkill = quest.TriggerWeaponSkill,
       TriggerProjectile = quest.TriggerProjectile,
       TriggerShots = quest.TriggerShots,
+      TriggerWhere = quest.TriggerWhere,
     };
   }
 
@@ -359,7 +360,8 @@ public sealed class LabQuestSet {
     if (!Same(a.TriggerEvent, b.TriggerEvent)
         || !Same(a.TriggerTarget, b.TriggerTarget)
         || !Same(a.TriggerWeaponSkill, b.TriggerWeaponSkill)
-        || a.TriggerProjectile != b.TriggerProjectile) {
+        || a.TriggerProjectile != b.TriggerProjectile
+        || !SameWhere(a.TriggerWhere, b.TriggerWhere)) {
       return "trigger changed";
     }
 
@@ -376,5 +378,25 @@ public sealed class LabQuestSet {
 
   static bool Same(string a, string b) {
     return string.Equals(a ?? string.Empty, b ?? string.Empty, StringComparison.Ordinal);
+  }
+
+  static bool SameWhere(
+      Dictionary<string, string> a, Dictionary<string, string> b) {
+    int aCount = a == null ? 0 : a.Count;
+    int bCount = b == null ? 0 : b.Count;
+    if (aCount != bCount) {
+      return false;
+    }
+    if (aCount == 0) {
+      return true;
+    }
+
+    foreach (KeyValuePair<string, string> field in a) {
+      if (!b.TryGetValue(field.Key, out string other)
+          || !string.Equals(field.Value, other, StringComparison.OrdinalIgnoreCase)) {
+        return false;
+      }
+    }
+    return true;
   }
 }

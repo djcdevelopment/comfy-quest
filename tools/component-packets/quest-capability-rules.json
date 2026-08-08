@@ -11,6 +11,9 @@
     "diagnostic": "Useful lab evidence, never a creator trigger by itself.",
     "disabled": "Unsafe, synthetic, or query-only seam that must not become a trigger."
   },
+  "TriggerAliases": {
+    "hit": ["damage_dealt", "resource_damaged"]
+  },
   "Rules": [
     {
       "Methods": ["Character.AddStaggerDamage"],

@@ -47,6 +47,12 @@
     "station_output_collected",
     "station_output_produced"
   ],
+  "TriggerAliases": {
+    "hit": [
+      "damage_dealt",
+      "resource_damaged"
+    ]
+  },
   "CategoryCounts": {
     "combat": {
       "UniqueSignatures": 11,

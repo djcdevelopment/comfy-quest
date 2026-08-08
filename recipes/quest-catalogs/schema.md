@@ -40,17 +40,22 @@ Each entry in `quests`:
   human checks them off automatically, e.g. "complete all 4 of the above").
 - `venue` — text. `"in_game"` or `"irl"`. Defaults to `"in_game"`; exists now so
   Ranger-style real-life badge quests don't force a schema change later.
-- `trigger` — object or null. A machine-readable spec for automatic in-game evidence
-  capture. Null means manual capture only. Implemented today (mod v0.5.0):
-  - `{ "event": "hit", "target": "tree_or_bush" | "tree" | "bush" | "any", "weapon_skill": "Unarmed" }`
-    — one shot when the local player damages a matching world object.
-  - `{ "event": "kill", "target": "<creature name substring>", "weapon_skill": "...",
-    "projectile": true|false, "shots": ["on_first_hit", "on_death"] }` — creature kills
-    attributed to the local player's blow; with `shots`, the first matching hit captures
-    shot 1 and that creature's death captures shot 2 in one submission (180s to finish,
-    60s per-quest cooldown). Without `shots`, a single capture fires on the kill.
-  Reserved: damage thresholds, item-stand mounts, emote/position events. No harvester
-  emits triggers; they are authored per-quest.
+- `trigger` — object or null. A machine-readable spec for automatic in-game completion;
+  null means manual completion only. `event` uses the stable creator vocabulary generated
+  in `tools/component-packets/samples/quest-capability-manifest.json`. `target` is the
+  optional subject substring; the existing `weapon_skill`, `projectile`, and `shots`
+  fields remain accepted. `hit` is a schema-1 compatibility alias for both creature and
+  resource damage. Additive `where` filters event-specific scalar fields without a schema
+  bump, for example:
+
+  ```json
+  { "event": "item_crafted", "target": "SwordIron",
+    "where": { "station": "forge", "quality": 2 } }
+  ```
+
+  The shared evaluator accepts all 34 creator-safe canonical events; in-game support is
+  claimed only after a normalized producer, dedupe guard, and witness receipt land. See
+  `quest-view-schema.md` for exact matching and rejection rules.
 
 That's the whole shape. If you need a field that isn't here, add it — then teach
 `validate.py` and the harvest adapters about it.

@@ -102,6 +102,10 @@ class QuestCapabilityManifestTests(unittest.TestCase):
         self.assertFalse(
             {event for event, routes in safe_routes.items() if "primary" not in routes}
         )
+        self.assertEqual(
+            self.manifest["TriggerAliases"],
+            {"hit": ["damage_dealt", "resource_damaged"]},
+        )
 
     def test_known_local_rpc_routes_share_event_and_dedupe_group(self) -> None:
         pairs = (

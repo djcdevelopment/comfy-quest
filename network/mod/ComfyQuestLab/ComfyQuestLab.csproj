@@ -61,7 +61,7 @@
   <!-- LINKED, not ProjectReference, and that is the whole point. A quest authored in
        the lab has to behave identically in the shipping mod, and the only way that is
        true rather than hoped-for is if both assemblies compile the SAME contract. These
-       three files are already proven linkable - ComfyNetworkSense.Tests links the same
+       five files are already proven linkable - ComfyNetworkSense.Tests links the same
        set - because they are deliberately Unity-free.
 
        Both namespaces are ComfyNetworkSense, so the lab refers to the quest types by
@@ -75,8 +75,10 @@
        and a test will pin the two together. -->
   <ItemGroup>
     <Compile Include="..\ComfyNetworkSense\Core\Models\TrackedQuest.cs" Link="Contract\TrackedQuest.cs" />
+    <Compile Include="..\ComfyNetworkSense\Core\Models\QuestEvent.cs" Link="Contract\QuestEvent.cs" />
     <Compile Include="..\ComfyNetworkSense\Core\Services\QuestViewLoader.cs" Link="Contract\QuestViewLoader.cs" />
     <Compile Include="..\ComfyNetworkSense\Core\Services\QuestTriggerEvaluator.cs" Link="Contract\QuestTriggerEvaluator.cs" />
+    <Compile Include="..\ComfyNetworkSense\Core\Services\QuestEventCatalog.g.cs" Link="Contract\QuestEventCatalog.g.cs" />
     <None Include="CHANGELOG.md" />
     <None Include="manifest.json" />
     <None Include="README.md" />

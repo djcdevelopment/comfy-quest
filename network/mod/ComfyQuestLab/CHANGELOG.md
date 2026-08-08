@@ -10,9 +10,17 @@ three tools that keep them honest. Nothing is published and there is no download
   against the live server. Client-only — `Awake` detects a dedicated server and returns
   before applying a single patch.
 - **Quest contract linked, not copied.** `TrackedQuest`, `QuestViewLoader` and
-  `QuestTriggerEvaluator` compile from ComfyNetworkSense's own source files, the same way
-  ComfyNetworkSense.Tests already links them. A quest that behaves one way in the lab
-  behaves the same way in the shipping mod because both compile the same bytes.
+  `QuestTriggerEvaluator`, plus the new `QuestEvent` and generated `QuestEventCatalog`,
+  compile from ComfyNetworkSense's own source files, the same way ComfyNetworkSense.Tests
+  already links them. A quest that behaves one way in the lab behaves the same way in the
+  shipping mod because both compile the same bytes.
+- **The shared evaluator is no longer kill-shaped.** All 34 creator-safe canonical events
+  use one `OnEvent` path with the existing `OnCreatureKilled` API retained as a wrapper.
+  Schema 1 gains optional scalar `trigger.where` filters without invalidating an existing
+  file. The published `hit` verb remains a broad alias for creature or resource damage.
+  Caller-supplied action identity dedupes local/RPC witnesses independently of quest
+  cooldown, including at the lab's zero-cooldown authoring setting. This is contract
+  capability; runtime integrations still require their own patch and witness receipts.
 - **All eight categories wired**, 26 atlas integrations plus two panel/input support hooks:
   - **harvest** — `TreeBase.Damage`, `TreeLog.Damage`, `Destructible.Damage`,
     `Pickable.Interact`. The first three are what the retired ComfyControlSurface hooked,
@@ -195,10 +203,11 @@ what the game said and had no idea what a quest was.
   Zero duplicated matching logic and nothing to drift. When a quest is not armed, one ablation
   — the same quest with the verb forced to `kill` — decides whether the verb was the only
   obstacle, so the panel can name the creator's actual trigger instead of shrugging.
-- **The verdict is the point, not a caveat.** `QuestTriggerEvaluator` matches `kill` only, so
-  of eight hooked schools exactly one can have a quest bound to it. A `hit` trigger parses
-  cleanly, errors nowhere, and can never fire. The **Quests tab** says which, and why, per
-  quest.
+- **The verdict is the point, not a caveat.** At this stage the quest engine forwarded only
+  `kill`, so of eight hooked schools exactly one reached a quest. A `hit` trigger parsed
+  cleanly, errored nowhere, and could not fire in game. The **Quests tab** said which, and
+  why, per quest. The later generic evaluator keeps that current runtime verdict separate
+  from contract capability until each producer is wired and witnessed.
 - **`lab_reload`** re-reads and **diffs by name** — `+ first_blood`, `~ punchwood (trigger
   changed)`, `= 3 unchanged`. "Reloaded" alone never tells a creator the file they just saved
   is the file the lab just read. It also builds a fresh evaluator, dropping cooldowns: a
