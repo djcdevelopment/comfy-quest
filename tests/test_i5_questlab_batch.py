@@ -53,6 +53,10 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
             self.source,
             r"\[ValidateSet\('i5', 'omen'\)\]\s*\[string\]\$Lane",
         )
+        self.assertIn(
+            'Join-Path $repoRoot ("captures\\questlab\\{0}" -f $Lane)',
+            self.source,
+        )
 
     def test_dry_run_stops_before_any_i5_process(self) -> None:
         dry_run_branch = self.source.index("if ($DryRun)")

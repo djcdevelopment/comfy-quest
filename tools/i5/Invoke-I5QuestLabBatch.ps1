@@ -52,7 +52,7 @@ $deployScript = Join-Path $PSScriptRoot 'Deploy-ToI5.ps1'
 $omenValheimRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim'
 $i5ValheimRoot = 'C:/Program Files (x86)/Steam/steamapps/common/Valheim'
 if (-not $OutputDirectory) {
-    $OutputDirectory = Join-Path $repoRoot 'captures\questlab\i5'
+    $OutputDirectory = Join-Path $repoRoot ("captures\questlab\{0}" -f $Lane)
 }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
@@ -205,7 +205,7 @@ if ($waitExit -eq 3) {
     exit 3
 }
 if ($waitExit -ne 0) {
-    throw "i5 receipt read failed with exit code $waitExit"
+    throw "$Lane receipt read failed with exit code $waitExit"
 }
 
 $receipt = $receiptJson | ConvertFrom-Json
