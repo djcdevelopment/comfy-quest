@@ -49,6 +49,10 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
         self.assertIn("[switch]$DryRun", self.source)
         self.assertIn("suite verdict:", self.source)
         self.assertIn("same-action double completion", self.source)
+        self.assertRegex(
+            self.source,
+            r"\[ValidateSet\('i5', 'omen'\)\]\s*\[string\]\$Lane",
+        )
 
     def test_dry_run_stops_before_any_i5_process(self) -> None:
         dry_run_branch = self.source.index("if ($DryRun)")
@@ -70,6 +74,8 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
                     "-OutputDirectory",
                     output_directory,
                     "-DryRun",
+                    "-Lane",
+                    "omen",
                 ],
                 cwd=REPO,
                 capture_output=True,
