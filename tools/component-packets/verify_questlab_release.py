@@ -42,6 +42,10 @@ VISUAL_CHECKS = {
     "scale_acceptable",
     "hall_width_acceptable",
     "runes_acceptable",
+    "rune_banners_acceptable",
+    "sign_lighting_acceptable",
+    "welcome_camp_acceptable",
+    "quest_grid_readable",
 }
 
 

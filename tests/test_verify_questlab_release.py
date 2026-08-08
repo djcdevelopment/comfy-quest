@@ -94,6 +94,21 @@ class QuestLabReleaseVerifierTests(unittest.TestCase):
             VERIFIER.validate_all_schools(live, "0.2.0", "questlab-v0.2.0-test"), []
         )
 
+    def test_visual_acceptance_covers_the_r11_review_surface(self) -> None:
+        self.assertEqual(
+            VERIFIER.VISUAL_CHECKS,
+            {
+                "solid_marble_floor",
+                "scale_acceptable",
+                "hall_width_acceptable",
+                "runes_acceptable",
+                "rune_banners_acceptable",
+                "sign_lighting_acceptable",
+                "welcome_camp_acceptable",
+                "quest_grid_readable",
+            },
+        )
+
     def test_missing_catalog_event_and_double_completion_turn_red(self) -> None:
         creator = suite_receipt("creator-events", self.creator_events)
         creator["expectations"].pop()

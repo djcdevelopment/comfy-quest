@@ -1,6 +1,6 @@
 {
   "schema": "comfy-questlab-gallery-acceptance/v1",
-  "selected_profile": "marble-wide",
+  "selected_profile": "marble-grand",
   "accepted_by": "",
   "accepted_utc": "",
   "comparison_request_id": "",
@@ -8,6 +8,10 @@
     "solid_marble_floor": false,
     "scale_acceptable": false,
     "hall_width_acceptable": false,
-    "runes_acceptable": false
+    "runes_acceptable": false,
+    "rune_banners_acceptable": false,
+    "sign_lighting_acceptable": false,
+    "welcome_camp_acceptable": false,
+    "quest_grid_readable": false
   }
 }
