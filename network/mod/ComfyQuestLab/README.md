@@ -37,8 +37,8 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r12 changes presentation and course layout, so those same suites must
-> be re-witnessed against the exact r12 DLL before the release cut is final. This README
+> 34/34 creator events. r13 changes presentation and course layout, so those same suites must
+> be re-witnessed against the exact r13 DLL before the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
 ## Why this exists
@@ -107,9 +107,12 @@ Use the row's **+** only when you need its source file, evaluator explanation, c
 advisories; load errors are collapsed separately.
 
 Hovering any clipped grid cell writes its full meaning into the help bar at the bottom of the
-window. **Pause** freezes the rows already on screen while observation continues in the ring;
-**Resume** returns to the live stream. Clearing the search and clearing the retained log are
-separate, explicitly labelled actions.
+window. Blue bindable-event cells are buttons: click one to copy the exact `trigger.event` ID
+instead of transcribing it. The Quests tab opens the local quest folder directly; its visible
+path can also be clicked to copy it. **Pause** freezes the retained moment while keeping search
+and school filters live over that snapshot; **Resume** returns to the live stream. **All** and
+**Default** recover the eight-school or quiet two-school filter presets. Clearing the search and
+clearing the retained log are separate, explicitly labelled actions.
 
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Its world-action grid gives each integration one row with a colored

@@ -81,7 +81,8 @@ class QuestLabPanelTests(unittest.TestCase):
             "DrawQuestDetails(quest, eventName, target, cooldown)",
             'GUILayout.Label("verdict  /  " + quest.ArmedLine())',
             'GUILayout.Toggle(_showQuestFolder,',
-            'new GUIContent("Folder", "show or hide the quest directory")',
+            'new GUIContent("Path", "show the quest directory;',
+            'new GUIContent("Open folder", "open the local quest directory")',
             '" LOAD ERROR"',
         ):
             with self.subTest(marker=marker):
@@ -119,7 +120,9 @@ class QuestLabPanelTests(unittest.TestCase):
         for marker in (
             "readonly List<LabEvent> _pausedRows",
             "_pausedRows.AddRange(",
-            "new List<LabEvent>(_pausedRows)",
+            "_ring.Recent(null, string.Empty, Math.Max(1, _ring.Count))",
+            "List<LabEvent> VisibleRows()",
+            "RowMatches(row, _filterText)",
             '" visible row"',
             'new GUIContent("Clear log", "discard retained event rows")',
             'new GUIContent("×", "clear the search")',
@@ -128,10 +131,31 @@ class QuestLabPanelTests(unittest.TestCase):
                 self.assertIn(marker, self.panel)
         self.assertNotIn("? new List<LabEvent>()", self.panel)
 
+    def test_filter_recovery_and_copy_actions_reduce_creator_transcription(self) -> None:
+        for marker in (
+            'new GUIContent("All", "show all eight event schools")',
+            "SetVisibleSchools(LabCategory.All)",
+            'new GUIContent("Default", "return to the quiet Combat + Harvest view")',
+            "SetVisibleSchools(LabCategory.DefaultVisible)",
+            "if (_visible.Count == 0)",
+            '"click to copy trigger.event: "',
+            "if (row.Usability == LabUsability.Today",
+            "if (quest.IsArmed && !string.IsNullOrWhiteSpace(eventName))",
+            'CopyToClipboard("trigger.event", creatorName)',
+            'CopyToClipboard("trigger.event", bindableEvent)',
+            "GUIUtility.systemCopyBuffer = value",
+            "blue cells copy exact IDs",
+            "Directory.CreateDirectory(LabQuestEngine.QuestDir)",
+            "Application.OpenURL(new Uri(LabQuestEngine.QuestDir).AbsoluteUri)",
+            'CopyToClipboard("quest folder", LabQuestEngine.QuestDir)',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+
     def test_hover_help_and_spellbook_grid_make_clipped_detail_discoverable(self) -> None:
         for marker in (
             "string tooltip = GUI.tooltip;",
-            '"Hover for details  ·  F6/Esc close',
+            '"Hover for details',
             'new GUIContent("WORLD ACTION")',
             'new GUIContent("QUEST USE")',
             'new GUIContent("TRUE NAME", "exact Valheim method")',

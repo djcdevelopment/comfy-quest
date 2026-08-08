@@ -91,6 +91,10 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   carried, makes Pause freeze visible rows instead of blanking them, separates search-clear
   from log-clear, converts Spellbook actions to the same compact verdict grid, colors the last
   matcher outcome, saves window position/size on close, and makes the percentage a 100% reset.
+  r13 makes safe blue event cells copy exact `trigger.event` IDs, opens or copies the quest
+  folder from the Quests tab, adds All/Default school recovery, fixes the empty-school filter
+  so it no longer means "show everything", and keeps search/school filtering live over a
+  genuinely frozen Pause snapshot.
 - **Bounded batch evidence is self-service.** `questlab_batch` can prepare, run, reset,
   report, and export two explicit suites. `all-schools` installs eight ordinary bindable
   example quests, safely clears every marked old build, raises a fresh compact course with
