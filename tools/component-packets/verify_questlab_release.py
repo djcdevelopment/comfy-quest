@@ -200,7 +200,9 @@ def validate_all_schools(
 
 
 def validate_gallery(
-    request_receipts: list[dict[str, Any]], acceptance: dict[str, Any]
+    request_receipts: list[dict[str, Any]],
+    acceptance: dict[str, Any],
+    expected_machine: str | None = None,
 ) -> tuple[list[str], str]:
     errors: list[str] = []
     by_operation: dict[str, list[dict[str, Any]]] = {}
@@ -211,6 +213,12 @@ def validate_gallery(
         require(receipt.get("state") == "completed", f"{operation} request did not complete", errors)
         require(bool(receipt.get("request_id")), f"{operation} request id is empty", errors)
         require(bool(receipt.get("machine")), f"{operation} machine is empty", errors)
+        if expected_machine:
+            require(
+                receipt.get("machine") == expected_machine,
+                f"{operation} request came from a different machine",
+                errors,
+            )
     require(
         GALLERY_OPERATIONS.issubset(by_operation),
         "gallery receipts must include build, compare, identify, clear, and rebuild",
@@ -272,7 +280,16 @@ def verify_release(
     acceptance = read_json(acceptance_path)
     errors = validate_creator_events(creator, expected_version, expected_release)
     errors.extend(validate_all_schools(live, expected_version, expected_release))
-    gallery_errors, selected = validate_gallery(gallery, acceptance)
+    require(
+        creator.get("machine") == live.get("machine"),
+        "creator-events and all-schools receipts came from different machines",
+        errors,
+    )
+    gallery_errors, selected = validate_gallery(
+        gallery,
+        acceptance,
+        expected_machine=str(live.get("machine", "")),
+    )
     errors.extend(gallery_errors)
     if errors:
         raise VerificationError("Quest Lab release evidence failed:\n- " + "\n- ".join(errors))

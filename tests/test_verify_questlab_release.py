@@ -140,15 +140,26 @@ class QuestLabReleaseVerifierTests(unittest.TestCase):
             "comparison_request_id": "gallery_compare-1",
             "observations": {name: True for name in VERIFIER.VISUAL_CHECKS},
         }
-        errors, selected = VERIFIER.validate_gallery(receipts, acceptance)
+        errors, selected = VERIFIER.validate_gallery(
+            receipts, acceptance, expected_machine="test-machine"
+        )
         self.assertEqual(errors, [])
         self.assertEqual(selected, "marble-wide")
 
         rejected = copy.deepcopy(acceptance)
         rejected["observations"]["hall_width_acceptable"] = False
-        errors, _ = VERIFIER.validate_gallery(receipts[:-1], rejected)
+        errors, _ = VERIFIER.validate_gallery(
+            receipts[:-1], rejected, expected_machine="test-machine"
+        )
         self.assertTrue(any("build, compare, identify, clear, and rebuild" in error for error in errors))
         self.assertTrue(any("hall_width_acceptable" in error for error in errors))
+
+        wrong_lane = copy.deepcopy(receipts)
+        wrong_lane[0]["machine"] = "another-machine"
+        errors, _ = VERIFIER.validate_gallery(
+            wrong_lane, acceptance, expected_machine="test-machine"
+        )
+        self.assertTrue(any("different machine" in error for error in errors))
 
     def test_checked_in_acceptance_template_cannot_accidentally_pass(self) -> None:
         sample = VERIFIER.read_json(
