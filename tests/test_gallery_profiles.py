@@ -15,6 +15,8 @@ TOOLS = REPO / "tools" / "component-packets"
 SUMMARY = TOOLS / "samples" / "gallery-profiles.json"
 GENERATOR = TOOLS / "generate_gallery.py"
 PLAN = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabGalleryPlan.g.cs"
+BUILDER = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabGalleryBuilder.cs"
+CONTROLLER = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabBatchController.cs"
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -101,6 +103,29 @@ class GalleryProfileTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_clear_claims_uninstantiated_marked_zdos_before_destroy(self) -> None:
+        source = BUILDER.read_text(encoding="utf-8")
+        helper = source[source.index("static bool DestroyMarkedZdo") :]
+        claim = helper.index("zdo.SetOwner(ZDOMan.GetSessionID());")
+        destroy = helper.index("ZDOMan.instance.DestroyZDO(zdo);")
+        self.assertLess(claim, destroy)
+        self.assertEqual(source.count("DestroyMarkedZdo(zdo)"), 2)
+
+    def test_batch_prepare_refreshes_consumable_targets(self) -> None:
+        builder = BUILDER.read_text(encoding="utf-8")
+        controller = CONTROLLER.read_text(encoding="utf-8")
+        self.assertIn("public string PrepareBatchTargets()", builder)
+        self.assertIn("Restock(LabCategory.Combat)", builder)
+        self.assertIn("Restock(LabCategory.Harvest)", builder)
+        self.assertIn("_gallery.PrepareBatchTargets()", controller)
+
+    def test_request_receipts_pin_release_and_do_not_leak_stale_suite_paths(self) -> None:
+        controller = CONTROLLER.read_text(encoding="utf-8")
+        self.assertIn('\\"plugin_version\\"', controller)
+        self.assertIn('\\"release_id\\"', controller)
+        self.assertIn("RequestExposesSuiteReceipt(request.operation)", controller)
+        self.assertIn('operation == "reset"', controller)
 
 
 if __name__ == "__main__":

@@ -203,6 +203,8 @@ def validate_gallery(
     request_receipts: list[dict[str, Any]],
     acceptance: dict[str, Any],
     expected_machine: str | None = None,
+    expected_version: str | None = None,
+    expected_release: str | None = None,
 ) -> tuple[list[str], str]:
     errors: list[str] = []
     by_operation: dict[str, list[dict[str, Any]]] = {}
@@ -219,6 +221,18 @@ def validate_gallery(
                 f"{operation} request came from a different machine",
                 errors,
             )
+        if expected_version:
+            require(
+                receipt.get("plugin_version") == expected_version,
+                f"{operation} request plugin version mismatch",
+                errors,
+            )
+        if expected_release:
+            require(
+                receipt.get("release_id") == expected_release,
+                f"{operation} request release id mismatch",
+                errors,
+            )
     require(
         GALLERY_OPERATIONS.issubset(by_operation),
         "gallery receipts must include build, compare, identify, clear, and rebuild",
@@ -228,7 +242,7 @@ def validate_gallery(
     require(any(detail.startswith("cleared ") for detail in clear_details), "no gallery clear removed marks", errors)
     identify_details = [str(item.get("detail", "")) for item in by_operation.get("gallery_identify", [])]
     require(
-        any("loaded gallery structures:" in detail for detail in identify_details),
+        any("gallery structures:" in detail for detail in identify_details),
         "gallery identify did not find marked structures",
         errors,
     )
@@ -289,6 +303,8 @@ def verify_release(
         gallery,
         acceptance,
         expected_machine=str(live.get("machine", "")),
+        expected_version=expected_version,
+        expected_release=expected_release,
     )
     errors.extend(gallery_errors)
     if errors:

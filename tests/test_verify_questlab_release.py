@@ -122,6 +122,8 @@ class QuestLabReleaseVerifierTests(unittest.TestCase):
                 "operation": operation,
                 "state": "completed",
                 "machine": "test-machine",
+                "plugin_version": "0.2.0",
+                "release_id": "questlab-v0.2.0-test",
                 "detail": (
                     "cleared 20 piece(s) matching 'all'"
                     if operation == "gallery_clear"
@@ -141,7 +143,11 @@ class QuestLabReleaseVerifierTests(unittest.TestCase):
             "observations": {name: True for name in VERIFIER.VISUAL_CHECKS},
         }
         errors, selected = VERIFIER.validate_gallery(
-            receipts, acceptance, expected_machine="test-machine"
+            receipts,
+            acceptance,
+            expected_machine="test-machine",
+            expected_version="0.2.0",
+            expected_release="questlab-v0.2.0-test",
         )
         self.assertEqual(errors, [])
         self.assertEqual(selected, "marble-wide")
@@ -149,7 +155,11 @@ class QuestLabReleaseVerifierTests(unittest.TestCase):
         rejected = copy.deepcopy(acceptance)
         rejected["observations"]["hall_width_acceptable"] = False
         errors, _ = VERIFIER.validate_gallery(
-            receipts[:-1], rejected, expected_machine="test-machine"
+            receipts[:-1],
+            rejected,
+            expected_machine="test-machine",
+            expected_version="0.2.0",
+            expected_release="questlab-v0.2.0-test",
         )
         self.assertTrue(any("build, compare, identify, clear, and rebuild" in error for error in errors))
         self.assertTrue(any("hall_width_acceptable" in error for error in errors))
@@ -157,9 +167,24 @@ class QuestLabReleaseVerifierTests(unittest.TestCase):
         wrong_lane = copy.deepcopy(receipts)
         wrong_lane[0]["machine"] = "another-machine"
         errors, _ = VERIFIER.validate_gallery(
-            wrong_lane, acceptance, expected_machine="test-machine"
+            wrong_lane,
+            acceptance,
+            expected_machine="test-machine",
+            expected_version="0.2.0",
+            expected_release="questlab-v0.2.0-test",
         )
         self.assertTrue(any("different machine" in error for error in errors))
+
+        wrong_release = copy.deepcopy(receipts)
+        wrong_release[0]["release_id"] = "questlab-v0.2.0-old"
+        errors, _ = VERIFIER.validate_gallery(
+            wrong_release,
+            acceptance,
+            expected_machine="test-machine",
+            expected_version="0.2.0",
+            expected_release="questlab-v0.2.0-test",
+        )
+        self.assertTrue(any("release id mismatch" in error for error in errors))
 
     def test_checked_in_acceptance_template_cannot_accidentally_pass(self) -> None:
         sample = VERIFIER.read_json(

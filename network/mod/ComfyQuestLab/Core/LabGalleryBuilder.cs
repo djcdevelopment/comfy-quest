@@ -652,10 +652,10 @@ public sealed class LabGalleryBuilder {
   /// could not have found it however hard it tried. What that looks like from inside the
   /// world is 1500 pieces of accumulated scaffolding and a clear that reports zero.
   ///
-  /// So the mark leads and the manifest follows. The loaded ZDO table includes structural
+  /// So the mark leads and the manifest follows. The locally known ZDO table includes structural
   /// pieces, portals, stations, and loose supplies alike, so a sweep finds every kind of
   /// gallery object in any session no matter which build placed it. The manifest is still
-  /// worth consulting afterwards for marked pieces sitting in zones that are not loaded.
+  /// worth consulting afterwards for marked pieces not synchronized to this client.
   ///
   /// Blueprint pieces are deliberately not touched: this asks IsGalleryPiece, not
   /// LabMarks.IsLabBuilt, so clearing a gallery never takes somebody's blueprint with it.</summary>
@@ -682,23 +682,13 @@ public sealed class LabGalleryBuilder {
         swept.Add(zdo.m_uid);
       }
     } catch (Exception ex) {
-      LogOnce("could not sweep loaded pieces: " + ex.Message);
+      LogOnce("could not sweep locally known pieces: " + ex.Message);
     }
 
     int removed = 0;
     foreach (ZDO zdo in doomed) {
       try {
-        if (zdo == null) {
-          continue;
-        }
-        ZNetView view = ZNetScene.instance.FindInstance(zdo);
-        if (view != null) {
-          view.ClaimOwnership();
-          view.Destroy();
-        } else {
-          ZDOMan.instance.DestroyZDO(zdo);
-        }
-        removed++;
+        if (DestroyMarkedZdo(zdo)) removed++;
       } catch (Exception) {
         // A piece somebody already broke is not an error worth stopping for.
       }
@@ -728,15 +718,7 @@ public sealed class LabGalleryBuilder {
           kept.Add(id);
           continue;
         }
-        ZNetView view = ZNetScene.instance.FindInstance(zdo);
-        if (view != null) {
-          view.ClaimOwnership();
-          view.Destroy();
-          removed++;
-        } else {
-          ZDOMan.instance.DestroyZDO(zdo);
-          removed++;
-        }
+        if (DestroyMarkedZdo(zdo)) removed++;
       } catch (Exception) {
         // A piece somebody already broke is not an error worth stopping for.
       }
@@ -746,8 +728,7 @@ public sealed class LabGalleryBuilder {
     SaveManifest();
 
     if (removed == 0) {
-      return "no gallery pieces matching '" + selector + "' are loaded here. The sweep only "
-           + "sees zones the game has loaded, so stand in the gallery and run this again.";
+      return "no marked gallery pieces matching '" + selector + "' are locally known.";
     }
     return "cleared " + removed + " piece(s) matching '" + selector + "'"
          + (notOurs > 0
@@ -755,8 +736,28 @@ public sealed class LabGalleryBuilder {
               + " alone — those ids belong to something else now, which is what happens to "
               + "a manifest across a reload"
             : string.Empty)
-         + ". Anything still standing is in a zone that is not loaded: walk toward it and "
-         + "run this again.";
+         + ".";
+  }
+
+  /// <summary>Destroy one already mark-validated gallery ZDO.
+  ///
+  /// A local world's ZDO table contains objects outside the currently instantiated zones.
+  /// <c>ZDOMan.DestroyZDO</c> silently ignores an unowned ZDO, so the no-view branch must
+  /// claim it just like <c>ZNetView.ClaimOwnership</c> does. The old branch counted that
+  /// ignored call as a removal, leaving thousands of durable gallery marks behind.</summary>
+  static bool DestroyMarkedZdo(ZDO zdo) {
+    if (zdo == null || ZDOMan.instance == null || ZNetScene.instance == null) {
+      return false;
+    }
+    ZNetView view = ZNetScene.instance.FindInstance(zdo);
+    if (view != null) {
+      view.ClaimOwnership();
+      view.Destroy();
+      return true;
+    }
+    zdo.SetOwner(ZDOMan.GetSessionID());
+    ZDOMan.instance.DestroyZDO(zdo);
+    return true;
   }
 
   static bool MatchesSelector(ZDO zdo, string selector) {
@@ -768,7 +769,7 @@ public sealed class LabGalleryBuilder {
         || string.Equals(GalleryBuild(zdo), selector, StringComparison.OrdinalIgnoreCase);
   }
 
-  /// <summary>Describe the loaded marked structures without relying on their prefab names
+  /// <summary>Describe locally known marked structures without relying on their prefab names
   /// or transient ids. This is deliberately read-only and is the safe first step before a
   /// selective clear after comparison testing.</summary>
   public string Identify() {
@@ -783,7 +784,7 @@ public sealed class LabGalleryBuilder {
         AddIdentity(zdo, counts, seen);
       }
     } catch (Exception ex) {
-      LogOnce("could not identify loaded pieces: " + ex.Message);
+      LogOnce("could not identify locally known pieces: " + ex.Message);
     }
 
     LoadManifestIfEmpty();
@@ -797,11 +798,11 @@ public sealed class LabGalleryBuilder {
     }
 
     if (counts.Count == 0) {
-      return "no marked gallery structures are loaded here.\n" + Profiles();
+      return "no marked gallery structures are locally known.\n" + Profiles();
     }
     var keys = new List<string>(counts.Keys);
     keys.Sort(StringComparer.OrdinalIgnoreCase);
-    var sb = new StringBuilder("loaded gallery structures:\n");
+    var sb = new StringBuilder("locally known gallery structures:\n");
     foreach (string key in keys) {
       sb.Append("  ").Append(key.Replace("\t", " | build ")).Append(": ")
         .Append(counts[key].ToString(CultureInfo.InvariantCulture)).AppendLine(" marked objects");
@@ -970,15 +971,16 @@ public sealed class LabGalleryBuilder {
     }
   }
 
-  /// <summary>How many lab-marked pieces are standing in the loaded zones right now.
+  /// <summary>How many lab-marked pieces are present in the locally known ZDO table.
   ///
   /// Exists so <c>lab_setup</c> can tell a first run from a second one. It could not before, and
   /// a second <c>lab_setup</c> silently raised another 620 pieces through the first — the same
   /// mistake that once let the count reach 1527 before anybody noticed. "The one command a
   /// newcomer needs" should not be a command that punishes running it twice.
   ///
-  /// Only sees loaded zones, same as <see cref="Clear"/>; a gallery across the map reads as zero.
-  /// That is the safe direction to be wrong in — it offers to build rather than refusing to.</summary>
+  /// A local world knows its complete table; a remote client can only answer for synchronized
+  /// objects. That is the safe direction to be wrong in — it offers to build rather than
+  /// destroying anything it cannot prove belongs to the lab.</summary>
   public int StandingPieceCount(string selector = null) {
     int n = 0;
     try {
@@ -1080,6 +1082,14 @@ public sealed class LabGalleryBuilder {
     }
     return "Prepared " + placed + "/" + LabBatchContract.PreparedSupplyPrefabs.Length
         + " bounded supply stacks (wood, coal, and copper ore).";
+  }
+
+  /// <summary>Refresh the two consumable targets required by the all-schools suite.
+  /// A standing gallery is not proof that its Greyling or birch survived an earlier run.</summary>
+  public string PrepareBatchTargets() {
+    string combat = Restock(LabCategory.Combat);
+    string harvest = Restock(LabCategory.Harvest);
+    return "Refreshed bounded practice targets. " + combat + " " + harvest;
   }
 
   /// <summary>Far enough not to spawn inside the player, close enough to be obviously for them.</summary>

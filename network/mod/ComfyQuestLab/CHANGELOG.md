@@ -32,12 +32,15 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   black-marble floors, 8–10 m halls, larger rings, and larger runes. Runtime commands can
   list, check, build, compare, identify, selectively clear, and rebuild profiles. Every
   object carries plan/profile/build marks; comparison sides share a build id, and clear
-  sweeps the loaded ZDO table so portals and loose supplies are covered alongside structure
-  pieces without ever touching an unmarked object. Generated JSON/count/preview artifacts
+  sweeps the locally known ZDO table so portals and loose supplies are covered alongside
+  structure pieces without ever touching an unmarked object. Uninstantiated marked ZDOs are
+  explicitly claimed before destruction; the r3 live run exposed that Valheim otherwise
+  ignores the delete while returning normally. Generated JSON/count/preview artifacts
   and seven drift tests agree. Live visual selection remains pending.
 - **Bounded batch evidence is self-service.** `questlab_batch` can prepare, run, reset,
   report, and export two explicit suites. `all-schools` installs eight ordinary bindable
-  example quests, prepares the gallery and consumables, and receipts real router witnesses
+  example quests, refreshes the consumable Greyling/birch targets, prepares the gallery and
+  supplies, and receipts real router witnesses
   separately from quest completions. `creator-events` probes all 34 safe events through the
   shared evaluator and labels the result synthetic. The live lane temporarily uses zero
   cooldown in memory so local/RPC double completion cannot hide behind normal cooldown, then
@@ -200,8 +203,9 @@ Intensity, range, and on/off are config; colour is per school.
 **Clear now sweeps by mark, not by manifest.** The manifest only ever described the most
 recent build — every build empties it first — so a second gallery orphaned the first
 beyond any reach, and the pieces accumulated to 1527 before anyone noticed a clear
-reporting zero. `WearNTear.GetAllInstances()` enumerates every loaded piece, so the sweep
-finds all lab-marked galleries in any session. It only sees loaded zones, and says so.
+reporting zero. The locally known ZDO table lets the sweep find all lab-marked galleries
+without depending on instantiated `WearNTear` components; local worlds know the whole table,
+while a remote client can only answer for objects it has synchronized.
 
 **Still unwitnessed at that point:** only harvest. Combat and the quest lane were witnessed
 on 2026-08-08 — see the end of this file. Six categories remain unseen. Item stands stay

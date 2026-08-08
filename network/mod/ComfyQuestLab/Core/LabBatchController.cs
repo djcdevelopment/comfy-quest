@@ -126,10 +126,12 @@ public sealed class LabBatchController {
       }
     }
 
+    string targets = _gallery.PrepareBatchTargets();
     string supplies = _gallery.PrepareBatchSupplies();
     _preparedSuiteId = suite.Id;
     _preparing = false;
-    ComfyQuestLab.Report("prepared " + suite.Id + ": " + reload + " " + supplies + "\n"
+    ComfyQuestLab.Report("prepared " + suite.Id + ": " + reload + " " + targets + " "
+        + supplies + "\n"
         + Instructions(suite));
   }
 
@@ -592,10 +594,15 @@ public sealed class LabBatchController {
       sb.AppendLine("  \"operation\": \"" + LabBatchContract.Json(request.operation) + "\",");
       sb.AppendLine("  \"state\": \"" + LabBatchContract.Json(state) + "\",");
       sb.AppendLine("  \"machine\": \"" + LabBatchContract.Json(Environment.MachineName) + "\",");
+      sb.AppendLine("  \"plugin_version\": \"" + ComfyQuestLab.PluginVersion + "\",");
+      sb.AppendLine("  \"release_id\": \"" + ComfyQuestLab.ReleaseId + "\",");
       sb.AppendLine("  \"completed_utc\": \"" + NowUtc() + "\",");
       sb.AppendLine("  \"detail\": \"" + LabBatchContract.Json(detail) + "\",");
+      string suiteReceiptPath = RequestExposesSuiteReceipt(request.operation)
+          ? _lastExportPath
+          : string.Empty;
       sb.AppendLine("  \"suite_receipt_path\": \""
-          + LabBatchContract.Json(_lastExportPath) + "\"");
+          + LabBatchContract.Json(suiteReceiptPath) + "\"");
       sb.AppendLine("}");
       WriteAtomic(path, sb.ToString());
       ComfyQuestLab.LogInfo("[batch-request] " + request.request_id + " " + state
@@ -603,6 +610,11 @@ public sealed class LabBatchController {
     } catch (Exception ex) {
       ComfyQuestLab.LogInfo("[batch-request] receipt failed: " + ex.Message);
     }
+  }
+
+  static bool RequestExposesSuiteReceipt(string operation) {
+    return operation == "run" || operation == "report" || operation == "export"
+        || operation == "reset";
   }
 }
 

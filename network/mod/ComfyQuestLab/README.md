@@ -85,7 +85,7 @@ update.
 | `questlab_gallery clear [profile-or-build-id]` | remove only matching marked gallery objects |
 | `questlab_gallery rebuild [profile]` | selectively clear and rebuild one profile |
 | `questlab_batch suites` | list the two bounded evidence classes |
-| `questlab_batch prepare all-schools` | write eight ordinary example quests, raise a gallery if needed, and stage supplies |
+| `questlab_batch prepare all-schools` | write eight ordinary example quests, raise a gallery if needed, refresh the Greyling and birch, and stage supplies |
 | `questlab_batch run [all-schools\|creator-events]` | start live witnessing or run the explicitly synthetic 34-event contract probe |
 | `questlab_batch reset\|report\|export` | reset safely, show progress, or write a machine-readable receipt |
 
@@ -141,7 +141,7 @@ is the default: a solid black-marble floor, 8 m halls, larger runes, and about 2
 placed objects. `marble-grand` expands that to 10 m halls and about 3,611 objects.
 
 Every object carries the plan version, profile id, and build id in its own ZDO. `identify`
-reads those durable marks from the loaded ZDO table; `clear` accepts either a profile or
+reads those durable marks from the locally known ZDO table; `clear` accepts either a profile or
 one comparison build id and refuses to touch anything unmarked. A comparison gives both
 sides one shared build id, so it can come down in one bounded operation. Generated counts
 and previews live in
@@ -150,7 +150,8 @@ and `gallery-plan-comparison.png`; `generate_gallery.py --check` guards plan dri
 
 ## Bounded suites and receipts
 
-`all-schools` prepares one schema-1, source-compatible example quest per school. A run
+`all-schools` prepares one schema-1, source-compatible example quest per school, fresh
+combat/harvest targets, and the fixed supply stacks. A run
 clears router/evaluator state, uses a volatile zero cooldown without changing the creator's
 config, and waits for real game actions. The receipt requires both the canonical event and
 its example quest completion in every school. It records raw signatures, canonical action
