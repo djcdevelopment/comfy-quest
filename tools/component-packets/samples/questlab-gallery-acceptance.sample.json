@@ -1,0 +1,13 @@
+{
+  "schema": "comfy-questlab-gallery-acceptance/v1",
+  "selected_profile": "marble-wide",
+  "accepted_by": "",
+  "accepted_utc": "",
+  "comparison_request_id": "",
+  "observations": {
+    "solid_marble_floor": false,
+    "scale_acceptable": false,
+    "hall_width_acceptable": false,
+    "runes_acceptable": false
+  }
+}
