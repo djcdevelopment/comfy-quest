@@ -194,8 +194,9 @@ html = [
     'a tree, and so on for all eight schools. You should never be walking across the map looking '
     'for the thing your quest is about; that is what the gallery is for.</p></li>',
     '<li><strong>Want to prove every school? <code>questlab_batch prepare all-schools</code>.</strong>',
-    '<p>Prepare safely clears marked old builds and raises one fresh compact course with targets, '
-    'tools, food, building materials, fuel, and the hub sign staged at point of use. Then run '
+    '<p>Prepare safely clears marked old builds, stages a ground welcome camp with Birch, axe, and '
+    'mounted picnic food, then raises one canopy-clear compact course with building materials, '
+    'fuel, targets, tools, and the lit hub sign at point of use. Then run '
     '<code>questlab_batch run all-schools</code> and follow the eight prepared prompts. '
     '<code>report</code> shows what remains and <code>export</code> writes a JSON receipt. The separate '
     '<code>creator-events</code> suite checks all 34 shared evaluator names, but labels itself synthetic '

@@ -60,7 +60,14 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   colliders beyond their ZDOs: solid-height sampling stacked the new floor 18.1 m above the
   player and suspended the nominal ground portal, causing a fatal fall. r9 samples Valheim
   terrain—not transient solids—for both the whole floor and ground portal, and gives cleared
-  GameObjects two quiescence frames before rebuilding.
+  GameObjects two quiescence frames before rebuilding. Derek's exact-r9 review then found the
+  course readable enough to complete but caught the remaining physical sequence: its Birch,
+  axe, and food were already upstairs, the hub sign sat at floor level, and natural trees still
+  crossed the deck. r10 keeps the world reversible rather than deleting those trees: the selected
+  deck rises 32 m above the highest sampled terrain (past the measured 30.5 m Meadows beech),
+  while a ground welcome camp places the Birch/axe before the portal and mounts three foods on
+  real item stands at a picnic table. The Social sign now stands on a two-metre post with a
+  persistent school-coloured lamp. The current generated build is 1,353 marked objects.
 - **The panel is an interactive tool, not a translucent overlay.** r6 uses a nearly opaque
   high-contrast surface, larger default dimensions, a bounded lower-right resize handle,
   and a spreadsheet-style live-event grid with stable columns and explicit BINDABLE /
@@ -240,9 +247,10 @@ without depending on instantiated `WearNTear` components; local worlds know the 
 while a remote client can only answer for objects it has synchronized.
 
 **Still unwitnessed at that point:** only harvest. Combat and the quest lane were witnessed
-on 2026-08-08 — see the end of this file. Six categories remain unseen. Item stands stay
-bare; `SetVisualItem` is a registered RPC rather than a callable method, so the gear is
-dropped beside them.
+on 2026-08-08 — see the end of this file. Six categories remained unseen. That initial cut
+left item stands bare because `SetVisualItem` is a registered RPC rather than a callable
+method, so its gear was dropped beside them; r10's welcome table later mirrors the verified
+vanilla ZDO state and invokes that exact RPC to mount its three foods.
 
 **The lab can read a quest now — and say when it never could.**
 

@@ -63,7 +63,8 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertLess(grand["footprintRadius"], classic["footprintRadius"])
         self.assertLess(classic["platformClearance"], wide["platformClearance"])
         self.assertLess(wide["platformClearance"], grand["platformClearance"])
-        self.assertGreaterEqual(grand["platformClearance"], 3.0)
+        self.assertEqual(grand["platformClearance"], 32.0)
+        self.assertEqual((grand["groundPortalX"], grand["groundPortalZ"]), (8.0, 0.0))
 
     def test_v2_profiles_have_one_horizontal_header_per_rune(self) -> None:
         # Profile ids are not school names; pin the generated eight-school lettering
@@ -93,8 +94,8 @@ class GalleryProfileTests(unittest.TestCase):
                 self.assertEqual(counts["runeNameLights"], 8)
 
     def test_estimates_account_for_every_placed_object(self) -> None:
-        # Build places one object for each generated floor/fixture/beam/course drop,
-        # plus eight school stations and three entrance/arrival portals.
+        # Build places one object for each generated floor/fixture/beam/course drop and
+        # ground-welcome fixture, plus eight school stations and three portals.
         for profile in self.profiles.values():
             counts = profile["counts"]
             expected = (
@@ -102,17 +103,20 @@ class GalleryProfileTests(unittest.TestCase):
                 + counts["fixtures"]
                 + counts["runeBeams"]
                 + counts["courseDrops"]
+                + counts["welcomeFixtures"]
                 + 11
             )
             self.assertEqual(counts["estimatedPlacedObjects"], expected)
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 3;", source)
+        self.assertIn("public const int PlanVersion = 4;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
-        self.assertIn("public float PlatformClearance;", source)
+        self.assertIn("public float PlatformClearance, GroundPortalX, GroundPortalZ;", source)
         self.assertIn("HallWidth, SpokeLength, FootprintRadius", source)
         self.assertIn("public CourseDrop[] CourseDrops;", source)
+        self.assertIn("public WelcomeFixture[] WelcomeFixtures;", source)
+        self.assertIn("public bool AtGround;", source)
         self.assertIn("RuneNameHeaders, RuneNameSigns, RuneNameLights;", source)
         self.assertEqual(source.count('Orient = "rune-name-lit"'), 16)
         self.assertEqual(source.count('Orient = "rune-name",'), 104)
@@ -122,31 +126,51 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_compact_course_stages_every_interaction_at_point_of_use(self) -> None:
         plan = PLAN.read_text(encoding="utf-8")
+        grand = plan[plan.index('Id = "marble-grand"') :]
         builder = BUILDER.read_text(encoding="utf-8")
         for marker in (
-            'Text = "sign here", X = 3.5f, Z = 6f',
-            'Prefab = "AxeBronze", Note = "bronze axe beside the arrival birch", X = 6.2f',
+            'Text = "sign here", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f',
+            'Prefab = "wood_pole2", X = 3.5f, Y = 0f, Z = 6f',
+            'Prefab = "Birch1", Kind = "prop", Note = "ground Birch and bronze axe before the ascent portal"',
+            'X = 5f, Y = 0f, Z = 2.5f, Yaw = 0f, AtGround = true',
+            'Prefab = "AxeBronze", Note = "bronze axe beside the ground welcome Birch", X = 5.5f',
+            'Stack = 1, AtGround = true',
             'Prefab = "Bow", Note = "bow on the player side of the combat spoke"',
             'Prefab = "ArrowWood", Note = "arrows beside the combat bow"',
             'Prefab = "Hammer", Note = "hammer in front of the building bench"',
             'Prefab = "Wood", Note = "wood beside the building hammer"',
             'Prefab = "Coal", Note = "coal directly in front of the smelter"',
-            'Prefab = "CookedMeat"',
-            'Prefab = "QueensJam"',
-            'Prefab = "Honey"',
+            'Prefab = "piece_table", AttachedItem = "", Note = "welcome picnic table"',
+            'Prefab = "itemstandh", AttachedItem = "CookedMeat"',
+            'Prefab = "itemstandh", AttachedItem = "QueensJam"',
+            'Prefab = "itemstandh", AttachedItem = "Honey"',
         ):
             with self.subTest(marker=marker):
-                self.assertIn(marker, plan)
+                self.assertIn(marker, grand)
         self.assertIn("foreach (LabGalleryPlan.CourseDrop item", builder)
+        self.assertIn("foreach (LabGalleryPlan.WelcomeFixture fixture", builder)
+        self.assertIn("AttachDisplayItem(built, fixture.AttachedItem)", builder)
         self.assertIn("SetStack(drop, item.Stack)", builder)
+        self.assertEqual(self.profiles["marble-grand"]["counts"]["welcomeFixtures"], 6)
+        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1353)
 
     def test_runtime_reports_clearance_and_horizontal_headers(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")
         self.assertIn('Append(" m terrain clearance, ")', source)
         self.assertIn('Append(" m hub-to-station walks, ")', source)
         self.assertIn('+ " horizontal rune headers ("', source)
-        self.assertIn("LabRuneLight.Mark(headerView.GetZDO(), fixture.LightSchool)", source)
-        self.assertIn("LabRuneLight.Apply(built, fixture.LightSchool)", source)
+        self.assertIn("LightPiece(built, fixture.LightSchool)", source)
+        self.assertIn("LightPiece(station, monument.Station.LightSchool)", source)
+
+    def test_mounted_welcome_food_is_real_and_does_not_litter_on_clear(self) -> None:
+        source = BUILDER.read_text(encoding="utf-8")
+        attach = source[source.index("void AttachDisplayItem") : source.index("void SetStack")]
+        self.assertIn("zdo.Set(ZDOVars.s_item, prefabName)", attach)
+        self.assertIn("ItemDrop.SaveToZDO(data, zdo)", attach)
+        self.assertIn('view.InvokeRPC(ZNetView.Everybody, "SetVisualItem"', attach)
+        destroy = source[source.index("static bool DestroyMarkedZdo") : source.index("static bool MatchesSelector")]
+        self.assertIn("SuppressMountedItemDrop(zdo, view)", destroy)
+        self.assertIn("zdo.Set(ZDOVars.s_item, string.Empty)", destroy)
 
     def test_preview_set_is_complete(self) -> None:
         for profile_id in self.profiles:

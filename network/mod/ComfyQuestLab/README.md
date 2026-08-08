@@ -37,8 +37,8 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r9 changes presentation and course layout, so those same suites must
-> be re-witnessed against the exact r9 DLL before the release cut is final. This README
+> 34/34 creator events. r10 changes presentation and course layout, so those same suites must
+> be re-witnessed against the exact r10 DLL before the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
 ## Why this exists
@@ -146,17 +146,19 @@ Gallery geometry is generated from the same eight rune definitions used by the p
 `classic` keeps the prior mixed-material shape as a comparison baseline. `marble-wide`
 has a solid black-marble floor, 8 m halls, larger runes, 1.5 m terrain clearance, and
 about 2,291 placed objects. The selected `marble-grand` direction is the default: it keeps
-10 m halls, 3 m clearance over the highest sampled ground, monumental runes, and horizontal
+10 m halls, 32 m clearance over the highest sampled ground, monumental runes, and horizontal
 school-name headers built from individually readable letters with one coloured light per
-word, but compresses each hub-to-station walk from 37 m to 9 m. Its 1,349 marked objects fit
+word, but compresses each hub-to-station walk from 37 m to 9 m. Its 1,353 marked objects fit
 within a 48 m footprint.
 
-The default is a course rather than an empty monument. The arrival portal puts a birch,
-bronze axe, and cooked meat/Queens Jam/honey within a few steps. Combat leaves a bow and 100
-wood arrows on the player's side with its Greyling at the rune. Building pairs its hammer
-and wood, Crafting puts coal directly in front of the smelter, and Social puts a `sign here`
-signpost in the hub. Every consumable is recreated by `lab_setup` or batch `prepare`, so a
-creator never needs prior inventory or a scavenger hunt.
+The default is a course rather than an empty monument. Before the ascent portal, a ground
+welcome camp puts a Birch beside its bronze axe and serves cooked meat, Queens Jam, and honey
+on real horizontal item stands atop a picnic table. Combat leaves a bow and 100 wood arrows
+on the player's side with its Greyling at the rune. Building pairs its hammer and wood,
+Crafting puts coal directly in front of the smelter, and Social raises its illuminated
+`sign here` sign on a two-metre post in the hub. Every consumable is recreated by `lab_setup`
+or batch `prepare`, so a creator never needs prior inventory or a scavenger hunt. The 32 m
+lift clears the measured 30.5 m Meadows beech canopy without deleting natural world trees.
 
 Every object carries the plan version, profile id, and build id in its own ZDO. `identify`
 reads those durable marks from the locally known ZDO table; `clear` accepts either a profile or

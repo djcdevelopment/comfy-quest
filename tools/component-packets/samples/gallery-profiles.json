@@ -10,6 +10,10 @@
       "ringRadius": 38.0,
       "runeHeight": 11.0,
       "platformClearance": 0.6,
+      "groundPortalX": 2.0,
+      "groundPortalZ": 0.0,
+      "welcomeAnchorX": 0.0,
+      "welcomeAnchorZ": 0.0,
       "hallWidth": 4.0,
       "spokeLength": 24.5,
       "footprintRadius": 60.0,
@@ -26,6 +30,7 @@
         "runeNameSigns": 0,
         "runeNameLights": 0,
         "courseDrops": 9,
+        "welcomeFixtures": 0,
         "estimatedPlacedObjects": 1393
       }
     },
@@ -36,6 +41,10 @@
       "ringRadius": 50.0,
       "runeHeight": 14.0,
       "platformClearance": 1.5,
+      "groundPortalX": 2.0,
+      "groundPortalZ": 0.0,
+      "welcomeAnchorX": 0.0,
+      "welcomeAnchorZ": 0.0,
       "hallWidth": 8.0,
       "spokeLength": 30.0,
       "footprintRadius": 77.0,
@@ -51,16 +60,21 @@
         "runeNameSigns": 60,
         "runeNameLights": 8,
         "courseDrops": 9,
+        "welcomeFixtures": 0,
         "estimatedPlacedObjects": 2291
       }
     },
     {
       "id": "marble-grand",
       "name": "Marble grand",
-      "description": "Selected compact court: 10 m halls with quarter-length walks, a raised all-marble floor, monumental runes, and interaction-local supplies.",
+      "description": "Selected compact court: a ground welcome camp, 10 m halls with quarter-length walks, and a canopy-clear all-marble deck.",
       "ringRadius": 27.0,
       "runeHeight": 17.0,
-      "platformClearance": 3.0,
+      "platformClearance": 32.0,
+      "groundPortalX": 8.0,
+      "groundPortalZ": 0.0,
+      "welcomeAnchorX": -3.0,
+      "welcomeAnchorZ": 0.0,
       "hallWidth": 10.0,
       "spokeLength": 9.0,
       "footprintRadius": 48.0,
@@ -70,13 +84,14 @@
       "solidMarbleFloor": true,
       "counts": {
         "floorTiles": 823,
-        "fixtures": 372,
+        "fixtures": 373,
         "runeBeams": 134,
         "runeNameHeaders": 8,
         "runeNameSigns": 60,
         "runeNameLights": 8,
-        "courseDrops": 9,
-        "estimatedPlacedObjects": 1349
+        "courseDrops": 6,
+        "welcomeFixtures": 6,
+        "estimatedPlacedObjects": 1353
       }
     }
   ]

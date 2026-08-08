@@ -62,6 +62,8 @@ public sealed class LabGalleryBuilder {
   const string GalleryMark = "comfyQuestLabGallery";
   const string GalleryProfileMark = "comfyQuestLabGalleryProfile";
   const string GalleryBuildMark = "comfyQuestLabGalleryBuild";
+  static readonly int VerticalItemStandPrefab = "itemstand".GetStableHashCode();
+  static readonly int HorizontalItemStandPrefab = "itemstandh".GetStableHashCode();
 
   /// <summary>Is this object part of a gallery the Tome raised? Used both to decide what
   /// clear may destroy and to keep support wear off after a zone reload.</summary>
@@ -136,6 +138,10 @@ public sealed class LabGalleryBuilder {
     foreach (LabGalleryPlan.CourseDrop drop in profile.CourseDrops) {
       AddUnique(wanted, drop.Prefab);
     }
+    foreach (LabGalleryPlan.WelcomeFixture fixture in profile.WelcomeFixtures) {
+      AddUnique(wanted, fixture.Prefab);
+      AddUnique(wanted, fixture.AttachedItem);
+    }
 
     var found = new List<string>();
     var missing = new List<string>();
@@ -156,7 +162,8 @@ public sealed class LabGalleryBuilder {
     sb.AppendLine(profile.PlatformTiles.Length + " floor tiles, "
         + profile.Fixtures.Length + " fixtures, "
         + CountBeams(profile) + " beams, " + profile.CourseDrops.Length
-        + " interaction-local drops; about "
+        + " interaction-local drops, " + profile.WelcomeFixtures.Length
+        + " ground welcome fixtures; about "
         + profile.EstimatedPlacedObjects + " placed objects.");
     sb.AppendLine(profile.HallWidth.ToString("0.#", CultureInfo.InvariantCulture)
         + " m halls; " + profile.SpokeLength.ToString("0.#", CultureInfo.InvariantCulture)
@@ -335,7 +342,7 @@ public sealed class LabGalleryBuilder {
     // Where the ground-level portal goes, sampled NOW — before a single floor tile
     // exists. Terrain-only sampling also ignores GameObjects still retiring from a safe
     // reset; solid height would put this portal on the old deck during that brief window.
-    Vector3 arrival = origin + new Vector3(2f, 0f, 0f);
+    Vector3 arrival = origin + new Vector3(profile.GroundPortalX, 0f, profile.GroundPortalZ);
     float arrivalGround;
     if (!TryNaturalTerrainHeight(arrival, out arrivalGround)) {
       _running = false;
@@ -344,6 +351,18 @@ public sealed class LabGalleryBuilder {
       yield break;
     }
     arrival.y = arrivalGround;
+
+    float welcomeGround = originTerrain;
+    if (profile.WelcomeFixtures.Length > 0) {
+      Vector3 welcomeAnchor = origin
+          + new Vector3(profile.WelcomeAnchorX, 0f, profile.WelcomeAnchorZ);
+      if (!TryNaturalTerrainHeight(welcomeAnchor, out welcomeGround)) {
+        _running = false;
+        Report("gallery stopped safely: Valheim could not resolve natural terrain for the "
+            + "welcome camp. Nothing was placed.");
+        yield break;
+      }
+    }
 
     int placed = 0;
 
@@ -388,7 +407,27 @@ public sealed class LabGalleryBuilder {
     }
     yield return null;
 
-    // 1c. the halls, and the sign at the mouth of each.
+    // 1c. a ground-level welcome before the ascent. The selected profile keeps its
+    // harvest target, bronze axe, food, and picnic furniture on terrain so the first
+    // actions happen before the portal. All fixtures share one terrain anchor: the item
+    // stands must remain on their table even when the wider footprint crosses a slope.
+    foreach (LabGalleryPlan.WelcomeFixture fixture in profile.WelcomeFixtures) {
+      var at = new Vector3(
+          origin.x + profile.WelcomeAnchorX + fixture.X,
+          welcomeGround + fixture.Y + BaseLift(fixture.Prefab),
+          origin.z + profile.WelcomeAnchorZ + fixture.Z);
+      GameObject built = Place(fixture.Prefab, at,
+          Quaternion.Euler(0f, fixture.Yaw, 0f));
+      if (built != null) {
+        placed++;
+        if (!string.IsNullOrEmpty(fixture.AttachedItem)) {
+          AttachDisplayItem(built, fixture.AttachedItem);
+        }
+      }
+      yield return null;
+    }
+
+    // 1d. the halls, and the sign at the mouth of each.
     //
     // Two courses of marble a side and no roof: the corridor frames the glyph at its end
     // without enclosing it, which is the composition — read the sign, walk the throat,
@@ -429,11 +468,7 @@ public sealed class LabGalleryBuilder {
         // school names were dark vertical threads over otherwise readable runes. The
         // generator now uses one sign per letter and marks only the central letter, so
         // each word gets one coloured light rather than one costly light per character.
-        var headerView = built.GetComponent<ZNetView>();
-        if (headerView != null && headerView.GetZDO() != null) {
-          LabRuneLight.Mark(headerView.GetZDO(), fixture.LightSchool);
-          LabRuneLight.Apply(built, fixture.LightSchool);
-        }
+        LightPiece(built, fixture.LightSchool);
       }
       if (placed % piecesPerFrame == 0) {
         yield return null;
@@ -486,8 +521,17 @@ public sealed class LabGalleryBuilder {
         }
       }
 
-      var stationAt = new Vector3(origin.x + monument.Station.X, floorY,
+      float stationBase = floorY;
+      var stationAt = new Vector3(origin.x + monument.Station.X, 0f,
                                   origin.z + monument.Station.Z);
+      if (monument.Station.AtGround
+          && !TryNaturalTerrainHeight(stationAt, out stationBase)) {
+        Report("could not resolve natural terrain for the " + monument.Category
+            + " station; that station was not placed.");
+        yield return null;
+        continue;
+      }
+      stationAt.y = stationBase + monument.Station.Y + BaseLift(monument.Station.Prefab);
       GameObject station = Place(monument.Station.Prefab, stationAt,
           Quaternion.Euler(0f, monument.Station.Yaw, 0f));
       if (station != null) {
@@ -498,17 +542,27 @@ public sealed class LabGalleryBuilder {
         if (!string.IsNullOrEmpty(monument.Station.Text)) {
           WriteSign(station, monument.Station.Text);
         }
+        if (!string.IsNullOrEmpty(monument.Station.LightSchool)) {
+          LightPiece(station, monument.Station.LightSchool);
+        }
       }
       yield return null;
     }
 
-    // 3. the course kit. Every item is beside the interaction that consumes it: axe by
-    // the arrival birch, bow and arrows on the player's side of Combat, coal directly in
-    // front of the smelter, hammer and wood at Building, and three foods in the hub.
-    // Dropped items glint and pick up normally, which is both more discoverable than an
-    // uncertain item-stand RPC and an Inventory-school witness for free.
+    // 3. the course kit. Every item is beside the interaction that consumes it: the axe
+    // stays on terrain with the welcome Birch, bow and arrows are on the player's side of
+    // Combat, coal is directly in front of the smelter, and hammer/wood sit at Building.
+    // The picnic food is mounted on the generated welcome stands above.
     foreach (LabGalleryPlan.CourseDrop item in profile.CourseDrops) {
-      var at = new Vector3(origin.x + item.X, floorY + item.Y, origin.z + item.Z);
+      float itemBase = floorY;
+      var at = new Vector3(origin.x + item.X, 0f, origin.z + item.Z);
+      if (item.AtGround && !TryNaturalTerrainHeight(at, out itemBase)) {
+        Report("could not resolve natural terrain for " + item.Prefab
+            + "; that course drop was not placed.");
+        yield return null;
+        continue;
+      }
+      at.y = itemBase + item.Y;
       GameObject drop = Place(item.Prefab, at, Quaternion.identity);
       if (drop != null) {
         placed++;
@@ -955,6 +1009,7 @@ public sealed class LabGalleryBuilder {
       return false;
     }
     ZNetView view = ZNetScene.instance.FindInstance(zdo);
+    SuppressMountedItemDrop(zdo, view);
     if (view != null) {
       view.ClaimOwnership();
       view.Destroy();
@@ -963,6 +1018,25 @@ public sealed class LabGalleryBuilder {
     zdo.SetOwner(ZDOMan.GetSessionID());
     ZDOMan.instance.DestroyZDO(zdo);
     return true;
+  }
+
+  /// <summary>Gallery-owned picnic food should disappear with the gallery, not be dropped
+  /// as three unmarked leftovers by ItemStand.OnDestroyed. Clear only the verified item
+  /// field and only on the two vanilla stand prefabs before their marked ZDO is destroyed.</summary>
+  static void SuppressMountedItemDrop(ZDO zdo, ZNetView view) {
+    try {
+      bool itemStand = view != null && view.GetComponent<ItemStand>() != null;
+      int prefab = zdo.GetPrefab();
+      if (!itemStand
+          && prefab != VerticalItemStandPrefab
+          && prefab != HorizontalItemStandPrefab) {
+        return;
+      }
+      zdo.Set(ZDOVars.s_item, string.Empty);
+    } catch (Exception) {
+      // Clear remains best-effort per marked object; the destroy path below still owns
+      // the object even if an obsolete game build no longer exposes this field.
+    }
   }
 
   static bool MatchesSelector(ZDO zdo, string selector) {
@@ -1306,6 +1380,55 @@ public sealed class LabGalleryBuilder {
     }
     TagPortal(go, tag);
     return true;
+  }
+
+  /// <summary>Populate a real horizontal item stand without borrowing from the player.
+  ///
+  /// ItemStand has no public SetVisualItem method; the extracted game implementation
+  /// registers an exact <c>SetVisualItem(string,int,int,int)</c> RPC and persists the item
+  /// under the verified <c>item</c> ZDO field. Mirror that vanilla state transition so the
+  /// food is visible, synced, saved, and removable through the ordinary stand interaction.</summary>
+  void AttachDisplayItem(GameObject standObject, string itemName) {
+    try {
+      if (standObject == null || ObjectDB.instance == null) {
+        return;
+      }
+      var stand = standObject.GetComponent<ItemStand>();
+      var view = standObject.GetComponent<ZNetView>();
+      GameObject itemPrefab = ObjectDB.instance.GetItemPrefab(itemName);
+      var itemDrop = itemPrefab == null ? null : itemPrefab.GetComponent<ItemDrop>();
+      if (stand == null || view == null || view.GetZDO() == null || itemDrop == null
+          || itemDrop.m_itemData == null || ItemStand.GetAttachPrefab(itemPrefab) == null) {
+        LogOnce("could not mount " + itemName + " on the welcome table; its stand or "
+            + "attach visual is unavailable in this game build.");
+        return;
+      }
+
+      ItemDrop.ItemData data = itemDrop.m_itemData.Clone();
+      data.m_stack = 1;
+      string prefabName = data.m_dropPrefab != null ? data.m_dropPrefab.name : itemPrefab.name;
+      ZDO zdo = view.GetZDO();
+      zdo.Set(ZDOVars.s_item, prefabName);
+      zdo.Set(ZDOVars.s_type, 0);
+      ItemDrop.SaveToZDO(data, zdo);
+      view.InvokeRPC(ZNetView.Everybody, "SetVisualItem",
+          prefabName, data.m_variant, data.m_quality, 0);
+    } catch (Exception ex) {
+      LogOnce("could not mount " + itemName + " on the welcome table: " + ex.Message);
+    }
+  }
+
+  /// <summary>Persist and immediately apply one school-coloured gallery lamp.</summary>
+  static void LightPiece(GameObject built, string school) {
+    if (built == null || string.IsNullOrEmpty(school)) {
+      return;
+    }
+    var view = built.GetComponent<ZNetView>();
+    if (view == null || view.GetZDO() == null) {
+      return;
+    }
+    LabRuneLight.Mark(view.GetZDO(), school);
+    LabRuneLight.Apply(built, school);
   }
 
   /// <summary>Make a dropped item a stack rather than a single. Best effort: if the

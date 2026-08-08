@@ -10,17 +10,19 @@ using System;
 
 /// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>
 public static class LabGalleryPlan {
-  public const int PlanVersion = 3;
+  public const int PlanVersion = 4;
   public const string DefaultProfileId = "marble-grand";
 
   public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }
-  public struct Station { public string Prefab, Kind, Note, Text;
-                          public float X, Z, Yaw; }
+  public struct Station { public string Prefab, Kind, Note, Text, LightSchool;
+                          public float X, Y, Z, Yaw; public bool AtGround; }
   public struct Monument { public string Category; public float Angle, Cx, Cz;
                            public float R, G, B;
                            public Beam[] Beams; public Station Station; }
   public struct CourseDrop { public string Prefab, Note;
-                             public float X, Y, Z; public int Stack; }
+                             public float X, Y, Z; public int Stack; public bool AtGround; }
+  public struct WelcomeFixture { public string Prefab, AttachedItem, Note;
+                                 public float X, Y, Z, Yaw; }
   public struct Tile { public float X, Z; public string Prefab; }
   public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;
                           public string Orient, Text, LightSchool; }
@@ -28,7 +30,8 @@ public static class LabGalleryPlan {
   public sealed class Profile {
     public string Id, Name, Description;
     public float RingRadius, RuneHeight, BeamLength, HallWidth, SpokeLength, FootprintRadius;
-    public float PlatformClearance;
+    public float PlatformClearance, GroundPortalX, GroundPortalZ;
+    public float WelcomeAnchorX, WelcomeAnchorZ;
     public bool SolidMarbleFloor;
     public int EstimatedPlacedObjects, RuneNameHeaders, RuneNameSigns, RuneNameLights;
     public string[] FloorMaterials;
@@ -36,6 +39,7 @@ public static class LabGalleryPlan {
     public Tile[] PlatformTiles;
     public Fixture[] Fixtures;
     public CourseDrop[] CourseDrops;
+    public WelcomeFixture[] WelcomeFixtures;
   }
 
   public static readonly Profile[] Profiles = {
@@ -46,6 +50,8 @@ public static class LabGalleryPlan {
       BeamLength = 2f, HallWidth = 4f,
       SpokeLength = 24.5f,
       PlatformClearance = 0.6f,
+      GroundPortalX = 2f, GroundPortalZ = 0f,
+      WelcomeAnchorX = 0f, WelcomeAnchorZ = 0f,
       FootprintRadius = 60f,
       SolidMarbleFloor = false,
       EstimatedPlacedObjects = 1393,
@@ -58,7 +64,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Combat,
           Angle = 0f, Cx = 0f, Cz = 46f,
           R = 1f, G = 0.28f, B = 0.22f,
-          Station = new Station { Prefab = "Greyling", Kind = "spawner", Note = "a target that fights back, restocked on demand", Text = "", X = 0f, Z = 31.5f, Yaw = 180f },
+          Station = new Station { Prefab = "Greyling", Kind = "spawner", Note = "a target that fights back, restocked on demand", Text = "", LightSchool = "", X = 0f, Y = 0f, Z = 31.5f, Yaw = 180f, AtGround = false },
           Beams = new[] {
             new Beam { X = 0f, Y = 9.465f, Z = 46f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = 0f, Y = 7.595f, Z = 46f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -75,7 +81,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Harvest,
           Angle = 45f, Cx = 32.527f, Cz = 32.527f,
           R = 0.45f, G = 0.95f, B = 0.4f,
-          Station = new Station { Prefab = "Birch1", Kind = "prop", Note = "a tree to strike, with room for pickables", Text = "", X = 22.274f, Z = 22.274f, Yaw = 225f },
+          Station = new Station { Prefab = "Birch1", Kind = "prop", Note = "a tree to strike, with room for pickables", Text = "", LightSchool = "", X = 22.274f, Y = 0f, Z = 22.274f, Yaw = 225f, AtGround = false },
           Beams = new[] {
             new Beam { X = 30.713f, Y = 8.695f, Z = 34.341f, Dx = 0.5772f, Dy = -0.5776f, Dz = -0.5772f },
             new Beam { X = 31.922f, Y = 7.485f, Z = 33.131f, Dx = 0.5772f, Dy = -0.5776f, Dz = -0.5772f },
@@ -91,7 +97,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Inventory,
           Angle = 90f, Cx = 46f, Cz = 0f,
           R = 0.95f, G = 0.78f, B = 0.3f,
-          Station = new Station { Prefab = "piece_chest_wood", Kind = "piece", Note = "a chest to empty, equip, and refill", Text = "", X = 31.5f, Z = 0f, Yaw = 270f },
+          Station = new Station { Prefab = "piece_chest_wood", Kind = "piece", Note = "a chest to empty, equip, and refill", Text = "", LightSchool = "", X = 31.5f, Y = 0f, Z = 0f, Yaw = 270f, AtGround = false },
           Beams = new[] {
             new Beam { X = 46f, Y = 9.96f, Z = 1.98f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = 46f, Y = 7.98f, Z = 1.98f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -110,7 +116,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Building,
           Angle = 135f, Cx = 32.527f, Cz = -32.527f,
           R = 0.98f, G = 0.55f, B = 0.2f,
-          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "a workbench and room to build or repair", Text = "", X = 22.274f, Z = -22.274f, Yaw = 315f },
+          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "a workbench and room to build or repair", Text = "", LightSchool = "", X = 22.274f, Y = 0f, Z = -22.274f, Yaw = 315f, AtGround = false },
           Beams = new[] {
             new Beam { X = 33.036f, Y = 9.795f, Z = -32.018f, Dx = 0.4649f, Dy = -0.7534f, Dz = 0.4649f },
             new Beam { X = 34.054f, Y = 8.145f, Z = -31f, Dx = 0.4649f, Dy = -0.7534f, Dz = 0.4649f },
@@ -132,7 +138,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Crafting,
           Angle = 180f, Cx = 0f, Cz = -46f,
           R = 0.55f, G = 0.8f, B = 1f,
-          Station = new Station { Prefab = "smelter", Kind = "piece", Note = "a smelter with room for cooking and fermenting", Text = "", X = 0f, Z = -31.5f, Yaw = 0f },
+          Station = new Station { Prefab = "smelter", Kind = "piece", Note = "a smelter with room for cooking and fermenting", Text = "", LightSchool = "", X = 0f, Y = 0f, Z = -31.5f, Yaw = 0f, AtGround = false },
           Beams = new[] {
             new Beam { X = -1.725f, Y = 9.85f, Z = -46f, Dx = 0.7183f, Dy = -0.6957f, Dz = 0f },
             new Beam { X = -0.135f, Y = 8.31f, Z = -46f, Dx = 0.7183f, Dy = -0.6957f, Dz = 0f },
@@ -146,7 +152,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Progression,
           Angle = 225f, Cx = -32.527f, Cz = -32.527f,
           R = 0.8f, G = 0.5f, B = 1f,
-          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "a bench and room to raise a skill", Text = "", X = -22.274f, Z = -22.274f, Yaw = 45f },
+          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "a bench and room to raise a skill", Text = "", LightSchool = "", X = -22.274f, Y = 0f, Z = -22.274f, Yaw = 45f, AtGround = false },
           Beams = new[] {
             new Beam { X = -33.672f, Y = 10.4f, Z = -31.381f, Dx = 0.7071f, Dy = 0f, Dz = -0.7071f },
             new Beam { X = -32.145f, Y = 10.4f, Z = -32.909f, Dx = 0.7071f, Dy = 0f, Dz = -0.7071f },
@@ -164,7 +170,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.World,
           Angle = 270f, Cx = -46f, Cz = 0f,
           R = 0.35f, G = 0.9f, B = 0.9f,
-          Station = new Station { Prefab = "portal_wood", Kind = "piece", Note = "a paired portal and world-state practice", Text = "", X = -31.5f, Z = 0f, Yaw = 90f },
+          Station = new Station { Prefab = "portal_wood", Kind = "piece", Note = "a paired portal and world-state practice", Text = "", LightSchool = "", X = -31.5f, Y = 0f, Z = 0f, Yaw = 90f, AtGround = false },
           Beams = new[] {
             new Beam { X = -46f, Y = 9.96f, Z = -2.25f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = -46f, Y = 7.98f, Z = -2.25f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -185,7 +191,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Social,
           Angle = 315f, Cx = -32.527f, Cz = 32.527f,
           R = 1f, G = 0.7f, B = 0.85f,
-          Station = new Station { Prefab = "sign", Kind = "piece", Note = "a sign to write and a place to speak", Text = "", X = -22.274f, Z = 22.274f, Yaw = 135f },
+          Station = new Station { Prefab = "sign", Kind = "piece", Note = "a sign to write and a place to speak", Text = "", LightSchool = "", X = -22.274f, Y = 0f, Z = 22.274f, Yaw = 135f, AtGround = false },
           Beams = new[] {
             new Beam { X = -34.754f, Y = 9.696f, Z = 30.3f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = -34.754f, Y = 7.848f, Z = 30.3f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -1497,15 +1503,17 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "sign", X = -4.879f, Y = 1.2f, Z = 9.263f, Yaw = 135f, Orient = "", Text = "<size=28><b><color=#ffb2d9>SOCIAL</color></b></size>\na sign to write and a place to speak\n<color=#8fdc8f>safe events can bind here</color>" },
       },
       CourseDrops = new[] {
-        new CourseDrop { Prefab = "AxeBronze", Note = "bronze axe beside the arrival birch", X = 20.153f, Y = 0.4f, Z = 20.153f, Stack = 1 },
-        new CourseDrop { Prefab = "Bow", Note = "bow on the player side of the combat spoke", X = -1.2f, Y = 0.4f, Z = 11f, Stack = 1 },
-        new CourseDrop { Prefab = "ArrowWood", Note = "arrows beside the combat bow", X = 1.2f, Y = 0.4f, Z = 11f, Stack = 100 },
-        new CourseDrop { Prefab = "Hammer", Note = "hammer in front of the building bench", X = 21.001f, Y = 0.4f, Z = -19.304f, Stack = 1 },
-        new CourseDrop { Prefab = "Wood", Note = "wood beside the building hammer", X = 19.304f, Y = 0.4f, Z = -21.001f, Stack = 50 },
-        new CourseDrop { Prefab = "Coal", Note = "coal directly in front of the smelter", X = 0f, Y = 0.4f, Z = -28.5f, Stack = 20 },
-        new CourseDrop { Prefab = "CookedMeat", Note = "health food at the arrival hub", X = 1.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
-        new CourseDrop { Prefab = "QueensJam", Note = "stamina food at the arrival hub", X = 3.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
-        new CourseDrop { Prefab = "Honey", Note = "quick stamina food at the arrival hub", X = 5.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
+        new CourseDrop { Prefab = "AxeBronze", Note = "bronze axe beside the Harvest Birch", X = 20.153f, Y = 0.4f, Z = 20.153f, Stack = 1, AtGround = false },
+        new CourseDrop { Prefab = "Bow", Note = "bow on the player side of the combat spoke", X = -1.2f, Y = 0.4f, Z = 11f, Stack = 1, AtGround = false },
+        new CourseDrop { Prefab = "ArrowWood", Note = "arrows beside the combat bow", X = 1.2f, Y = 0.4f, Z = 11f, Stack = 100, AtGround = false },
+        new CourseDrop { Prefab = "Hammer", Note = "hammer in front of the building bench", X = 21.001f, Y = 0.4f, Z = -19.304f, Stack = 1, AtGround = false },
+        new CourseDrop { Prefab = "Wood", Note = "wood beside the building hammer", X = 19.304f, Y = 0.4f, Z = -21.001f, Stack = 50, AtGround = false },
+        new CourseDrop { Prefab = "Coal", Note = "coal directly in front of the smelter", X = 0f, Y = 0.4f, Z = -28.5f, Stack = 20, AtGround = false },
+        new CourseDrop { Prefab = "CookedMeat", Note = "health food at the arrival hub", X = 1.5f, Y = 0.4f, Z = 3.5f, Stack = 10, AtGround = false },
+        new CourseDrop { Prefab = "QueensJam", Note = "stamina food at the arrival hub", X = 3.5f, Y = 0.4f, Z = 3.5f, Stack = 10, AtGround = false },
+        new CourseDrop { Prefab = "Honey", Note = "quick stamina food at the arrival hub", X = 5.5f, Y = 0.4f, Z = 3.5f, Stack = 10, AtGround = false },
+      },
+      WelcomeFixtures = new WelcomeFixture[] {
       },
     },
     new Profile {
@@ -1515,6 +1523,8 @@ public static class LabGalleryPlan {
       BeamLength = 2f, HallWidth = 8f,
       SpokeLength = 30f,
       PlatformClearance = 1.5f,
+      GroundPortalX = 2f, GroundPortalZ = 0f,
+      WelcomeAnchorX = 0f, WelcomeAnchorZ = 0f,
       FootprintRadius = 77f,
       SolidMarbleFloor = true,
       EstimatedPlacedObjects = 2291,
@@ -1527,7 +1537,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Combat,
           Angle = 0f, Cx = 0f, Cz = 60f,
           R = 1f, G = 0.28f, B = 0.22f,
-          Station = new Station { Prefab = "Greyling", Kind = "spawner", Note = "a target that fights back, restocked on demand", Text = "", X = 0f, Z = 42f, Yaw = 180f },
+          Station = new Station { Prefab = "Greyling", Kind = "spawner", Note = "a target that fights back, restocked on demand", Text = "", LightSchool = "", X = 0f, Y = 0f, Z = 42f, Yaw = 180f, AtGround = false },
           Beams = new[] {
             new Beam { X = 0f, Y = 12.358f, Z = 60f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = 0f, Y = 10.375f, Z = 60f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -1547,7 +1557,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Harvest,
           Angle = 45f, Cx = 42.426f, Cz = 42.426f,
           R = 0.45f, G = 0.95f, B = 0.4f,
-          Station = new Station { Prefab = "Birch1", Kind = "prop", Note = "a tree to strike, with room for pickables", Text = "", X = 29.698f, Z = 29.698f, Yaw = 225f },
+          Station = new Station { Prefab = "Birch1", Kind = "prop", Note = "a tree to strike, with room for pickables", Text = "", LightSchool = "", X = 29.698f, Y = 0f, Z = 29.698f, Yaw = 225f, AtGround = false },
           Beams = new[] {
             new Beam { X = 39.963f, Y = 11.437f, Z = 44.889f, Dx = 0.5693f, Dy = -0.5932f, Dz = -0.5693f },
             new Beam { X = 40.949f, Y = 10.41f, Z = 43.904f, Dx = 0.5693f, Dy = -0.5932f, Dz = -0.5693f },
@@ -1567,7 +1577,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Inventory,
           Angle = 90f, Cx = 60f, Cz = 0f,
           R = 0.95f, G = 0.78f, B = 0.3f,
-          Station = new Station { Prefab = "piece_chest_wood", Kind = "piece", Note = "a chest to empty, equip, and refill", Text = "", X = 42f, Z = 0f, Yaw = 270f },
+          Station = new Station { Prefab = "piece_chest_wood", Kind = "piece", Note = "a chest to empty, equip, and refill", Text = "", LightSchool = "", X = 42f, Y = 0f, Z = 0f, Yaw = 270f, AtGround = false },
           Beams = new[] {
             new Beam { X = 60f, Y = 13f, Z = 2.42f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = 60f, Y = 10.9f, Z = 2.42f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -1587,7 +1597,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Building,
           Angle = 135f, Cx = 42.426f, Cz = -42.426f,
           R = 0.98f, G = 0.55f, B = 0.2f,
-          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "a workbench and room to build or repair", Text = "", X = 29.698f, Z = -29.698f, Yaw = 315f },
+          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "a workbench and room to build or repair", Text = "", LightSchool = "", X = 29.698f, Y = 0f, Z = -29.698f, Yaw = 315f, AtGround = false },
           Beams = new[] {
             new Beam { X = 42.841f, Y = 12.93f, Z = -42.012f, Dx = 0.4542f, Dy = -0.7664f, Dz = 0.4542f },
             new Beam { X = 43.671f, Y = 11.53f, Z = -41.182f, Dx = 0.4542f, Dy = -0.7664f, Dz = 0.4542f },
@@ -1611,7 +1621,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Crafting,
           Angle = 180f, Cx = 0f, Cz = -60f,
           R = 0.55f, G = 0.8f, B = 1f,
-          Station = new Station { Prefab = "smelter", Kind = "piece", Note = "a smelter with room for cooking and fermenting", Text = "", X = 0f, Z = -42f, Yaw = 0f },
+          Station = new Station { Prefab = "smelter", Kind = "piece", Note = "a smelter with room for cooking and fermenting", Text = "", LightSchool = "", X = 0f, Y = 0f, Z = -42f, Yaw = 0f, AtGround = false },
           Beams = new[] {
             new Beam { X = -2.351f, Y = 12.895f, Z = -60f, Dx = 0.7041f, Dy = -0.7101f, Dz = 0f },
             new Beam { X = -0.894f, Y = 11.425f, Z = -60f, Dx = 0.7041f, Dy = -0.7101f, Dz = 0f },
@@ -1627,7 +1637,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Progression,
           Angle = 225f, Cx = -42.426f, Cz = -42.426f,
           R = 0.8f, G = 0.5f, B = 1f,
-          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "a bench and room to raise a skill", Text = "", X = -29.698f, Z = -29.698f, Yaw = 45f },
+          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "a bench and room to raise a skill", Text = "", LightSchool = "", X = -29.698f, Y = 0f, Z = -29.698f, Yaw = 45f, AtGround = false },
           Beams = new[] {
             new Beam { X = -44.138f, Y = 13.35f, Z = -40.715f, Dx = 0.7071f, Dy = 0f, Dz = -0.7071f },
             new Beam { X = -42.893f, Y = 13.35f, Z = -41.96f, Dx = 0.7071f, Dy = 0f, Dz = -0.7071f },
@@ -1647,7 +1657,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.World,
           Angle = 270f, Cx = -60f, Cz = 0f,
           R = 0.35f, G = 0.9f, B = 0.9f,
-          Station = new Station { Prefab = "portal_wood", Kind = "piece", Note = "a paired portal and world-state practice", Text = "", X = -42f, Z = 0f, Yaw = 90f },
+          Station = new Station { Prefab = "portal_wood", Kind = "piece", Note = "a paired portal and world-state practice", Text = "", LightSchool = "", X = -42f, Y = 0f, Z = 0f, Yaw = 90f, AtGround = false },
           Beams = new[] {
             new Beam { X = -60f, Y = 13f, Z = -2.75f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = -60f, Y = 10.9f, Z = -2.75f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -1671,7 +1681,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Social,
           Angle = 315f, Cx = -42.426f, Cz = 42.426f,
           R = 1f, G = 0.7f, B = 0.85f,
-          Station = new Station { Prefab = "sign", Kind = "piece", Note = "a sign to write and a place to speak", Text = "", X = -29.698f, Z = 29.698f, Yaw = 135f },
+          Station = new Station { Prefab = "sign", Kind = "piece", Note = "a sign to write and a place to speak", Text = "", LightSchool = "", X = -29.698f, Y = 0f, Z = 29.698f, Yaw = 135f, AtGround = false },
           Beams = new[] {
             new Beam { X = -45.149f, Y = 12.65f, Z = 39.704f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = -45.149f, Y = 10.69f, Z = 39.704f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -3864,27 +3874,31 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "sign", X = -40.128f, Y = 16.25f, Z = 44.725f, Yaw = 135f, Orient = "rune-name", Text = "<size=44><b><color=#ffb2d9>L</color></b></size>" },
       },
       CourseDrops = new[] {
-        new CourseDrop { Prefab = "AxeBronze", Note = "bronze axe beside the arrival birch", X = 27.577f, Y = 0.4f, Z = 27.577f, Stack = 1 },
-        new CourseDrop { Prefab = "Bow", Note = "bow on the player side of the combat spoke", X = -1.2f, Y = 0.4f, Z = 15f, Stack = 1 },
-        new CourseDrop { Prefab = "ArrowWood", Note = "arrows beside the combat bow", X = 1.2f, Y = 0.4f, Z = 15f, Stack = 100 },
-        new CourseDrop { Prefab = "Hammer", Note = "hammer in front of the building bench", X = 28.426f, Y = 0.4f, Z = -26.729f, Stack = 1 },
-        new CourseDrop { Prefab = "Wood", Note = "wood beside the building hammer", X = 26.729f, Y = 0.4f, Z = -28.426f, Stack = 50 },
-        new CourseDrop { Prefab = "Coal", Note = "coal directly in front of the smelter", X = 0f, Y = 0.4f, Z = -39f, Stack = 20 },
-        new CourseDrop { Prefab = "CookedMeat", Note = "health food at the arrival hub", X = 1.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
-        new CourseDrop { Prefab = "QueensJam", Note = "stamina food at the arrival hub", X = 3.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
-        new CourseDrop { Prefab = "Honey", Note = "quick stamina food at the arrival hub", X = 5.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
+        new CourseDrop { Prefab = "AxeBronze", Note = "bronze axe beside the Harvest Birch", X = 27.577f, Y = 0.4f, Z = 27.577f, Stack = 1, AtGround = false },
+        new CourseDrop { Prefab = "Bow", Note = "bow on the player side of the combat spoke", X = -1.2f, Y = 0.4f, Z = 15f, Stack = 1, AtGround = false },
+        new CourseDrop { Prefab = "ArrowWood", Note = "arrows beside the combat bow", X = 1.2f, Y = 0.4f, Z = 15f, Stack = 100, AtGround = false },
+        new CourseDrop { Prefab = "Hammer", Note = "hammer in front of the building bench", X = 28.426f, Y = 0.4f, Z = -26.729f, Stack = 1, AtGround = false },
+        new CourseDrop { Prefab = "Wood", Note = "wood beside the building hammer", X = 26.729f, Y = 0.4f, Z = -28.426f, Stack = 50, AtGround = false },
+        new CourseDrop { Prefab = "Coal", Note = "coal directly in front of the smelter", X = 0f, Y = 0.4f, Z = -39f, Stack = 20, AtGround = false },
+        new CourseDrop { Prefab = "CookedMeat", Note = "health food at the arrival hub", X = 1.5f, Y = 0.4f, Z = 3.5f, Stack = 10, AtGround = false },
+        new CourseDrop { Prefab = "QueensJam", Note = "stamina food at the arrival hub", X = 3.5f, Y = 0.4f, Z = 3.5f, Stack = 10, AtGround = false },
+        new CourseDrop { Prefab = "Honey", Note = "quick stamina food at the arrival hub", X = 5.5f, Y = 0.4f, Z = 3.5f, Stack = 10, AtGround = false },
+      },
+      WelcomeFixtures = new WelcomeFixture[] {
       },
     },
     new Profile {
       Id = "marble-grand", Name = "Marble grand",
-      Description = "Selected compact court: 10 m halls with quarter-length walks, a raised all-marble floor, monumental runes, and interaction-local supplies.",
+      Description = "Selected compact court: a ground welcome camp, 10 m halls with quarter-length walks, and a canopy-clear all-marble deck.",
       RingRadius = 27f, RuneHeight = 17f,
       BeamLength = 2f, HallWidth = 10f,
       SpokeLength = 9f,
-      PlatformClearance = 3f,
+      PlatformClearance = 32f,
+      GroundPortalX = 8f, GroundPortalZ = 0f,
+      WelcomeAnchorX = -3f, WelcomeAnchorZ = 0f,
       FootprintRadius = 48f,
       SolidMarbleFloor = true,
-      EstimatedPlacedObjects = 1349,
+      EstimatedPlacedObjects = 1353,
       RuneNameHeaders = 8,
       RuneNameSigns = 60,
       RuneNameLights = 8,
@@ -3894,7 +3908,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Combat,
           Angle = 0f, Cx = 0f, Cz = 34f,
           R = 1f, G = 0.28f, B = 0.22f,
-          Station = new Station { Prefab = "Greyling", Kind = "spawner", Note = "Greyling at the rune; bow and arrows at the spoke mouth", Text = "", X = 0f, Z = 24f, Yaw = 180f },
+          Station = new Station { Prefab = "Greyling", Kind = "spawner", Note = "Greyling at the rune; bow and arrows at the spoke mouth", Text = "", LightSchool = "", X = 0f, Y = 0f, Z = 24f, Yaw = 180f, AtGround = false },
           Beams = new[] {
             new Beam { X = 0f, Y = 15.268f, Z = 34f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = 0f, Y = 13.204f, Z = 34f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -3917,7 +3931,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Harvest,
           Angle = 45f, Cx = 24.042f, Cz = 24.042f,
           R = 0.45f, G = 0.95f, B = 0.4f,
-          Station = new Station { Prefab = "Birch1", Kind = "prop", Note = "birch and bronze axe beside the arrival portal", Text = "", X = 8f, Z = 0f, Yaw = 0f },
+          Station = new Station { Prefab = "Birch1", Kind = "prop", Note = "ground Birch and bronze axe before the ascent portal", Text = "", LightSchool = "", X = 5f, Y = 0f, Z = 2.5f, Yaw = 0f, AtGround = true },
           Beams = new[] {
             new Beam { X = 20.907f, Y = 13.977f, Z = 27.176f, Dx = 0.5785f, Dy = -0.5751f, Dz = -0.5785f },
             new Beam { X = 22.161f, Y = 12.73f, Z = 25.923f, Dx = 0.5785f, Dy = -0.5751f, Dz = -0.5785f },
@@ -3937,7 +3951,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Inventory,
           Angle = 90f, Cx = 34f, Cz = 0f,
           R = 0.95f, G = 0.78f, B = 0.3f,
-          Station = new Station { Prefab = "piece_chest_wood", Kind = "piece", Note = "a chest to empty, equip, and refill", Text = "", X = 24f, Z = 0f, Yaw = 270f },
+          Station = new Station { Prefab = "piece_chest_wood", Kind = "piece", Note = "a chest to empty, equip, and refill", Text = "", LightSchool = "", X = 24f, Y = 0f, Z = 0f, Yaw = 270f, AtGround = false },
           Beams = new[] {
             new Beam { X = 34f, Y = 16.194f, Z = 3.08f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = 34f, Y = 14.281f, Z = 3.08f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -3961,7 +3975,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Building,
           Angle = 135f, Cx = 24.042f, Cz = -24.042f,
           R = 0.98f, G = 0.55f, B = 0.2f,
-          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "hammer and wood directly in front of the bench", Text = "", X = 16.971f, Z = -16.971f, Yaw = 315f },
+          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "hammer and wood directly in front of the bench", Text = "", LightSchool = "", X = 16.971f, Y = 0f, Z = -16.971f, Yaw = 315f, AtGround = false },
           Beams = new[] {
             new Beam { X = 24.57f, Y = 15.79f, Z = -23.514f, Dx = 0.4667f, Dy = -0.7513f, Dz = 0.4667f },
             new Beam { X = 25.626f, Y = 14.09f, Z = -22.458f, Dx = 0.4667f, Dy = -0.7513f, Dz = 0.4667f },
@@ -3989,7 +4003,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Crafting,
           Angle = 180f, Cx = 0f, Cz = -34f,
           R = 0.55f, G = 0.8f, B = 1f,
-          Station = new Station { Prefab = "smelter", Kind = "piece", Note = "coal directly in front of the smelter", Text = "", X = 0f, Z = -24f, Yaw = 0f },
+          Station = new Station { Prefab = "smelter", Kind = "piece", Note = "coal directly in front of the smelter", Text = "", LightSchool = "", X = 0f, Y = 0f, Z = -24f, Yaw = 0f, AtGround = false },
           Beams = new[] {
             new Beam { X = -3.178f, Y = 15.926f, Z = -34f, Dx = 0.7206f, Dy = -0.6934f, Dz = 0f },
             new Beam { X = -1.694f, Y = 14.498f, Z = -34f, Dx = 0.7206f, Dy = -0.6934f, Dz = 0f },
@@ -4007,7 +4021,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Progression,
           Angle = 225f, Cx = -24.042f, Cz = -24.042f,
           R = 0.8f, G = 0.5f, B = 1f,
-          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "nearby course actions raise skills", Text = "", X = -16.971f, Z = -16.971f, Yaw = 45f },
+          Station = new Station { Prefab = "piece_workbench", Kind = "piece", Note = "nearby course actions raise skills", Text = "", LightSchool = "", X = -16.971f, Y = 0f, Z = -16.971f, Yaw = 45f, AtGround = false },
           Beams = new[] {
             new Beam { X = -26.22f, Y = 16.3f, Z = -21.864f, Dx = 0.7071f, Dy = 0f, Dz = -0.7071f },
             new Beam { X = -24.636f, Y = 16.3f, Z = -23.448f, Dx = 0.7071f, Dy = 0f, Dz = -0.7071f },
@@ -4029,7 +4043,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.World,
           Angle = 270f, Cx = -34f, Cz = 0f,
           R = 0.35f, G = 0.9f, B = 0.9f,
-          Station = new Station { Prefab = "portal_wood", Kind = "piece", Note = "a paired portal and world-state practice", Text = "", X = -24f, Z = 0f, Yaw = 90f },
+          Station = new Station { Prefab = "portal_wood", Kind = "piece", Note = "a paired portal and world-state practice", Text = "", LightSchool = "", X = -24f, Y = 0f, Z = 0f, Yaw = 90f, AtGround = false },
           Beams = new[] {
             new Beam { X = -34f, Y = 16.194f, Z = -3.5f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = -34f, Y = 14.281f, Z = -3.5f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -4058,7 +4072,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Social,
           Angle = 315f, Cx = -24.042f, Cz = 24.042f,
           R = 1f, G = 0.7f, B = 0.85f,
-          Station = new Station { Prefab = "sign", Kind = "piece", Note = "the hub sign says sign here", Text = "sign here", X = 3.5f, Z = 6f, Yaw = 180f },
+          Station = new Station { Prefab = "sign", Kind = "piece", Note = "the hub sign says sign here", Text = "sign here", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f, Yaw = 180f, AtGround = false },
           Beams = new[] {
             new Beam { X = -27.506f, Y = 15.62f, Z = 20.577f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = -27.506f, Y = 13.58f, Z = 20.577f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -5220,7 +5234,7 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "blackmarble_floor_large", X = -18.385f, Y = 4f, Z = 29.698f, Yaw = 45f, Orient = "panel", Text = "" },
         new Fixture { Prefab = "blackmarble_floor_large", X = -18.385f, Y = 12f, Z = 29.698f, Yaw = 45f, Orient = "panel", Text = "" },
         new Fixture { Prefab = "sign", X = 6.1f, Y = 1.2f, Z = 15f, Yaw = 180f, Orient = "", Text = "<size=28><b><color=#ff4738>COMBAT</color></b></size>\nGreyling at the rune; bow and arrows at the spoke mouth\n<color=#8fdc8f>safe events can bind here</color>" },
-        new Fixture { Prefab = "sign", X = 14.92f, Y = 1.2f, Z = 6.293f, Yaw = 225f, Orient = "", Text = "<size=28><b><color=#73f266>HARVEST</color></b></size>\nbirch and bronze axe beside the arrival portal\n<color=#8fdc8f>safe events can bind here</color>" },
+        new Fixture { Prefab = "sign", X = 14.92f, Y = 1.2f, Z = 6.293f, Yaw = 225f, Orient = "", Text = "<size=28><b><color=#73f266>HARVEST</color></b></size>\nground Birch and bronze axe before the ascent portal\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = 15f, Y = 1.2f, Z = -6.1f, Yaw = 270f, Orient = "", Text = "<size=28><b><color=#f2c74c>INVENTORY</color></b></size>\na chest to empty, equip, and refill\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = 6.293f, Y = 1.2f, Z = -14.92f, Yaw = 315f, Orient = "", Text = "<size=28><b><color=#fa8c33>BUILDING</color></b></size>\nhammer and wood directly in front of the bench\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -6.1f, Y = 1.2f, Z = -15f, Yaw = 0f, Orient = "", Text = "<size=28><b><color=#8cccff>CRAFTING</color></b></size>\ncoal directly in front of the smelter\n<color=#8fdc8f>safe events can bind here</color>" },
@@ -5287,17 +5301,23 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "sign", X = -23.582f, Y = 19.5f, Z = 24.501f, Yaw = 135f, Orient = "rune-name-lit", Text = "<size=44><b><color=#ffb2d9>I</color></b></size>", LightSchool = "social" },
         new Fixture { Prefab = "sign", X = -22.663f, Y = 19.5f, Z = 25.42f, Yaw = 135f, Orient = "rune-name", Text = "<size=44><b><color=#ffb2d9>A</color></b></size>" },
         new Fixture { Prefab = "sign", X = -21.744f, Y = 19.5f, Z = 26.34f, Yaw = 135f, Orient = "rune-name", Text = "<size=44><b><color=#ffb2d9>L</color></b></size>" },
+        new Fixture { Prefab = "wood_pole2", X = 3.5f, Y = 0f, Z = 6f, Yaw = 0f, Orient = "sign-post", Text = "" },
       },
       CourseDrops = new[] {
-        new CourseDrop { Prefab = "AxeBronze", Note = "bronze axe beside the arrival birch", X = 6.2f, Y = 0.4f, Z = 1.4f, Stack = 1 },
-        new CourseDrop { Prefab = "Bow", Note = "bow on the player side of the combat spoke", X = -1.2f, Y = 0.4f, Z = 16f, Stack = 1 },
-        new CourseDrop { Prefab = "ArrowWood", Note = "arrows beside the combat bow", X = 1.2f, Y = 0.4f, Z = 16f, Stack = 100 },
-        new CourseDrop { Prefab = "Hammer", Note = "hammer in front of the building bench", X = 15.698f, Y = 0.4f, Z = -14.001f, Stack = 1 },
-        new CourseDrop { Prefab = "Wood", Note = "wood beside the building hammer", X = 14.001f, Y = 0.4f, Z = -15.698f, Stack = 50 },
-        new CourseDrop { Prefab = "Coal", Note = "coal directly in front of the smelter", X = 0f, Y = 0.4f, Z = -21f, Stack = 20 },
-        new CourseDrop { Prefab = "CookedMeat", Note = "health food at the arrival hub", X = 1.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
-        new CourseDrop { Prefab = "QueensJam", Note = "stamina food at the arrival hub", X = 3.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
-        new CourseDrop { Prefab = "Honey", Note = "quick stamina food at the arrival hub", X = 5.5f, Y = 0.4f, Z = 3.5f, Stack = 10 },
+        new CourseDrop { Prefab = "AxeBronze", Note = "bronze axe beside the ground welcome Birch", X = 5.5f, Y = 0.4f, Z = 0.8f, Stack = 1, AtGround = true },
+        new CourseDrop { Prefab = "Bow", Note = "bow on the player side of the combat spoke", X = -1.2f, Y = 0.4f, Z = 16f, Stack = 1, AtGround = false },
+        new CourseDrop { Prefab = "ArrowWood", Note = "arrows beside the combat bow", X = 1.2f, Y = 0.4f, Z = 16f, Stack = 100, AtGround = false },
+        new CourseDrop { Prefab = "Hammer", Note = "hammer in front of the building bench", X = 15.698f, Y = 0.4f, Z = -14.001f, Stack = 1, AtGround = false },
+        new CourseDrop { Prefab = "Wood", Note = "wood beside the building hammer", X = 14.001f, Y = 0.4f, Z = -15.698f, Stack = 50, AtGround = false },
+        new CourseDrop { Prefab = "Coal", Note = "coal directly in front of the smelter", X = 0f, Y = 0.4f, Z = -21f, Stack = 20, AtGround = false },
+      },
+      WelcomeFixtures = new WelcomeFixture[] {
+        new WelcomeFixture { Prefab = "piece_table", AttachedItem = "", Note = "welcome picnic table", X = 0f, Y = 0f, Z = 0f, Yaw = 0f },
+        new WelcomeFixture { Prefab = "piece_bench01", AttachedItem = "", Note = "south picnic bench", X = 0f, Y = 0f, Z = -1.35f, Yaw = 0f },
+        new WelcomeFixture { Prefab = "piece_bench01", AttachedItem = "", Note = "north picnic bench", X = 0f, Y = 0f, Z = 1.35f, Yaw = 0f },
+        new WelcomeFixture { Prefab = "itemstandh", AttachedItem = "CookedMeat", Note = "health food display", X = -0.8f, Y = 0.84f, Z = 0f, Yaw = 0f },
+        new WelcomeFixture { Prefab = "itemstandh", AttachedItem = "QueensJam", Note = "stamina food display", X = 0f, Y = 0.84f, Z = 0f, Yaw = 0f },
+        new WelcomeFixture { Prefab = "itemstandh", AttachedItem = "Honey", Note = "quick stamina food display", X = 0.8f, Y = 0.84f, Z = 0f, Yaw = 0f },
       },
     },
   };
@@ -5317,5 +5337,6 @@ public static class LabGalleryPlan {
   public static Tile[] PlatformTiles { get { return Find(DefaultProfileId).PlatformTiles; } }
   public static Fixture[] Fixtures { get { return Find(DefaultProfileId).Fixtures; } }
   public static CourseDrop[] CourseDrops { get { return Find(DefaultProfileId).CourseDrops; } }
+  public static WelcomeFixture[] WelcomeFixtures { get { return Find(DefaultProfileId).WelcomeFixtures; } }
   public static float RuneHeight { get { return Find(DefaultProfileId).RuneHeight; } }
 }
