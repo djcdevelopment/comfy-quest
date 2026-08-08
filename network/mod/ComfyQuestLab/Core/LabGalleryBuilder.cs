@@ -306,13 +306,24 @@ public sealed class LabGalleryBuilder {
     // One height for the whole platform: the highest ground under the footprint, plus a
     // clearance. A level floor on uneven ground is the entire point — sampling per tile
     // would reproduce the hillside the platform exists to hide.
-    float top = origin.y;
+    // Gallery rebuild can begin while Unity is still retiring the old marked GameObjects.
+    // Solid-height sampling sees those stale marble colliders and stacks the replacement on
+    // top of them (the first r8 live reset produced an 18.1 m floor this way). Seed from and
+    // sample only Valheim terrain; the profile's explicit clearance is the sole vertical lift.
+    float originTerrain;
+    if (!TryNaturalTerrainHeight(origin, out originTerrain)) {
+      _running = false;
+      Report("gallery stopped safely: Valheim could not resolve natural terrain at the build "
+          + "origin. Nothing was placed.");
+      yield break;
+    }
+    float top = originTerrain;
     int tiles = profile.PlatformTiles.Length;
     for (int i = 0; i < tiles; i += 7) {   // every seventh tile is plenty to find the max
       Vector3 at = origin + new Vector3(profile.PlatformTiles[i].X, 0f,
                                         profile.PlatformTiles[i].Z);
       float ground;
-      if (TryGroundHeight(at, out ground) && ground > top) {
+      if (TryNaturalTerrainHeight(at, out ground) && ground > top) {
         top = ground;
       }
     }
@@ -322,15 +333,17 @@ public sealed class LabGalleryBuilder {
         + " m above its origin. Stand back.");
 
     // Where the ground-level portal goes, sampled NOW — before a single floor tile
-    // exists. TryGroundHeight asks for the SOLID height, which counts placed pieces and
-    // not just terrain, so asking after the floor is down returns the top of the deck and
-    // puts the "ground" portal on the platform beside its own partner. That is exactly
-    // what the first build did: two portals up top, none to walk to.
+    // exists. Terrain-only sampling also ignores GameObjects still retiring from a safe
+    // reset; solid height would put this portal on the old deck during that brief window.
     Vector3 arrival = origin + new Vector3(2f, 0f, 0f);
     float arrivalGround;
-    if (TryGroundHeight(arrival, out arrivalGround)) {
-      arrival.y = arrivalGround;
+    if (!TryNaturalTerrainHeight(arrival, out arrivalGround)) {
+      _running = false;
+      Report("gallery stopped safely: Valheim could not resolve natural terrain for the "
+          + "ground portal. Nothing was placed.");
+      yield break;
     }
+    arrival.y = arrivalGround;
 
     int placed = 0;
 
@@ -683,6 +696,7 @@ public sealed class LabGalleryBuilder {
   const float TeleportAcceptTimeout = 4f;
   const float TeleportFinishTimeout = 18f;
   const float DestroySettleTimeout = 5f;
+  const int DestroyQuiescenceFrames = 2;
 
   /// <summary>Return a player standing on the selected gallery to the natural terrain at
   /// the same X/Z, then remove every matching marked object.
@@ -766,6 +780,12 @@ public sealed class LabGalleryBuilder {
       if (remaining > 0) {
         _lastLifecycleResult += " " + remaining + " matching marked piece(s) remained locally "
             + "known after the bounded destroy-settle window.";
+      } else {
+        // ZDO retirement can lead the corresponding Unity GameObject/collider by one end-of-frame
+        // destroy. Give it two frames before a rebuild can sample or occupy the same site.
+        for (int frame = 0; frame < DestroyQuiescenceFrames; frame++) {
+          yield return null;
+        }
       }
       Report(_lastLifecycleResult);
     } finally {

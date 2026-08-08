@@ -55,7 +55,12 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   The first exact-r7 live clear returned to terrain and removed all 5,860 accumulated pieces,
   then exposed that the request receipt sampled the ZDO table before Valheim retired queued
   destroys. r8 waits a bounded five seconds for that retirement and only passes the lifecycle
-  when no matching marked object remains.
+  when no matching marked object remains. Its first exact live reset cleared 3,668 marked
+  objects and built the requested 1,349-object course, but Unity retained the retired marble
+  colliders beyond their ZDOs: solid-height sampling stacked the new floor 18.1 m above the
+  player and suspended the nominal ground portal, causing a fatal fall. r9 samples Valheim
+  terrain—not transient solids—for both the whole floor and ground portal, and gives cleared
+  GameObjects two quiescence frames before rebuilding.
 - **The panel is an interactive tool, not a translucent overlay.** r6 uses a nearly opaque
   high-contrast surface, larger default dimensions, a bounded lower-right resize handle,
   and a spreadsheet-style live-event grid with stable columns and explicit BINDABLE /

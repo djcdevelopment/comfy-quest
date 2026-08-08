@@ -224,6 +224,18 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertNotIn("PrepareBatchTargets", controller)
         self.assertNotIn("PrepareBatchSupplies", controller)
 
+    def test_rebuild_height_ignores_retiring_gallery_colliders(self) -> None:
+        source = BUILDER.read_text(encoding="utf-8")
+        build = source[source.index("public IEnumerator Build(") : source.index("// ---- clear")]
+        self.assertIn("TryNaturalTerrainHeight(origin, out originTerrain)", build)
+        self.assertIn("TryNaturalTerrainHeight(at, out ground)", build)
+        self.assertIn("TryNaturalTerrainHeight(arrival, out arrivalGround)", build)
+        self.assertIn("could not resolve natural terrain at the build", build)
+        self.assertIn("could not resolve natural terrain for the", build)
+        self.assertNotIn("TryGroundHeight(", build)
+        self.assertIn("DestroyQuiescenceFrames = 2", source)
+        self.assertIn("frame < DestroyQuiescenceFrames", source)
+
     def test_request_receipts_pin_release_and_do_not_leak_stale_suite_paths(self) -> None:
         controller = CONTROLLER.read_text(encoding="utf-8")
         self.assertIn('\\"plugin_version\\"', controller)
