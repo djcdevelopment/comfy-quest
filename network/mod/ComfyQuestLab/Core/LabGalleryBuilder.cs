@@ -701,6 +701,34 @@ public sealed class LabGalleryBuilder {
     }
   }
 
+  /// <summary>How many lab-marked pieces are standing in the loaded zones right now.
+  ///
+  /// Exists so <c>lab_setup</c> can tell a first run from a second one. It could not before, and
+  /// a second <c>lab_setup</c> silently raised another 620 pieces through the first — the same
+  /// mistake that once let the count reach 1527 before anybody noticed. "The one command a
+  /// newcomer needs" should not be a command that punishes running it twice.
+  ///
+  /// Only sees loaded zones, same as <see cref="Clear"/>; a gallery across the map reads as zero.
+  /// That is the safe direction to be wrong in — it offers to build rather than refusing to.</summary>
+  public int StandingPieceCount() {
+    int n = 0;
+    try {
+      foreach (WearNTear wear in WearNTear.GetAllInstances()) {
+        if (wear == null) {
+          continue;
+        }
+        var view = wear.GetComponent<ZNetView>();
+        ZDO zdo = view == null ? null : view.GetZDO();
+        if (zdo != null && IsGalleryPiece(zdo)) {
+          n++;
+        }
+      }
+    } catch (Exception ex) {
+      LogOnce("could not count standing pieces: " + ex.Message);
+    }
+    return n;
+  }
+
   /// <summary>Put a fresh practice target in front of the player.
   ///
   /// The gallery plan has always declared <c>Kind = "spawner"</c> and a note reading "respawned

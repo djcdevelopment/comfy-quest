@@ -202,8 +202,20 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
               LabQuestEngine.Reload();
             }
 
-            StartCoroutine(_gallery.Build(this));
-            Report("Quest lab setup started! The gallery is being raised.");
+            // Do NOT raise a second gallery through the first. Before this check, running
+            // lab_setup twice silently stacked another 620 pieces — and it is exactly the
+            // command a newcomer is most likely to re-run, because it is the one we tell them
+            // to start with.
+            int standing = _gallery.StandingPieceCount();
+            if (standing > 0) {
+              Report("A lab gallery is already standing here (" + standing + " pieces) — leaving "
+                  + "it alone. questlab_gallery clear removes it, or lab_target puts a fresh "
+                  + "practice target in front of you.");
+            } else {
+              StartCoroutine(_gallery.Build(this));
+              Report("Quest lab setup started! The gallery is being raised.");
+            }
+
             Report("Press " + LabConfig.PanelShortcut.Value + " to open the lab console. "
                 + "Learn the spells at djcdevelopment.github.io/baseline/questlab/");
           });
