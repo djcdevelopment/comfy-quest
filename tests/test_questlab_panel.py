@@ -68,6 +68,25 @@ class QuestLabPanelTests(unittest.TestCase):
         self.assertIn('return "BINDABLE";', self.panel)
         self.assertIn('return "DIAGNOSTIC";', self.panel)
 
+    def test_quests_are_a_school_colored_expandable_grid(self) -> None:
+        for heading in ("SCHOOL", "QUEST", "EVENT -> TARGET", "STATE", "FIRES"):
+            with self.subTest(heading=heading):
+                self.assertIn(f'new GUIContent("{heading}")', self.panel)
+        for marker in (
+            "DrawQuestGridRow(set.Quests[i], i)",
+            "LabRunes.For(category)",
+            "LabRunes.ColorFor(category)",
+            "QuestStateColor(quest.Armed)",
+            'GUILayout.Button(expanded ? "-" : "+"',
+            "DrawQuestDetails(quest, eventName, target, cooldown)",
+            'GUILayout.Label("verdict  /  " + quest.ArmedLine())',
+            'GUILayout.Toggle(_showQuestFolder, "Folder"',
+            '" LOAD ERROR"',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+        self.assertNotIn("void DrawQuests()", self.panel)
+
     def test_window_has_a_bounded_drag_resize_handle(self) -> None:
         for marker in (
             "DrawResizeHandle();",

@@ -3,6 +3,8 @@ namespace ComfyQuestLab;
 using System;
 using System.Collections.Generic;
 
+using ComfyNetworkSense;
+
 using UnityEngine;
 
 /// <summary>The live event console.
@@ -30,6 +32,10 @@ public sealed class LabPanel {
   const float SchoolColumn = 112f;
   const float EventColumn = 180f;
   const float UseColumn = 116f;
+  const float QuestTriggerColumn = 220f;
+  const float QuestStateColumn = 104f;
+  const float QuestFiresColumn = 54f;
+  const float QuestExpandColumn = 32f;
   const float MinPanelScale = 0.65f;
   const float MaxPanelScale = 2f;
   const float PanelScaleStep = 0.1f;
@@ -45,6 +51,9 @@ public sealed class LabPanel {
   string _filterText = string.Empty;
   bool _paused;
   bool _showTrueNames;
+  bool _showQuestFolder;
+  bool _showQuestErrors;
+  string _expandedQuestKey;
   bool _resizing;
   Vector2 _resizeStartMouse;
   Vector2 _resizeStartSize;
@@ -60,6 +69,7 @@ public sealed class LabPanel {
   GUIStyle _gridHeaderStyle;
   GUIStyle _gridEvenStyle;
   GUIStyle _gridOddStyle;
+  GUIStyle _questDetailStyle;
   GUIStyle _resizeStyle;
   Tab _tab = Tab.Console;
 
@@ -156,7 +166,7 @@ public sealed class LabPanel {
     } else if (_tab == Tab.Spellbook) {
       DrawSpellbook();
     } else {
-      DrawQuests();
+      DrawQuestDashboard();
     }
 
     DrawResizeHandle();
@@ -353,94 +363,216 @@ public sealed class LabPanel {
     }
   }
 
-  /// <summary>Your quest files, and what the lab thinks of them.
-  ///
-  /// A tab rather than rows in the console, because this is standing state: a validation
-  /// problem persists until somebody fixes it, and the ring holds ConsoleRows * 8 events
-  /// filtered by category — one fight would scroll a roster away and a filter toggle would
-  /// hide it. Only the moments (a reload, a firing) go in the console.
-  ///
-  /// The line that earns its place here is "last event" below: it shows the canonical name and
-  /// target the matcher was actually handed, which turns "why didn't my quest fire" from a
-  /// guess into a read.</summary>
-  void DrawQuests() {
+  /// <summary>Creator-facing quest dashboard. Scan-critical facts remain in the grid;
+  /// evaluator prose and source provenance stay one click behind each row.</summary>
+  void DrawQuestDashboard() {
     LabQuestSet set = LabQuestEngine.Set;
 
     GUILayout.BeginHorizontal();
-    GUILayout.Label(set.Quests.Count + " loaded · " + set.ArmedCount + " armed");
+    GUILayout.Label(set.Quests.Count + " quests  /  " + set.ArmedCount + " armed");
     GUILayout.FlexibleSpace();
+    _showQuestFolder = GUILayout.Toggle(_showQuestFolder, "Folder", GUI.skin.button,
+        GUILayout.Width(68f));
     if (GUILayout.Button("Reload", GUILayout.Width(70f))) {
       ComfyQuestLab.Report(LabQuestEngine.Reload());
     }
     GUILayout.EndHorizontal();
 
-    GUILayout.Label("from " + LabQuestEngine.QuestDir);
+    if (_showQuestFolder) {
+      GUILayout.Label(LabQuestEngine.QuestDir);
+    }
 
     string lastEvent = LabQuestEngine.LastEventLine;
-    GUILayout.Label("last event the matcher was given: "
+    GUILayout.Label("matcher  /  "
         + (string.IsNullOrEmpty(lastEvent) ? "none yet" : lastEvent));
 
     if (!LabConfig.QuestsEnabled.Value) {
-      GUILayout.Label("questsEnabled is OFF — files are loaded, but nothing will fire.");
+      Color previous = GUI.contentColor;
+      GUI.contentColor = new Color(1f, 0.62f, 0.46f, 1f);
+      GUILayout.Label("QUESTS OFF  /  files are loaded, but nothing will fire");
+      GUI.contentColor = previous;
     }
 
     GUILayout.Space(4f);
+    DrawQuestGridHeader();
     _questScroll = GUILayout.BeginScrollView(_questScroll);
 
     if (set.Quests.Count == 0 && set.Errors.Count == 0) {
-      GUILayout.Label("No quest files yet. Run lab_setup for a starter one, or drop a");
-      GUILayout.Label("quest-view.json into the folder above and run lab_reload.");
+      GUILayout.Label("No quests yet. Run lab_setup, or add a quest-view.json and reload.");
     }
 
-    string file = null;
-    foreach (LabQuest quest in set.Quests) {
-      if (quest.SourceFile != file) {
-        file = quest.SourceFile;
-        GUILayout.Space(6f);
-        GUILayout.Label(file);
-      }
-
-      Color before = GUI.color;
-      // The same dimming the spellbook uses for a seam it cannot witness: real, but not
-      // available to you. A creator should be able to tell at a glance without reading.
-      if (!quest.IsArmed) {
-        GUI.color = new Color(1f, 1f, 1f, 0.68f);
-      }
-
-      GUILayout.Label("  " + (quest.IsArmed ? "*" : "-") + "  " + quest.Quest.Name
-          + "  (" + quest.QuestId + ")");
-      GUILayout.Label("        -> " + quest.ArmedLine());
-
-      if (quest.IsArmed) {
-        double cooldown = LabQuestEngine.CooldownRemaining(quest.QuestId);
-        GUILayout.Label("        fired " + quest.Fires
-            + (quest.Fires == 1 ? " time" : " times") + " since the last reload"
-            + (cooldown > 0.0
-                ? "  ·  re-arms in " + Mathf.CeilToInt((float) cooldown) + "s"
-                : string.Empty));
-      }
-
-      foreach (string note in quest.Advisories) {
-        GUILayout.Label("        ! " + note);
-      }
-
-      GUI.color = before;
+    for (int i = 0; i < set.Quests.Count; i++) {
+      DrawQuestGridRow(set.Quests[i], i);
     }
 
     if (set.Errors.Count > 0) {
       GUILayout.Space(8f);
-      GUILayout.Label("Files that would not load");
-      foreach (LabQuestFileError error in set.Errors) {
-        GUILayout.Label("  " + error.SourceFile);
-        // The contract's own sentence first, then ours. Keeping them apart is the point:
-        // a creator can tell which half came from the thing that will actually run their
-        // quest, and the lab never gets to paraphrase that half.
-        GUILayout.Label("      " + error.ContractMessage);
-        GUILayout.Label("      " + error.Remedy);
+      Color previous = GUI.contentColor;
+      GUI.contentColor = new Color(1f, 0.62f, 0.46f, 1f);
+      _showQuestErrors = GUILayout.Toggle(_showQuestErrors,
+          (_showQuestErrors ? "-" : "+") + "  " + set.Errors.Count + " LOAD ERROR"
+              + (set.Errors.Count == 1 ? string.Empty : "S"),
+          GUI.skin.button);
+      GUI.contentColor = previous;
+      if (_showQuestErrors) {
+        foreach (LabQuestFileError error in set.Errors) {
+          GUILayout.BeginVertical(_questDetailStyle);
+          GUILayout.Label(error.SourceFile);
+          GUILayout.Label("contract  /  " + error.ContractMessage);
+          GUILayout.Label("fix  /  " + error.Remedy);
+          GUILayout.EndVertical();
+        }
       }
     }
 
     GUILayout.EndScrollView();
+  }
+
+  void DrawQuestGridHeader() {
+    GUILayout.BeginHorizontal();
+    GridCell(new GUIContent("SCHOOL"), _gridHeaderStyle, SchoolColumn);
+    GridCell(new GUIContent("QUEST"), _gridHeaderStyle, -1f);
+    GridCell(new GUIContent("EVENT -> TARGET"), _gridHeaderStyle, QuestTriggerColumn);
+    GridCell(new GUIContent("STATE"), _gridHeaderStyle, QuestStateColumn);
+    GridCell(new GUIContent("FIRES"), _gridHeaderStyle, QuestFiresColumn);
+    GridCell(new GUIContent(string.Empty, "expand details"), _gridHeaderStyle,
+        QuestExpandColumn);
+    GUILayout.EndHorizontal();
+  }
+
+  void DrawQuestGridRow(LabQuest quest, int index) {
+    GUIStyle style = index % 2 == 0 ? _gridEvenStyle : _gridOddStyle;
+    string key = QuestKey(quest);
+    bool expanded = string.Equals(_expandedQuestKey, key, StringComparison.Ordinal);
+    string category = QuestSchool(quest);
+    string questName = quest.Quest == null || string.IsNullOrWhiteSpace(quest.Quest.Name)
+        ? "unnamed quest"
+        : quest.Quest.Name;
+    string eventName = quest.Quest == null || string.IsNullOrWhiteSpace(quest.Quest.TriggerEvent)
+        ? "manual"
+        : quest.Quest.TriggerEvent;
+    string target = quest.Quest == null || string.IsNullOrWhiteSpace(quest.Quest.TriggerTarget)
+        ? "any"
+        : quest.Quest.TriggerTarget;
+
+    GUILayout.BeginHorizontal();
+    Color prior = style.normal.textColor;
+    Color priorHover = style.hover.textColor;
+    Color schoolColor = LabRunes.ColorFor(category);
+    style.normal.textColor = schoolColor;
+    style.hover.textColor = schoolColor;
+    GridCell(new GUIContent(LabJournal.For(category).Title, LabRunes.For(category), category),
+        style, SchoolColumn);
+    style.normal.textColor = prior;
+    style.hover.textColor = priorHover;
+
+    GridCell(new GUIContent(questName, quest.QuestId + "  /  " + quest.SourceFile),
+        style, -1f);
+    GridCell(new GUIContent(eventName + " -> " + target, "creator trigger"),
+        style, QuestTriggerColumn);
+
+    Color stateColor = QuestStateColor(quest.Armed);
+    style.normal.textColor = stateColor;
+    style.hover.textColor = stateColor;
+    GridCell(new GUIContent(QuestStateLabel(quest.Armed), quest.ArmedLine()),
+        style, QuestStateColumn);
+    style.normal.textColor = prior;
+    style.hover.textColor = priorHover;
+
+    double cooldown = quest.IsArmed ? LabQuestEngine.CooldownRemaining(quest.QuestId) : 0.0;
+    string fireTip = cooldown > 0.0
+        ? "re-arms in " + Mathf.CeilToInt((float) cooldown) + "s"
+        : "since the last reload";
+    GridCell(new GUIContent(quest.IsArmed ? quest.Fires.ToString() : "-", fireTip),
+        style, QuestFiresColumn);
+    if (GUILayout.Button(expanded ? "-" : "+", GUILayout.Width(QuestExpandColumn),
+        GUILayout.Height(28f))) {
+      _expandedQuestKey = expanded ? null : key;
+    }
+    GUILayout.EndHorizontal();
+
+    if (expanded) {
+      DrawQuestDetails(quest, eventName, target, cooldown);
+    }
+  }
+
+  void DrawQuestDetails(LabQuest quest, string eventName, string target, double cooldown) {
+    GUILayout.BeginVertical(_questDetailStyle);
+    GUILayout.Label("quest_id  /  " + (quest.QuestId ?? "none")
+        + "    file  /  " + (quest.SourceFile ?? "unknown"));
+    GUILayout.Label("trigger  /  " + eventName + " -> " + target);
+
+    Color previous = GUI.contentColor;
+    GUI.contentColor = QuestStateColor(quest.Armed);
+    GUILayout.Label("verdict  /  " + quest.ArmedLine());
+    GUI.contentColor = previous;
+
+    if (quest.IsArmed) {
+      GUILayout.Label("fires  /  " + quest.Fires
+          + (cooldown > 0.0
+              ? "    re-arms in " + Mathf.CeilToInt((float) cooldown) + "s"
+              : "    ready"));
+    }
+    foreach (string note in quest.Advisories) {
+      GUI.contentColor = new Color(1f, 0.78f, 0.38f, 1f);
+      GUILayout.Label("note  /  " + note);
+      GUI.contentColor = previous;
+    }
+    GUILayout.EndVertical();
+  }
+
+  static string QuestKey(LabQuest quest) {
+    return (quest.SourceFile ?? string.Empty) + "\n" + (quest.QuestId ?? string.Empty);
+  }
+
+  static string QuestSchool(LabQuest quest) {
+    if (quest == null || quest.Quest == null) {
+      return LabCategory.Combat;
+    }
+
+    QuestEventCatalog.Definition definition;
+    if (QuestEventCatalog.TryGet(quest.Quest.TriggerEvent, out definition)) {
+      return definition.Category;
+    }
+
+    // Schema-1's "hit" alias spans combat and harvest. The legacy starter quest names
+    // tree_or_bush, so preserve the school a creator expects instead of choosing whichever
+    // canonical alias happens to appear first in a dictionary.
+    string target = quest.Quest.TriggerTarget ?? string.Empty;
+    if (target.IndexOf("tree", StringComparison.OrdinalIgnoreCase) >= 0
+        || target.IndexOf("bush", StringComparison.OrdinalIgnoreCase) >= 0) {
+      return LabCategory.Harvest;
+    }
+
+    foreach (string eventName in QuestEventCatalog.AllEventNames) {
+      if (QuestEventCatalog.TriggerMatches(quest.Quest.TriggerEvent, eventName)
+          && QuestEventCatalog.TryGet(eventName, out definition)) {
+        return definition.Category;
+      }
+    }
+    return LabCategory.Combat;
+  }
+
+  static string QuestStateLabel(string armed) {
+    switch (armed) {
+      case LabArmed.Yes: return "ARMED";
+      case LabArmed.NoTrigger: return "MANUAL";
+      case LabArmed.AutoChecked: return "EXTERNAL";
+      case LabArmed.Irl: return "IRL";
+      case LabArmed.UnsupportedEvent: return "UNBOUND";
+      default: return "CHECK";
+    }
+  }
+
+  static Color QuestStateColor(string armed) {
+    switch (armed) {
+      case LabArmed.Yes: return new Color(0.55f, 1f, 0.64f, 1f);
+      case LabArmed.NoTrigger:
+      case LabArmed.AutoChecked: return new Color(1f, 0.78f, 0.38f, 1f);
+      case LabArmed.Irl: return new Color(0.72f, 0.76f, 0.82f, 1f);
+      case LabArmed.UnsupportedEvent: return new Color(1f, 0.48f, 0.42f, 1f);
+      default: return new Color(1f, 0.66f, 0.42f, 1f);
+    }
   }
 
   /// <summary>The spellbook. Eight runes, each a school of things the world will answer
@@ -554,6 +686,12 @@ public sealed class LabPanel {
         _gridEvenBackground, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal);
     _gridOddStyle = GridStyle(
         _gridOddBackground, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal);
+
+    _questDetailStyle = GridStyle(
+        _gridOddBackground, new Color(0.86f, 0.90f, 0.96f, 1f), FontStyle.Normal);
+    _questDetailStyle.padding = new RectOffset(18, 10, 8, 8);
+    _questDetailStyle.wordWrap = true;
+    _questDetailStyle.clipping = TextClipping.Overflow;
 
     _resizeStyle = new GUIStyle(GUI.skin.box);
     _resizeStyle.normal.background = _resizeBackground;

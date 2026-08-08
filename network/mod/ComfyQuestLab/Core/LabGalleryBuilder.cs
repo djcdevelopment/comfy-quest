@@ -140,7 +140,7 @@ public sealed class LabGalleryBuilder {
     }
     foreach (LabGalleryPlan.WelcomeFixture fixture in profile.WelcomeFixtures) {
       AddUnique(wanted, fixture.Prefab);
-      AddUnique(wanted, fixture.AttachedItem);
+      AddUniqueCandidates(wanted, fixture.AttachedItem);
     }
 
     var found = new List<string>();
@@ -192,6 +192,27 @@ public sealed class LabGalleryBuilder {
   static void AddUnique(List<string> values, string value) {
     if (!string.IsNullOrWhiteSpace(value) && !values.Contains(value)) {
       values.Add(value);
+    }
+  }
+
+  static string[] SplitCandidates(string value) {
+    if (string.IsNullOrWhiteSpace(value)) {
+      return new string[0];
+    }
+    string[] raw = value.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+    var clean = new List<string>();
+    foreach (string candidate in raw) {
+      string trimmed = candidate.Trim();
+      if (!string.IsNullOrEmpty(trimmed) && !clean.Contains(trimmed)) {
+        clean.Add(trimmed);
+      }
+    }
+    return clean.ToArray();
+  }
+
+  static void AddUniqueCandidates(List<string> values, string candidates) {
+    foreach (string candidate in SplitCandidates(candidates)) {
+      AddUnique(values, candidate);
     }
   }
 
@@ -468,7 +489,8 @@ public sealed class LabGalleryBuilder {
         // school names were dark vertical threads over otherwise readable runes. The
         // generator now uses one sign per letter and marks only the central letter, so
         // each word gets one coloured light rather than one costly light per character.
-        LightPiece(built, fixture.LightSchool);
+        LightPiece(built, fixture.LightSchool,
+            fixture.Orient == "rune-name-lit" ? LabRuneLight.BannerFaceStyle : null);
       }
       if (placed % piecesPerFrame == 0) {
         yield return null;
@@ -543,7 +565,7 @@ public sealed class LabGalleryBuilder {
           WriteSign(station, monument.Station.Text);
         }
         if (!string.IsNullOrEmpty(monument.Station.LightSchool)) {
-          LightPiece(station, monument.Station.LightSchool);
+          LightPiece(station, monument.Station.LightSchool, LabRuneLight.SignFaceStyle);
         }
       }
       yield return null;
@@ -1388,38 +1410,53 @@ public sealed class LabGalleryBuilder {
   /// registers an exact <c>SetVisualItem(string,int,int,int)</c> RPC and persists the item
   /// under the verified <c>item</c> ZDO field. Mirror that vanilla state transition so the
   /// food is visible, synced, saved, and removable through the ordinary stand interaction.</summary>
-  void AttachDisplayItem(GameObject standObject, string itemName) {
+  void AttachDisplayItem(GameObject standObject, string candidateNames) {
     try {
       if (standObject == null || ObjectDB.instance == null) {
         return;
       }
       var stand = standObject.GetComponent<ItemStand>();
       var view = standObject.GetComponent<ZNetView>();
-      GameObject itemPrefab = ObjectDB.instance.GetItemPrefab(itemName);
-      var itemDrop = itemPrefab == null ? null : itemPrefab.GetComponent<ItemDrop>();
-      if (stand == null || view == null || view.GetZDO() == null || itemDrop == null
-          || itemDrop.m_itemData == null || ItemStand.GetAttachPrefab(itemPrefab) == null) {
-        LogOnce("could not mount " + itemName + " on the welcome table; its stand or "
-            + "attach visual is unavailable in this game build.");
+      string[] candidates = SplitCandidates(candidateNames);
+      if (stand == null || view == null || view.GetZDO() == null || candidates.Length == 0) {
+        LogOnce("could not populate a welcome-table item stand; its stand state or food "
+            + "candidate list is unavailable.");
         return;
       }
 
-      ItemDrop.ItemData data = itemDrop.m_itemData.Clone();
-      data.m_stack = 1;
-      string prefabName = data.m_dropPrefab != null ? data.m_dropPrefab.name : itemPrefab.name;
-      ZDO zdo = view.GetZDO();
-      zdo.Set(ZDOVars.s_item, prefabName);
-      zdo.Set(ZDOVars.s_type, 0);
-      ItemDrop.SaveToZDO(data, zdo);
-      view.InvokeRPC(ZNetView.Everybody, "SetVisualItem",
-          prefabName, data.m_variant, data.m_quality, 0);
+      foreach (string itemName in candidates) {
+        GameObject itemPrefab = ObjectDB.instance.GetItemPrefab(itemName);
+        var itemDrop = itemPrefab == null ? null : itemPrefab.GetComponent<ItemDrop>();
+        if (itemDrop == null || itemDrop.m_itemData == null
+            || ItemStand.GetAttachPrefab(itemPrefab) == null) {
+          continue;
+        }
+
+        ItemDrop.ItemData data = itemDrop.m_itemData.Clone();
+        data.m_stack = 1;
+        string prefabName = data.m_dropPrefab != null ? data.m_dropPrefab.name : itemPrefab.name;
+        ZDO zdo = view.GetZDO();
+        zdo.Set(ZDOVars.s_item, prefabName);
+        zdo.Set(ZDOVars.s_type, 0);
+        ItemDrop.SaveToZDO(data, zdo);
+        view.InvokeRPC(ZNetView.Everybody, "SetVisualItem",
+            prefabName, data.m_variant, data.m_quality, 0);
+        if (!string.Equals(itemName, candidates[0], StringComparison.Ordinal)) {
+          Report("welcome table used visible fallback " + itemName + " because "
+              + candidates[0] + " has no item-stand attach visual in this game build.");
+        }
+        return;
+      }
+      LogOnce("could not mount any welcome-table food candidate ("
+          + string.Join(", ", candidates) + "); none has an item-stand attach visual in "
+          + "this game build.");
     } catch (Exception ex) {
-      LogOnce("could not mount " + itemName + " on the welcome table: " + ex.Message);
+      LogOnce("could not populate a welcome-table item stand: " + ex.Message);
     }
   }
 
   /// <summary>Persist and immediately apply one school-coloured gallery lamp.</summary>
-  static void LightPiece(GameObject built, string school) {
+  static void LightPiece(GameObject built, string school, string style = null) {
     if (built == null || string.IsNullOrEmpty(school)) {
       return;
     }
@@ -1427,8 +1464,8 @@ public sealed class LabGalleryBuilder {
     if (view == null || view.GetZDO() == null) {
       return;
     }
-    LabRuneLight.Mark(view.GetZDO(), school);
-    LabRuneLight.Apply(built, school);
+    LabRuneLight.Mark(view.GetZDO(), school, style);
+    LabRuneLight.Apply(built, school, style);
   }
 
   /// <summary>Make a dropped item a stack rather than a single. Best effort: if the

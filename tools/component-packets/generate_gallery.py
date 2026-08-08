@@ -432,7 +432,7 @@ def build_welcome_fixtures(spec: dict):
             0.0,
             0.0,
             "quick stamina food display",
-            "Honey",
+            "Bread|CarrotSoup|Sausages|TurnipStew",
         ),
     ]
 
@@ -572,8 +572,12 @@ def rune_name_signs(spec: dict, monuments: list[dict]):
     if not spec["rune_name_headers"]:
         return []
     signs = []
-    along = spec["ring_radius"] + spec["rune_gap"] + spec["stage_depth"] / 2.0
-    y = spec["rune_base_y"] + spec["rune_height"] + 1.5
+    inner_end = spec["ring_radius"] - spec["pad_depth"] / 2.0
+    # Derek's r10 pass liked the one-letter horizontal treatment but showed it floating
+    # above the far rune like a distant sky label. Stage the word as an entrance banner:
+    # just past the hub into the spoke throat, and 0.75 m above the wall courses.
+    along = spec["plaza_radius"] + (inner_end - spec["plaza_radius"]) * 0.55
+    y = spec["wall_courses"] * 2.0 + 0.75
     for monument in monuments:
         angle = math.radians(monument["angle"])
         sx, sz = math.sin(angle), math.cos(angle)
@@ -707,9 +711,10 @@ def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
         wanted.update(item["prefab"] for item in profile["courseDrops"])
         wanted.update(item["prefab"] for item in profile["welcomeFixtures"])
         wanted.update(
-            item["attachedItem"]
+            candidate
             for item in profile["welcomeFixtures"]
-            if item["attachedItem"]
+            for candidate in item["attachedItem"].split("|")
+            if candidate
         )
     missing = sorted(wanted - set(entries))
     if missing:
@@ -739,11 +744,11 @@ def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
             if profile["platformClearance"] < 31.0:
                 raise SystemExit("selected gallery does not clear the measured Meadows canopy")
             attached = {
-                item["attachedItem"]
+                item["attachedItem"].split("|", 1)[0]
                 for item in profile["welcomeFixtures"]
                 if item["attachedItem"]
             }
-            if attached != {"CookedMeat", "QueensJam", "Honey"}:
+            if attached != {"CookedMeat", "QueensJam", "Bread"}:
                 raise SystemExit("selected gallery welcome table is missing mounted food")
         expected_headers = 0 if profile["id"] == "classic" else len(ORDER)
         expected_signs = 0 if profile["id"] == "classic" else sum(map(len, ORDER))
@@ -794,7 +799,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "",
         "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
         "public static class LabGalleryPlan {",
-        "  public const int PlanVersion = 4;",
+        "  public const int PlanVersion = 5;",
         f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
         "",
         "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",

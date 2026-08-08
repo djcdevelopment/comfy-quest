@@ -37,8 +37,8 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r10 changes presentation and course layout, so those same suites must
-> be re-witnessed against the exact r10 DLL before the release cut is final. This README
+> 34/34 creator events. r11 changes presentation and course layout, so those same suites must
+> be re-witnessed against the exact r11 DLL before the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
 ## Why this exists
@@ -100,6 +100,11 @@ the lower-right handle resizes it within the current screen. The visible **− /
 zoom the whole panel from 65–200% in 10% steps; the choice is saved as `panelScale`, so a
 windowed/1080p creator and a 4K creator can tune the same grid independently.
 
+The **Quests** tab is a compact dashboard rather than a prose dump. Its fixed columns show
+the colored school rune, quest name, creator event and target, armed state, and fire count.
+Use the row's **+** only when you need its source file, evaluator explanation, cooldown, or
+advisories; load errors are collapsed separately.
+
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Every page lists what the world answers to in that school and marks
 which ones this build will show you — so you can tell "Valheim can do this" from "the lab
@@ -152,8 +157,10 @@ word, but compresses each hub-to-station walk from 37 m to 9 m. Its 1,353 marked
 within a 48 m footprint.
 
 The default is a course rather than an empty monument. Before the ascent portal, a ground
-welcome camp puts a Birch beside its bronze axe and serves cooked meat, Queens Jam, and honey
-on real horizontal item stands atop a picnic table. Combat leaves a bow and 100 wood arrows
+welcome camp puts a Birch beside its bronze axe and serves cooked meat, Queens Jam, and bread
+on real horizontal item stands atop a picnic table. Each display carries a generated, prefab-
+checked fallback list because not every food has Valheim's required `attach` child in every game
+build. Combat leaves a bow and 100 wood arrows
 on the player's side with its Greyling at the rune. Building pairs its hammer and wood,
 Crafting puts coal directly in front of the smelter, and Social raises its illuminated
 `sign here` sign on a two-metre post in the hub. Every consumable is recreated by `lab_setup`

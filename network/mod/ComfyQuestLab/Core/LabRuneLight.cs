@@ -33,6 +33,9 @@ public static class LabRuneLight {
   /// <summary>ZDO string field on a rune beam or central header sign that carries a lamp;
   /// the value is the school, so the colour survives a reload without a lookup table.</summary>
   public const string RuneLightMark = "comfyQuestLabRuneLight";
+  public const string RuneLightStyleMark = "comfyQuestLabRuneLightStyle";
+  public const string SignFaceStyle = "sign-face";
+  public const string BannerFaceStyle = "banner-face";
 
   const string LampChildName = "comfy-quest-lab-rune-lamp";
 
@@ -116,7 +119,7 @@ public static class LabRuneLight {
         if (school.Length == 0) {
           continue;
         }
-        Apply(wear.gameObject, school);
+        Apply(wear.gameObject, school, StyleOf(zdo));
         touched++;
       }
     } catch (Exception) {
@@ -171,12 +174,13 @@ public static class LabRuneLight {
   }
 
   /// <summary>Mark a piece as the one carrying this monument's lamp.</summary>
-  public static void Mark(ZDO zdo, string school) {
+  public static void Mark(ZDO zdo, string school, string style = null) {
     if (zdo == null || string.IsNullOrEmpty(school)) {
       return;
     }
     try {
       zdo.Set(RuneLightMark, school);
+      zdo.Set(RuneLightStyleMark, style ?? string.Empty);
     } catch (Exception) {
       // A monument that ends up unlit is a cosmetic loss, not a failed build.
     }
@@ -193,9 +197,20 @@ public static class LabRuneLight {
     }
   }
 
+  public static string StyleOf(ZDO zdo) {
+    if (zdo == null) {
+      return string.Empty;
+    }
+    try {
+      return zdo.GetString(RuneLightStyleMark, string.Empty);
+    } catch (Exception) {
+      return string.Empty;
+    }
+  }
+
   /// <summary>Hang the lamp, or take it down if the config says so. Idempotent: a piece
   /// that already has its lamp is retuned rather than given a second one.</summary>
-  public static void Apply(GameObject host, string school) {
+  public static void Apply(GameObject host, string school, string style = null) {
     if (host == null) {
       return;
     }
@@ -215,9 +230,21 @@ public static class LabRuneLight {
       } else {
         lamp = new GameObject(LampChildName);
         lamp.transform.SetParent(host.transform, false);
-        lamp.transform.localPosition = Vector3.zero;
         lamp.AddComponent<Light>();
       }
+
+      bool signFace = string.Equals(style, SignFaceStyle, StringComparison.Ordinal);
+      bool bannerFace = string.Equals(style, BannerFaceStyle, StringComparison.Ordinal);
+      bool faceLamp = signFace || bannerFace;
+      // The Social prompt is only two metres above a reflective marble floor. The ordinary
+      // 11 m rune wash turned that floor into a white bloom and left the sign itself dark.
+      // Put a tight lamp just off the sign face; at 1.6 m it cannot reach the floor, while
+      // the sign and top of its post remain visibly pink. Bridge banners use the same face
+      // offset with a 5.5 m word wash that still stops above the floor; rune hosts keep the
+      // ordinary wide setting.
+      lamp.transform.localPosition = faceLamp
+          ? new Vector3(0f, 0f, -0.32f)
+          : Vector3.zero;
 
       var light = lamp.GetComponent<Light>();
       if (light == null) {
@@ -225,8 +252,14 @@ public static class LabRuneLight {
       }
       light.type = LightType.Point;
       light.color = ColourFor(school);
-      light.intensity = Intensity != null ? Intensity.Value : 6f;
-      light.range = Range != null ? Range.Value : 22f;
+      float configuredIntensity = Intensity != null ? Intensity.Value : 6f;
+      float configuredRange = Range != null ? Range.Value : 22f;
+      light.intensity = signFace
+          ? Mathf.Min(configuredIntensity, 1.5f)
+          : (bannerFace ? Mathf.Min(configuredIntensity, 2.5f) : configuredIntensity);
+      light.range = signFace
+          ? Mathf.Min(configuredRange, 1.6f)
+          : (bannerFace ? Mathf.Min(configuredRange, 5.5f) : configuredRange);
       // No shadows on purpose: eight shadow-casting point lights across a 76 m gallery is
       // a real frame cost, and a rune reads by its own glow rather than by what it casts.
       light.shadows = LightShadows.None;
@@ -277,7 +310,7 @@ public static class RuneLightPatches {
       if (school.Length == 0) {
         return;
       }
-      LabRuneLight.Apply(__instance.gameObject, school);
+      LabRuneLight.Apply(__instance.gameObject, school, LabRuneLight.StyleOf(zdo));
     } catch (Exception) {
       // Runs for every piece in the world; one failure is not worth a repeating log line.
     }

@@ -12,12 +12,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 TOOLS = REPO / "tools" / "component-packets"
+MOD = REPO / "network" / "mod" / "ComfyQuestLab"
 SUMMARY = TOOLS / "samples" / "gallery-profiles.json"
 GENERATOR = TOOLS / "generate_gallery.py"
-PLAN = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabGalleryPlan.g.cs"
-BUILDER = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabGalleryBuilder.cs"
-CONTROLLER = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabBatchController.cs"
-PLUGIN = REPO / "network" / "mod" / "ComfyQuestLab" / "ComfyQuestLab.cs"
+PLAN = MOD / "Core" / "LabGalleryPlan.g.cs"
+BUILDER = MOD / "Core" / "LabGalleryBuilder.cs"
+CONTROLLER = MOD / "Core" / "LabBatchController.cs"
+PLUGIN = MOD / "ComfyQuestLab.cs"
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -93,6 +94,13 @@ class GalleryProfileTests(unittest.TestCase):
                 self.assertEqual(counts["runeNameSigns"], expected_signs)
                 self.assertEqual(counts["runeNameLights"], 8)
 
+        generator = GENERATOR.read_text(encoding="utf-8")
+        self.assertIn(
+            'along = spec["plaza_radius"] + (inner_end - spec["plaza_radius"]) * 0.55',
+            generator,
+        )
+        self.assertIn('y = spec["wall_courses"] * 2.0 + 0.75', generator)
+
     def test_estimates_account_for_every_placed_object(self) -> None:
         # Build places one object for each generated floor/fixture/beam/course drop and
         # ground-welcome fixture, plus eight school stations and three portals.
@@ -110,7 +118,7 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 4;", source)
+        self.assertIn("public const int PlanVersion = 5;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
         self.assertIn("public float PlatformClearance, GroundPortalX, GroundPortalZ;", source)
         self.assertIn("HallWidth, SpokeLength, FootprintRadius", source)
@@ -143,7 +151,7 @@ class GalleryProfileTests(unittest.TestCase):
             'Prefab = "piece_table", AttachedItem = "", Note = "welcome picnic table"',
             'Prefab = "itemstandh", AttachedItem = "CookedMeat"',
             'Prefab = "itemstandh", AttachedItem = "QueensJam"',
-            'Prefab = "itemstandh", AttachedItem = "Honey"',
+            'Prefab = "itemstandh", AttachedItem = "Bread|CarrotSoup|Sausages|TurnipStew"',
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, grand)
@@ -159,8 +167,19 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn('Append(" m terrain clearance, ")', source)
         self.assertIn('Append(" m hub-to-station walks, ")', source)
         self.assertIn('+ " horizontal rune headers ("', source)
-        self.assertIn("LightPiece(built, fixture.LightSchool)", source)
-        self.assertIn("LightPiece(station, monument.Station.LightSchool)", source)
+        self.assertIn('fixture.Orient == "rune-name-lit"', source)
+        self.assertIn("LabRuneLight.BannerFaceStyle", source)
+        self.assertIn(
+            "LightPiece(station, monument.Station.LightSchool, LabRuneLight.SignFaceStyle)",
+            source,
+        )
+        light = (MOD / "Core" / "LabRuneLight.cs").read_text(encoding="utf-8")
+        self.assertIn('public const string SignFaceStyle = "sign-face";', light)
+        self.assertIn('public const string BannerFaceStyle = "banner-face";', light)
+        self.assertIn("? new Vector3(0f, 0f, -0.32f)", light)
+        self.assertIn("Mathf.Min(configuredIntensity, 1.5f)", light)
+        self.assertIn("Mathf.Min(configuredRange, 1.6f)", light)
+        self.assertIn("Mathf.Min(configuredRange, 5.5f)", light)
 
     def test_mounted_welcome_food_is_real_and_does_not_litter_on_clear(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")
@@ -168,6 +187,8 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("zdo.Set(ZDOVars.s_item, prefabName)", attach)
         self.assertIn("ItemDrop.SaveToZDO(data, zdo)", attach)
         self.assertIn('view.InvokeRPC(ZNetView.Everybody, "SetVisualItem"', attach)
+        self.assertIn("foreach (string itemName in candidates)", attach)
+        self.assertIn("welcome table used visible fallback", attach)
         destroy = source[source.index("static bool DestroyMarkedZdo") : source.index("static bool MatchesSelector")]
         self.assertIn("SuppressMountedItemDrop(zdo, view)", destroy)
         self.assertIn("zdo.Set(ZDOVars.s_item, string.Empty)", destroy)

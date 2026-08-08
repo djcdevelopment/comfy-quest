@@ -67,7 +67,16 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   deck rises 32 m above the highest sampled terrain (past the measured 30.5 m Meadows beech),
   while a ground welcome camp places the Birch/axe before the portal and mounts three foods on
   real item stands at a picnic table. The Social sign now stands on a two-metre post with a
-  persistent school-coloured lamp. The current generated build is 1,353 marked objects.
+  persistent school-coloured lamp. The generated build is 1,353 marked objects. Its exact-r10
+  prepare safely cleared 1,343 remaining r9 objects, raised that deck 32.7 m above the live site,
+  and verified all 1,353 new marks, then exposed two presentation facts that headless prefab
+  checks could not: Honey has no item-stand `attach` child, and the sign's ordinary 11 m point
+  light bleached the marble floor. r11 gives the third food an ordered, prefab-checked visible
+  fallback list and persists a `sign-face` lamp style: a 1.6 m wash offset onto the sign cannot
+  reach the floor. The liked horizontal rune names move from the distant rune top to entrance
+  banners 55% into each spoke, 0.75 m above the wall courses; their separate 5.5 m face wash
+  lights the word and wall tops without reaching the marble floor. Monument lighting keeps its
+  wider setting.
 - **The panel is an interactive tool, not a translucent overlay.** r6 uses a nearly opaque
   high-contrast surface, larger default dimensions, a bounded lower-right resize handle,
   and a spreadsheet-style live-event grid with stable columns and explicit BINDABLE /
@@ -75,7 +84,10 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   blocks camera/player actions, and restores the previous cursor state on F6, Escape, the
   Close button, disable, or plugin teardown. It retains native IMGUI and adds no Jötunn
   dependency. r8 adds visible − / + whole-panel zoom from 65–200%, persisted in config, so
-  creators can tune windowed, 1080p, and 4K layouts without editing a file.
+  creators can tune windowed, 1080p, and 4K layouts without editing a file. r11 replaces the
+  Quests tab's repeated prose with a fixed school-colored grid: rune, quest, event/target,
+  state, and fire count remain visible, while source, evaluator verdict, cooldown, advice,
+  and load errors expand only on request.
 - **Bounded batch evidence is self-service.** `questlab_batch` can prepare, run, reset,
   report, and export two explicit suites. `all-schools` installs eight ordinary bindable
   example quests, safely clears every marked old build, raises a fresh compact course with
@@ -255,8 +267,9 @@ while a remote client can only answer for objects it has synchronized.
 **Still unwitnessed at that point:** only harvest. Combat and the quest lane were witnessed
 on 2026-08-08 — see the end of this file. Six categories remained unseen. That initial cut
 left item stands bare because `SetVisualItem` is a registered RPC rather than a callable
-method, so its gear was dropped beside them; r10's welcome table later mirrors the verified
-vanilla ZDO state and invokes that exact RPC to mount its three foods.
+method, so its gear was dropped beside them; r10's welcome table later mirrored the verified
+vanilla ZDO state and invoked that exact RPC, and r11 added visible fallbacks for items whose
+prefabs do not expose Valheim's required `attach` child.
 
 **The lab can read a quest now — and say when it never could.**
 
