@@ -38,7 +38,9 @@ param(
     [ValidateRange(0, 60)]
     [int]$WaitSeconds = 45,
 
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+
+    [switch]$DryRun
 )
 
 $ErrorActionPreference = 'Stop'
@@ -87,6 +89,14 @@ $localRequestReceipt = Join-Path $OutputDirectory "$requestId-request.json"
     $localRequestReceipt,
     $requestJson + [Environment]::NewLine,
     (New-Object System.Text.UTF8Encoding($false)))
+
+if ($DryRun) {
+    Write-Host 'dry run - no i5 files changed'
+    Write-Host "request id: $requestId"
+    Write-Host "request envelope: $localRequestReceipt"
+    Write-Output $requestJson
+    exit 0
+}
 
 $tempBase = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $tempRoot = Join-Path $tempBase ("questlab-i5-" + $nonce)

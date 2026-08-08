@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -44,6 +46,41 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
         self.assertIn("-ValheimConfig", self.source)
         self.assertGreaterEqual(self.source.count("BatchMode=yes"), 3)
         self.assertIn("comfy-questlab-batch-request/v1", self.source)
+        self.assertIn("[switch]$DryRun", self.source)
+
+    def test_dry_run_stops_before_any_i5_process(self) -> None:
+        dry_run_branch = self.source.index("if ($DryRun)")
+        self.assertLess(dry_run_branch, self.source.index("& powershell.exe"))
+        self.assertLess(dry_run_branch, self.source.index("& ssh"))
+
+        with tempfile.TemporaryDirectory() as output_directory:
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(SCRIPT),
+                    "run",
+                    "-Suite",
+                    "creator-events",
+                    "-OutputDirectory",
+                    output_directory,
+                    "-DryRun",
+                ],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            receipts = list(Path(output_directory).glob("*-request.json"))
+            self.assertEqual(len(receipts), 1)
+            envelope = json.loads(receipts[0].read_text(encoding="utf-8"))
+            self.assertEqual(envelope["schema"], "comfy-questlab-batch-request/v1")
+            self.assertEqual(envelope["operation"], "run")
+            self.assertEqual(envelope["suite"], "creator-events")
 
     def test_no_generic_execution_or_keystroke_primitive_exists(self) -> None:
         for forbidden in (
