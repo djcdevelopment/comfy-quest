@@ -47,9 +47,9 @@ public static class LabJournal {
     new Page {
       Category = LabCategory.Combat,
       Title = "Combat",
-      What = new[] { "Hitting things, and things dying. The only category with any ground a quest", "can stand on today — and the only place you can see all three verdicts side", "by side, which is the fastest way to understand what they mean." },
+      What = new[] { "Hitting things, blocking, healing, staggering, and things dying. Each deliberate", "act has stable quest vocabulary; the lower-level witnesses that corroborate it", "remain visible only as diagnostics." },
       Try = new[] { "Find a Greyling and hit it once, then finish it.", "You get two kinds of row: the hits, and the death." },
-      Watch = new[] { "The hits and the kill get DIFFERENT verdicts, and that is the whole lesson.", "The kill says a quest can fire on it. The hits say they emit an event that no", "quest trigger matches — real, visible, and unusable. If you want a quest that", "fires on a hit rather than a kill, nothing today will run it." },
+      Watch = new[] { "A hit and a kill are different creator events: damage_dealt and kill. Bind to", "the precise one when you can; the older hit spelling remains a compatibility", "alias for creature or resource damage. A local blow and its server-carried echo", "share one action identity, so one swing cannot complete a quest twice." },
       Spells = new[] {
         new Spell { Name = "a blow being blocked", TrueName = "Character.BlockAttack", Verdict = "diagnostic only — never bindable", Bound = true },
         new Spell { Name = "a blow blocked by something carrying a shield", TrueName = "Humanoid.BlockAttack", Verdict = "bindable: attack_blocked", Bound = true },
@@ -70,7 +70,7 @@ public static class LabJournal {
       Title = "Harvest",
       What = new[] { "Chopping trees, breaking bushes and rocks, picking berries. The first thing", "most people try, and the reason this lab exists: hitting a bush used to fire", "a quest, and the mod that could do it was retired." },
       Try = new[] { "Punch a tree with bare fists, then punch a raspberry bush, then pick one.", "Three rows, and the third is a different shape from the first two." },
-      Watch = new[] { "A standing tree and a felled trunk are different things to the game, so they", "are different rows. And picking a berry is not damage at all — it is an", "interact. Nobody guesses that, and a quest written as though picking were", "hitting would never fire." },
+      Watch = new[] { "A standing tree and a felled trunk are different things to the game, so they", "are different rows. And picking a berry is not damage at all — it is an", "interact. Bind damage as resource_damaged and picking as resource_picked; the", "older hit alias still covers resource damage, but it does not mean picking." },
       Spells = new[] {
         new Spell { Name = "a picked thing marked as taken", TrueName = "Pickable.SetPicked", Verdict = "diagnostic only — never bindable", Bound = true },
         new Spell { Name = "a picked thing marked as taken, server-carried", TrueName = "Pickable.RPC_SetPicked", Verdict = "diagnostic only — never bindable", Bound = true },
@@ -92,7 +92,7 @@ public static class LabJournal {
       Title = "Inventory",
       What = new[] { "Picking things up, equipping them, eating them, emptying chests. The largest", "group of seams in the game and the noisiest, because the game moves items", "around constantly for reasons that have nothing to do with you." },
       Try = new[] { "Drop something and pick it back up, then equip a weapon and eat food.", "Then open a chest and take everything." },
-      Watch = new[] { "The lab watches what you DID, not every time the item list changed. Adding an", "item internally happens on crafting, on stacking, on moving between chests —", "a quest built on that would fire constantly and mean nothing. It is left", "alone on purpose, and you can see it listed as available in the atlas if you", "disagree." },
+      Watch = new[] { "The lab watches what you DID, not every time the item list changed. Adding an", "item internally happens on crafting, on stacking, on moving between chests —", "a quest built on that would fire constantly and mean nothing. It is left", "diagnostic-only on purpose. Pickup, drop, equip, unequip, consume, and emptying", "a container are stable creator events and can each bind a quest." },
       Spells = new[] {
         new Spell { Name = "an item landing on the ground", TrueName = "ItemDrop.DropItem", Verdict = "diagnostic only — never bindable", Bound = true },
         new Spell { Name = "an item on the ground being taken", TrueName = "ItemDrop.Pickup", Verdict = "diagnostic only — never bindable", Bound = true },
@@ -114,7 +114,7 @@ public static class LabJournal {
       Title = "Building",
       What = new[] { "Placing pieces, repairing them, taking them down, and structures breaking.", "The category a settlement steward actually wants: build a longhouse, repair", "the dock, keep the walls up." },
       Try = new[] { "Place a workbench, hit it with a hammer to repair it, then remove it.", "If something of yours is damaged, let it break and watch that row too." },
-      Watch = new[] { "Placing is something YOU do; breaking is something that HAPPENS. So breaking", "is reported whoever caused it, and the row says whether it was you. That", "distinction is what lets a 'defend the base' quest work at all." },
+      Watch = new[] { "Placing is something YOU do; breaking is something that HAPPENS. So breaking", "is reported whoever caused it, and the row says whether it was you. That", "distinction is what lets a 'defend the base' quest work at all. Placement,", "removal, repair, damage, and destruction have separate bindable names." },
       Spells = new[] {
         new Spell { Name = "a structure being repaired", TrueName = "WearNTear.Repair", Verdict = "diagnostic only — never bindable", Bound = true },
         new Spell { Name = "a structure being repaired, server-carried", TrueName = "WearNTear.RPC_Repair", Verdict = "bindable: piece_repaired", Bound = true },
@@ -132,7 +132,7 @@ public static class LabJournal {
       Title = "Crafting",
       What = new[] { "Making things at a bench, and feeding the machines that make things —", "smelters, kilns, cooking stations. Two different acts that people tend to", "lump together." },
       Try = new[] { "Craft anything at a workbench. Then put ore and coal into a smelter.", "Notice they are separate rows with separate names." },
-      Watch = new[] { "The craft is reported by the crafting WINDOW, not by your character. That is", "genuinely surprising and it is why searching for a 'player crafts' event", "turns up nothing and people conclude crafting cannot be tracked. It can." },
+      Watch = new[] { "The craft is reported by the crafting WINDOW, not by your character. That is", "genuinely surprising and it is why searching for a 'player crafts' event", "turns up nothing and people conclude crafting cannot be tracked. It can: the", "crafted item, station input, fuel, produced output, and collected output are", "separate bindable events." },
       Spells = new[] {
         new Spell { Name = "a smelter finishing something", TrueName = "Smelter.Spawn", Verdict = "bindable: station_output_produced", Bound = true },
         new Spell { Name = "crafting something at a bench", TrueName = "InventoryGui.DoCrafting", Verdict = "bindable: item_crafted", Bound = true },
@@ -152,7 +152,7 @@ public static class LabJournal {
       Title = "Progression",
       What = new[] { "Skills going up, stamina being spent, and dying. The category people ask for", "by name and then cannot find, because the names they ask for do not exist." },
       Try = new[] { "Swing an axe at a tree a few times until the skill-up message appears.", "You will see the skill row fire at the same moment." },
-      Watch = new[] { "There is an event for 'a skill went up'. There is no event for 'my skill is", "level 30' — that is a question you can ask, not something the game announces.", "A quest can fire on the first and cannot on the second, and that difference", "catches everybody once.", "Stamina is off by default. It fires when you run, so it buries everything." },
+      Watch = new[] { "There is an event for 'a skill went up'. There is no event for 'my skill is", "level 30' — that is a question you can ask, not something the game announces.", "A quest can fire on the first and cannot on the second, and that difference", "catches everybody once.", "Skill raises, skill loss, death, maximum-health changes, and stamina changes", "are bindable. Stamina observation is off by default because running can bury", "everything; enable it only for that experiment." },
       Spells = new[] {
         new Spell { Name = "a skill going up", TrueName = "Skills.RaiseSkill", Verdict = "diagnostic only — never bindable", Bound = true },
         new Spell { Name = "a skill going up, asked for by you", TrueName = "Player.RaiseSkill", Verdict = "bindable: skill_raised", Bound = true },
@@ -171,7 +171,7 @@ public static class LabJournal {
       Title = "World",
       What = new[] { "Moving through the world, and the world itself changing state. Small, and it", "contains the most interesting seam nobody has used." },
       Try = new[] { "Take a portal.", "If you are on a world where a boss has been killed, that already fired." },
-      Watch = new[] { "Valheim keeps a short list of world-wide flags — which bosses are dead, and", "so what the world allows. That is the nearest thing the game has to a", "server-wide event, which makes it the obvious foundation for a guild-scale", "quest, and nothing has ever built on it." },
+      Watch = new[] { "Valheim keeps a short list of world-wide flags — which bosses are dead, and", "so what the world allows. That is the nearest thing the game has to a", "server-wide event. Portal travel and global-key set/remove each have stable", "bindable names; asking which biome a coordinate occupies remains a query, not", "an event." },
       Spells = new[] {
         new Spell { Name = "the world forgetting something", TrueName = "ZoneSystem.RemoveGlobalKey", Verdict = "bindable: global_key_removed", Bound = true },
         new Spell { Name = "the world recording something, as when a boss falls", TrueName = "ZoneSystem.SetGlobalKey", Verdict = "bindable: global_key_set", Bound = true },
@@ -185,7 +185,7 @@ public static class LabJournal {
       Title = "Social",
       What = new[] { "Talking, and writing on signs. The quietest category and the one with the", "most room, because it needs nothing from combat at all." },
       Try = new[] { "Say something in chat, then place a sign and write on it." },
-      Watch = new[] { "A quest that completes when somebody writes a particular sign, or says a", "phrase somewhere specific, is entirely possible and nobody has written one.", "Community rituals tend to look far more like this than like killing things —", "which is worth remembering when the combat seams are the ones that work." },
+      Watch = new[] { "A quest that completes when somebody writes a particular sign, or says a", "phrase somewhere specific, is directly bindable through sign_written or chat_sent.", "Community rituals tend to look far more like this than like killing things —", "which is worth remembering. Messages merely received from somebody else stay", "diagnostic-only, so another player cannot complete your speaking quest for you." },
       Spells = new[] {
         new Spell { Name = "a message appearing in the chat window", TrueName = "Chat.OnNewChatMessage", Verdict = "diagnostic only — never bindable", Bound = true },
         new Spell { Name = "a message reaching everyone, server-carried", TrueName = "Chat.RPC_ChatMessage", Verdict = "diagnostic only — never bindable", Bound = true },

@@ -15,13 +15,14 @@ Seams the lab actually hooks are marked, so a reader can tell "this exists in th
 game" from "this lab will show it to you" — a distinction that is invisible in a
 list of method names and matters enormously to somebody deciding what to build.
 
-  python tools/component-packets/generate_journal.py
+  python tools/component-packets/generate_journal.py [--check]
 
 Writes network/mod/ComfyQuestLab/Ui/LabJournal.g.cs
 """
 import json
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -165,11 +166,19 @@ lines += [
     "",
 ]
 
-os.makedirs(os.path.dirname(OUT), exist_ok=True)
-with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
-    fh.write("\n".join(lines))
+rendered = "\n".join(lines)
+checking = "--check" in sys.argv[1:]
+if checking:
+    existing = open(OUT, encoding="utf-8").read() if os.path.exists(OUT) else None
+    if existing != rendered:
+        print(f"STALE: {OUT}; run generate_journal.py")
+        raise SystemExit(1)
+else:
+    os.makedirs(os.path.dirname(OUT), exist_ok=True)
+    with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(rendered)
 
-print(f"  {OUT}")
+print(f"  {'verified' if checking else 'generated'} {OUT}")
 integrated_atlas_methods = len(hooked & set(capabilities_by_method))
 print(
     f"  {len(ORDER)} pages, {total_seams} spells named, "

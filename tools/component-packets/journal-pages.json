@@ -20,19 +20,19 @@
     "combat": {
       "title": "Combat",
       "what": [
-        "Hitting things, and things dying. The only category with any ground a quest",
-        "can stand on today — and the only place you can see all three verdicts side",
-        "by side, which is the fastest way to understand what they mean."
+        "Hitting things, blocking, healing, staggering, and things dying. Each deliberate",
+        "act has stable quest vocabulary; the lower-level witnesses that corroborate it",
+        "remain visible only as diagnostics."
       ],
       "try": [
         "Find a Greyling and hit it once, then finish it.",
         "You get two kinds of row: the hits, and the death."
       ],
       "watch": [
-        "The hits and the kill get DIFFERENT verdicts, and that is the whole lesson.",
-        "The kill says a quest can fire on it. The hits say they emit an event that no",
-        "quest trigger matches — real, visible, and unusable. If you want a quest that",
-        "fires on a hit rather than a kill, nothing today will run it."
+        "A hit and a kill are different creator events: damage_dealt and kill. Bind to",
+        "the precise one when you can; the older hit spelling remains a compatibility",
+        "alias for creature or resource damage. A local blow and its server-carried echo",
+        "share one action identity, so one swing cannot complete a quest twice."
       ]
     },
     "harvest": {
@@ -49,8 +49,8 @@
       "watch": [
         "A standing tree and a felled trunk are different things to the game, so they",
         "are different rows. And picking a berry is not damage at all — it is an",
-        "interact. Nobody guesses that, and a quest written as though picking were",
-        "hitting would never fire."
+        "interact. Bind damage as resource_damaged and picking as resource_picked; the",
+        "older hit alias still covers resource damage, but it does not mean picking."
       ]
     },
     "inventory": {
@@ -68,8 +68,8 @@
         "The lab watches what you DID, not every time the item list changed. Adding an",
         "item internally happens on crafting, on stacking, on moving between chests —",
         "a quest built on that would fire constantly and mean nothing. It is left",
-        "alone on purpose, and you can see it listed as available in the atlas if you",
-        "disagree."
+        "diagnostic-only on purpose. Pickup, drop, equip, unequip, consume, and emptying",
+        "a container are stable creator events and can each bind a quest."
       ]
     },
     "building": {
@@ -86,7 +86,8 @@
       "watch": [
         "Placing is something YOU do; breaking is something that HAPPENS. So breaking",
         "is reported whoever caused it, and the row says whether it was you. That",
-        "distinction is what lets a 'defend the base' quest work at all."
+        "distinction is what lets a 'defend the base' quest work at all. Placement,",
+        "removal, repair, damage, and destruction have separate bindable names."
       ]
     },
     "crafting": {
@@ -103,7 +104,9 @@
       "watch": [
         "The craft is reported by the crafting WINDOW, not by your character. That is",
         "genuinely surprising and it is why searching for a 'player crafts' event",
-        "turns up nothing and people conclude crafting cannot be tracked. It can."
+        "turns up nothing and people conclude crafting cannot be tracked. It can: the",
+        "crafted item, station input, fuel, produced output, and collected output are",
+        "separate bindable events."
       ]
     },
     "progression": {
@@ -121,7 +124,9 @@
         "level 30' — that is a question you can ask, not something the game announces.",
         "A quest can fire on the first and cannot on the second, and that difference",
         "catches everybody once.",
-        "Stamina is off by default. It fires when you run, so it buries everything."
+        "Skill raises, skill loss, death, maximum-health changes, and stamina changes",
+        "are bindable. Stamina observation is off by default because running can bury",
+        "everything; enable it only for that experiment."
       ]
     },
     "world": {
@@ -137,8 +142,9 @@
       "watch": [
         "Valheim keeps a short list of world-wide flags — which bosses are dead, and",
         "so what the world allows. That is the nearest thing the game has to a",
-        "server-wide event, which makes it the obvious foundation for a guild-scale",
-        "quest, and nothing has ever built on it."
+        "server-wide event. Portal travel and global-key set/remove each have stable",
+        "bindable names; asking which biome a coordinate occupies remains a query, not",
+        "an event."
       ]
     },
     "social": {
@@ -152,9 +158,10 @@
       ],
       "watch": [
         "A quest that completes when somebody writes a particular sign, or says a",
-        "phrase somewhere specific, is entirely possible and nobody has written one.",
+        "phrase somewhere specific, is directly bindable through sign_written or chat_sent.",
         "Community rituals tend to look far more like this than like killing things —",
-        "which is worth remembering when the combat seams are the ones that work."
+        "which is worth remembering. Messages merely received from somebody else stay",
+        "diagnostic-only, so another player cannot complete your speaking quest for you."
       ]
     }
   },

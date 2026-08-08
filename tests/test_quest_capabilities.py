@@ -26,6 +26,11 @@ GENERATOR = REPO / "tools" / "component-packets" / "generate_seam_catalog.py"
 RULES = REPO / "tools" / "component-packets" / "quest-capability-rules.json"
 PATCH_CHECKER = REPO / "tools" / "component-packets" / "check_lab_patches.py"
 PATCHES = REPO / "network" / "mod" / "ComfyQuestLab" / "Patches"
+JOURNAL_GENERATOR = REPO / "tools" / "component-packets" / "generate_journal.py"
+TOME_GENERATOR = REPO / "tools" / "component-packets" / "render_quest_lab.py"
+JOURNAL_SOURCE = REPO / "tools" / "component-packets" / "journal-pages.json"
+JOURNAL_OUTPUT = REPO / "network" / "mod" / "ComfyQuestLab" / "Ui" / "LabJournal.g.cs"
+TOME_OUTPUT = REPO / "Lumberjacks" / "src" / "Game.Gateway" / "Community" / "questlab.html"
 
 SPEC = importlib.util.spec_from_file_location("quest_capability_generator", GENERATOR)
 CAPABILITY_GENERATOR = importlib.util.module_from_spec(SPEC)
@@ -139,6 +144,29 @@ class QuestCapabilityManifestTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_in_game_and_web_tomes_are_fresh_and_do_not_repeat_scaffold_claims(self) -> None:
+        for generator in (JOURNAL_GENERATOR, TOME_GENERATOR):
+            with self.subTest(generator=generator.name):
+                result = subprocess.run(
+                    [sys.executable, str(generator), "--check"],
+                    cwd=REPO,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        forbidden = (
+            "The only category with any ground a quest can stand on today",
+            "nothing today will run it",
+            "the combat seams are the ones that work",
+        )
+        for path in (JOURNAL_SOURCE, JOURNAL_OUTPUT, TOME_OUTPUT):
+            text = path.read_text(encoding="utf-8")
+            for claim in forbidden:
+                with self.subTest(path=path.name, claim=claim):
+                    self.assertNotIn(claim, text)
 
     def test_every_creator_safe_signature_has_a_runtime_patch(self) -> None:
         result = subprocess.run(

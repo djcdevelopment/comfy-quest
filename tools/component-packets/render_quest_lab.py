@@ -5,11 +5,12 @@ This is the web-facing version of the in-game spellbook, generated from the same
 source files: journal-pages.json and valheim-event-atlas.json. It also includes
 SVG representations of the runes drawn from LabRunes.cs.
 
-Writes Lumberjacks/src/Game.Gateway/Community/questlab.html
+Writes Lumberjacks/src/Game.Gateway/Community/questlab.html. Pass --check to verify drift.
 """
 import json
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -253,8 +254,16 @@ for cat in ORDER:
 
 html.append('</div></body></html>')
 
-os.makedirs(os.path.dirname(OUT), exist_ok=True)
-with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
-    fh.write("\n".join(html))
+rendered = "\n".join(html)
+checking = "--check" in sys.argv[1:]
+if checking:
+    existing = open(OUT, encoding="utf-8").read() if os.path.exists(OUT) else None
+    if existing != rendered:
+        print(f"STALE: {OUT}; run render_quest_lab.py")
+        raise SystemExit(1)
+else:
+    os.makedirs(os.path.dirname(OUT), exist_ok=True)
+    with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(rendered)
 
-print(f"Generated {OUT}")
+print(f"{'Verified' if checking else 'Generated'} {OUT}")
