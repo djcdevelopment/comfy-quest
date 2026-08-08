@@ -47,6 +47,8 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
         self.assertGreaterEqual(self.source.count("BatchMode=yes"), 3)
         self.assertIn("comfy-questlab-batch-request/v1", self.source)
         self.assertIn("[switch]$DryRun", self.source)
+        self.assertIn("suite verdict:", self.source)
+        self.assertIn("same-action double completion", self.source)
 
     def test_dry_run_stops_before_any_i5_process(self) -> None:
         dry_run_branch = self.source.index("if ($DryRun)")

@@ -195,6 +195,21 @@ if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
         $suiteJson + [Environment]::NewLine,
         (New-Object System.Text.UTF8Encoding($false)))
     Write-Host "suite receipt: $localSuite"
+    Write-Host ("suite verdict: {0} ({1}/{2} events, {3}/{2} quests, {4} double completions)" -f `
+        $suiteObject.verdict,
+        $suiteObject.witnessed_events,
+        $suiteObject.required_events,
+        $suiteObject.completed_example_quests,
+        $suiteObject.double_completions)
+    if ([int]$suiteObject.double_completions -ne 0) {
+        Write-Error 'Quest Lab suite receipt records a same-action double completion.'
+        exit 1
+    }
+    if ($Operation -eq 'run' -and $Suite -eq 'creator-events' -and
+        $suiteObject.verdict -ne 'pass') {
+        Write-Error "creator-events contract suite did not pass: $($suiteObject.verdict)"
+        exit 1
+    }
 }
 
 $logScript = @'
