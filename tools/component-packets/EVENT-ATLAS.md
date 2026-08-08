@@ -18,7 +18,10 @@ running, no Docker, and no BepInEx — it reads the DLL.
 
 ## What the numbers say today
 
-91 seams across 8 categories. All 91 are patchable. **One is usable by a quest today.**
+91 atlas rows across 8 categories. They normalize to **90 exact signatures** and **77
+method IDs**: `Player.OnDeath()` is intentionally listed in both combat and progression,
+and overloads share a method ID without sharing a signature. All 90 signatures are
+patchable. **One is usable by a quest today.**
 
 | Category | Seams | Hooked | Quest-usable |
 | --- | ---: | ---: | ---: |
@@ -30,6 +33,28 @@ running, no Docker, and no BepInEx — it reads the DLL.
 | building | 9 | 0 | 0 |
 | world | 9 | 0 | 0 |
 | social | 5 | 0 | 0 |
+
+Those are extraction-era runtime numbers, not the expansion target. The creator-facing
+classification lives in
+[`quest-capability-rules.json`](quest-capability-rules.json), and the generated,
+signature-exact result lives in
+[`samples/quest-capability-manifest.json`](samples/quest-capability-manifest.json). The
+current policy normalizes 43 event meanings and marks 34 stable events as safe candidates
+for creator quests. A candidate does not become `today` until the shared evaluator,
+runtime patch, dedupe guard, and witness receipt all exist.
+
+The distinction is deliberate:
+
+| Layer | Identity | Purpose |
+| --- | --- | --- |
+| Atlas row | category + exact signature | Preserve what assembly extraction found, including the dual-school `Player.OnDeath()` row. |
+| Exact capability | exact signature | Resolve overloads and record route, actor boundary, profile, and dedupe group. |
+| Creator event | stable name such as `item_crafted` | Give quest authors vocabulary that survives method and ownership-route changes. |
+
+Run `python tools/component-packets/generate_seam_catalog.py --check` to prove all three
+cardinalities and every classification are current. Generation fails when an atlas method
+is missing a rule, a removed method leaves a stale rule, or a creator-safe event lacks a
+primary route.
 
 ## Reading a verdict
 
@@ -88,3 +113,11 @@ Worth recording, because they are the ones people reach for:
 `diff_atlas.py` compares a committed atlas against a fresh sweep. Run it after a Valheim
 patch: a seam that disappears is a hook that will silently stop firing, which is exactly
 the class of breakage this file exists to catch early.
+
+Then regenerate the joined capability artifacts:
+
+```bash
+python tools/component-packets/generate_seam_catalog.py
+python tools/component-packets/generate_seam_catalog.py --check
+python tools/component-packets/check_lab_patches.py
+```

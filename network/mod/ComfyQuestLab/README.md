@@ -6,9 +6,10 @@ Install it on your own world, hit something, and watch the game tell you what it
 did — and whether a quest could actually fire on it.
 
 > **Scaffold.** The live view, the spellbook and the quest lane all work, and all eight
-> schools are wired — 28 seams, 27 of which apply by default (`Player.UseStamina` is
-> config-gated). `lab_setup` raises the practice gallery and writes a starter quest file;
-> it is the one command a newcomer needs.
+> schools are wired — 26 atlas integrations plus two panel/input support hooks; 25 atlas
+> integrations apply by default (`Player.UseStamina` is config-gated). `lab_setup` raises
+> the practice gallery and writes a starter quest file; it is the one command a newcomer
+> needs.
 >
 > **Verified in game** (2026-08-07, one session). A seam fires and the live view reports
 > it, which is the whole claim:
@@ -99,8 +100,11 @@ Every event ends in one of three verdicts:
 | **the world speaks, but no quest is listening yet** | It really happens and you can watch it — striking a living thing does — but nothing will carry it into a quest. |
 | **nothing binds a quest to this yet** | Most of the game. |
 
-The full picture, with all 91 seams:
+The full picture—91 atlas rows, 90 exact signatures, and 77 method IDs:
 [`tools/component-packets/EVENT-ATLAS.md`](../../../tools/component-packets/EVENT-ATLAS.md).
+Its generated capability manifest classifies every exact signature and names 34 stable
+creator-event candidates. Those are classifications, not runtime promises: this scaffold
+still binds only `kill` until the shared evaluator and witnessed integrations land.
 
 ## Writing a quest
 

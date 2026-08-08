@@ -1,0 +1,2627 @@
+{
+  "Schema": "comfy-quest-capabilities/v1",
+  "SourceAtlas": "tools/component-packets/samples/valheim-event-atlas.json",
+  "SourceRules": "tools/component-packets/quest-capability-rules.json",
+  "AssemblySource": "assembly_valheim.dll (Steam client install, extracted 2026-08-07)",
+  "Counts": {
+    "AtlasRows": 91,
+    "UniqueSignatures": 90,
+    "UniqueMethods": 77,
+    "CanonicalEvents": 43,
+    "CreatorSafeEvents": 34,
+    "CreatorSafeSignatures": 57
+  },
+  "CreatorSafeEvents": [
+    "attack_blocked",
+    "character_healed",
+    "character_staggered",
+    "chat_sent",
+    "container_emptied",
+    "damage_dealt",
+    "global_key_removed",
+    "global_key_set",
+    "item_consumed",
+    "item_crafted",
+    "item_dropped",
+    "item_equipped",
+    "item_picked_up",
+    "item_unequipped",
+    "kill",
+    "max_health_changed",
+    "piece_damaged",
+    "piece_destroyed",
+    "piece_placed",
+    "piece_removed",
+    "piece_repaired",
+    "player_died",
+    "player_teleported",
+    "resource_damaged",
+    "resource_picked",
+    "sign_written",
+    "skill_raised",
+    "skills_lowered",
+    "stamina_gained",
+    "stamina_spent",
+    "station_fuel_added",
+    "station_input_added",
+    "station_output_collected",
+    "station_output_produced"
+  ],
+  "CategoryCounts": {
+    "combat": {
+      "UniqueSignatures": 11,
+      "AtlasRows": 11,
+      "CreatorSafeSignatures": 8,
+      "CreatorEvents": 5
+    },
+    "harvest": {
+      "UniqueSignatures": 13,
+      "AtlasRows": 13,
+      "CreatorSafeSignatures": 11,
+      "CreatorEvents": 2
+    },
+    "inventory": {
+      "UniqueSignatures": 22,
+      "AtlasRows": 22,
+      "CreatorSafeSignatures": 6,
+      "CreatorEvents": 6
+    },
+    "building": {
+      "UniqueSignatures": 9,
+      "AtlasRows": 9,
+      "CreatorSafeSignatures": 7,
+      "CreatorEvents": 5
+    },
+    "crafting": {
+      "UniqueSignatures": 11,
+      "AtlasRows": 11,
+      "CreatorSafeSignatures": 10,
+      "CreatorEvents": 5
+    },
+    "progression": {
+      "UniqueSignatures": 10,
+      "AtlasRows": 11,
+      "CreatorSafeSignatures": 6,
+      "CreatorEvents": 6
+    },
+    "world": {
+      "UniqueSignatures": 9,
+      "AtlasRows": 9,
+      "CreatorSafeSignatures": 7,
+      "CreatorEvents": 3
+    },
+    "social": {
+      "UniqueSignatures": 5,
+      "AtlasRows": 5,
+      "CreatorSafeSignatures": 2,
+      "CreatorEvents": 2
+    }
+  },
+  "Signatures": [
+    {
+      "SignatureId": "Character.AddStaggerDamage(float, Vector3, HitData)",
+      "MethodId": "Character.AddStaggerDamage",
+      "DeclaringType": "Character",
+      "Method": "AddStaggerDamage",
+      "ReturnType": "bool",
+      "Parameters": [
+        "float",
+        "Vector3",
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        0
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "character_staggered",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "character-staggered",
+      "ActorScope": "local-player-caused",
+      "Reason": "Low-level stagger accumulation can fire before the stable stagger action."
+    },
+    {
+      "SignatureId": "Character.BlockAttack(HitData, Character)",
+      "MethodId": "Character.BlockAttack",
+      "DeclaringType": "Character",
+      "Method": "BlockAttack",
+      "ReturnType": "bool",
+      "Parameters": [
+        "HitData",
+        "Character"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        1
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "attack_blocked",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "attack-blocked",
+      "ActorScope": "local-player",
+      "Reason": "Base implementation can accompany the Humanoid override."
+    },
+    {
+      "SignatureId": "Character.Damage(HitData)",
+      "MethodId": "Character.Damage",
+      "DeclaringType": "Character",
+      "Method": "Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        2
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "produces-event-no-trigger",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "damage_dealt",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "character-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "Local damage route; deduped with the owning RPC route."
+    },
+    {
+      "SignatureId": "Character.Heal(float, bool)",
+      "MethodId": "Character.Heal",
+      "DeclaringType": "Character",
+      "Method": "Heal",
+      "ReturnType": "void",
+      "Parameters": [
+        "float",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        3
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "character_healed",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "character-healed",
+      "ActorScope": "local-player-caused",
+      "Reason": "Intentional heal route with a stable amount payload."
+    },
+    {
+      "SignatureId": "Character.OnDeath()",
+      "MethodId": "Character.OnDeath",
+      "DeclaringType": "Character",
+      "Method": "OnDeath",
+      "ReturnType": "void",
+      "Parameters": [],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        4
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "today",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "kill",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "creature-killed",
+      "ActorScope": "local-player-caused",
+      "Reason": "Existing backward-compatible kill trigger source."
+    },
+    {
+      "SignatureId": "Character.RPC_Damage(long, HitData)",
+      "MethodId": "Character.RPC_Damage",
+      "DeclaringType": "Character",
+      "Method": "RPC_Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        5
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "produces-event-no-trigger",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "damage_dealt",
+      "Route": "alternate",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "character-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "Owning RPC route is an alternative witness for the same damage action."
+    },
+    {
+      "SignatureId": "Character.RPC_Heal(long, float, bool)",
+      "MethodId": "Character.RPC_Heal",
+      "DeclaringType": "Character",
+      "Method": "RPC_Heal",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "float",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        6
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "character_healed",
+      "Route": "alternate",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "character-healed",
+      "ActorScope": "local-player-caused",
+      "Reason": "RPC witness for the same heal action."
+    },
+    {
+      "SignatureId": "Character.RPC_Stagger(long, Vector3)",
+      "MethodId": "Character.RPC_Stagger",
+      "DeclaringType": "Character",
+      "Method": "RPC_Stagger",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "Vector3"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        7
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "character_staggered",
+      "Route": "alternate",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "character-staggered",
+      "ActorScope": "local-player-caused",
+      "Reason": "RPC witness for the stable stagger action."
+    },
+    {
+      "SignatureId": "Character.SetHealth(float)",
+      "MethodId": "Character.SetHealth",
+      "DeclaringType": "Character",
+      "Method": "SetHealth",
+      "ReturnType": "void",
+      "Parameters": [
+        "float"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        8
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "health_changed",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "health-changed",
+      "ActorScope": "observed-character",
+      "Reason": "Generic mutation has no reliable cause and is too noisy for quests."
+    },
+    {
+      "SignatureId": "Character.Stagger(Vector3)",
+      "MethodId": "Character.Stagger",
+      "DeclaringType": "Character",
+      "Method": "Stagger",
+      "ReturnType": "void",
+      "Parameters": [
+        "Vector3"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        9
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "character_staggered",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "character-staggered",
+      "ActorScope": "local-player-caused",
+      "Reason": "Completed stagger is the creator-facing action."
+    },
+    {
+      "SignatureId": "Chat.OnNewChatMessage(GameObject, long, Vector3, Type, UserInfo, string)",
+      "MethodId": "Chat.OnNewChatMessage",
+      "DeclaringType": "Chat",
+      "Method": "OnNewChatMessage",
+      "ReturnType": "void",
+      "Parameters": [
+        "GameObject",
+        "long",
+        "Vector3",
+        "Type",
+        "UserInfo",
+        "string"
+      ],
+      "AtlasCategories": [
+        "social"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        10
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "social",
+      "CanonicalEvent": "chat_received",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "chat-received",
+      "ActorScope": "observed-player",
+      "Reason": "Inbound chat is duplicated across routes and message text is private."
+    },
+    {
+      "SignatureId": "Chat.RPC_ChatMessage(long, Vector3, int, UserInfo, string)",
+      "MethodId": "Chat.RPC_ChatMessage",
+      "DeclaringType": "Chat",
+      "Method": "RPC_ChatMessage",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "Vector3",
+        "int",
+        "UserInfo",
+        "string"
+      ],
+      "AtlasCategories": [
+        "social"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        11
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "social",
+      "CanonicalEvent": "chat_received",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "chat-received",
+      "ActorScope": "observed-player",
+      "Reason": "Inbound chat is duplicated across routes and message text is private."
+    },
+    {
+      "SignatureId": "Chat.SendText(Type, string)",
+      "MethodId": "Chat.SendText",
+      "DeclaringType": "Chat",
+      "Method": "SendText",
+      "ReturnType": "void",
+      "Parameters": [
+        "Type",
+        "string"
+      ],
+      "AtlasCategories": [
+        "social"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        12
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "social",
+      "CanonicalEvent": "chat_sent",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "chat-sent",
+      "ActorScope": "local-player",
+      "Reason": "Local send intent is stable; creator payloads must remain redacted by default."
+    },
+    {
+      "SignatureId": "Container.RPC_RequestTakeAll(long, long)",
+      "MethodId": "Container.RPC_RequestTakeAll",
+      "DeclaringType": "Container",
+      "Method": "RPC_RequestTakeAll",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "long"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        13
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "container_emptied",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "container-take-all",
+      "ActorScope": "local-player",
+      "Reason": "Request alone does not prove that any item moved."
+    },
+    {
+      "SignatureId": "Container.TakeAll(Humanoid)",
+      "MethodId": "Container.TakeAll",
+      "DeclaringType": "Container",
+      "Method": "TakeAll",
+      "ReturnType": "bool",
+      "Parameters": [
+        "Humanoid"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        14
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "container_emptied",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "container-take-all",
+      "ActorScope": "local-player",
+      "Reason": "Successful transfer is the stable take-all action."
+    },
+    {
+      "SignatureId": "CookingStation.RPC_AddFuel(long)",
+      "MethodId": "CookingStation.RPC_AddFuel",
+      "DeclaringType": "CookingStation",
+      "Method": "RPC_AddFuel",
+      "ReturnType": "void",
+      "Parameters": [
+        "long"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        15
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_fuel_added",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "cooking-fuel-added",
+      "ActorScope": "local-player-caused",
+      "Reason": "Authoritative cooking-station fuel acceptance."
+    },
+    {
+      "SignatureId": "CookingStation.RPC_AddItem(long, string)",
+      "MethodId": "CookingStation.RPC_AddItem",
+      "DeclaringType": "CookingStation",
+      "Method": "RPC_AddItem",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "string"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        16
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_input_added",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "cooking-input-added",
+      "ActorScope": "local-player-caused",
+      "Reason": "Authoritative cooking-station item acceptance."
+    },
+    {
+      "SignatureId": "CookingStation.RPC_RemoveDoneItem(long, Vector3, int)",
+      "MethodId": "CookingStation.RPC_RemoveDoneItem",
+      "DeclaringType": "CookingStation",
+      "Method": "RPC_RemoveDoneItem",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "Vector3",
+        "int"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        17
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_output_collected",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "cooking-output-collected",
+      "ActorScope": "local-player-caused",
+      "Reason": "Authoritative collection of completed station output."
+    },
+    {
+      "SignatureId": "Destructible.Damage(HitData)",
+      "MethodId": "Destructible.Damage",
+      "DeclaringType": "Destructible",
+      "Method": "Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        18
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "Local resource damage routes share one stable creator event."
+    },
+    {
+      "SignatureId": "Destructible.RPC_Damage(long, HitData)",
+      "MethodId": "Destructible.RPC_Damage",
+      "DeclaringType": "Destructible",
+      "Method": "RPC_Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        19
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "alternate",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "RPC alternatives must coalesce with local resource damage."
+    },
+    {
+      "SignatureId": "Fermenter.RPC_AddItem(long, string)",
+      "MethodId": "Fermenter.RPC_AddItem",
+      "DeclaringType": "Fermenter",
+      "Method": "RPC_AddItem",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "string"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        20
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_input_added",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "fermenter-input-added",
+      "ActorScope": "local-player-caused",
+      "Reason": "Authoritative fermenter input acceptance."
+    },
+    {
+      "SignatureId": "Humanoid.BlockAttack(HitData, Character)",
+      "MethodId": "Humanoid.BlockAttack",
+      "DeclaringType": "Humanoid",
+      "Method": "BlockAttack",
+      "ReturnType": "bool",
+      "Parameters": [
+        "HitData",
+        "Character"
+      ],
+      "AtlasCategories": [
+        "combat"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        21
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "combat",
+      "CanonicalEvent": "attack_blocked",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "attack-blocked",
+      "ActorScope": "local-player",
+      "Reason": "Successful local-player block is the creator-facing action."
+    },
+    {
+      "SignatureId": "Humanoid.ConsumeItem(Inventory, ItemData, bool)",
+      "MethodId": "Humanoid.ConsumeItem",
+      "DeclaringType": "Humanoid",
+      "Method": "ConsumeItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "Inventory",
+        "ItemData",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        22
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_consumed",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "item-consumed",
+      "ActorScope": "local-player",
+      "Reason": "Base route can accompany the Player override."
+    },
+    {
+      "SignatureId": "Humanoid.DropItem(Inventory, ItemData, int)",
+      "MethodId": "Humanoid.DropItem",
+      "DeclaringType": "Humanoid",
+      "Method": "DropItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "Inventory",
+        "ItemData",
+        "int"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        23
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_dropped",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "item-dropped",
+      "ActorScope": "local-player",
+      "Reason": "Successful local-player drop request."
+    },
+    {
+      "SignatureId": "Humanoid.EquipItem(ItemData, bool)",
+      "MethodId": "Humanoid.EquipItem",
+      "DeclaringType": "Humanoid",
+      "Method": "EquipItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "ItemData",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        24
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_equipped",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "item-equipped",
+      "ActorScope": "local-player",
+      "Reason": "Successful local-player equip action."
+    },
+    {
+      "SignatureId": "Humanoid.Pickup(GameObject, bool, bool)",
+      "MethodId": "Humanoid.Pickup",
+      "DeclaringType": "Humanoid",
+      "Method": "Pickup",
+      "ReturnType": "bool",
+      "Parameters": [
+        "GameObject",
+        "bool",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        25
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_picked_up",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "item-picked-up",
+      "ActorScope": "local-player",
+      "Reason": "Successful local-player pickup action."
+    },
+    {
+      "SignatureId": "Humanoid.UnequipItem(ItemData, bool)",
+      "MethodId": "Humanoid.UnequipItem",
+      "DeclaringType": "Humanoid",
+      "Method": "UnequipItem",
+      "ReturnType": "void",
+      "Parameters": [
+        "ItemData",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        26
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_unequipped",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "item-unequipped",
+      "ActorScope": "local-player",
+      "Reason": "Local-player unequip action."
+    },
+    {
+      "SignatureId": "Inventory.AddItem(string, int, int, int, long, string, bool)",
+      "MethodId": "Inventory.AddItem",
+      "DeclaringType": "Inventory",
+      "Method": "AddItem",
+      "ReturnType": "ItemData",
+      "Parameters": [
+        "string",
+        "int",
+        "int",
+        "int",
+        "long",
+        "string",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        27
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_added",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-add",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Seven overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.AddItem(ItemData)",
+      "MethodId": "Inventory.AddItem",
+      "DeclaringType": "Inventory",
+      "Method": "AddItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "ItemData"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        28
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_added",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-add",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Seven overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.AddItem(string, int, int, int, long, string, Vector2i, bool)",
+      "MethodId": "Inventory.AddItem",
+      "DeclaringType": "Inventory",
+      "Method": "AddItem",
+      "ReturnType": "ItemData",
+      "Parameters": [
+        "string",
+        "int",
+        "int",
+        "int",
+        "long",
+        "string",
+        "Vector2i",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        29
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_added",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-add",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Seven overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.AddItem(ItemData, Vector2i)",
+      "MethodId": "Inventory.AddItem",
+      "DeclaringType": "Inventory",
+      "Method": "AddItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "ItemData",
+        "Vector2i"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        30
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_added",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-add",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Seven overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.AddItem(GameObject, int)",
+      "MethodId": "Inventory.AddItem",
+      "DeclaringType": "Inventory",
+      "Method": "AddItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "GameObject",
+        "int"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        31
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_added",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-add",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Seven overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.AddItem(string, int, float, Vector2i, bool, int, int, long, string, Dictionary`2, int, bool)",
+      "MethodId": "Inventory.AddItem",
+      "DeclaringType": "Inventory",
+      "Method": "AddItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "string",
+        "int",
+        "float",
+        "Vector2i",
+        "bool",
+        "int",
+        "int",
+        "long",
+        "string",
+        "Dictionary`2",
+        "int",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        32
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_added",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-add",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Seven overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.AddItem(ItemData, int, int, int)",
+      "MethodId": "Inventory.AddItem",
+      "DeclaringType": "Inventory",
+      "Method": "AddItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "ItemData",
+        "int",
+        "int",
+        "int"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        33
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_added",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-add",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Seven overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.RemoveItem(int)",
+      "MethodId": "Inventory.RemoveItem",
+      "DeclaringType": "Inventory",
+      "Method": "RemoveItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "int"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        34
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_removed",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-remove",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Four overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.RemoveItem(ItemData)",
+      "MethodId": "Inventory.RemoveItem",
+      "DeclaringType": "Inventory",
+      "Method": "RemoveItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "ItemData"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        35
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_removed",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-remove",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Four overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.RemoveItem(ItemData, int)",
+      "MethodId": "Inventory.RemoveItem",
+      "DeclaringType": "Inventory",
+      "Method": "RemoveItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "ItemData",
+        "int"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        36
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_removed",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-remove",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Four overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "Inventory.RemoveItem(string, int, int, bool)",
+      "MethodId": "Inventory.RemoveItem",
+      "DeclaringType": "Inventory",
+      "Method": "RemoveItem",
+      "ReturnType": "void",
+      "Parameters": [
+        "string",
+        "int",
+        "int",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        37
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "inventory_item_removed",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "inventory-remove",
+      "ActorScope": "local-player-inventory",
+      "Reason": "Four overloads are low-level mutations reached by many higher-level actions."
+    },
+    {
+      "SignatureId": "InventoryGui.DoCrafting(Player)",
+      "MethodId": "InventoryGui.DoCrafting",
+      "DeclaringType": "InventoryGui",
+      "Method": "DoCrafting",
+      "ReturnType": "void",
+      "Parameters": [
+        "Player"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        38
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "item_crafted",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "item-crafted",
+      "ActorScope": "local-player",
+      "Reason": "Completed crafting path is the stable result."
+    },
+    {
+      "SignatureId": "InventoryGui.OnCraftPressed()",
+      "MethodId": "InventoryGui.OnCraftPressed",
+      "DeclaringType": "InventoryGui",
+      "Method": "OnCraftPressed",
+      "ReturnType": "void",
+      "Parameters": [],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        39
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "item_crafted",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "item-crafted",
+      "ActorScope": "local-player",
+      "Reason": "Button intent does not prove crafting succeeded."
+    },
+    {
+      "SignatureId": "ItemDrop.DropItem(ItemData, int, Vector3, Quaternion)",
+      "MethodId": "ItemDrop.DropItem",
+      "DeclaringType": "ItemDrop",
+      "Method": "DropItem",
+      "ReturnType": "ItemDrop",
+      "Parameters": [
+        "ItemData",
+        "int",
+        "Vector3",
+        "Quaternion"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        40
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_dropped",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "item-dropped",
+      "ActorScope": "local-player",
+      "Reason": "Spawn helper can accompany the higher-level humanoid action."
+    },
+    {
+      "SignatureId": "ItemDrop.Pickup(Humanoid)",
+      "MethodId": "ItemDrop.Pickup",
+      "DeclaringType": "ItemDrop",
+      "Method": "Pickup",
+      "ReturnType": "void",
+      "Parameters": [
+        "Humanoid"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        41
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_picked_up",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "item-picked-up",
+      "ActorScope": "local-player",
+      "Reason": "Ownership and item helpers do not alone prove inventory transfer."
+    },
+    {
+      "SignatureId": "ItemDrop.RPC_RequestOwn(long)",
+      "MethodId": "ItemDrop.RPC_RequestOwn",
+      "DeclaringType": "ItemDrop",
+      "Method": "RPC_RequestOwn",
+      "ReturnType": "void",
+      "Parameters": [
+        "long"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        42
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_picked_up",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "item-picked-up",
+      "ActorScope": "local-player",
+      "Reason": "Ownership and item helpers do not alone prove inventory transfer."
+    },
+    {
+      "SignatureId": "MineRock.Damage(HitData)",
+      "MethodId": "MineRock.Damage",
+      "DeclaringType": "MineRock",
+      "Method": "Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        43
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "Local resource damage routes share one stable creator event."
+    },
+    {
+      "SignatureId": "MineRock5.Damage(HitData)",
+      "MethodId": "MineRock5.Damage",
+      "DeclaringType": "MineRock5",
+      "Method": "Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        44
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "Local resource damage routes share one stable creator event."
+    },
+    {
+      "SignatureId": "MineRock5.RPC_Damage(long, HitData, int)",
+      "MethodId": "MineRock5.RPC_Damage",
+      "DeclaringType": "MineRock5",
+      "Method": "RPC_Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "HitData",
+        "int"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        45
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "alternate",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "RPC alternatives must coalesce with local resource damage."
+    },
+    {
+      "SignatureId": "Pickable.Interact(Humanoid, bool, bool)",
+      "MethodId": "Pickable.Interact",
+      "DeclaringType": "Pickable",
+      "Method": "Interact",
+      "ReturnType": "bool",
+      "Parameters": [
+        "Humanoid",
+        "bool",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        46
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_picked",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-picked",
+      "ActorScope": "local-player",
+      "Reason": "Successful interaction is the stable pick action."
+    },
+    {
+      "SignatureId": "Pickable.RPC_Pick(long, int)",
+      "MethodId": "Pickable.RPC_Pick",
+      "DeclaringType": "Pickable",
+      "Method": "RPC_Pick",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "int"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        47
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_picked",
+      "Route": "alternate",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-picked",
+      "ActorScope": "local-player",
+      "Reason": "RPC alternative for the same pick action."
+    },
+    {
+      "SignatureId": "Pickable.RPC_SetPicked(long, bool)",
+      "MethodId": "Pickable.RPC_SetPicked",
+      "DeclaringType": "Pickable",
+      "Method": "RPC_SetPicked",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        48
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_pick_state_changed",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "resource-pick-state",
+      "ActorScope": "observed-world",
+      "Reason": "State replication can fire for loading, regrowth, and remote actions."
+    },
+    {
+      "SignatureId": "Pickable.SetPicked(bool)",
+      "MethodId": "Pickable.SetPicked",
+      "DeclaringType": "Pickable",
+      "Method": "SetPicked",
+      "ReturnType": "void",
+      "Parameters": [
+        "bool"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        49
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_pick_state_changed",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "resource-pick-state",
+      "ActorScope": "observed-world",
+      "Reason": "State replication can fire for loading, regrowth, and remote actions."
+    },
+    {
+      "SignatureId": "Player.AddStamina(float)",
+      "MethodId": "Player.AddStamina",
+      "DeclaringType": "Player",
+      "Method": "AddStamina",
+      "ReturnType": "void",
+      "Parameters": [
+        "float"
+      ],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        50
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "stamina_gained",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "stamina-gained",
+      "ActorScope": "local-player",
+      "Reason": "Stable local-player mutation but high-frequency, so opt-in."
+    },
+    {
+      "SignatureId": "Player.ConsumeItem(Inventory, ItemData, bool)",
+      "MethodId": "Player.ConsumeItem",
+      "DeclaringType": "Player",
+      "Method": "ConsumeItem",
+      "ReturnType": "bool",
+      "Parameters": [
+        "Inventory",
+        "ItemData",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "inventory"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        51
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "inventory",
+      "CanonicalEvent": "item_consumed",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "item-consumed",
+      "ActorScope": "local-player",
+      "Reason": "Successful player consumption is the stable action."
+    },
+    {
+      "SignatureId": "Player.OnDeath()",
+      "MethodId": "Player.OnDeath",
+      "DeclaringType": "Player",
+      "Method": "OnDeath",
+      "ReturnType": "void",
+      "Parameters": [],
+      "AtlasCategories": [
+        "progression",
+        "combat"
+      ],
+      "AtlasRowCount": 2,
+      "AtlasRows": [
+        52,
+        53
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "player_died",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "player-died",
+      "ActorScope": "local-player",
+      "Reason": "Single signature intentionally appears in combat and progression atlas schools."
+    },
+    {
+      "SignatureId": "Player.PlacePiece(Piece, Vector3, Quaternion, bool)",
+      "MethodId": "Player.PlacePiece",
+      "DeclaringType": "Player",
+      "Method": "PlacePiece",
+      "ReturnType": "void",
+      "Parameters": [
+        "Piece",
+        "Vector3",
+        "Quaternion",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        54
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_placed",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "piece-placed",
+      "ActorScope": "local-player",
+      "Reason": "Completed local placement is the stable build action."
+    },
+    {
+      "SignatureId": "Player.RaiseSkill(SkillType, float)",
+      "MethodId": "Player.RaiseSkill",
+      "DeclaringType": "Player",
+      "Method": "RaiseSkill",
+      "ReturnType": "void",
+      "Parameters": [
+        "SkillType",
+        "float"
+      ],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        55
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "skill_raised",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "skill-raised",
+      "ActorScope": "local-player",
+      "Reason": "Player route supplies the stable local actor boundary."
+    },
+    {
+      "SignatureId": "Player.RemovePiece()",
+      "MethodId": "Player.RemovePiece",
+      "DeclaringType": "Player",
+      "Method": "RemovePiece",
+      "ReturnType": "bool",
+      "Parameters": [],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        56
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_removed",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "piece-removed",
+      "ActorScope": "local-player",
+      "Reason": "Successful local hammer removal."
+    },
+    {
+      "SignatureId": "Player.Repair(ItemData, Piece)",
+      "MethodId": "Player.Repair",
+      "DeclaringType": "Player",
+      "Method": "Repair",
+      "ReturnType": "void",
+      "Parameters": [
+        "ItemData",
+        "Piece"
+      ],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        57
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_repaired",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "piece-repaired",
+      "ActorScope": "local-player",
+      "Reason": "Local hammer repair supplies actor and piece context."
+    },
+    {
+      "SignatureId": "Player.SetMaxHealth(float, bool)",
+      "MethodId": "Player.SetMaxHealth",
+      "DeclaringType": "Player",
+      "Method": "SetMaxHealth",
+      "ReturnType": "void",
+      "Parameters": [
+        "float",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        58
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "max_health_changed",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "max-health-changed",
+      "ActorScope": "local-player",
+      "Reason": "Stable local-player progression mutation."
+    },
+    {
+      "SignatureId": "Player.TeleportTo(Vector3, Quaternion, bool)",
+      "MethodId": "Player.TeleportTo",
+      "DeclaringType": "Player",
+      "Method": "TeleportTo",
+      "ReturnType": "bool",
+      "Parameters": [
+        "Vector3",
+        "Quaternion",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        59
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "player_teleported",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "player-teleported",
+      "ActorScope": "local-player",
+      "Reason": "Successful local-player teleport action."
+    },
+    {
+      "SignatureId": "Player.UseStamina(float)",
+      "MethodId": "Player.UseStamina",
+      "DeclaringType": "Player",
+      "Method": "UseStamina",
+      "ReturnType": "void",
+      "Parameters": [
+        "float"
+      ],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        60
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "stamina_spent",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "stamina-spent",
+      "ActorScope": "local-player",
+      "Reason": "Stable local-player mutation but high-frequency, so opt-in."
+    },
+    {
+      "SignatureId": "Sign.SetText(string)",
+      "MethodId": "Sign.SetText",
+      "DeclaringType": "Sign",
+      "Method": "SetText",
+      "ReturnType": "void",
+      "Parameters": [
+        "string"
+      ],
+      "AtlasCategories": [
+        "social"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        61
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "social",
+      "CanonicalEvent": "sign_written",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "sign-written",
+      "ActorScope": "local-player",
+      "Reason": "Intentional sign update; text payload remains local/redacted by default."
+    },
+    {
+      "SignatureId": "Skills.CheatRaiseSkill(string, float, bool)",
+      "MethodId": "Skills.CheatRaiseSkill",
+      "DeclaringType": "Skills",
+      "Method": "CheatRaiseSkill",
+      "ReturnType": "void",
+      "Parameters": [
+        "string",
+        "float",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        62
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "skill_cheat_used",
+      "Route": "suppressed",
+      "Profile": "disabled",
+      "CreatorSafe": false,
+      "DedupeGroup": "skill-cheat",
+      "ActorScope": "local-player",
+      "Reason": "Cheat path must never satisfy ordinary creator quests."
+    },
+    {
+      "SignatureId": "Skills.GetSkillLevel(SkillType)",
+      "MethodId": "Skills.GetSkillLevel",
+      "DeclaringType": "Skills",
+      "Method": "GetSkillLevel",
+      "ReturnType": "float",
+      "Parameters": [
+        "SkillType"
+      ],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        63
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "skill_level_queried",
+      "Route": "suppressed",
+      "Profile": "disabled",
+      "CreatorSafe": false,
+      "DedupeGroup": "skill-query",
+      "ActorScope": "local-player",
+      "Reason": "Read query is called pervasively and is not a gameplay action."
+    },
+    {
+      "SignatureId": "Skills.LowerAllSkills(float)",
+      "MethodId": "Skills.LowerAllSkills",
+      "DeclaringType": "Skills",
+      "Method": "LowerAllSkills",
+      "ReturnType": "void",
+      "Parameters": [
+        "float"
+      ],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        64
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "skills_lowered",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "skills-lowered",
+      "ActorScope": "local-player",
+      "Reason": "Completed local-player skill loss mutation."
+    },
+    {
+      "SignatureId": "Skills.OnDeath()",
+      "MethodId": "Skills.OnDeath",
+      "DeclaringType": "Skills",
+      "Method": "OnDeath",
+      "ReturnType": "void",
+      "Parameters": [],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        65
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "skills_lowered",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "skills-lowered",
+      "ActorScope": "local-player",
+      "Reason": "Death path can accompany LowerAllSkills and player_died."
+    },
+    {
+      "SignatureId": "Skills.RaiseSkill(SkillType, float)",
+      "MethodId": "Skills.RaiseSkill",
+      "DeclaringType": "Skills",
+      "Method": "RaiseSkill",
+      "ReturnType": "void",
+      "Parameters": [
+        "SkillType",
+        "float"
+      ],
+      "AtlasCategories": [
+        "progression"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        66
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "progression",
+      "CanonicalEvent": "skill_raised",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "skill-raised",
+      "ActorScope": "local-player",
+      "Reason": "Lower-level skills mutation can accompany Player.RaiseSkill."
+    },
+    {
+      "SignatureId": "Smelter.OnAddFuel(Switch, Humanoid, ItemData)",
+      "MethodId": "Smelter.OnAddFuel",
+      "DeclaringType": "Smelter",
+      "Method": "OnAddFuel",
+      "ReturnType": "bool",
+      "Parameters": [
+        "Switch",
+        "Humanoid",
+        "ItemData"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        67
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_fuel_added",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "smelter-fuel-added",
+      "ActorScope": "local-player",
+      "Reason": "Successful interaction supplies actor and item context."
+    },
+    {
+      "SignatureId": "Smelter.OnAddOre(Switch, Humanoid, ItemData)",
+      "MethodId": "Smelter.OnAddOre",
+      "DeclaringType": "Smelter",
+      "Method": "OnAddOre",
+      "ReturnType": "bool",
+      "Parameters": [
+        "Switch",
+        "Humanoid",
+        "ItemData"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        68
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_input_added",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "smelter-input-added",
+      "ActorScope": "local-player",
+      "Reason": "Successful interaction supplies actor and item context."
+    },
+    {
+      "SignatureId": "Smelter.RPC_AddFuel(long)",
+      "MethodId": "Smelter.RPC_AddFuel",
+      "DeclaringType": "Smelter",
+      "Method": "RPC_AddFuel",
+      "ReturnType": "void",
+      "Parameters": [
+        "long"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        69
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_fuel_added",
+      "Route": "alternate",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "smelter-fuel-added",
+      "ActorScope": "local-player-caused",
+      "Reason": "Authoritative alternative for the same smelter fuel action."
+    },
+    {
+      "SignatureId": "Smelter.RPC_AddOre(long, string)",
+      "MethodId": "Smelter.RPC_AddOre",
+      "DeclaringType": "Smelter",
+      "Method": "RPC_AddOre",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "string"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        70
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_input_added",
+      "Route": "alternate",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "smelter-input-added",
+      "ActorScope": "local-player-caused",
+      "Reason": "Authoritative alternative for the same smelter input action."
+    },
+    {
+      "SignatureId": "Smelter.Spawn(string, int)",
+      "MethodId": "Smelter.Spawn",
+      "DeclaringType": "Smelter",
+      "Method": "Spawn",
+      "ReturnType": "void",
+      "Parameters": [
+        "string",
+        "int"
+      ],
+      "AtlasCategories": [
+        "crafting"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        71
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "crafting",
+      "CanonicalEvent": "station_output_produced",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "station-output-produced",
+      "ActorScope": "observed-world",
+      "Reason": "Completed production is stable even when no player is present."
+    },
+    {
+      "SignatureId": "Talker.Say(Type, string)",
+      "MethodId": "Talker.Say",
+      "DeclaringType": "Talker",
+      "Method": "Say",
+      "ReturnType": "void",
+      "Parameters": [
+        "Type",
+        "string"
+      ],
+      "AtlasCategories": [
+        "social"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        72
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "social",
+      "CanonicalEvent": "speech_heard",
+      "Route": "diagnostic",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "speech-heard",
+      "ActorScope": "observed-character",
+      "Reason": "Ambient and scripted speech is noisy and may contain private text."
+    },
+    {
+      "SignatureId": "TreeBase.Damage(HitData)",
+      "MethodId": "TreeBase.Damage",
+      "DeclaringType": "TreeBase",
+      "Method": "Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        73
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "Local resource damage routes share one stable creator event."
+    },
+    {
+      "SignatureId": "TreeBase.RPC_Damage(long, HitData)",
+      "MethodId": "TreeBase.RPC_Damage",
+      "DeclaringType": "TreeBase",
+      "Method": "RPC_Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        74
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "alternate",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "RPC alternatives must coalesce with local resource damage."
+    },
+    {
+      "SignatureId": "TreeLog.Damage(HitData)",
+      "MethodId": "TreeLog.Damage",
+      "DeclaringType": "TreeLog",
+      "Method": "Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        75
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "Local resource damage routes share one stable creator event."
+    },
+    {
+      "SignatureId": "TreeLog.RPC_Damage(long, HitData)",
+      "MethodId": "TreeLog.RPC_Damage",
+      "DeclaringType": "TreeLog",
+      "Method": "RPC_Damage",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "harvest"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        76
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "harvest",
+      "CanonicalEvent": "resource_damaged",
+      "Route": "alternate",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "resource-damage",
+      "ActorScope": "local-player-caused",
+      "Reason": "RPC alternatives must coalesce with local resource damage."
+    },
+    {
+      "SignatureId": "WearNTear.ApplyDamage(float, HitData)",
+      "MethodId": "WearNTear.ApplyDamage",
+      "DeclaringType": "WearNTear",
+      "Method": "ApplyDamage",
+      "ReturnType": "bool",
+      "Parameters": [
+        "float",
+        "HitData"
+      ],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        77
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_damaged",
+      "Route": "primary",
+      "Profile": "extended",
+      "CreatorSafe": true,
+      "DedupeGroup": "piece-damaged",
+      "ActorScope": "local-player-caused",
+      "Reason": "Applied local-player damage is the stable piece-damage result."
+    },
+    {
+      "SignatureId": "WearNTear.Destroy(HitData, bool)",
+      "MethodId": "WearNTear.Destroy",
+      "DeclaringType": "WearNTear",
+      "Method": "Destroy",
+      "ReturnType": "void",
+      "Parameters": [
+        "HitData",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        78
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_destroyed",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "piece-destroyed",
+      "ActorScope": "local-player-caused",
+      "Reason": "Completed destruction is the stable result."
+    },
+    {
+      "SignatureId": "WearNTear.RPC_Remove(long, bool)",
+      "MethodId": "WearNTear.RPC_Remove",
+      "DeclaringType": "WearNTear",
+      "Method": "RPC_Remove",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        79
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_removed",
+      "Route": "alternate",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "piece-removed",
+      "ActorScope": "local-player-caused",
+      "Reason": "RPC alternative for the same remove action."
+    },
+    {
+      "SignatureId": "WearNTear.RPC_Repair(long)",
+      "MethodId": "WearNTear.RPC_Repair",
+      "DeclaringType": "WearNTear",
+      "Method": "RPC_Repair",
+      "ReturnType": "void",
+      "Parameters": [
+        "long"
+      ],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        80
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_repaired",
+      "Route": "alternate",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "piece-repaired",
+      "ActorScope": "local-player-caused",
+      "Reason": "RPC alternative for the same repair action."
+    },
+    {
+      "SignatureId": "WearNTear.Remove(bool)",
+      "MethodId": "WearNTear.Remove",
+      "DeclaringType": "WearNTear",
+      "Method": "Remove",
+      "ReturnType": "void",
+      "Parameters": [
+        "bool"
+      ],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        81
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_removed",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "piece-removed",
+      "ActorScope": "observed-world",
+      "Reason": "Low-level removal may be decay, destruction, or another player."
+    },
+    {
+      "SignatureId": "WearNTear.Repair()",
+      "MethodId": "WearNTear.Repair",
+      "DeclaringType": "WearNTear",
+      "Method": "Repair",
+      "ReturnType": "bool",
+      "Parameters": [],
+      "AtlasCategories": [
+        "building"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        82
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "building",
+      "CanonicalEvent": "piece_repaired",
+      "Route": "corroborating",
+      "Profile": "diagnostic",
+      "CreatorSafe": false,
+      "DedupeGroup": "piece-repaired",
+      "ActorScope": "observed-world",
+      "Reason": "Low-level result lacks reliable local-player attribution."
+    },
+    {
+      "SignatureId": "WorldGenerator.GetBiome(Vector3)",
+      "MethodId": "WorldGenerator.GetBiome",
+      "DeclaringType": "WorldGenerator",
+      "Method": "GetBiome",
+      "ReturnType": "Biome",
+      "Parameters": [
+        "Vector3"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        83
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "biome_queried",
+      "Route": "suppressed",
+      "Profile": "disabled",
+      "CreatorSafe": false,
+      "DedupeGroup": "biome-query",
+      "ActorScope": "world-query",
+      "Reason": "Two pervasive query overloads are not biome-entry actions."
+    },
+    {
+      "SignatureId": "WorldGenerator.GetBiome(float, float, float, bool)",
+      "MethodId": "WorldGenerator.GetBiome",
+      "DeclaringType": "WorldGenerator",
+      "Method": "GetBiome",
+      "ReturnType": "Biome",
+      "Parameters": [
+        "float",
+        "float",
+        "float",
+        "bool"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        84
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "biome_queried",
+      "Route": "suppressed",
+      "Profile": "disabled",
+      "CreatorSafe": false,
+      "DedupeGroup": "biome-query",
+      "ActorScope": "world-query",
+      "Reason": "Two pervasive query overloads are not biome-entry actions."
+    },
+    {
+      "SignatureId": "ZoneSystem.RPC_SetGlobalKey(long, string)",
+      "MethodId": "ZoneSystem.RPC_SetGlobalKey",
+      "DeclaringType": "ZoneSystem",
+      "Method": "RPC_SetGlobalKey",
+      "ReturnType": "void",
+      "Parameters": [
+        "long",
+        "string"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        85
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "global_key_set",
+      "Route": "alternate",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "global-key-set",
+      "ActorScope": "world-authority",
+      "Reason": "RPC alternative for the same authoritative world change."
+    },
+    {
+      "SignatureId": "ZoneSystem.RemoveGlobalKey(GlobalKeys)",
+      "MethodId": "ZoneSystem.RemoveGlobalKey",
+      "DeclaringType": "ZoneSystem",
+      "Method": "RemoveGlobalKey",
+      "ReturnType": "void",
+      "Parameters": [
+        "GlobalKeys"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        86
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "global_key_removed",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "global-key-removed",
+      "ActorScope": "world-authority",
+      "Reason": "Both overloads represent the same authoritative removal."
+    },
+    {
+      "SignatureId": "ZoneSystem.RemoveGlobalKey(string)",
+      "MethodId": "ZoneSystem.RemoveGlobalKey",
+      "DeclaringType": "ZoneSystem",
+      "Method": "RemoveGlobalKey",
+      "ReturnType": "void",
+      "Parameters": [
+        "string"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        87
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "global_key_removed",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "global-key-removed",
+      "ActorScope": "world-authority",
+      "Reason": "Both overloads represent the same authoritative removal."
+    },
+    {
+      "SignatureId": "ZoneSystem.SetGlobalKey(GlobalKeys, float)",
+      "MethodId": "ZoneSystem.SetGlobalKey",
+      "DeclaringType": "ZoneSystem",
+      "Method": "SetGlobalKey",
+      "ReturnType": "void",
+      "Parameters": [
+        "GlobalKeys",
+        "float"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        88
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "global_key_set",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "global-key-set",
+      "ActorScope": "world-authority",
+      "Reason": "Three overloads represent the same authoritative world change."
+    },
+    {
+      "SignatureId": "ZoneSystem.SetGlobalKey(GlobalKeys)",
+      "MethodId": "ZoneSystem.SetGlobalKey",
+      "DeclaringType": "ZoneSystem",
+      "Method": "SetGlobalKey",
+      "ReturnType": "void",
+      "Parameters": [
+        "GlobalKeys"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        89
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "global_key_set",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "global-key-set",
+      "ActorScope": "world-authority",
+      "Reason": "Three overloads represent the same authoritative world change."
+    },
+    {
+      "SignatureId": "ZoneSystem.SetGlobalKey(string)",
+      "MethodId": "ZoneSystem.SetGlobalKey",
+      "DeclaringType": "ZoneSystem",
+      "Method": "SetGlobalKey",
+      "ReturnType": "void",
+      "Parameters": [
+        "string"
+      ],
+      "AtlasCategories": [
+        "world"
+      ],
+      "AtlasRowCount": 1,
+      "AtlasRows": [
+        90
+      ],
+      "Patchable": true,
+      "AtlasQuestUsability": "lab-candidate",
+      "CanonicalCategory": "world",
+      "CanonicalEvent": "global_key_set",
+      "Route": "primary",
+      "Profile": "core",
+      "CreatorSafe": true,
+      "DedupeGroup": "global-key-set",
+      "ActorScope": "world-authority",
+      "Reason": "Three overloads represent the same authoritative world change."
+    }
+  ]
+}

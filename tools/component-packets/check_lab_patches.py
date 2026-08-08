@@ -8,7 +8,7 @@ and it catches it headless: no Valheim, no BepInEx, no game launch.
 
   python tools/component-packets/check_lab_patches.py
 
-Exit 0 when every TryPatch target is in the atlas with a matching signature.
+Exit 0 when every TryPatch target is in the exact generated capability manifest.
 """
 import json
 import os
@@ -17,7 +17,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-ATLAS = os.path.join(HERE, "samples", "valheim-event-atlas.json")
+MANIFEST = os.path.join(HERE, "samples", "quest-capability-manifest.json")
 PATCHES = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Patches")
 
 # LabPatching.TryPatch(harmony, typeof(X), "Method", new[] { typeof(A), typeof(B) }, ...)
@@ -37,15 +37,15 @@ SHORTEN = {
     "System.Type.EmptyTypes": "",
 }
 
-atlas = json.load(open(ATLAS, encoding="utf-8"))
-# id -> list of parameter-type lists, one per overload
+with open(MANIFEST, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+signatures = {row["SignatureId"]: row for row in manifest["Signatures"]}
 by_id = {}
-for s in atlas["Seams"]:
-    params = s["Signature"].split("(", 1)[1].rstrip(")")
-    params = [p.strip() for p in params.split(",") if p.strip()]
-    by_id.setdefault(s["Id"], []).append(params)
+for row in manifest["Signatures"]:
+    by_id.setdefault(row["MethodId"], []).append(row["Parameters"])
 
-problems, checked = [], 0
+problems, checked, atlas_checked, support_checked = [], 0, 0, 0
+support_seams = {"GameCamera.UpdateMouseCapture", "Character.TakeInput"}
 for name in sorted(os.listdir(PATCHES)):
     if not name.endswith(".cs"):
         continue
@@ -58,18 +58,24 @@ for name in sorted(os.listdir(PATCHES)):
         checked += 1
 
         # UI plumbing seams are intentionally outside the quest-trigger atlas.
-        if seam_id in ("GameCamera.UpdateMouseCapture", "Character.TakeInput"):
+        if seam_id in support_seams:
+            support_checked += 1
             continue
 
+        atlas_checked += 1
         if seam_id not in by_id:
             problems.append(f"{name}: {seam_id} is not in the atlas")
             continue
-        if args not in by_id[seam_id]:
+        signature_id = f"{seam_id}({', '.join(args)})"
+        if signature_id not in signatures:
             problems.append(
-                f"{name}: {seam_id}({', '.join(args)}) does not match any overload; "
+                f"{name}: {signature_id} does not match any overload; "
                 f"atlas has {by_id[seam_id]}")
 
-print(f"checked {checked} TryPatch call(s) against {len(by_id)} atlas seams")
+print(
+    f"checked {checked} TryPatch call(s): {atlas_checked} atlas integration(s), "
+    f"{support_checked} lab support hook(s), against {len(signatures)} exact signatures"
+)
 for p in problems:
     print(f"  ! {p}")
 if problems:

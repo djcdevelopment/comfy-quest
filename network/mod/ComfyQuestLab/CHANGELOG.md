@@ -13,7 +13,7 @@ three tools that keep them honest. Nothing is published and there is no download
   `QuestTriggerEvaluator` compile from ComfyNetworkSense's own source files, the same way
   ComfyNetworkSense.Tests already links them. A quest that behaves one way in the lab
   behaves the same way in the shipping mod because both compile the same bytes.
-- **All eight categories wired**, 28 seams:
+- **All eight categories wired**, 26 atlas integrations plus two panel/input support hooks:
   - **harvest** — `TreeBase.Damage`, `TreeLog.Damage`, `Destructible.Damage`,
     `Pickable.Interact`. The first three are what the retired ComfyControlSurface hooked,
     and the reason punching a bush used to fire a quest and no longer does. `TreeLog` is
@@ -46,15 +46,19 @@ three tools that keep them honest. Nothing is published and there is no download
     rituals look more like that than like killing things. `Talker.Say` is deliberately
     skipped — it is the broadcast that results, so taking both double-counts your own
     messages.
-- **`LabSeamCatalog.g.cs`, generated from the atlas.** A patch names its seam and the
-  catalog answers category and usability. Without it every patch file would restate a
-  verdict the atlas already knows and the two would drift the first time a hook landed.
-  Regenerate with `tools/component-packets/generate_seam_catalog.py`.
+- **Exact capability contract generated from the atlas plus policy.** The 91 atlas rows
+  normalize to 90 exact signatures and 77 method IDs. `quest-capability-rules.json`
+  classifies every method into a stable creator event, route, runtime profile, actor
+  boundary, and dedupe group; `quest-capability-manifest.json` expands that policy back
+  across every overload. `LabSeamCatalog.g.cs` compiles the same joined data into the
+  mod while keeping legacy method-ID lookups compatible. Generation and `--check` fail
+  on a missing or stale classification.
 - **`check_lab_patches.py` — the guard that matters.** Harmony resolves
   `AccessTools.Method` at runtime, so a wrong argument list does not fail the build; it
-  returns null and the patch silently never applies. The checker verifies all 28 targets
-  against the atlas headless, and it is a real guard: it rejects wrong arg lists, missing
-  parameters, typo'd names, and overloads that do not exist.
+  returns null and the patch silently never applies. The checker verifies 26 atlas
+  integrations against the 90 exact signatures and reports the two lab support hooks
+  separately. It rejects wrong arg lists, missing parameters, typo'd names, and overloads
+  that do not exist.
 - **Runes, one per category, doing double duty.** The same mark is the spellbook tab and
   the console's filter toggle, so learning the book teaches the console for free. Drawn
   procedurally from line segments — runes ARE line segments — so there are no PNGs to
