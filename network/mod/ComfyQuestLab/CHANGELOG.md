@@ -41,6 +41,12 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   one-metre sign wrapping whole school names vertically. r6 generates one sign per letter
   in a centred horizontal row and gives each word one school-coloured light. The corrected
   headers remain subject to the final visual pass.
+- **Gallery sites are reusable.** r7 makes console and batch clear asynchronous and safe:
+  when the local player is standing on the selected raised floor, the command finds the
+  terrain-only height at the same X/Z, completes and verifies Valheim's own replicated
+  teleport, and only then removes marked objects. `rebuild` uses the same lifecycle. A
+  refused or incomplete terrain return leaves the gallery standing instead of dropping the
+  player, so repeated visual batches no longer require fresh ground or a manual portal exit.
 - **The panel is an interactive tool, not a translucent overlay.** r6 uses a nearly opaque
   high-contrast surface, larger default dimensions, a bounded lower-right resize handle,
   and a spreadsheet-style live-event grid with stable columns and explicit BINDABLE /

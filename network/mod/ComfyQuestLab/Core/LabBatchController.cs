@@ -440,8 +440,16 @@ public sealed class LabBatchController {
       return;
     }
     if (operation == "gallery_clear") {
-      WriteRequestReceipt(request, _gallery.IsRunning ? "rejected" : "completed",
-          _gallery.Clear(request.selector));
+      if (_gallery.IsRunning || _preparing) {
+        WriteRequestReceipt(request, "rejected", "gallery_or_prepare_busy");
+        return;
+      }
+      host.StartCoroutine(RequestRoutine(
+          request,
+          _gallery.ClearSafely(request.selector),
+          () => _gallery.LastLifecycleResult,
+          () => _gallery.LastLifecycleSucceeded
+              && _gallery.StandingPieceCount(request.selector) == 0));
       return;
     }
     if (_gallery.IsRunning || _preparing) {

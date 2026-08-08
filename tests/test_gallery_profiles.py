@@ -17,6 +17,7 @@ GENERATOR = TOOLS / "generate_gallery.py"
 PLAN = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabGalleryPlan.g.cs"
 BUILDER = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabGalleryBuilder.cs"
 CONTROLLER = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabBatchController.cs"
+PLUGIN = REPO / "network" / "mod" / "ComfyQuestLab" / "ComfyQuestLab.cs"
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -153,6 +154,35 @@ class GalleryProfileTests(unittest.TestCase):
         destroy = helper.index("ZDOMan.instance.DestroyZDO(zdo);")
         self.assertLess(claim, destroy)
         self.assertEqual(source.count("DestroyMarkedZdo(zdo)"), 2)
+
+    def test_clear_returns_to_verified_natural_terrain_before_deleting(self) -> None:
+        source = BUILDER.read_text(encoding="utf-8")
+        lifecycle = source[
+            source.index("public IEnumerator ClearSafely") : source.index(
+                "string ClearMarked"
+            )
+        ]
+        self.assertIn(
+            "TryTerrainRetreat(player, selector, out retreat, out retreatError)",
+            lifecycle,
+        )
+        self.assertIn("player.TeleportTo(retreat, facing, false)", lifecycle)
+        self.assertIn("while (player.IsTeleporting()", lifecycle)
+        self.assertIn("ReachedTerrainRetreat(player, retreat)", lifecycle)
+        self.assertIn("else if (!string.IsNullOrEmpty(retreatError))", lifecycle)
+        self.assertLess(
+            lifecycle.index("ReachedTerrainRetreat(player, retreat)"),
+            lifecycle.index("ClearMarked(selector)"),
+        )
+        self.assertIn("ZoneSystem.instance.GetGroundHeight(at, out height)", source)
+        self.assertIn("finally {\n      _running = false;", lifecycle)
+
+    def test_console_and_batch_clear_use_the_safe_coroutine(self) -> None:
+        controller = CONTROLLER.read_text(encoding="utf-8")
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        self.assertIn("_gallery.ClearSafely(request.selector)", controller)
+        self.assertIn("_gallery.LastLifecycleSucceeded", controller)
+        self.assertIn("StartCoroutine(_gallery.ClearSafely(value));", plugin)
 
     def test_batch_prepare_refreshes_consumable_targets(self) -> None:
         builder = BUILDER.read_text(encoding="utf-8")

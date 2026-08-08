@@ -82,8 +82,8 @@ update.
 | `questlab_gallery build [profile]` | raise one marked profile; default is `marble-grand` |
 | `questlab_gallery compare [left] [right]` | raise two profiles side by side under one build id |
 | `questlab_gallery identify` | report loaded profile and build marks before changing the world |
-| `questlab_gallery clear [profile-or-build-id]` | remove only matching marked gallery objects |
-| `questlab_gallery rebuild [profile]` | selectively clear and rebuild one profile |
+| `questlab_gallery clear [profile-or-build-id]` | return safely to the terrain below, then remove only matching marked gallery objects |
+| `questlab_gallery rebuild [profile]` | safely clear and rebuild one profile at the same reusable site |
 | `questlab_batch suites` | list the two bounded evidence classes |
 | `questlab_batch prepare all-schools` | write eight ordinary example quests, raise a gallery if needed, refresh the Greyling and birch, and stage supplies |
 | `questlab_batch run [all-schools\|creator-events]` | start live witnessing or run the explicitly synthetic 34-event contract probe |
@@ -150,7 +150,11 @@ word, and about 3,671 objects.
 Every object carries the plan version, profile id, and build id in its own ZDO. `identify`
 reads those durable marks from the locally known ZDO table; `clear` accepts either a profile or
 one comparison build id and refuses to touch anything unmarked. A comparison gives both
-sides one shared build id, so it can come down in one bounded operation. Generated counts
+sides one shared build id, so it can come down in one bounded operation. If the local player
+is standing on the selected raised floor, `clear` first uses Valheim's replicated teleport to
+return them to the natural terrain at the same X/Z; deletion starts only after that target is
+verified. `rebuild` inherits the same lifecycle, allowing one patch of ground to be reused.
+Generated counts
 and previews live in
 [`gallery-profiles.json`](../../../tools/component-packets/samples/gallery-profiles.json)
 and `gallery-plan-comparison.png`; `generate_gallery.py --check` guards plan drift.

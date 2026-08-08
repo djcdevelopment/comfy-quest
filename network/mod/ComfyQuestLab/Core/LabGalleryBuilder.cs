@@ -47,6 +47,8 @@ public sealed class LabGalleryBuilder {
   static readonly AccessTools.FieldRef<ZDOMan, Dictionary<ZDOID, ZDO>> _objectsByIdRef =
       AccessTools.FieldRefAccess<ZDOMan, Dictionary<ZDOID, ZDO>>("m_objectsByID");
   bool _running;
+  string _lastLifecycleResult = "no gallery lifecycle command has run yet.";
+  bool _lastLifecycleSucceeded;
   string _activeProfileId = "legacy";
   string _activeBuildId = "legacy";
   int _buildSequence;
@@ -99,6 +101,8 @@ public sealed class LabGalleryBuilder {
   }
 
   public bool IsRunning { get { return _running; } }
+  public string LastLifecycleResult { get { return _lastLifecycleResult; } }
+  public bool LastLifecycleSucceeded { get { return _lastLifecycleSucceeded; } }
 
   static string ManifestPath {
     get {
@@ -597,7 +601,14 @@ public sealed class LabGalleryBuilder {
       Report(UnknownProfile(profileId));
       yield break;
     }
-    Report(Clear(profile.Id));
+    IEnumerator clear = ClearSafely(profile.Id);
+    while (clear.MoveNext()) {
+      yield return clear.Current;
+    }
+    if (!LastLifecycleSucceeded) {
+      Report("rebuild stopped because the old " + profile.Id + " gallery could not be cleared safely.");
+      yield break;
+    }
     IEnumerator build = Build(host, profile.Id);
     while (build.MoveNext()) {
       yield return build.Current;
@@ -665,6 +676,152 @@ public sealed class LabGalleryBuilder {
 
   // ---- clear -----------------------------------------------------------------------
 
+  const float TerrainRetreatThreshold = 0.45f;
+  const float SupportingPieceRadius = 3f;
+  const float SupportingPieceVerticalRange = 4f;
+  const float TerrainRetreatLift = 0.5f;
+  const float TeleportAcceptTimeout = 4f;
+  const float TeleportFinishTimeout = 18f;
+
+  /// <summary>Return a player standing on the selected gallery to the natural terrain at
+  /// the same X/Z, then remove every matching marked object.
+  ///
+  /// Clear used to be synchronous. That made its object ownership rules safe, but not its
+  /// player lifecycle: using it from an elevated marble floor removed the floor before the
+  /// player had somewhere else to stand. Requiring people to find a new field (or remember
+  /// which portal was the ground portal) is not a reusable authoring loop.
+  ///
+  /// The terrain target deliberately comes from ZoneSystem.GetGroundHeight, whose ray mask
+  /// is terrain-only. GetSolidHeight sees the gallery floor and would teleport the player
+  /// right back onto the object about to disappear. Valheim's own TeleportTo owns movement
+  /// and replication. If it is cooling down, this waits a bounded four seconds; if the
+  /// teleport never completes at the intended ground target, the gallery stays standing.</summary>
+  public IEnumerator ClearSafely(string selector = null) {
+    _lastLifecycleSucceeded = false;
+    _lastLifecycleResult = "gallery clear has not completed.";
+    if (ZNetScene.instance == null || Player.m_localPlayer == null) {
+      _lastLifecycleResult = "not in a world yet.";
+      Report(_lastLifecycleResult);
+      yield break;
+    }
+    if (_running) {
+      _lastLifecycleResult = "gallery lifecycle operation in progress — wait for it to finish before clearing.";
+      Report(_lastLifecycleResult);
+      yield break;
+    }
+
+    selector = NormalizeSelector(selector);
+    _running = true;
+    try {
+      Player player = Player.m_localPlayer;
+      Vector3 retreat;
+      string retreatError;
+      if (TryTerrainRetreat(player, selector, out retreat, out retreatError)) {
+        Report("returning you to natural ground before clearing '" + selector + "'.");
+        Quaternion facing = player.transform.rotation;
+        bool accepted = false;
+        float acceptDeadline = Time.realtimeSinceStartup + TeleportAcceptTimeout;
+        while (Time.realtimeSinceStartup < acceptDeadline) {
+          if (Player.m_localPlayer != player) {
+            break;
+          }
+          if (player.TeleportTo(retreat, facing, false)) {
+            accepted = true;
+            break;
+          }
+          yield return null;
+        }
+        if (!accepted) {
+          _lastLifecycleResult = "clear stopped safely: Valheim did not accept the terrain return. "
+              + "The marked gallery is still standing; wait a moment and run clear again.";
+          Report(_lastLifecycleResult);
+          yield break;
+        }
+
+        float finishDeadline = Time.realtimeSinceStartup + TeleportFinishTimeout;
+        while (player.IsTeleporting() && Time.realtimeSinceStartup < finishDeadline) {
+          yield return null;
+        }
+        if (player.IsTeleporting() || !ReachedTerrainRetreat(player, retreat)) {
+          _lastLifecycleResult = "clear stopped safely: the terrain return did not finish at its verified target. "
+              + "The marked gallery is still standing.";
+          Report(_lastLifecycleResult);
+          yield break;
+        }
+      } else if (!string.IsNullOrEmpty(retreatError)) {
+        _lastLifecycleResult = retreatError;
+        Report(_lastLifecycleResult);
+        yield break;
+      }
+
+      _lastLifecycleResult = ClearMarked(selector);
+      _lastLifecycleSucceeded = true;
+      Report(_lastLifecycleResult);
+    } finally {
+      _running = false;
+    }
+  }
+
+  static string NormalizeSelector(string selector) {
+    return string.IsNullOrWhiteSpace(selector) ? "all" : selector.Trim();
+  }
+
+  bool TryTerrainRetreat(
+      Player player, string selector, out Vector3 retreat, out string error) {
+    Vector3 current = player.transform.position;
+    retreat = current;
+    error = string.Empty;
+
+    float radiusSquared = SupportingPieceRadius * SupportingPieceRadius;
+    bool matchingPieceUnderfoot = false;
+    try {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        if (zdo == null || !IsGalleryPiece(zdo) || !MatchesSelector(zdo, selector)) {
+          continue;
+        }
+        Vector3 piece = zdo.GetPosition();
+        float dx = piece.x - current.x;
+        float dz = piece.z - current.z;
+        if (dx * dx + dz * dz <= radiusSquared
+            && Mathf.Abs(piece.y - current.y) <= SupportingPieceVerticalRange) {
+          matchingPieceUnderfoot = true;
+          break;
+        }
+      }
+    } catch (Exception ex) {
+      LogOnce("could not verify whether the selected gallery supports the player: " + ex.Message);
+      error = "clear stopped safely: could not verify what is supporting the player. "
+          + "The marked gallery is still standing.";
+      return false;
+    }
+    if (!matchingPieceUnderfoot) {
+      return false;
+    }
+
+    float terrain;
+    if (!TryNaturalTerrainHeight(current, out terrain)) {
+      error = "clear stopped safely: Valheim could not resolve the natural terrain below you. "
+          + "The marked gallery is still standing.";
+      return false;
+    }
+    if (current.y - terrain < TerrainRetreatThreshold) {
+      return false;
+    }
+
+    retreat = new Vector3(current.x, terrain + TerrainRetreatLift, current.z);
+    return true;
+  }
+
+  static bool ReachedTerrainRetreat(Player player, Vector3 target) {
+    if (player == null) {
+      return false;
+    }
+    Vector3 actual = player.transform.position;
+    float dx = actual.x - target.x;
+    float dz = actual.z - target.z;
+    return dx * dx + dz * dz <= 2.25f && Mathf.Abs(actual.y - target.y) <= 1.5f;
+  }
+
   /// <summary>Take the gallery down — every gallery, not just the last one.
   ///
   /// The manifest cannot be the answer here and never could. Every build begins by
@@ -680,15 +837,11 @@ public sealed class LabGalleryBuilder {
   ///
   /// Blueprint pieces are deliberately not touched: this asks IsGalleryPiece, not
   /// LabMarks.IsLabBuilt, so clearing a gallery never takes somebody's blueprint with it.</summary>
-  public string Clear(string selector = null) {
+  string ClearMarked(string selector) {
     if (ZNetScene.instance == null) {
       return "not in a world yet.";
     }
-    if (_running) {
-      return "gallery build in progress — wait for it to finish before clearing.";
-    }
-
-    selector = string.IsNullOrWhiteSpace(selector) ? "all" : selector.Trim();
+    selector = NormalizeSelector(selector);
 
     // Collect first, destroy second. Destroying while walking the instance list mutates
     // the thing being walked.
@@ -1123,6 +1276,21 @@ public sealed class LabGalleryBuilder {
         return false;
       }
       return ZoneSystem.instance.GetSolidHeight(at, out height);
+    } catch (Exception) {
+      return false;
+    }
+  }
+
+  /// <summary>Terrain only. Unlike TryGroundHeight, this intentionally ignores pieces,
+  /// characters, and every other solid so gallery clear can find the reusable site below
+  /// its own raised floor.</summary>
+  static bool TryNaturalTerrainHeight(Vector3 at, out float height) {
+    height = at.y;
+    try {
+      if (ZoneSystem.instance == null) {
+        return false;
+      }
+      return ZoneSystem.instance.GetGroundHeight(at, out height);
     } catch (Exception) {
       return false;
     }

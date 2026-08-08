@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260808-r6";
+  public const string ReleaseId = "questlab-v0.2.0-20260808-r7";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -298,7 +298,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
               string right = args.Length >= 4 ? args[3] : "marble-grand";
               StartCoroutine(_gallery.Compare(this, value ?? "marble-wide", right));
             } else if (verb == "clear") {
-              Report(_gallery.Clear(value));
+              StartCoroutine(_gallery.ClearSafely(value));
             } else if (verb == "rebuild") {
               StartCoroutine(_gallery.Rebuild(this, value));
             } else if (verb == "identify") {
