@@ -77,10 +77,11 @@ class QuestLabPanelTests(unittest.TestCase):
             "LabRunes.For(category)",
             "LabRunes.ColorFor(category)",
             "QuestStateColor(quest.Armed)",
-            'GUILayout.Button(expanded ? "-" : "+"',
+            'new GUIContent(expanded ? "-" : "+"',
             "DrawQuestDetails(quest, eventName, target, cooldown)",
             'GUILayout.Label("verdict  /  " + quest.ArmedLine())',
-            'GUILayout.Toggle(_showQuestFolder, "Folder"',
+            'GUILayout.Toggle(_showQuestFolder,',
+            'new GUIContent("Folder", "show or hide the quest directory")',
             '" LOAD ERROR"',
         ):
             with self.subTest(marker=marker):
@@ -102,12 +103,59 @@ class QuestLabPanelTests(unittest.TestCase):
     def test_panel_zoom_scales_layout_mouse_and_persists_in_config(self) -> None:
         self.assertIn('"panelScale"', self.plugin)
         for marker in (
-            'GUILayout.Button("-"',
-            'GUILayout.Button("+"',
+            'new GUIContent("-", "zoom out")',
+            'new GUIContent("+", "zoom in")',
+            '"reset zoom to 100%"',
+            "SetPanelScale(1f)",
             "Matrix4x4.Scale(new Vector3(_drawScale, _drawScale, 1f))",
             "(mouse - _resizeStartMouse) / _drawScale",
             "Screen.width / Mathf.Max(MinPanelScale, scale)",
             "LabConfig.PanelScale.Value = scale",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+
+    def test_pause_freezes_rows_instead_of_blank_screen(self) -> None:
+        for marker in (
+            "readonly List<LabEvent> _pausedRows",
+            "_pausedRows.AddRange(",
+            "new List<LabEvent>(_pausedRows)",
+            '" visible row"',
+            'new GUIContent("Clear log", "discard retained event rows")',
+            'new GUIContent("×", "clear the search")',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+        self.assertNotIn("? new List<LabEvent>()", self.panel)
+
+    def test_hover_help_and_spellbook_grid_make_clipped_detail_discoverable(self) -> None:
+        for marker in (
+            "string tooltip = GUI.tooltip;",
+            '"Hover for details  ·  F6/Esc close',
+            'new GUIContent("WORLD ACTION")',
+            'new GUIContent("QUEST USE")',
+            'new GUIContent("TRUE NAME", "exact Valheim method")',
+            "DrawSpellGridRow(current.Spells[i], i)",
+            'return "BINDABLE  /  "',
+            'return "DIAGNOSTIC";',
+            '"BUILD COVERAGE  /  "',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+
+    def test_window_position_and_size_persist_on_close(self) -> None:
+        for key in ("panelX", "panelY", "panelWidth", "panelHeight"):
+            with self.subTest(key=key):
+                self.assertIn(f'"{key}"', self.plugin)
+        for marker in (
+            "_window = SavedWindow();",
+            "SaveWindow();",
+            "LabConfig.PanelX.Value",
+            "LabConfig.PanelY.Value",
+            "LabConfig.PanelWidth.Value",
+            "LabConfig.PanelHeight.Value",
+            "float.IsNaN(rect.x) || float.IsInfinity(rect.x)",
+            "float.IsNaN(rect.width) || float.IsInfinity(rect.width)",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.panel)

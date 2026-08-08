@@ -87,7 +87,10 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   creators can tune windowed, 1080p, and 4K layouts without editing a file. r11 replaces the
   Quests tab's repeated prose with a fixed school-colored grid: rune, quest, event/target,
   state, and fire count remain visible, while source, evaluator verdict, cooldown, advice,
-  and load errors expand only on request.
+  and load errors expand only on request. r12 renders the hover help those cells already
+  carried, makes Pause freeze visible rows instead of blanking them, separates search-clear
+  from log-clear, converts Spellbook actions to the same compact verdict grid, colors the last
+  matcher outcome, saves window position/size on close, and makes the percentage a 100% reset.
 - **Bounded batch evidence is self-service.** `questlab_batch` can prepare, run, reset,
   report, and export two explicit suites. `all-schools` installs eight ordinary bindable
   example quests, safely clears every marked old build, raises a fresh compact course with

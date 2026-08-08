@@ -94,7 +94,7 @@ class QuestLabReleaseVerifierTests(unittest.TestCase):
             VERIFIER.validate_all_schools(live, "0.2.0", "questlab-v0.2.0-test"), []
         )
 
-    def test_visual_acceptance_covers_the_r11_review_surface(self) -> None:
+    def test_visual_acceptance_covers_the_current_review_surface(self) -> None:
         self.assertEqual(
             VERIFIER.VISUAL_CHECKS,
             {

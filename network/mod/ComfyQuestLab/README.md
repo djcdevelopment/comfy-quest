@@ -37,8 +37,8 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r11 changes presentation and course layout, so those same suites must
-> be re-witnessed against the exact r11 DLL before the release cut is final. This README
+> 34/34 creator events. r12 changes presentation and course layout, so those same suites must
+> be re-witnessed against the exact r12 DLL before the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
 ## Why this exists
@@ -96,19 +96,26 @@ panel. Two different keys, and mixing them up is the most common first stumble.
 Opening the panel explicitly hands mouse and player input to the Lab: the cursor unlocks,
 camera look and gameplay clicks stop, and the previous cursor state is restored on **F6**,
 **Escape**, or the visible **Close** button. The high-contrast window opens at 900×620 and
-the lower-right handle resizes it within the current screen. The visible **− / +** controls
-zoom the whole panel from 65–200% in 10% steps; the choice is saved as `panelScale`, so a
-windowed/1080p creator and a 4K creator can tune the same grid independently.
+the lower-right handle resizes it within the current screen. Position and size are saved when
+the panel closes. The visible **− / +** controls zoom the whole panel from 65–200% in 10%
+steps; click the percentage to return to 100%. A windowed/1080p creator and a 4K creator can
+tune the same grid independently.
 
 The **Quests** tab is a compact dashboard rather than a prose dump. Its fixed columns show
 the colored school rune, quest name, creator event and target, armed state, and fire count.
 Use the row's **+** only when you need its source file, evaluator explanation, cooldown, or
 advisories; load errors are collapsed separately.
 
+Hovering any clipped grid cell writes its full meaning into the help bar at the bottom of the
+window. **Pause** freezes the rows already on screen while observation continues in the ring;
+**Resume** returns to the live stream. Clearing the search and clearing the retained log are
+separate, explicitly labelled actions.
+
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
-try, and the trap. Every page lists what the world answers to in that school and marks
-which ones this build will show you — so you can tell "Valheim can do this" from "the lab
-will show it to you".
+try, and the trap. Its world-action grid gives each integration one row with a colored
+`BINDABLE`, `DIAGNOSTIC`, or `NOT IN BUILD` verdict; exact Valheim method names remain a
+toggle. You can tell "Valheim can do this" from "the lab will show it to you" without
+reading a repeated prose block.
 
 Each category has a rune, and **the same rune is its filter in the live view**. Learn the
 book and you have learned the console. Turning to a page also lights that rune in the
@@ -283,6 +290,8 @@ and pausing drops nothing — the ring keeps collecting behind it.
 | `enabled` | `true` | Master switch. OFF drops every observation. |
 | `panelShortcut` | `F6` | F7 is taken by the retired control surface. `None` = console commands only. |
 | `panelScale` | `1` | Whole-panel zoom, 0.65–2.00. The in-panel − / + buttons change and persist it in 10% steps. |
+| `panelX`, `panelY` | `80`, `90` | Saved logical screen position. Updated on close and clamped after resolution/zoom changes. |
+| `panelWidth`, `panelHeight` | `900`, `620` | Saved logical window size. Updated on close; the drag handle remains bounded to the current screen. |
 | `consoleRows` | `18` | Rows on screen; the ring holds 8× that so you can scroll back. |
 | `galleryPiecesPerFrame` | `24` | Gallery objects placed per frame, clamped to 1–200. Lower it on a slower client. |
 | `blueprintPiecesPerFrame` | `12` | Blueprint objects placed per frame, clamped to 1–200. |

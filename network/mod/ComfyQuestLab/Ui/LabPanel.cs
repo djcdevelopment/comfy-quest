@@ -35,13 +35,16 @@ public sealed class LabPanel {
   const float QuestTriggerColumn = 220f;
   const float QuestStateColumn = 104f;
   const float QuestFiresColumn = 54f;
-  const float QuestExpandColumn = 32f;
+  const float QuestExpandColumn = 44f;
+  const float SpellUseColumn = 190f;
+  const float SpellTrueNameColumn = 220f;
   const float MinPanelScale = 0.65f;
   const float MaxPanelScale = 2f;
   const float PanelScaleStep = 0.1f;
 
   readonly LabEventRing _ring;
   readonly HashSet<string> _visible = new HashSet<string>(LabCategory.DefaultVisible);
+  readonly List<LabEvent> _pausedRows = new List<LabEvent>();
 
   Rect _window = new Rect(80f, 90f, DefaultWidth, DefaultHeight);
   Vector2 _scroll;
@@ -70,6 +73,9 @@ public sealed class LabPanel {
   GUIStyle _gridEvenStyle;
   GUIStyle _gridOddStyle;
   GUIStyle _questDetailStyle;
+  GUIStyle _statusStyle;
+  GUIStyle _sectionHeaderStyle;
+  GUIStyle _helpStyle;
   GUIStyle _resizeStyle;
   Tab _tab = Tab.Console;
 
@@ -82,7 +88,8 @@ public sealed class LabPanel {
     Color previous = GUI.color;
     // A rune that is switched off is still legible, just quiet.
     GUI.color = on ? Color.white : new Color(1f, 1f, 1f, 0.68f);
-    bool now = GUILayout.Toggle(on, new GUIContent(" " + label, LabRunes.For(category)),
+    bool now = GUILayout.Toggle(on, new GUIContent(" " + label, LabRunes.For(category),
+        label + " school"),
         GUI.skin.button, GUILayout.Width(width), GUILayout.Height(24f));
     GUI.color = previous;
     return now;
@@ -92,6 +99,7 @@ public sealed class LabPanel {
 
   public LabPanel(LabEventRing ring) {
     _ring = ring;
+    _window = SavedWindow();
   }
 
   public void Toggle() {
@@ -104,6 +112,7 @@ public sealed class LabPanel {
   }
 
   public void Close() {
+    SaveWindow();
     IsOpen = false;
     _resizing = false;
     InputGuard.ReleasePanelInput();
@@ -169,31 +178,40 @@ public sealed class LabPanel {
       DrawQuestDashboard();
     }
 
+    DrawHelpBar();
     DrawResizeHandle();
     GUI.DragWindow(new Rect(0f, 0f, Mathf.Max(0f, _window.width - ResizeHandle), 24f));
   }
 
   bool DrawTabs() {
     GUILayout.BeginHorizontal();
-    if (GUILayout.Toggle(_tab == Tab.Console, "What just happened", GUI.skin.button)) {
+    if (GUILayout.Toggle(_tab == Tab.Console,
+        new GUIContent("What just happened", "live creator events and quest usability"),
+        GUI.skin.button)) {
       _tab = Tab.Console;
     }
-    if (GUILayout.Toggle(_tab == Tab.Spellbook, "Spellbook", GUI.skin.button)) {
+    if (GUILayout.Toggle(_tab == Tab.Spellbook,
+        new GUIContent("Spellbook", "browse the eight event schools"), GUI.skin.button)) {
       _tab = Tab.Spellbook;
     }
-    if (GUILayout.Toggle(_tab == Tab.Quests, "Quests", GUI.skin.button)) {
+    if (GUILayout.Toggle(_tab == Tab.Quests,
+        new GUIContent("Quests", "loaded quest files and evaluator state"), GUI.skin.button)) {
       _tab = Tab.Quests;
     }
     GUILayout.FlexibleSpace();
-    GUILayout.Label(_ring.Count + " held · " + _ring.TotalSeen + " seen · mouse active");
-    if (GUILayout.Button("-", GUILayout.Width(28f))) {
+    GUILayout.Label(new GUIContent(_ring.Count + " held · " + _ring.TotalSeen + " seen",
+        "events currently retained / events observed this session"));
+    if (GUILayout.Button(new GUIContent("-", "zoom out"), GUILayout.Width(28f))) {
       SetPanelScale(_drawScale - PanelScaleStep);
     }
-    GUILayout.Label(Mathf.RoundToInt(_drawScale * 100f) + "%", GUILayout.Width(44f));
-    if (GUILayout.Button("+", GUILayout.Width(28f))) {
+    if (GUILayout.Button(new GUIContent(Mathf.RoundToInt(_drawScale * 100f) + "%",
+        "reset zoom to 100%"), GUILayout.Width(48f))) {
+      SetPanelScale(1f);
+    }
+    if (GUILayout.Button(new GUIContent("+", "zoom in"), GUILayout.Width(28f))) {
       SetPanelScale(_drawScale + PanelScaleStep);
     }
-    if (GUILayout.Button("Close", GUILayout.Width(58f))) {
+    if (GUILayout.Button(new GUIContent("Close", "F6 or Escape"), GUILayout.Width(58f))) {
       GUILayout.EndHorizontal();
       Close();
       return true;
@@ -221,7 +239,7 @@ public sealed class LabPanel {
     }
 
     GUILayout.BeginHorizontal();
-    GUILayout.Label("match", GUILayout.Width(42f));
+    GUILayout.Label("find", GUILayout.Width(34f));
 
     // Naming the control is the only way to know IMGUI focus, and knowing it is what
     // stops every keystroke in this box from also being a game hotkey.
@@ -229,28 +247,59 @@ public sealed class LabPanel {
     _filterText = GUILayout.TextField(_filterText ?? string.Empty, GUILayout.MinWidth(160f));
     InputGuard.TypingInLab = GUI.GetNameOfFocusedControl() == FilterControlName;
 
-    if (GUILayout.Button(_paused ? "Resume" : "Pause", GUILayout.Width(70f))) {
-      _paused = !_paused;
+    bool controlsEnabled = GUI.enabled;
+    GUI.enabled = controlsEnabled && !string.IsNullOrEmpty(_filterText);
+    if (GUILayout.Button(new GUIContent("×", "clear the search"), GUILayout.Width(28f))) {
+      _filterText = string.Empty;
+      GUI.FocusControl(null);
+      InputGuard.TypingInLab = false;
     }
-    if (GUILayout.Button("Clear", GUILayout.Width(56f))) {
+    GUI.enabled = controlsEnabled;
+
+    if (GUILayout.Button(new GUIContent(_paused ? "Resume" : "Pause",
+        _paused ? "return to the live event stream" : "freeze the rows currently visible"),
+        GUILayout.Width(70f))) {
+      if (_paused) {
+        _paused = false;
+        _pausedRows.Clear();
+      } else {
+        _pausedRows.Clear();
+        _pausedRows.AddRange(
+            _ring.Recent(_visible, _filterText, LabConfig.ConsoleRows.Value));
+        _paused = true;
+      }
+    }
+    if (GUILayout.Button(new GUIContent("Clear log", "discard retained event rows"),
+        GUILayout.Width(72f))) {
       _ring.Clear();
+      _pausedRows.Clear();
     }
     GUILayout.EndHorizontal();
 
     GUILayout.Space(3f);
-    GUILayout.Label("BINDABLE enters the shared quest evaluator · DIAGNOSTIC is observation only");
+    if (_paused) {
+      Color previous = GUI.contentColor;
+      GUI.contentColor = new Color(1f, 0.78f, 0.38f, 1f);
+      GUILayout.Label("PAUSED  /  " + _pausedRows.Count
+          + " visible row" + (_pausedRows.Count == 1 ? string.Empty : "s") + " frozen");
+      GUI.contentColor = previous;
+    } else {
+      GUILayout.Label("BINDABLE enters the shared quest evaluator · DIAGNOSTIC is observation only");
+    }
 
     // --- spreadsheet ---------------------------------------------------------------
     DrawGridHeader();
     _scroll = GUILayout.BeginScrollView(_scroll);
     List<LabEvent> rows = _paused
-        ? new List<LabEvent>()
+        ? new List<LabEvent>(_pausedRows)
         : _ring.Recent(_visible, _filterText, LabConfig.ConsoleRows.Value);
 
-    if (_paused) {
-      GUILayout.Label("Paused. Nothing is being dropped — resume to see what arrived.");
-    } else if (rows.Count == 0) {
-      GUILayout.Label(EmptyMessage());
+    if (rows.Count == 0) {
+      if (_paused) {
+        GUILayout.Label("Paused with no visible rows. Resume when you are ready.");
+      } else {
+        GUILayout.Label(EmptyMessage());
+      }
     } else {
       for (int i = 0; i < rows.Count; i++) {
         DrawGridRow(rows[i], i);
@@ -286,12 +335,17 @@ public sealed class LabPanel {
     style.normal.textColor = schoolColor;
     style.hover.textColor = schoolColor;
     GridCell(new GUIContent(LabJournal.For(row.Category).Title,
-        LabRunes.For(row.Category), row.Category), style, SchoolColumn);
+        LabRunes.For(row.Category), LabJournal.For(row.Category).Title + " school"),
+        style, SchoolColumn);
     style.normal.textColor = prior;
     style.hover.textColor = priorHover;
 
-    GridCell(new GUIContent(LabSpellNames.For(creatorName), row.Seam), style, EventColumn);
-    GridCell(new GUIContent(targetDetail, targetDetail), style, -1f);
+    GridCell(new GUIContent(LabSpellNames.For(creatorName),
+        "creator event: " + creatorName + "\nsource seam: " + row.Seam),
+        style, EventColumn);
+    GridCell(new GUIContent(targetDetail,
+        string.IsNullOrWhiteSpace(targetDetail) ? "no target detail" : targetDetail),
+        style, -1f);
 
     Color usabilityColor = UsabilityColor(row.Usability);
     style.normal.textColor = usabilityColor;
@@ -371,9 +425,11 @@ public sealed class LabPanel {
     GUILayout.BeginHorizontal();
     GUILayout.Label(set.Quests.Count + " quests  /  " + set.ArmedCount + " armed");
     GUILayout.FlexibleSpace();
-    _showQuestFolder = GUILayout.Toggle(_showQuestFolder, "Folder", GUI.skin.button,
+    _showQuestFolder = GUILayout.Toggle(_showQuestFolder,
+        new GUIContent("Folder", "show or hide the quest directory"), GUI.skin.button,
         GUILayout.Width(68f));
-    if (GUILayout.Button("Reload", GUILayout.Width(70f))) {
+    if (GUILayout.Button(new GUIContent("Reload", "re-read every quest file and reset cooldowns"),
+        GUILayout.Width(70f))) {
       ComfyQuestLab.Report(LabQuestEngine.Reload());
     }
     GUILayout.EndHorizontal();
@@ -383,8 +439,7 @@ public sealed class LabPanel {
     }
 
     string lastEvent = LabQuestEngine.LastEventLine;
-    GUILayout.Label("matcher  /  "
-        + (string.IsNullOrEmpty(lastEvent) ? "none yet" : lastEvent));
+    DrawMatcherStatus(lastEvent);
 
     if (!LabConfig.QuestsEnabled.Value) {
       Color previous = GUI.contentColor;
@@ -410,8 +465,10 @@ public sealed class LabPanel {
       Color previous = GUI.contentColor;
       GUI.contentColor = new Color(1f, 0.62f, 0.46f, 1f);
       _showQuestErrors = GUILayout.Toggle(_showQuestErrors,
-          (_showQuestErrors ? "-" : "+") + "  " + set.Errors.Count + " LOAD ERROR"
-              + (set.Errors.Count == 1 ? string.Empty : "S"),
+          new GUIContent(
+              (_showQuestErrors ? "-" : "+") + "  " + set.Errors.Count + " LOAD ERROR"
+                  + (set.Errors.Count == 1 ? string.Empty : "S"),
+              "show or hide quest-file parse failures"),
           GUI.skin.button);
       GUI.contentColor = previous;
       if (_showQuestErrors) {
@@ -428,6 +485,26 @@ public sealed class LabPanel {
     GUILayout.EndScrollView();
   }
 
+  void DrawMatcherStatus(string lastEvent) {
+    string line = string.IsNullOrEmpty(lastEvent) ? "none yet" : lastEvent;
+    Color prior = _statusStyle.normal.textColor;
+    Color priorHover = _statusStyle.hover.textColor;
+    Color color = string.IsNullOrEmpty(lastEvent)
+        ? new Color(0.72f, 0.76f, 0.82f, 1f)
+        : (lastEvent.IndexOf("fired ", StringComparison.OrdinalIgnoreCase) >= 0
+            ? new Color(0.55f, 1f, 0.64f, 1f)
+            : (lastEvent.IndexOf("cooling down", StringComparison.OrdinalIgnoreCase) >= 0
+                ? new Color(1f, 0.78f, 0.38f, 1f)
+                : new Color(0.78f, 0.84f, 0.92f, 1f)));
+    _statusStyle.normal.textColor = color;
+    _statusStyle.hover.textColor = color;
+    GUILayout.Label(new GUIContent("LAST MATCH  /  " + line,
+        "the exact canonical event, target, and evaluator outcome"),
+        _statusStyle, GUILayout.Height(26f));
+    _statusStyle.normal.textColor = prior;
+    _statusStyle.hover.textColor = priorHover;
+  }
+
   void DrawQuestGridHeader() {
     GUILayout.BeginHorizontal();
     GridCell(new GUIContent("SCHOOL"), _gridHeaderStyle, SchoolColumn);
@@ -435,7 +512,7 @@ public sealed class LabPanel {
     GridCell(new GUIContent("EVENT -> TARGET"), _gridHeaderStyle, QuestTriggerColumn);
     GridCell(new GUIContent("STATE"), _gridHeaderStyle, QuestStateColumn);
     GridCell(new GUIContent("FIRES"), _gridHeaderStyle, QuestFiresColumn);
-    GridCell(new GUIContent(string.Empty, "expand details"), _gridHeaderStyle,
+    GridCell(new GUIContent("MORE", "expand one quest's diagnostics"), _gridHeaderStyle,
         QuestExpandColumn);
     GUILayout.EndHorizontal();
   }
@@ -485,7 +562,9 @@ public sealed class LabPanel {
         : "since the last reload";
     GridCell(new GUIContent(quest.IsArmed ? quest.Fires.ToString() : "-", fireTip),
         style, QuestFiresColumn);
-    if (GUILayout.Button(expanded ? "-" : "+", GUILayout.Width(QuestExpandColumn),
+    if (GUILayout.Button(new GUIContent(expanded ? "-" : "+",
+        expanded ? "collapse details" : "show source, verdict, cooldown, and advice"),
+        GUILayout.Width(QuestExpandColumn),
         GUILayout.Height(28f))) {
       _expandedQuestKey = expanded ? null : key;
     }
@@ -599,61 +678,155 @@ public sealed class LabPanel {
     LabJournal.Page current = LabJournal.For(_journalCategory);
     _journalScroll = GUILayout.BeginScrollView(_journalScroll);
 
-    Color previous = GUI.color;
-    GUI.color = LabRunes.ColorFor(current.Category);
-    GUILayout.Label(current.Title);
-    GUI.color = previous;
-    GUILayout.Space(4f);
+    Color schoolColor = LabRunes.ColorFor(current.Category);
+    DrawSectionHeading(current.Title.ToUpperInvariant(), schoolColor,
+        LabRunes.For(current.Category));
     foreach (string line in current.What) {
       GUILayout.Label(line);
     }
 
-    GUILayout.Space(8f);
-    GUILayout.Label("Go and try");
+    DrawSectionHeading("TRY THIS", schoolColor);
     foreach (string line in current.Try) {
       GUILayout.Label("  " + line);
     }
 
-    GUILayout.Space(8f);
-    GUILayout.Label("Worth knowing");
+    DrawSectionHeading("WORTH KNOWING", new Color(1f, 0.78f, 0.38f, 1f));
     foreach (string line in current.Watch) {
       GUILayout.Label("  " + line);
     }
 
-    GUILayout.Space(8f);
+    DrawSectionHeading("WORLD ACTIONS", schoolColor);
     GUILayout.BeginHorizontal();
-    GUILayout.Label("What the world answers to");
+    GUILayout.Label("One row per integrated action; hover clipped cells for the full wording.");
     GUILayout.FlexibleSpace();
     // You do not need a thing's true name to see it happen — only to command it. So the
     // method names are here, and they are not in your way until you ask.
-    _showTrueNames = GUILayout.Toggle(_showTrueNames, "true names", GUI.skin.button,
+    _showTrueNames = GUILayout.Toggle(_showTrueNames,
+        new GUIContent("true names", "show exact Valheim method names"), GUI.skin.button,
         GUILayout.Width(96f));
     GUILayout.EndHorizontal();
 
-    foreach (LabJournal.Spell spell in current.Spells) {
-      Color before = GUI.color;
-      if (!spell.Bound) {
-        GUI.color = new Color(1f, 1f, 1f, 0.68f);
-      }
-      GUILayout.Label("  " + (spell.Bound ? "*" : "-") + "  " + spell.Name);
-      GUILayout.Label("        " + spell.Verdict
-          + (spell.Bound ? string.Empty : "  ·  intentionally not integrated"));
-      if (_showTrueNames) {
-        GUILayout.Label("        true name: " + spell.TrueName);
-      }
-      GUI.color = before;
+    DrawSpellGridHeader();
+    for (int i = 0; i < current.Spells.Length; i++) {
+      DrawSpellGridRow(current.Spells[i], i);
     }
 
     GUILayout.Space(8f);
-    GUILayout.Label("Integrated " + LabPatching.AppliedCount + " of "
-        + LabPatching.Outcomes.Count + " seams this build reached for.");
+    int unavailable = 0;
     foreach (LabPatching.Outcome outcome in LabPatching.Outcomes) {
       if (!outcome.Applied) {
-        GUILayout.Label("  unavailable: " + outcome.Label + " — " + outcome.Detail);
+        unavailable++;
+      }
+    }
+    Color statusColor = unavailable == 0
+        ? new Color(0.55f, 1f, 0.64f, 1f)
+        : new Color(1f, 0.78f, 0.38f, 1f);
+    DrawSectionHeading("BUILD COVERAGE  /  " + LabPatching.AppliedCount + " OF "
+        + LabPatching.Outcomes.Count + " HOOKS AVAILABLE", statusColor);
+    if (unavailable > 0) {
+      foreach (LabPatching.Outcome outcome in LabPatching.Outcomes) {
+        if (!outcome.Applied) {
+          GUILayout.Label("  unavailable: " + outcome.Label + " — " + outcome.Detail);
+        }
       }
     }
 
     GUILayout.EndScrollView();
+  }
+
+  void DrawSectionHeading(string text, Color color, Texture texture = null) {
+    Color prior = _sectionHeaderStyle.normal.textColor;
+    Color priorHover = _sectionHeaderStyle.hover.textColor;
+    _sectionHeaderStyle.normal.textColor = color;
+    _sectionHeaderStyle.hover.textColor = color;
+    GUILayout.Space(7f);
+    GUILayout.Label(new GUIContent(text, texture), _sectionHeaderStyle,
+        GUILayout.Height(27f));
+    _sectionHeaderStyle.normal.textColor = prior;
+    _sectionHeaderStyle.hover.textColor = priorHover;
+  }
+
+  void DrawSpellGridHeader() {
+    GUILayout.BeginHorizontal();
+    GridCell(new GUIContent("WORLD ACTION"), _gridHeaderStyle, -1f);
+    GridCell(new GUIContent("QUEST USE"), _gridHeaderStyle, SpellUseColumn);
+    if (_showTrueNames) {
+      GridCell(new GUIContent("TRUE NAME", "exact Valheim method"),
+          _gridHeaderStyle, SpellTrueNameColumn);
+    }
+    GUILayout.EndHorizontal();
+  }
+
+  void DrawSpellGridRow(LabJournal.Spell spell, int index) {
+    GUIStyle style = index % 2 == 0 ? _gridEvenStyle : _gridOddStyle;
+    Color prior = style.normal.textColor;
+    Color priorHover = style.hover.textColor;
+    Color rowColor = spell.Bound
+        ? prior
+        : new Color(0.62f, 0.67f, 0.74f, 1f);
+    style.normal.textColor = rowColor;
+    style.hover.textColor = rowColor;
+
+    GUILayout.BeginHorizontal();
+    GridCell(new GUIContent(spell.Name, spell.Verdict), style, -1f);
+    Color useColor = SpellUseColor(spell);
+    style.normal.textColor = useColor;
+    style.hover.textColor = useColor;
+    GridCell(new GUIContent(SpellUseLabel(spell), spell.Verdict), style, SpellUseColumn);
+    style.normal.textColor = rowColor;
+    style.hover.textColor = rowColor;
+    if (_showTrueNames) {
+      GridCell(new GUIContent(spell.TrueName, "exact diagnostic provenance"),
+          style, SpellTrueNameColumn);
+    }
+    GUILayout.EndHorizontal();
+    style.normal.textColor = prior;
+    style.hover.textColor = priorHover;
+  }
+
+  static string SpellUseLabel(LabJournal.Spell spell) {
+    if (!spell.Bound) {
+      return "NOT IN BUILD";
+    }
+    if (spell.Verdict.StartsWith("bindable:", StringComparison.OrdinalIgnoreCase)) {
+      return "BINDABLE  /  " + spell.Verdict.Substring("bindable:".Length).Trim();
+    }
+    if (spell.Verdict.IndexOf("diagnostic", StringComparison.OrdinalIgnoreCase) >= 0) {
+      return "DIAGNOSTIC";
+    }
+    return "OBSERVED";
+  }
+
+  static Color SpellUseColor(LabJournal.Spell spell) {
+    if (!spell.Bound) {
+      return new Color(0.62f, 0.67f, 0.74f, 1f);
+    }
+    if (spell.Verdict.StartsWith("bindable:", StringComparison.OrdinalIgnoreCase)) {
+      return new Color(0.55f, 1f, 0.64f, 1f);
+    }
+    if (spell.Verdict.IndexOf("diagnostic", StringComparison.OrdinalIgnoreCase) >= 0) {
+      return new Color(1f, 0.78f, 0.38f, 1f);
+    }
+    return new Color(0.62f, 0.82f, 1f, 1f);
+  }
+
+  void DrawHelpBar() {
+    string tooltip = GUI.tooltip;
+    bool hasTooltip = !string.IsNullOrWhiteSpace(tooltip);
+    Color prior = _helpStyle.normal.textColor;
+    Color priorHover = _helpStyle.hover.textColor;
+    Color color = hasTooltip
+        ? new Color(0.72f, 0.88f, 1f, 1f)
+        : new Color(0.66f, 0.72f, 0.80f, 1f);
+    _helpStyle.normal.textColor = color;
+    _helpStyle.hover.textColor = color;
+    GUILayout.Space(4f);
+    GUILayout.Label(hasTooltip
+            ? tooltip.Replace("\n", "  /  ")
+            : "Hover for details  ·  F6/Esc close  ·  drag title to move  ·  drag ↘ to resize",
+        _helpStyle, GUILayout.Height(24f));
+    _helpStyle.normal.textColor = prior;
+    _helpStyle.hover.textColor = priorHover;
   }
 
   void EnsureStyles() {
@@ -692,6 +865,15 @@ public sealed class LabPanel {
     _questDetailStyle.padding = new RectOffset(18, 10, 8, 8);
     _questDetailStyle.wordWrap = true;
     _questDetailStyle.clipping = TextClipping.Overflow;
+
+    _statusStyle = GridStyle(
+        _gridEvenBackground, new Color(0.78f, 0.84f, 0.92f, 1f), FontStyle.Bold);
+    _sectionHeaderStyle = GridStyle(
+        _gridHeaderBackground, Color.white, FontStyle.Bold);
+    _sectionHeaderStyle.fontSize = 14;
+    _helpStyle = GridStyle(
+        _gridEvenBackground, new Color(0.66f, 0.72f, 0.80f, 1f), FontStyle.Normal);
+    _helpStyle.fontSize = 12;
 
     _resizeStyle = new GUIStyle(GUI.skin.box);
     _resizeStyle.normal.background = _resizeBackground;
@@ -781,7 +963,43 @@ public sealed class LabPanel {
     _window = ClampWindow(_window, scale);
   }
 
+  static Rect SavedWindow() {
+    try {
+      return new Rect(
+          LabConfig.PanelX.Value,
+          LabConfig.PanelY.Value,
+          LabConfig.PanelWidth.Value,
+          LabConfig.PanelHeight.Value);
+    } catch (Exception) {
+      return new Rect(80f, 90f, DefaultWidth, DefaultHeight);
+    }
+  }
+
+  void SaveWindow() {
+    try {
+      Rect saved = ClampWindow(_window, CurrentPanelScale());
+      LabConfig.PanelX.Value = Mathf.Round(saved.x);
+      LabConfig.PanelY.Value = Mathf.Round(saved.y);
+      LabConfig.PanelWidth.Value = Mathf.Round(saved.width);
+      LabConfig.PanelHeight.Value = Mathf.Round(saved.height);
+    } catch (Exception) {
+      // Layout persistence is a convenience; closing the panel must always succeed.
+    }
+  }
+
   static Rect ClampWindow(Rect rect, float scale) {
+    if (float.IsNaN(rect.x) || float.IsInfinity(rect.x)) {
+      rect.x = 80f;
+    }
+    if (float.IsNaN(rect.y) || float.IsInfinity(rect.y)) {
+      rect.y = 90f;
+    }
+    if (float.IsNaN(rect.width) || float.IsInfinity(rect.width)) {
+      rect.width = DefaultWidth;
+    }
+    if (float.IsNaN(rect.height) || float.IsInfinity(rect.height)) {
+      rect.height = DefaultHeight;
+    }
     float logicalWidth = Screen.width / Mathf.Max(MinPanelScale, scale);
     float logicalHeight = Screen.height / Mathf.Max(MinPanelScale, scale);
     float maxWidth = Mathf.Max(360f, logicalWidth - 24f);

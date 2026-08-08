@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260808-r11";
+  public const string ReleaseId = "questlab-v0.2.0-20260808-r12";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -442,6 +442,10 @@ public static class LabConfig {
   public static ConfigEntry<bool> Enabled { get; private set; }
   public static ConfigEntry<KeyboardShortcut> PanelShortcut { get; private set; }
   public static ConfigEntry<float> PanelScale { get; private set; }
+  public static ConfigEntry<float> PanelX { get; private set; }
+  public static ConfigEntry<float> PanelY { get; private set; }
+  public static ConfigEntry<float> PanelWidth { get; private set; }
+  public static ConfigEntry<float> PanelHeight { get; private set; }
   public static ConfigEntry<int> ConsoleRows { get; private set; }
   public static ConfigEntry<bool> VerboseLogging { get; private set; }
   public static ConfigEntry<string> EventProfile { get; private set; }
@@ -479,6 +483,27 @@ public static class LabConfig {
                 "Quest Lab panel zoom. Use the - and + controls inside the panel to tune "
                 + "windowed, 1080p, and 4K layouts; the choice is saved here. Hot-reloadable.",
                 new AcceptableValueRange<float>(0.65f, 2f)));
+
+    PanelX = config.Bind(
+        "Lab", "panelX", 80f,
+        "Saved horizontal position of the Quest Lab window in unscaled screen coordinates. "
+        + "Updated when the panel closes; out-of-screen values are clamped safely.");
+    PanelY = config.Bind(
+        "Lab", "panelY", 90f,
+        "Saved vertical position of the Quest Lab window in unscaled screen coordinates. "
+        + "Updated when the panel closes; out-of-screen values are clamped safely.");
+    PanelWidth = config.Bind(
+        "Lab", "panelWidth", 900f,
+        new ConfigDescription(
+            "Saved Quest Lab window width. Drag the lower-right handle; the value is saved "
+            + "when the panel closes.",
+            new AcceptableValueRange<float>(700f, 2400f)));
+    PanelHeight = config.Bind(
+        "Lab", "panelHeight", 620f,
+        new ConfigDescription(
+            "Saved Quest Lab window height. Drag the lower-right handle; the value is saved "
+            + "when the panel closes.",
+            new AcceptableValueRange<float>(440f, 1800f)));
 
     ConsoleRows =
         config.Bind(
@@ -547,7 +572,7 @@ public static class LabConfig {
             "Quests",
             "questsEnabled",
             true,
-            "Whether the lab evaluates your quest files against what you kill. OFF = files "
+            "Whether the lab evaluates your quest files against safe creator events. OFF = files "
             + "are still loaded and still shown in the Quests tab, but nothing fires. Turn it "
             + "off to prove that a quest firing is what you think it is.");
 
