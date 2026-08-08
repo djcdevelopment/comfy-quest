@@ -1,600 +1,783 @@
 #!/usr/bin/env python3
-"""Lay out the Tome's gallery, and render a plan of it.
+"""Generate Quest Lab Gallery v2 runtime profiles and top-down previews.
 
-A student should get value two minutes after downloading, not after an hour of
-hunting creatures and crafting a bow. So the lab builds its own ground: eight rune
-monuments in a ring, a station under each one for practising that school, and an
-armoury at the centre so nothing has to be found or made.
-
-The runes are raised from logs. They are already line segments — that is why they
-draw well at fourteen pixels — and a line segment is also a beam. The SAME table in
-Ui/LabRunes.cs drives both, so a monument cannot end up a different shape from the
-glyph on its page.
-
-Emits the plan as data rather than code-with-numbers-in-it, so this script and the
-mod agree by construction, and so the preview below is a picture of what will
-actually be built.
+The gallery is data, not hand-coded coordinates. Rune strokes come from LabRunes.cs,
+prefab names and 2 m floor spans are checked against the committed runtime dump, and
+the same profile model emits the C# plan, a machine-readable summary, and previews.
 
   python tools/component-packets/generate_gallery.py
+  python tools/component-packets/generate_gallery.py --check
 
-Writes network/mod/ComfyQuestLab/Core/LabGalleryPlan.g.cs
-      plus a top-down preview PNG next to it when Pillow is available.
+Writes:
+  network/mod/ComfyQuestLab/Core/LabGalleryPlan.g.cs
+  tools/component-packets/samples/gallery-profiles.json
+  tools/component-packets/samples/gallery-plan*.png (when Pillow is installed)
 """
+
+from __future__ import annotations
+
+import argparse
 import json
 import math
 import os
 import re
 import sys
+from pathlib import Path
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-RUNES = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Ui", "LabRunes.cs")
-OUT = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Core", "LabGalleryPlan.g.cs")
-PREVIEW = os.path.join(HERE, "samples", "gallery-plan.png")
-DUMP = os.path.join(HERE, "samples", "prefab-dump.json")
 
-# --- dimensions, in metres -------------------------------------------------------
-RING_RADIUS = 38.0     # 30 m of arc between monuments — room to breathe, short spokes
-RUNE_WIDTH = 9.0       # a rune reads from the centre of the ring at this size
-RUNE_HEIGHT = 11.0
-RUNE_BASE_Y = 0.5      # lifted clear of ground clutter
-BEAM_LENGTH = 2.0      # a wood beam is 2 m; segments are cut into this many
-STATION_INSET = 6.5    # station stands on the same pad as its monument, in front of it
-RACK_RADIUS = 6.0      # armoury ring, close enough to spawn to be unmissable
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+RUNES = REPO / "network" / "mod" / "ComfyQuestLab" / "Ui" / "LabRunes.cs"
+OUT = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabGalleryPlan.g.cs"
+SUMMARY = HERE / "samples" / "gallery-profiles.json"
+DEFAULT_PREVIEW = HERE / "samples" / "gallery-plan.png"
+DEFAULT_DUMP = HERE / "samples" / "prefab-dump.json"
 
-# --- the platform ---------------------------------------------------------------
-# Valheim ground is not flat, and 89 beams on a hillside is how this reads as broken
-# rather than impressive. So the gallery brings its own floor.
-#
-# NOT a disc: a 38 m disc is roughly 1,100 tiles of which most are never walked on.
-# A plaza, eight spokes and eight pads is a fraction of that and looks deliberate —
-# a ritual floor rather than a car park. The shape also tells you where to go.
-TILE = 2.0             # wood_floor is 2x2 m
-PLAZA_RADIUS = 9.0
-SPOKE_HALF_WIDTH = 2.0
-PAD_HALF_WIDTH = 7.0   # wide enough to carry a 9 m rune with a margin
-PAD_DEPTH = 9.0        # from just behind the monument to just in front of the station
-
-ORDER = ["Combat", "Harvest", "Inventory", "Building", "Crafting", "Progression",
-         "World", "Social"]
-
-# What each school needs on the ground to be practisable in the first two minutes.
-# Prefab names are the well-known Valheim ones; the builder logs any it cannot
-# resolve rather than assuming, because this list is the one thing here that was
-# not read out of the assembly.
-STATIONS = {
-    "Combat":      ("Greyling",       "spawner", "a target that fights back, respawned on demand"),
-    "Harvest":     ("Birch1",         "prop",    "a tree to strike, a bush and a berry to pick"),
-    "Inventory":   ("piece_chest_wood", "piece", "a chest to empty, with something in it"),
-    "Building":    ("piece_workbench", "piece",  "a workbench, so pieces can be placed and repaired"),
-    "Crafting":    ("smelter",        "piece",   "a smelter and a kiln, fuelled"),
-    "Progression": ("piece_workbench", "piece",  "a bench, and room to swing until a skill rises"),
-    "World":       ("portal_wood",    "piece",   "a portal pair, to travel between"),
-    "Social":      ("sign",           "piece",   "a sign to write on"),
-}
-
-# The armoury. One weapon per stand, chosen so every school can be practised
-# immediately: fists need nothing, but a bow without arrows teaches nothing.
-ARMOURY = [
-    ("AxeBronze",     "an axe, for trees"),
-    ("Club",          "a club, for creatures"),
-    ("Bow",           "a bow"),
-    ("ArrowWood",     "arrows for it"),
-    ("PickaxeBronze", "a pickaxe, for rock"),
-    ("Hammer",        "a hammer, for building"),
-    ("Cultivator",    "a cultivator"),
-    ("Torch",         "a torch"),
+ORDER = [
+    "Combat",
+    "Harvest",
+    "Inventory",
+    "Building",
+    "Crafting",
+    "Progression",
+    "World",
+    "Social",
 ]
 
-
-# --- palette --------------------------------------------------------------------
-# One place to swap materials. Every name here is cross-checked against a
-# `questlab_prefabs dump` by --prefab-dump, because prefab names are the one thing in
-# this project that is NOT read out of the assembly — the atlas knows which components
-# exist, not which prefabs carry them.
-#
-# Stone underfoot in the plaza, black marble down the halls: the plaza reads as ground
-# you stand on and the halls as something built. The rune strokes stay wood on purpose.
-# A warm lit beam against cold marble is the whole composition — swap "beam" to a marble
-# piece and the glyph stops being the brightest thing at the end of the corridor.
-PALETTE = {
-    "plaza":  "stone_floor_2x2",     # 2x2, verified by snap span
-    "hall":   "blackmarble_floor",   # 2x2
-    "pad":    "blackmarble_floor",
-    "stage":  "blackmarble_floor",   # the rune's own platform, past the hall
-    "panel":  "blackmarble_floor_large",  # 8 x 8 x 2, stood on edge as a backdrop
-    "wall":   "blackmarble_2x2x1",   # 2 wide, 2 tall, 1 thick
-    "column": "blackmarble_column_1",
-    "sign":   "sign",                # ZDO "text" carries the copy
-    "beam":   "wood_beam",           # the strokes; deliberately not marble
+STATIONS = {
+    "Combat": ("Greyling", "spawner", "a target that fights back, restocked on demand"),
+    "Harvest": ("Birch1", "prop", "a tree to strike, with room for pickables"),
+    "Inventory": ("piece_chest_wood", "piece", "a chest to empty, equip, and refill"),
+    "Building": ("piece_workbench", "piece", "a workbench and room to build or repair"),
+    "Crafting": ("smelter", "piece", "a smelter with room for cooking and fermenting"),
+    "Progression": ("piece_workbench", "piece", "a bench and room to raise a skill"),
+    "World": ("portal_wood", "piece", "a paired portal and world-state practice"),
+    "Social": ("sign", "piece", "a sign to write and a place to speak"),
 }
 
-# Hall wall height, in courses of PALETTE["wall"] (2 m each). Two courses frames the
-# corridor without roofing it — a 11 m rune still stands 7 m clear above the wall head,
-# which is the shot: you read the sign, then walk toward a lit glyph against open sky.
-WALL_COURSES = 2
-WALL_INSET = 0.5        # wall centre sits this far outside the hall floor edge
+ARMOURY = [
+    ("AxeBronze", "an axe, for trees"),
+    ("Club", "a club, for creatures"),
+    ("Bow", "a bow"),
+    ("ArrowWood", "arrows for it"),
+    ("PickaxeBronze", "a pickaxe, for rock"),
+    ("Hammer", "a hammer, for building"),
+    ("Cultivator", "a cultivator"),
+    ("Torch", "a torch"),
+]
 
-# Yaw that turns a wall's 2 m width along the corridor rather than across it. This is
-# the one number here that is a convention rather than a measurement; a wrong guess
-# shows up as every wall rotated a quarter turn, and is fixed by changing this alone.
-WALL_YAW_OFFSET = 90.0
-
-# --- the rune stage --------------------------------------------------------------
-# The rune gets its own platform past the end of the hall, with a gap of open air
-# between it and the pad. Two problems answered at once: a chest or a hearth staged on
-# the pad can no longer stand in front of the glyph, and a backdrop behind and to the
-# sides gives it something black to burn against instead of open sky.
-#
-# The backdrop is blackmarble_floor_large stood on edge — 8 x 8 x 2, so four of them
-# make a 16 m wall where the 2 m blocks would have taken forty. Its thin axis is its
-# local Y, which is what the builder swings onto the hall's ray.
-RUNE_GAP = 4.0              # open air between the pad edge and the stage
-STAGE_DEPTH = 8.0
-STAGE_HALF_WIDTH = 8.0      # 16 m across, a 9 m rune with margin either side
-PANEL = 8.0                 # blackmarble_floor_large face, verified from snap points
-BACKDROP_COLUMNS = 2        # 16 m wide
-BACKDROP_ROWS = 2           # 16 m tall, clears an 11 m rune
-WING_ROWS = 2               # side returns, same height
-
-# Where the rune itself now stands: centred on its own stage rather than on the pad.
-RUNE_RADIUS = RING_RADIUS + RUNE_GAP + STAGE_DEPTH / 2
-
-# One colour per school, and this is the ONLY place it is written down. The plan carries
-# it into the mod, so the rune lamp and the sign heading cannot drift apart.
 SCHOOL_COLOURS = {
-    "Combat":      (1.00, 0.28, 0.22),
-    "Harvest":     (0.45, 0.95, 0.40),
-    "Inventory":   (0.95, 0.78, 0.30),
-    "Building":    (0.98, 0.55, 0.20),
-    "Crafting":    (0.55, 0.80, 1.00),
+    "Combat": (1.00, 0.28, 0.22),
+    "Harvest": (0.45, 0.95, 0.40),
+    "Inventory": (0.95, 0.78, 0.30),
+    "Building": (0.98, 0.55, 0.20),
+    "Crafting": (0.55, 0.80, 1.00),
     "Progression": (0.80, 0.50, 1.00),
-    "World":       (0.35, 0.90, 0.90),
-    "Social":      (1.00, 0.70, 0.85),
+    "World": (0.35, 0.90, 0.90),
+    "Social": (1.00, 0.70, 0.85),
 }
 
-# Exactly one seam in the whole atlas can bind a quest today. Saying so on the sign at
-# the mouth of every hall is the argument the lab exists to make, made before anyone
-# walks in rather than after they have wasted an evening.
-QUEST_USABLE = {"Combat"}
+COMMON_PALETTE = {
+    "panel": "blackmarble_floor_large",
+    "wall": "blackmarble_2x2x1",
+    "column": "blackmarble_column_1",
+    "sign": "sign",
+    "beam": "wood_beam",
+}
+
+# These are intentionally meaningfully different rather than tiny tuning variants. The
+# first preserves the already-proven build as a comparison baseline. Both v2 choices use
+# black marble for every walking-surface cell; the wider one is the reversible default.
+PROFILE_SPECS = [
+    {
+        "id": "classic",
+        "name": "Classic ring",
+        "description": "The proven mixed stone/marble footprint retained for comparison.",
+        "ring_radius": 38.0,
+        "rune_width": 9.0,
+        "rune_height": 11.0,
+        "rune_base_y": 0.5,
+        "beam_length": 2.0,
+        "station_inset": 6.5,
+        "rack_radius": 6.0,
+        "tile": 2.0,
+        "plaza_radius": 9.0,
+        "hall_half_width": 2.0,
+        "pad_half_width": 7.0,
+        "pad_depth": 9.0,
+        "rune_gap": 4.0,
+        "stage_depth": 8.0,
+        "stage_half_width": 8.0,
+        "wall_courses": 2,
+        "floor": {
+            "plaza": "stone_floor_2x2",
+            "hall": "blackmarble_floor",
+            "pad": "blackmarble_floor",
+            "stage": "blackmarble_floor",
+        },
+    },
+    {
+        "id": "marble-wide",
+        "name": "Marble wide",
+        "description": "Gallery v2 default: an all-marble floor, 8 m halls, and larger runes.",
+        "ring_radius": 50.0,
+        "rune_width": 11.0,
+        "rune_height": 14.0,
+        "rune_base_y": 0.75,
+        "beam_length": 2.0,
+        "station_inset": 8.0,
+        "rack_radius": 8.0,
+        "tile": 2.0,
+        "plaza_radius": 13.0,
+        "hall_half_width": 4.0,
+        "pad_half_width": 10.0,
+        "pad_depth": 14.0,
+        "rune_gap": 5.0,
+        "stage_depth": 10.0,
+        "stage_half_width": 10.0,
+        "wall_courses": 2,
+        "floor": {
+            "plaza": "blackmarble_floor",
+            "hall": "blackmarble_floor",
+            "pad": "blackmarble_floor",
+            "stage": "blackmarble_floor",
+        },
+    },
+    {
+        "id": "marble-grand",
+        "name": "Marble grand",
+        "description": "A no-compromise all-marble court with 10 m halls and monumental runes.",
+        "ring_radius": 62.0,
+        "rune_width": 14.0,
+        "rune_height": 17.0,
+        "rune_base_y": 1.0,
+        "beam_length": 2.0,
+        "station_inset": 10.0,
+        "rack_radius": 10.0,
+        "tile": 2.0,
+        "plaza_radius": 17.0,
+        "hall_half_width": 5.0,
+        "pad_half_width": 13.0,
+        "pad_depth": 16.0,
+        "rune_gap": 6.0,
+        "stage_depth": 14.0,
+        "stage_half_width": 14.0,
+        "wall_courses": 3,
+        "floor": {
+            "plaza": "blackmarble_floor",
+            "hall": "blackmarble_floor",
+            "pad": "blackmarble_floor",
+            "stage": "blackmarble_floor",
+        },
+    },
+]
+
+DEFAULT_PROFILE = "marble-wide"
+PANEL_SIZE = 8.0
+BACKDROP_COLUMNS = 2
+BACKDROP_ROWS = 2
+WING_ROWS = 2
+WALL_INSET = 0.5
+WALL_YAW_OFFSET = 90.0
+EXTRA_PLACED_OBJECTS = 32  # 3 portals + 8 stations + 8 stands + 8 items + 5 supplies
 
 
-def hex_of(rgb):
-    return "#%02x%02x%02x" % tuple(max(0, min(255, int(round(c * 255)))) for c in rgb)
-
-
-def sign_text(category, note):
-    """Copy for the sign at a hall mouth. Unity rich text: the Sign widget takes the
-    same <b>/<color>/<size> tags the rest of the game's UI does, and the string rides
-    to the piece in its own ZDO "text" field, which the component atlas reports as a
-    plain read/write — so there is no RPC signature to guess at."""
-    heading = hex_of(SCHOOL_COLOURS[category])
-    verdict = ("a quest CAN bind here" if category in QUEST_USABLE
-               else "nothing binds a quest here yet")
-    verdict_colour = "#8fdc8f" if category in QUEST_USABLE else "#d08a72"
-    return (f"<size=28><b><color={heading}>{category.upper()}</color></b></size>\n"
-            f"{note}\n"
-            f"<color={verdict_colour}>{verdict}</color>")
-
-
-def validate_against_dump(dump_path):
-    """Fail loudly on a palette name this game build does not have, and check that the
-    pieces we lay on a 2 m grid really are 2 m — snap points are the piece's own
-    statement of its footprint, so this catches a swap to a 4 m slab before 600 pieces
-    go into somebody's world overlapping each other."""
-    data = json.loads(open(dump_path, encoding="utf-8").read())
-    entries = {e["name"]: e for e in data.get("prefabs", [])}
-
-    missing = sorted(v for v in PALETTE.values() if v not in entries)
-    if missing:
-        raise SystemExit(
-            "palette names absent from the prefab dump: " + ", ".join(missing)
-            + " — fix PALETTE before regenerating the plan.")
-
-    for key in ("plaza", "hall", "pad"):
-        snaps = entries[PALETTE[key]].get("snapPoints") or []
-        if not snaps:
-            print(f"  ! {PALETTE[key]} has no snap points — footprint unverified")
-            continue
-        span_x = max(s[0] for s in snaps) - min(s[0] for s in snaps)
-        span_z = max(s[2] for s in snaps) - min(s[2] for s in snaps)
-        if abs(span_x - TILE) > 0.05 or abs(span_z - TILE) > 0.05:
-            raise SystemExit(
-                f"{PALETTE[key]} spans {span_x:.2f} x {span_z:.2f} m, but the plan lays "
-                f"it on a {TILE} m grid — pieces would overlap or leave gaps.")
-    return len(entries)
-
-
-def read_rune_segments(path):
-    """Read the same table the UI draws from. Parsing the source rather than
-    duplicating the numbers is the whole point: one shape, two scales."""
-    src = open(path, encoding="utf-8").read()
-    blocks = re.findall(r"\{ LabCategory\.(\w+), new\[\] \{(.*?)\} \},", src, re.S)
-    out = {}
+def read_rune_segments(path: Path) -> dict[str, list[tuple[float, float, float, float]]]:
+    source = path.read_text(encoding="utf-8")
+    blocks = re.findall(r"\{ LabCategory\.(\w+), new\[\] \{(.*?)\} \},", source, re.S)
+    parsed = {}
     for name, body in blocks:
-        out[name] = [tuple(float(v) for v in m) for m in re.findall(
-            r"new Seg\(([\d.]+)f?,\s*([\d.]+)f?,\s*([\d.]+)f?,\s*([\d.]+)f?\)",
-            body.replace("f", ""))]
-    return out
+        parsed[name] = [
+            tuple(float(value) for value in match)
+            for match in re.findall(
+                r"new Seg\(([\d.]+)f?,\s*([\d.]+)f?,\s*([\d.]+)f?,\s*([\d.]+)f?\)",
+                body.replace("f", ""),
+            )
+        ]
+    return parsed
 
 
-def monument_beams(segments, angle_deg):
-    """Cut each rune stroke into beam-length pieces standing in a vertical plane.
+def hex_of(rgb: tuple[float, float, float]) -> str:
+    values = tuple(max(0, min(255, int(round(component * 255)))) for component in rgb)
+    return "#%02x%02x%02x" % values
 
-    The plane faces the centre of the ring, so a student standing at the armoury
-    sees all eight runes face-on rather than edge-on."""
-    a = math.radians(angle_deg)
-    cx, cz = RUNE_RADIUS * math.sin(a), RUNE_RADIUS * math.cos(a)
-    # Tangent to the ring: the rune's "across" direction.
-    rx, rz = math.sin(a + math.pi / 2), math.cos(a + math.pi / 2)
 
+def sign_text(category: str, note: str) -> str:
+    heading = hex_of(SCHOOL_COLOURS[category])
+    return (
+        f"<size=28><b><color={heading}>{category.upper()}</color></b></size>\n"
+        f"{note}\n<color=#8fdc8f>safe events can bind here</color>"
+    )
+
+
+def monument_beams(segments, angle_deg: float, spec: dict):
+    angle = math.radians(angle_deg)
+    rune_radius = spec["ring_radius"] + spec["rune_gap"] + spec["stage_depth"] / 2.0
+    cx, cz = rune_radius * math.sin(angle), rune_radius * math.cos(angle)
+    rx, rz = math.sin(angle + math.pi / 2.0), math.cos(angle + math.pi / 2.0)
     beams = []
     for x1, y1, x2, y2 in segments:
-        # Rune space is 0..1 with y downward; world y goes up.
-        ax = (x1 - 0.5) * RUNE_WIDTH
-        ay = (1.0 - y1) * RUNE_HEIGHT
-        bx = (x2 - 0.5) * RUNE_WIDTH
-        by = (1.0 - y2) * RUNE_HEIGHT
+        ax = (x1 - 0.5) * spec["rune_width"]
+        ay = (1.0 - y1) * spec["rune_height"]
+        bx = (x2 - 0.5) * spec["rune_width"]
+        by = (1.0 - y2) * spec["rune_height"]
         length = math.hypot(bx - ax, by - ay)
-        count = max(1, int(round(length / BEAM_LENGTH)))
-        for i in range(count):
-            t0, t1 = i / count, (i + 1) / count
-            mx = ax + (bx - ax) * (t0 + t1) / 2
-            my = ay + (by - ay) * (t0 + t1) / 2
-            beams.append({
-                "x": round(cx + rx * mx, 3),
-                "y": round(RUNE_BASE_Y + my, 3),
-                "z": round(cz + rz * mx, 3),
-                # Direction of the stroke in world space, for the builder to aim the
-                # beam along. Emitted as a vector rather than an angle so the mod can
-                # decide which local axis to align without this script guessing.
-                "dx": round(rx * (bx - ax) / (length or 1), 4),
-                "dy": round((by - ay) / (length or 1), 4),
-                "dz": round(rz * (bx - ax) / (length or 1), 4),
-            })
-    return beams, (cx, cz), (rx, rz)
+        count = max(1, int(round(length / spec["beam_length"])))
+        for index in range(count):
+            t0, t1 = index / count, (index + 1) / count
+            mx = ax + (bx - ax) * (t0 + t1) / 2.0
+            my = ay + (by - ay) * (t0 + t1) / 2.0
+            beams.append(
+                {
+                    "x": round(cx + rx * mx, 3),
+                    "y": round(spec["rune_base_y"] + my, 3),
+                    "z": round(cz + rz * mx, 3),
+                    "dx": round(rx * (bx - ax) / (length or 1.0), 4),
+                    "dy": round((by - ay) / (length or 1.0), 4),
+                    "dz": round(rz * (bx - ax) / (length or 1.0), 4),
+                }
+            )
+    return beams, (cx, cz)
 
 
-segments = read_rune_segments(RUNES)
-missing = [c for c in ORDER if c not in segments]
-if missing:
-    raise SystemExit(f"no rune segments for {missing} — LabRunes.cs and this script disagree")
-
-monuments = []
-for i, category in enumerate(ORDER):
-    angle = i * (360.0 / len(ORDER))
-    beams, (cx, cz), (rx, rz) = monument_beams(segments[category], angle)
-    a = math.radians(angle)
-    station_prefab, station_kind, station_note = STATIONS[category]
-    monuments.append({
-        "category": category,
-        "angle": angle,
-        "cx": round(cx, 3), "cz": round(cz, 3),
-        "beams": beams,
-        "station": {
-            "prefab": station_prefab,
-            "kind": station_kind,
-            "note": station_note,
-            "x": round((RING_RADIUS - STATION_INSET) * math.sin(a), 3),
-            "z": round((RING_RADIUS - STATION_INSET) * math.cos(a), 3),
-        },
-    })
-
-rack = []
-for i, (item, note) in enumerate(ARMOURY):
-    a = 2 * math.pi * i / len(ARMOURY)
-    rack.append({
-        "item": item, "note": note,
-        "x": round(RACK_RADIUS * math.sin(a), 3),
-        "z": round(RACK_RADIUS * math.cos(a), 3),
-        "yaw": round((math.degrees(a) + 180.0) % 360.0, 1),   # face the centre
-    })
+def build_monuments(spec: dict, segments: dict):
+    monuments = []
+    for index, category in enumerate(ORDER):
+        angle = index * (360.0 / len(ORDER))
+        beams, (cx, cz) = monument_beams(segments[category], angle, spec)
+        radians = math.radians(angle)
+        prefab, kind, note = STATIONS[category]
+        monuments.append(
+            {
+                "category": category,
+                "angle": angle,
+                "cx": round(cx, 3),
+                "cz": round(cz, 3),
+                "beams": beams,
+                "station": {
+                    "prefab": prefab,
+                    "kind": kind,
+                    "note": note,
+                    "x": round((spec["ring_radius"] - spec["station_inset"]) * math.sin(radians), 3),
+                    "z": round((spec["ring_radius"] - spec["station_inset"]) * math.cos(radians), 3),
+                },
+            }
+        )
+    return monuments
 
 
-def platform_tiles(monuments):
-    """Grid cells that need a floor: plaza, spokes out to each pad, pads under each
-    monument. Deduped, because spokes and pads overlap where they meet."""
+def build_armoury(spec: dict):
+    rack = []
+    for index, (item, note) in enumerate(ARMOURY):
+        angle = 2.0 * math.pi * index / len(ARMOURY)
+        rack.append(
+            {
+                "item": item,
+                "note": note,
+                "x": round(spec["rack_radius"] * math.sin(angle), 3),
+                "z": round(spec["rack_radius"] * math.cos(angle), 3),
+                "yaw": round((math.degrees(angle) + 180.0) % 360.0, 1),
+            }
+        )
+    return rack
+
+
+def platform_tiles(spec: dict, monuments: list[dict]):
+    tile = spec["tile"]
+    reach = spec["ring_radius"] + spec["rune_gap"] + spec["stage_depth"] + 2.0
+    steps = int(reach / tile) + 2
+    rays = [
+        (math.sin(math.radians(monument["angle"])), math.cos(math.radians(monument["angle"])))
+        for monument in monuments
+    ]
     tiles = {}
-    reach = RING_RADIUS + PAD_DEPTH
-    steps = int(reach / TILE) + 2
-    rays = [(math.sin(math.radians(m["angle"])), math.cos(math.radians(m["angle"])))
-            for m in monuments]
-
     for i in range(-steps, steps + 1):
         for j in range(-steps, steps + 1):
-            x, z = i * TILE, j * TILE
-            r = math.hypot(x, z)
-            if r <= PLAZA_RADIUS:
+            x, z = i * tile, j * tile
+            if math.hypot(x, z) <= spec["plaza_radius"]:
                 tiles[(x, z)] = "plaza"
                 continue
             for sx, sz in rays:
-                along = x * sx + z * sz              # distance along the ray
-                across = abs(x * sz - z * sx)        # perpendicular offset
-                if along <= 0:
+                along = x * sx + z * sz
+                across = abs(x * sz - z * sx)
+                if along <= 0.0:
                     continue
-                # hall
-                if across <= SPOKE_HALF_WIDTH and along <= RING_RADIUS - PAD_DEPTH / 2:
-                    tiles.setdefault((x, z), "hall"); break
-                # pad
-                if (across <= PAD_HALF_WIDTH
-                        and abs(along - RING_RADIUS + PAD_DEPTH / 2 - 1.0) <= PAD_DEPTH / 2):
-                    tiles.setdefault((x, z), "pad"); break
-                # the rune's own stage, floating past the pad with a gap of open air
-                if (across <= STAGE_HALF_WIDTH
-                        and RING_RADIUS + RUNE_GAP <= along
-                            <= RING_RADIUS + RUNE_GAP + STAGE_DEPTH):
-                    tiles.setdefault((x, z), "stage"); break
-    return sorted((x, z, kind) for (x, z), kind in tiles.items())
+                if (
+                    across <= spec["hall_half_width"]
+                    and along <= spec["ring_radius"] - spec["pad_depth"] / 2.0
+                ):
+                    tiles.setdefault((x, z), "hall")
+                    break
+                if (
+                    across <= spec["pad_half_width"]
+                    and abs(along - spec["ring_radius"] + spec["pad_depth"] / 2.0 - 1.0)
+                    <= spec["pad_depth"] / 2.0
+                ):
+                    tiles.setdefault((x, z), "pad")
+                    break
+                if (
+                    across <= spec["stage_half_width"]
+                    and spec["ring_radius"] + spec["rune_gap"]
+                    <= along
+                    <= spec["ring_radius"] + spec["rune_gap"] + spec["stage_depth"]
+                ):
+                    tiles.setdefault((x, z), "stage")
+                    break
+    return [
+        {"x": x, "z": z, "kind": kind, "prefab": spec["floor"][kind]}
+        for (x, z), kind in sorted(tiles.items())
+    ]
 
 
-def backdrop_panels(monuments):
-    """A black wall behind each rune, and a return down each side.
-
-    blackmarble_floor_large stood on edge. The slab is 8 x 8 with its 2 m thickness on
-    local Y, so the builder turns that thin axis onto the hall's ray and the 8 x 8 face
-    ends up spanning across the hall and straight up — which is why these carry an
-    orientation the builder has to honour rather than a plain yaw."""
+def backdrop_panels(spec: dict, monuments: list[dict]):
     panels = []
-    back_along = RING_RADIUS + RUNE_GAP + STAGE_DEPTH
-    for m in monuments:
-        th = math.radians(m["angle"])
-        sx, sz = math.sin(th), math.cos(th)
-        px, pz = math.cos(th), -math.sin(th)
-
-        # the wall behind
-        for col in range(BACKDROP_COLUMNS):
-            off = (col - (BACKDROP_COLUMNS - 1) / 2.0) * PANEL
+    back_along = spec["ring_radius"] + spec["rune_gap"] + spec["stage_depth"]
+    for monument in monuments:
+        angle = math.radians(monument["angle"])
+        sx, sz = math.sin(angle), math.cos(angle)
+        px, pz = math.cos(angle), -math.sin(angle)
+        for column in range(BACKDROP_COLUMNS):
+            offset = (column - (BACKDROP_COLUMNS - 1) / 2.0) * PANEL_SIZE
             for row in range(BACKDROP_ROWS):
-                panels.append({
-                    "prefab": PALETTE["panel"],
-                    "x": round(sx * back_along + px * off, 3),
-                    "y": round(PANEL / 2.0 + row * PANEL, 3),   # centre height
-                    "z": round(sz * back_along + pz * off, 3),
-                    "yaw": round(m["angle"] % 360.0, 3),
-                    "orient": "panel",
-                    "text": "",
-                })
-
-        # the returns, one either side, turned a quarter so they face inward
+                panels.append(
+                    fixture(
+                        COMMON_PALETTE["panel"],
+                        sx * back_along + px * offset,
+                        PANEL_SIZE / 2.0 + row * PANEL_SIZE,
+                        sz * back_along + pz * offset,
+                        monument["angle"],
+                        "panel",
+                    )
+                )
         for side in (-1.0, 1.0):
-            off = side * (BACKDROP_COLUMNS * PANEL / 2.0)
-            along = back_along - PANEL / 2.0
+            offset = side * (BACKDROP_COLUMNS * PANEL_SIZE / 2.0)
+            along = back_along - PANEL_SIZE / 2.0
             for row in range(WING_ROWS):
-                panels.append({
-                    "prefab": PALETTE["panel"],
-                    "x": round(sx * along + px * off, 3),
-                    "y": round(PANEL / 2.0 + row * PANEL, 3),
-                    "z": round(sz * along + pz * off, 3),
-                    "yaw": round((m["angle"] + 90.0) % 360.0, 3),
-                    "orient": "panel",
-                    "text": "",
-                })
+                panels.append(
+                    fixture(
+                        COMMON_PALETTE["panel"],
+                        sx * along + px * offset,
+                        PANEL_SIZE / 2.0 + row * PANEL_SIZE,
+                        sz * along + pz * offset,
+                        monument["angle"] + 90.0,
+                        "panel",
+                    )
+                )
     return panels
 
 
-def hall_walls(monuments):
-    """Two courses of marble down each side of each hall, and no roof.
-
-    The corridor is the framing device: from the plaza you see a sign, a throat of black
-    marble, and a lit glyph at the end of it. Roofing that would trade the rune against
-    open sky for a tunnel, which is why WALL_COURSES stops at head height and stays
-    there."""
+def hall_walls(spec: dict, monuments: list[dict]):
     walls = []
-    inner_end = RING_RADIUS - PAD_DEPTH / 2
-    for m in monuments:
-        th = math.radians(m["angle"])
-        sx, sz = math.sin(th), math.cos(th)
-        px, pz = math.cos(th), -math.sin(th)          # across the hall
-        along = PLAZA_RADIUS
+    inner_end = spec["ring_radius"] - spec["pad_depth"] / 2.0
+    for monument in monuments:
+        angle = math.radians(monument["angle"])
+        sx, sz = math.sin(angle), math.cos(angle)
+        px, pz = math.cos(angle), -math.sin(angle)
+        along = spec["plaza_radius"]
         while along <= inner_end + 1e-6:
             for side in (-1.0, 1.0):
-                off = side * (SPOKE_HALF_WIDTH + WALL_INSET)
-                x, z = sx * along + px * off, sz * along + pz * off
-                for course in range(WALL_COURSES):
-                    walls.append({
-                        "prefab": PALETTE["wall"],
-                        "x": round(x, 3), "y": round(course * 2.0, 3), "z": round(z, 3),
-                        "yaw": round((m["angle"] + WALL_YAW_OFFSET) % 360.0, 3),
-                        "orient": "",
-                        "text": "",
-                    })
-            along += TILE
+                offset = side * (spec["hall_half_width"] + WALL_INSET)
+                x, z = sx * along + px * offset, sz * along + pz * offset
+                for course in range(spec["wall_courses"]):
+                    walls.append(
+                        fixture(
+                            COMMON_PALETTE["wall"],
+                            x,
+                            course * 2.0,
+                            z,
+                            monument["angle"] + WALL_YAW_OFFSET,
+                        )
+                    )
+            along += spec["tile"]
     return walls
 
 
-def hall_signs(monuments):
-    """One sign at each hall mouth, facing back into the plaza so it is read on the way
-    in rather than discovered on the way out."""
+def hall_signs(spec: dict, monuments: list[dict]):
     signs = []
-    for m in monuments:
-        th = math.radians(m["angle"])
-        sx, sz = math.sin(th), math.cos(th)
-        px, pz = math.cos(th), -math.sin(th)
-        along = PLAZA_RADIUS + 1.0
-        off = SPOKE_HALF_WIDTH + WALL_INSET + 0.6      # just outside the wall line
-        signs.append({
-            "prefab": PALETTE["sign"],
-            "x": round(sx * along + px * off, 3),
-            "y": 1.2,
-            "z": round(sz * along + pz * off, 3),
-            "yaw": round((m["angle"] + 180.0) % 360.0, 3),
-            "orient": "",
-            "text": sign_text(m["category"], m["station"]["note"]),
-        })
+    for monument in monuments:
+        angle = math.radians(monument["angle"])
+        sx, sz = math.sin(angle), math.cos(angle)
+        px, pz = math.cos(angle), -math.sin(angle)
+        along = spec["plaza_radius"] + 1.0
+        offset = spec["hall_half_width"] + WALL_INSET + 0.6
+        signs.append(
+            fixture(
+                COMMON_PALETTE["sign"],
+                sx * along + px * offset,
+                1.2,
+                sz * along + pz * offset,
+                monument["angle"] + 180.0,
+                text=sign_text(monument["category"], monument["station"]["note"]),
+            )
+        )
     return signs
 
 
-def cs(text):
-    """A C# string literal. Newlines are escaped, not embedded: sign copy is multi-line
-    and a raw newline inside a quoted literal is a compile error, not a formatting
-    quirk."""
-    return ('"' + text.replace("\\", "\\\\").replace('"', '\\"')
-                      .replace("\r", "\\r").replace("\n", "\\n") + '"')
+def fixture(prefab, x, y, z, yaw, orient="", text=""):
+    return {
+        "prefab": prefab,
+        "x": round(x, 3),
+        "y": round(y, 3),
+        "z": round(z, 3),
+        "yaw": round(yaw % 360.0, 3),
+        "orient": orient,
+        "text": text,
+    }
 
 
-lines = [
-    "// <auto-generated>",
-    "//   Generated by tools/component-packets/generate_gallery.py.",
-    "//   The rune strokes are read from Ui/LabRunes.cs, so a monument is the same shape",
-    "//   as the glyph on its page — one table, two scales. Do not edit by hand.",
-    "// </auto-generated>",
-    "",
-    "namespace ComfyQuestLab;",
-    "",
-    "/// <summary>Where everything in the gallery goes, relative to its origin.",
-    "///",
-    "/// Coordinates are metres from the gallery centre, not world coordinates: the builder",
-    "/// adds the player's chosen origin, so the gallery can be raised anywhere rather than",
-    "/// tying the Tome to one world.</summary>",
-    "public static class LabGalleryPlan {",
-    "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",
-    "  public struct Station { public string Prefab, Kind, Note; public float X, Z; }",
-    "  public struct Monument { public string Category; public float Angle, Cx, Cz;",
-    "                           public float R, G, B;",
-    "                           public Beam[] Beams; public Station Station; }",
-    "  public struct RackItem { public string Item, Note; public float X, Z, Yaw; }",
-    "",
-    "  /// <summary>One floor cell and what to pave it with. Stone in the plaza, black",
-    "  /// marble down the halls — the plaza reads as ground, the halls as built.</summary>",
-    "  public struct Tile { public float X, Z; public string Prefab; }",
-    "",
-    "  /// <summary>Anything standing on the floor that is not a monument: hall walls, and",
-    "  /// the sign at each hall mouth. Text is empty except on signs, where it carries",
-    "  /// Unity rich-text markup into the piece's own ZDO \"text\" field.</summary>",
-    "  /// Orient is \"\" for anything that only needs a yaw, and \"panel\" for a slab",
-    "  /// stood on edge — for those the builder turns the piece's thin axis onto the",
-    "  /// hall's ray, and reads Y as a centre height rather than a base.</summary>",
-    "  public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;",
-    "                          public string Orient, Text; }",
-    "",
-    f"  public const float RingRadius = {RING_RADIUS}f;",
-    f"  public const float RuneHeight = {RUNE_HEIGHT}f;",
-    f"  public const float BeamLength = {BEAM_LENGTH}f;",
-    "",
-    "  public static readonly Monument[] Monuments = {",
-]
-
-total_beams = 0
-for m in monuments:
-    total_beams += len(m["beams"])
-    lines.append("    new Monument {")
-    lines.append(f"      Category = LabCategory.{m['category']},")
-    lines.append(f"      Angle = {m['angle']}f, Cx = {m['cx']}f, Cz = {m['cz']}f,")
-    cr, cg, cb = SCHOOL_COLOURS[m["category"]]
-    lines.append(f"      R = {cr}f, G = {cg}f, B = {cb}f,")
-    st = m["station"]
-    lines.append(f"      Station = new Station {{ Prefab = {cs(st['prefab'])}, "
-                 f"Kind = {cs(st['kind'])}, Note = {cs(st['note'])}, "
-                 f"X = {st['x']}f, Z = {st['z']}f }},")
-    lines.append("      Beams = new[] {")
-    for b in m["beams"]:
-        lines.append(f"        new Beam {{ X = {b['x']}f, Y = {b['y']}f, Z = {b['z']}f, "
-                     f"Dx = {b['dx']}f, Dy = {b['dy']}f, Dz = {b['dz']}f }},")
-    lines.append("      },")
-    lines.append("    },")
-
-tiles = platform_tiles(monuments)
-fixtures = hall_walls(monuments) + backdrop_panels(monuments) + hall_signs(monuments)
-lines += ["  };", "",
-          "  /// <summary>Floor tiles, 2 m apart, relative to the gallery origin. The",
-          "  /// builder picks ONE world height for the whole platform — the highest ground",
-          "  /// under the footprint plus a clearance — so the floor is level even where the",
-          "  /// terrain is not, and drops supports wherever the gap is worth hiding.</summary>",
-          "  public static readonly Tile[] PlatformTiles = {"]
-for x, z, kind in tiles:
-    lines.append(f"    new Tile {{ X = {x}f, Z = {z}f, Prefab = {cs(PALETTE[kind])} }},")
-lines += ["  };", "",
-          "  /// <summary>Hall walls and the sign at each hall mouth.</summary>",
-          "  public static readonly Fixture[] Fixtures = {"]
-for f in fixtures:
-    lines.append(f"    new Fixture {{ Prefab = {cs(f['prefab'])}, X = {f['x']}f, "
-                 f"Y = {f['y']}f, Z = {f['z']}f, Yaw = {f['yaw']}f, "
-                 f"Orient = {cs(f['orient'])}, Text = {cs(f['text'])} }},")
-lines += ["  };", "", "  public static readonly RackItem[] Armoury = {"]
-for r in rack:
-    lines.append(f"    new RackItem {{ Item = {cs(r['item'])}, Note = {cs(r['note'])}, "
-                 f"X = {r['x']}f, Z = {r['z']}f, Yaw = {r['yaw']}f }},")
-lines += ["  };", "}", ""]
-
-dump_path = None
-if "--prefab-dump" in sys.argv:
-    dump_path = sys.argv[sys.argv.index("--prefab-dump") + 1]
-elif os.path.exists(DUMP):
-    dump_path = DUMP
-if dump_path:
-    known = validate_against_dump(dump_path)
-    print(f"  palette checked against {known} prefabs in {os.path.basename(dump_path)}")
-else:
-    print("  ! no prefab dump — palette names are UNVERIFIED; run questlab_prefabs dump")
-
-os.makedirs(os.path.dirname(OUT), exist_ok=True)
-with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
-    fh.write("\n".join(lines))
-print(f"  {OUT}")
-walls = sum(1 for f in fixtures if not f["text"])
-print(f"  8 monuments, {total_beams} beams, {len(rack)} armoury stands, "
-      f"{len(tiles)} floor tiles, {walls} wall pieces, {len(fixtures) - walls} signs")
-
-# --- preview ---------------------------------------------------------------------
-try:
-    from PIL import Image, ImageDraw
-except ImportError:
-    print("  (Pillow absent — no preview rendered)")
-    raise SystemExit(0)
-
-SPAN, PX = 130.0, 900
-img = Image.new("RGB", (PX, PX), (11, 16, 19))
-d = ImageDraw.Draw(img)
+def build_profile(spec: dict, segments: dict):
+    monuments = build_monuments(spec, segments)
+    tiles = platform_tiles(spec, monuments)
+    fixtures = hall_walls(spec, monuments) + backdrop_panels(spec, monuments) + hall_signs(spec, monuments)
+    armoury = build_armoury(spec)
+    beam_count = sum(len(monument["beams"]) for monument in monuments)
+    footprint = (
+        spec["ring_radius"]
+        + spec["rune_gap"]
+        + spec["stage_depth"]
+        + max(spec["stage_half_width"], BACKDROP_COLUMNS * PANEL_SIZE / 2.0)
+        + 2.0
+    )
+    floor_materials = sorted({tile["prefab"] for tile in tiles})
+    return {
+        "id": spec["id"],
+        "name": spec["name"],
+        "description": spec["description"],
+        "ringRadius": spec["ring_radius"],
+        "runeHeight": spec["rune_height"],
+        "beamLength": spec["beam_length"],
+        "hallWidth": spec["hall_half_width"] * 2.0,
+        "floorMaterials": floor_materials,
+        "solidMarbleFloor": floor_materials == ["blackmarble_floor"],
+        "footprintRadius": footprint,
+        "monuments": monuments,
+        "tiles": tiles,
+        "fixtures": fixtures,
+        "armoury": armoury,
+        "counts": {
+            "floorTiles": len(tiles),
+            "fixtures": len(fixtures),
+            "runeBeams": beam_count,
+            "armouryStands": len(armoury),
+            "estimatedPlacedObjects": len(tiles) + len(fixtures) + beam_count + EXTRA_PLACED_OBJECTS,
+        },
+    }
 
 
-def to_px(x, z):
-    return (PX / 2 + x / SPAN * PX, PX / 2 - z / SPAN * PX)
+def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
+    data = json.loads(dump_path.read_text(encoding="utf-8"))
+    entries = {entry["name"]: entry for entry in data.get("prefabs", [])}
+    wanted = set(COMMON_PALETTE.values()) | {"itemstand", "wood_floor", "wood_pole"}
+    wanted.update(prefab for prefab, _, _ in STATIONS.values())
+    wanted.update(item for item, _ in ARMOURY)
+    for profile in profiles:
+        wanted.update(profile["floorMaterials"])
+    missing = sorted(wanted - set(entries))
+    if missing:
+        raise SystemExit("gallery prefab(s) absent from dump: " + ", ".join(missing))
+
+    for profile in profiles:
+        for floor in profile["floorMaterials"]:
+            snaps = entries[floor].get("snapPoints") or []
+            if not snaps:
+                raise SystemExit(f"{floor} has no snap points; floor span is unverified")
+            span_x = max(point[0] for point in snaps) - min(point[0] for point in snaps)
+            span_z = max(point[2] for point in snaps) - min(point[2] for point in snaps)
+            if abs(span_x - 2.0) > 0.05 or abs(span_z - 2.0) > 0.05:
+                raise SystemExit(f"{floor} spans {span_x:.2f} x {span_z:.2f}, not the 2 m grid")
+
+    ids = [profile["id"] for profile in profiles]
+    if len(ids) != len(set(ids)) or DEFAULT_PROFILE not in ids:
+        raise SystemExit("gallery profile ids must be unique and include the default")
+    for profile in profiles:
+        if profile["id"] != "classic" and not profile["solidMarbleFloor"]:
+            raise SystemExit(f"v2 profile {profile['id']} is not an all-marble floor")
+        if profile["id"] != "classic" and profile["hallWidth"] <= 4.0:
+            raise SystemExit(f"v2 profile {profile['id']} did not widen the classic halls")
+    return len(entries)
 
 
-COLOURS = {
-    "Combat": (237, 115, 102), "Harvest": (122, 204, 133), "Inventory": (217, 184, 107),
-    "Building": (199, 153, 97), "Crafting": (235, 158, 77), "Progression": (245, 214, 107),
-    "World": (117, 194, 235), "Social": (194, 168, 240),
-}
+def cs(text: str) -> str:
+    return (
+        '"'
+        + text.replace("\\", "\\\\").replace('"', '\\"').replace("\r", "\\r").replace("\n", "\\n")
+        + '"'
+    )
 
-# Plaza stone reads warmer than the marble halls, so the preview can be checked at a
-# glance for the material split as well as the footprint.
-TILE_FILL = {"plaza": (46, 42, 38), "hall": (22, 20, 26), "pad": (22, 20, 26)}
-for x, z, kind in tiles:
-    px, pz = to_px(x, z)
-    half = TILE / SPAN * PX / 2
-    d.rectangle([px - half, pz - half, px + half, pz + half],
-                fill=TILE_FILL.get(kind, (31, 26, 20)), outline=(46, 38, 29))
 
-for f in fixtures:
-    px, pz = to_px(f["x"], f["z"])
-    r = 2 if f["text"] else 1
-    d.ellipse([px - r, pz - r, px + r, pz + r],
-              fill=(220, 190, 120) if f["text"] else (96, 92, 110))
+def f(value) -> str:
+    number = float(value)
+    if number.is_integer():
+        return f"{int(number)}f"
+    return f"{number:g}f"
 
-d.ellipse([*to_px(-RING_RADIUS, RING_RADIUS), *to_px(RING_RADIUS, -RING_RADIUS)],
-          outline=(38, 50, 55))
-d.ellipse([*to_px(-RACK_RADIUS, RACK_RADIUS), *to_px(RACK_RADIUS, -RACK_RADIUS)],
-          outline=(60, 78, 84))
 
-for m in monuments:
-    colour = COLOURS[m["category"]]
-    for b in m["beams"]:
-        px, pz = to_px(b["x"], b["z"])
-        d.ellipse([px - 2.2, pz - 2.2, px + 2.2, pz + 2.2], fill=colour)
-    sx, sz = to_px(m["station"]["x"], m["station"]["z"])
-    d.rectangle([sx - 4, sz - 4, sx + 4, sz + 4], outline=colour)
-    lx, lz = to_px(m["cx"] * 1.19, m["cz"] * 1.19)
-    d.text((lx - 24, lz - 5), m["category"], fill=colour)
+def render_csharp(profiles: list[dict]) -> str:
+    lines = [
+        "// <auto-generated>",
+        "//   Generated by tools/component-packets/generate_gallery.py.",
+        "//   Rune strokes come from Ui/LabRunes.cs and profile prefab names are checked",
+        "//   against samples/prefab-dump.json. Do not edit by hand.",
+        "// </auto-generated>",
+        "",
+        "namespace ComfyQuestLab;",
+        "",
+        "using System;",
+        "",
+        "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
+        "public static class LabGalleryPlan {",
+        "  public const int PlanVersion = 2;",
+        f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
+        "",
+        "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",
+        "  public struct Station { public string Prefab, Kind, Note; public float X, Z; }",
+        "  public struct Monument { public string Category; public float Angle, Cx, Cz;",
+        "                           public float R, G, B;",
+        "                           public Beam[] Beams; public Station Station; }",
+        "  public struct RackItem { public string Item, Note; public float X, Z, Yaw; }",
+        "  public struct Tile { public float X, Z; public string Prefab; }",
+        "  public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;",
+        "                          public string Orient, Text; }",
+        "",
+        "  public sealed class Profile {",
+        "    public string Id, Name, Description;",
+        "    public float RingRadius, RuneHeight, BeamLength, HallWidth, FootprintRadius;",
+        "    public bool SolidMarbleFloor;",
+        "    public int EstimatedPlacedObjects;",
+        "    public string[] FloorMaterials;",
+        "    public Monument[] Monuments;",
+        "    public Tile[] PlatformTiles;",
+        "    public Fixture[] Fixtures;",
+        "    public RackItem[] Armoury;",
+        "  }",
+        "",
+        "  public static readonly Profile[] Profiles = {",
+    ]
+    for profile in profiles:
+        lines.extend(
+            [
+                "    new Profile {",
+                f"      Id = {cs(profile['id'])}, Name = {cs(profile['name'])},",
+                f"      Description = {cs(profile['description'])},",
+                f"      RingRadius = {f(profile['ringRadius'])}, RuneHeight = {f(profile['runeHeight'])},",
+                f"      BeamLength = {f(profile['beamLength'])}, HallWidth = {f(profile['hallWidth'])},",
+                f"      FootprintRadius = {f(profile['footprintRadius'])},",
+                f"      SolidMarbleFloor = {str(profile['solidMarbleFloor']).lower()},",
+                f"      EstimatedPlacedObjects = {profile['counts']['estimatedPlacedObjects']},",
+                "      FloorMaterials = new[] { "
+                + ", ".join(cs(item) for item in profile["floorMaterials"])
+                + " },",
+                "      Monuments = new[] {",
+            ]
+        )
+        for monument in profile["monuments"]:
+            red, green, blue = SCHOOL_COLOURS[monument["category"]]
+            station = monument["station"]
+            lines.extend(
+                [
+                    "        new Monument {",
+                    f"          Category = LabCategory.{monument['category']},",
+                    f"          Angle = {f(monument['angle'])}, Cx = {f(monument['cx'])}, Cz = {f(monument['cz'])},",
+                    f"          R = {f(red)}, G = {f(green)}, B = {f(blue)},",
+                    "          Station = new Station { "
+                    f"Prefab = {cs(station['prefab'])}, Kind = {cs(station['kind'])}, "
+                    f"Note = {cs(station['note'])}, X = {f(station['x'])}, Z = {f(station['z'])} }},",
+                    "          Beams = new[] {",
+                ]
+            )
+            for beam in monument["beams"]:
+                lines.append(
+                    "            new Beam { "
+                    f"X = {f(beam['x'])}, Y = {f(beam['y'])}, Z = {f(beam['z'])}, "
+                    f"Dx = {f(beam['dx'])}, Dy = {f(beam['dy'])}, Dz = {f(beam['dz'])} }},"
+                )
+            lines.extend(["          },", "        },"])
+        lines.extend(["      },", "      PlatformTiles = new[] {"])
+        for tile in profile["tiles"]:
+            lines.append(
+                f"        new Tile {{ X = {f(tile['x'])}, Z = {f(tile['z'])}, Prefab = {cs(tile['prefab'])} }},"
+            )
+        lines.extend(["      },", "      Fixtures = new[] {"])
+        for item in profile["fixtures"]:
+            lines.append(
+                "        new Fixture { "
+                f"Prefab = {cs(item['prefab'])}, X = {f(item['x'])}, Y = {f(item['y'])}, "
+                f"Z = {f(item['z'])}, Yaw = {f(item['yaw'])}, "
+                f"Orient = {cs(item['orient'])}, Text = {cs(item['text'])} }},"
+            )
+        lines.extend(["      },", "      Armoury = new[] {"])
+        for item in profile["armoury"]:
+            lines.append(
+                "        new RackItem { "
+                f"Item = {cs(item['item'])}, Note = {cs(item['note'])}, X = {f(item['x'])}, "
+                f"Z = {f(item['z'])}, Yaw = {f(item['yaw'])} }},"
+            )
+        lines.extend(["      },", "    },"])
+    lines.extend(
+        [
+            "  };",
+            "",
+            "  public static Profile Find(string id) {",
+            "    string wanted = string.IsNullOrWhiteSpace(id) ? DefaultProfileId : id.Trim();",
+            "    foreach (Profile profile in Profiles) {",
+            "      if (string.Equals(profile.Id, wanted, StringComparison.OrdinalIgnoreCase)) {",
+            "        return profile;",
+            "      }",
+            "    }",
+            "    return null;",
+            "  }",
+            "",
+            "  // Source-compatible default aliases used by seed/tests and older call sites.",
+            "  public static Monument[] Monuments { get { return Find(DefaultProfileId).Monuments; } }",
+            "  public static Tile[] PlatformTiles { get { return Find(DefaultProfileId).PlatformTiles; } }",
+            "  public static Fixture[] Fixtures { get { return Find(DefaultProfileId).Fixtures; } }",
+            "  public static RackItem[] Armoury { get { return Find(DefaultProfileId).Armoury; } }",
+            "  public static float RuneHeight { get { return Find(DefaultProfileId).RuneHeight; } }",
+            "}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
-for r in rack:
-    px, pz = to_px(r["x"], r["z"])
-    d.rectangle([px - 2, pz - 2, px + 2, pz + 2], fill=(200, 200, 190))
-d.text((PX / 2 - 26, PX / 2 - 4), "armoury", fill=(150, 168, 165))
-d.text((12, PX - 22),
-       f"gallery plan · {SPAN:.0f} m across · {total_beams} beams · {len(tiles)} floor tiles",
-       fill=(120, 140, 138))
 
-os.makedirs(os.path.dirname(PREVIEW), exist_ok=True)
-img.save(PREVIEW)
-print(f"  {PREVIEW}")
+def summary_model(profiles: list[dict]) -> dict:
+    return {
+        "Schema": "comfy-questlab-gallery-profiles/v2",
+        "DefaultProfile": DEFAULT_PROFILE,
+        "ProfileCount": len(profiles),
+        "Profiles": [
+            {
+                key: profile[key]
+                for key in (
+                    "id",
+                    "name",
+                    "description",
+                    "ringRadius",
+                    "runeHeight",
+                    "hallWidth",
+                    "footprintRadius",
+                    "floorMaterials",
+                    "solidMarbleFloor",
+                    "counts",
+                )
+            }
+            for profile in profiles
+        ],
+    }
+
+
+def render_previews(profiles: list[dict]) -> None:
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        print("  (Pillow absent - previews not rendered)")
+        return
+
+    colors = {
+        "Combat": (237, 115, 102),
+        "Harvest": (122, 204, 133),
+        "Inventory": (217, 184, 107),
+        "Building": (199, 153, 97),
+        "Crafting": (235, 158, 77),
+        "Progression": (245, 214, 107),
+        "World": (117, 194, 235),
+        "Social": (194, 168, 240),
+    }
+
+    images = []
+    for profile in profiles:
+        size = 720
+        span = profile["footprintRadius"] * 2.0 + 8.0
+        image = Image.new("RGB", (size, size), (11, 16, 19))
+        draw = ImageDraw.Draw(image)
+
+        def point(x, z):
+            return (size / 2.0 + x / span * size, size / 2.0 - z / span * size)
+
+        floor_fill = (25, 25, 31) if profile["solidMarbleFloor"] else (45, 40, 37)
+        half = 2.0 / span * size / 2.0
+        for tile in profile["tiles"]:
+            px, pz = point(tile["x"], tile["z"])
+            fill = floor_fill if tile["prefab"] == "blackmarble_floor" else (55, 48, 42)
+            draw.rectangle([px - half, pz - half, px + half, pz + half], fill=fill)
+        for item in profile["fixtures"]:
+            px, pz = point(item["x"], item["z"])
+            radius = 2 if item["text"] else 1
+            draw.ellipse([px - radius, pz - radius, px + radius, pz + radius], fill=(105, 102, 118))
+        for monument in profile["monuments"]:
+            color = colors[monument["category"]]
+            for beam in monument["beams"]:
+                px, pz = point(beam["x"], beam["z"])
+                draw.ellipse([px - 2, pz - 2, px + 2, pz + 2], fill=color)
+        draw.text((12, 10), f"{profile['name']} ({profile['id']})", fill=(235, 240, 238))
+        draw.text(
+            (12, size - 24),
+            f"{profile['hallWidth']:.0f} m halls | {profile['counts']['estimatedPlacedObjects']} objects",
+            fill=(155, 170, 167),
+        )
+        path = HERE / "samples" / f"gallery-plan-{profile['id']}.png"
+        image.save(path)
+        images.append(image)
+        if profile["id"] == DEFAULT_PROFILE:
+            image.save(DEFAULT_PREVIEW)
+        print(f"  {path}")
+
+    composite = Image.new("RGB", (len(images) * 480, 480), (11, 16, 19))
+    for index, image in enumerate(images):
+        composite.paste(image.resize((480, 480)), (index * 480, 0))
+    comparison = HERE / "samples" / "gallery-plan-comparison.png"
+    composite.save(comparison)
+    print(f"  {comparison}")
+
+
+def write_or_check(path: Path, content: str, check: bool) -> None:
+    if check:
+        actual = path.read_text(encoding="utf-8") if path.exists() else None
+        if actual != content:
+            raise SystemExit(f"generated gallery artifact is stale: {path}")
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8", newline="\n")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--prefab-dump", type=Path, default=DEFAULT_DUMP)
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+
+    segments = read_rune_segments(RUNES)
+    missing = [category for category in ORDER if category not in segments]
+    if missing:
+        raise SystemExit(f"LabRunes.cs is missing gallery segments for: {missing}")
+
+    profiles = [build_profile(spec, segments) for spec in PROFILE_SPECS]
+    known = validate_profiles(profiles, args.prefab_dump)
+    csharp = render_csharp(profiles)
+    summary = json.dumps(summary_model(profiles), indent=2, ensure_ascii=False) + "\n"
+    write_or_check(OUT, csharp, args.check)
+    write_or_check(SUMMARY, summary, args.check)
+
+    if args.check:
+        print(
+            f"verified {len(profiles)} gallery profiles; default {DEFAULT_PROFILE}; "
+            f"prefab dump {known} entries"
+        )
+        return 0
+
+    print(f"  palette checked against {known} prefabs in {args.prefab_dump.name}")
+    print(f"  {OUT}")
+    print(f"  {SUMMARY}")
+    for profile in profiles:
+        counts = profile["counts"]
+        print(
+            f"  {profile['id']}: {profile['hallWidth']:.0f} m halls, "
+            f"{counts['floorTiles']} floor, {counts['fixtures']} fixtures, "
+            f"{counts['runeBeams']} beams, ~{counts['estimatedPlacedObjects']} objects"
+        )
+    render_previews(profiles)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,68 @@
+{
+  "Schema": "comfy-questlab-gallery-profiles/v2",
+  "DefaultProfile": "marble-wide",
+  "ProfileCount": 3,
+  "Profiles": [
+    {
+      "id": "classic",
+      "name": "Classic ring",
+      "description": "The proven mixed stone/marble footprint retained for comparison.",
+      "ringRadius": 38.0,
+      "runeHeight": 11.0,
+      "hallWidth": 4.0,
+      "footprintRadius": 60.0,
+      "floorMaterials": [
+        "blackmarble_floor",
+        "stone_floor_2x2"
+      ],
+      "solidMarbleFloor": false,
+      "counts": {
+        "floorTiles": 796,
+        "fixtures": 488,
+        "runeBeams": 89,
+        "armouryStands": 8,
+        "estimatedPlacedObjects": 1405
+      }
+    },
+    {
+      "id": "marble-wide",
+      "name": "Marble wide",
+      "description": "Gallery v2 default: an all-marble floor, 8 m halls, and larger runes.",
+      "ringRadius": 50.0,
+      "runeHeight": 14.0,
+      "hallWidth": 8.0,
+      "footprintRadius": 77.0,
+      "floorMaterials": [
+        "blackmarble_floor"
+      ],
+      "solidMarbleFloor": true,
+      "counts": {
+        "floorTiles": 1517,
+        "fixtures": 584,
+        "runeBeams": 110,
+        "armouryStands": 8,
+        "estimatedPlacedObjects": 2243
+      }
+    },
+    {
+      "id": "marble-grand",
+      "name": "Marble grand",
+      "description": "A no-compromise all-marble court with 10 m halls and monumental runes.",
+      "ringRadius": 62.0,
+      "runeHeight": 17.0,
+      "hallWidth": 10.0,
+      "footprintRadius": 98.0,
+      "floorMaterials": [
+        "blackmarble_floor"
+      ],
+      "solidMarbleFloor": true,
+      "counts": {
+        "floorTiles": 2461,
+        "fixtures": 984,
+        "runeBeams": 134,
+        "armouryStands": 8,
+        "estimatedPlacedObjects": 3611
+      }
+    }
+  ]
+}

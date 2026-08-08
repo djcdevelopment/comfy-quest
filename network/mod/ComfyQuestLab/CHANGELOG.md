@@ -26,6 +26,14 @@ three tools that keep them honest. Nothing is published and there is no download
   witnesses before quest evaluation. Diagnostic-only witnesses are structurally non-bindable;
   four query/cheat signatures remain deliberately disabled. Headless and assembly-build receipts
   are complete; the six schools beyond combat and harvest still need bounded i5 live receipts.
+- **Gallery v2 is profile-driven and reversible.** The generated `classic`, `marble-wide`,
+  and `marble-grand` plans retain the proven geometry as a baseline while adding solid
+  black-marble floors, 8–10 m halls, larger rings, and larger runes. Runtime commands can
+  list, check, build, compare, identify, selectively clear, and rebuild profiles. Every
+  object carries plan/profile/build marks; comparison sides share a build id, and clear
+  sweeps the loaded ZDO table so portals and loose supplies are covered alongside structure
+  pieces without ever touching an unmarked object. Generated JSON/count/preview artifacts
+  and seven drift tests agree. Live visual selection remains pending.
 - **The initial eight-category scaffold wired** 26 atlas integrations plus two panel/input support hooks:
   - **harvest** — `TreeBase.Damage`, `TreeLog.Damage`, `Destructible.Damage`,
     `Pickable.Interact`. The first three are what the retired ComfyControlSurface hooked,

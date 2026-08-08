@@ -7,6 +7,8 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 
+using HarmonyLib;
+
 using UnityEngine;
 
 /// <summary>Raises the gallery described by <see cref="LabGalleryPlan"/>.
@@ -14,19 +16,22 @@ using UnityEngine;
 /// This is the one part of the Tome that changes the world rather than witnessing it,
 /// and it only ever does so when a person types a command. Nothing here runs on its own.
 ///
-/// Three commands, in the order you should use them:
+/// Gallery v2 commands, in the order you should use them:
 ///
 ///   check   resolve every prefab the plan names and report what is missing. Places
 ///           nothing. Prefab names are the one thing in this project NOT read out of the
 ///           game assembly, so this exists to turn a guess into a fact before 600 pieces
 ///           are committed to somebody's world.
-///   build   raise it, spread across frames so the game does not hitch.
-///   clear   take it down again, using a manifest written at build time.
+///   profiles list the reversible geometry choices and their exact generated counts.
+///   build   raise one profile, spread across frames so the game does not hitch.
+///   compare raise two labelled profiles side by side for human judgement.
+///   identify report the profile/build marks on loaded gallery structures.
+///   clear   take down only marked gallery objects, optionally by profile or build id.
+///   rebuild clear one profile and raise it again at the player's current position.
 ///
 /// A gallery is raised at the player's feet, so the plan stays origin-relative and the
 /// Tome is not tied to one world.</summary>
 public sealed class LabGalleryBuilder {
-  const int PiecesPerFrame = 12;
   const float PlatformClearance = 0.6f;   // floor sits this far above the highest ground
 
   /// <summary>Portal tags. Two portals sharing a tag connect to each other; the pairing
@@ -40,7 +45,12 @@ public sealed class LabGalleryBuilder {
   static readonly string[] Supplies = { "Wood", "Wood", "FineWood", "RoundLog", "Stone" };
 
   readonly List<ZDOID> _placed = new List<ZDOID>();
+  static readonly AccessTools.FieldRef<ZDOMan, Dictionary<ZDOID, ZDO>> _objectsByIdRef =
+      AccessTools.FieldRefAccess<ZDOMan, Dictionary<ZDOID, ZDO>>("m_objectsByID");
   bool _running;
+  string _activeProfileId = "legacy";
+  string _activeBuildId = "legacy";
+  int _buildSequence;
 
   /// <summary>A mark every gallery piece carries in its own ZDO.
   ///
@@ -53,6 +63,8 @@ public sealed class LabGalleryBuilder {
   /// field — the same mechanism the portals use for their pairing tag, so it is a proven
   /// shape rather than a guessed one. It answers the question in any session.</summary>
   const string GalleryMark = "comfyQuestLabGallery";
+  const string GalleryProfileMark = "comfyQuestLabGalleryProfile";
+  const string GalleryBuildMark = "comfyQuestLabGalleryBuild";
 
   /// <summary>Is this object part of a gallery the Tome raised? Used both to decide what
   /// clear may destroy and to keep support wear off after a zone reload.</summary>
@@ -64,6 +76,26 @@ public sealed class LabGalleryBuilder {
       return zdo.GetString(GalleryMark, string.Empty).Length > 0;
     } catch (Exception) {
       return false;
+    }
+  }
+
+  public static string GalleryProfile(ZDO zdo) {
+    try {
+      return zdo == null
+          ? "unknown"
+          : zdo.GetString(GalleryProfileMark, "legacy");
+    } catch (Exception) {
+      return "unknown";
+    }
+  }
+
+  public static string GalleryBuild(ZDO zdo) {
+    try {
+      return zdo == null
+          ? "unknown"
+          : zdo.GetString(GalleryBuildMark, "legacy");
+    } catch (Exception) {
+      return "unknown";
     }
   }
 
@@ -80,22 +112,35 @@ public sealed class LabGalleryBuilder {
 
   /// <summary>Resolve everything the plan names, place nothing, and say what is missing.
   /// Run this first, always.</summary>
-  public string Check() {
+  public string Check(string profileId = null) {
     if (ZNetScene.instance == null) {
       return "not in a world yet — load a world first.";
     }
 
-    var wanted = new List<string> { "wood_floor", "wood_beam", "wood_pole" };
-    foreach (LabGalleryPlan.Monument m in LabGalleryPlan.Monuments) {
+    LabGalleryPlan.Profile profile = LabGalleryPlan.Find(profileId);
+    if (profile == null) {
+      return UnknownProfile(profileId);
+    }
+
+    var wanted = new List<string> { "wood_beam", "portal_wood", "itemstand" };
+    foreach (LabGalleryPlan.Tile tile in profile.PlatformTiles) {
+      AddUnique(wanted, tile.Prefab);
+    }
+    foreach (LabGalleryPlan.Fixture fixture in profile.Fixtures) {
+      AddUnique(wanted, fixture.Prefab);
+    }
+    foreach (LabGalleryPlan.Monument m in profile.Monuments) {
       if (!wanted.Contains(m.Station.Prefab)) {
         wanted.Add(m.Station.Prefab);
       }
     }
-    wanted.Add("itemstand");
-    foreach (LabGalleryPlan.RackItem r in LabGalleryPlan.Armoury) {
+    foreach (LabGalleryPlan.RackItem r in profile.Armoury) {
       if (!wanted.Contains(r.Item)) {
         wanted.Add(r.Item);
       }
+    }
+    foreach (string supply in Supplies) {
+      AddUnique(wanted, supply);
     }
 
     var found = new List<string>();
@@ -105,7 +150,8 @@ public sealed class LabGalleryBuilder {
     }
 
     var sb = new StringBuilder();
-    sb.AppendLine("gallery check — " + found.Count + " of " + wanted.Count + " prefabs resolved");
+    sb.AppendLine("gallery check " + profile.Id + " — "
+        + found.Count + " of " + wanted.Count + " prefabs resolved");
     if (missing.Count > 0) {
       sb.AppendLine("MISSING (the plan names these and this game build does not have them):");
       foreach (string name in missing) {
@@ -113,21 +159,72 @@ public sealed class LabGalleryBuilder {
       }
       sb.AppendLine("Find the right name with: questlab_prefabs <part of the name>");
     }
-    sb.AppendLine(LabGalleryPlan.PlatformTiles.Length + " floor tiles, "
-        + LabGalleryPlan.Fixtures.Length + " walls and signs, "
-        + CountBeams() + " beams, " + LabGalleryPlan.Armoury.Length + " stands.");
+    sb.AppendLine(profile.PlatformTiles.Length + " floor tiles, "
+        + profile.Fixtures.Length + " fixtures, "
+        + CountBeams(profile) + " beams, " + profile.Armoury.Length + " stands; about "
+        + profile.EstimatedPlacedObjects + " placed objects.");
+    sb.AppendLine(profile.HallWidth.ToString("0.#", CultureInfo.InvariantCulture)
+        + " m halls; floor " + string.Join(", ", profile.FloorMaterials)
+        + (profile.SolidMarbleFloor ? " (solid marble)" : " (mixed material)"));
     sb.Append(missing.Count == 0
-        ? "Ready. questlab_gallery build"
+        ? "Ready. questlab_gallery build " + profile.Id
         : "Not ready — fix the names above first.");
     return sb.ToString();
   }
 
-  static int CountBeams() {
+  static int CountBeams(LabGalleryPlan.Profile profile) {
     int n = 0;
-    foreach (LabGalleryPlan.Monument m in LabGalleryPlan.Monuments) {
+    foreach (LabGalleryPlan.Monument m in profile.Monuments) {
       n += m.Beams.Length;
     }
     return n;
+  }
+
+  static void AddUnique(List<string> values, string value) {
+    if (!string.IsNullOrWhiteSpace(value) && !values.Contains(value)) {
+      values.Add(value);
+    }
+  }
+
+  public static string Profiles() {
+    var sb = new StringBuilder();
+    sb.AppendLine("gallery profiles (default: " + LabGalleryPlan.DefaultProfileId + "):");
+    foreach (LabGalleryPlan.Profile profile in LabGalleryPlan.Profiles) {
+      sb.Append("  ").Append(profile.Id).Append(" — ")
+        .Append(profile.Name).Append(": about ")
+        .Append(profile.EstimatedPlacedObjects.ToString(CultureInfo.InvariantCulture))
+        .Append(" objects, ")
+        .Append(profile.HallWidth.ToString("0.#", CultureInfo.InvariantCulture))
+        .Append(" m halls, ")
+        .Append(profile.SolidMarbleFloor ? "solid marble" : "mixed floor")
+        .AppendLine();
+      sb.AppendLine("    " + profile.Description);
+    }
+    sb.Append("Use questlab_gallery check <profile> before building.");
+    return sb.ToString();
+  }
+
+  static string UnknownProfile(string profileId) {
+    var ids = new List<string>();
+    foreach (LabGalleryPlan.Profile profile in LabGalleryPlan.Profiles) {
+      ids.Add(profile.Id);
+    }
+    return "unknown gallery profile '" + (profileId ?? string.Empty)
+        + "'. One of: " + string.Join(", ", ids);
+  }
+
+  string NextBuildId(string label) {
+    _buildSequence++;
+    return label + "-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture)
+        + "-" + _buildSequence.ToString("00", CultureInfo.InvariantCulture);
+  }
+
+  static int GalleryPiecesPerFrame() {
+    try {
+      return Mathf.Clamp(LabConfig.GalleryPiecesPerFrame.Value, 1, 200);
+    } catch (Exception) {
+      return 24;
+    }
   }
 
   /// <summary>Search what this game build actually has. The honest way to fix a name the
@@ -163,6 +260,15 @@ public sealed class LabGalleryBuilder {
   // ---- build -----------------------------------------------------------------------
 
   public IEnumerator Build(MonoBehaviour host) {
+    return Build(host, LabGalleryPlan.DefaultProfileId);
+  }
+
+  public IEnumerator Build(
+      MonoBehaviour host,
+      string profileId,
+      Vector3? originOffset = null,
+      bool preservePlaced = false,
+      string buildId = null) {
     if (_running) {
       Report("already building.");
       yield break;
@@ -173,26 +279,38 @@ public sealed class LabGalleryBuilder {
       yield break;
     }
 
+    LabGalleryPlan.Profile profile = LabGalleryPlan.Find(profileId);
+    if (profile == null) {
+      Report(UnknownProfile(profileId));
+      yield break;
+    }
+
     _running = true;
-    _placed.Clear();
-    Vector3 origin = player.transform.position;
+    if (!preservePlaced) {
+      _placed.Clear();
+    }
+    Vector3 origin = player.transform.position + (originOffset ?? Vector3.zero);
+    _activeProfileId = profile.Id;
+    _activeBuildId = string.IsNullOrWhiteSpace(buildId) ? NextBuildId(profile.Id) : buildId;
+    int piecesPerFrame = GalleryPiecesPerFrame();
 
     // One height for the whole platform: the highest ground under the footprint, plus a
     // clearance. A level floor on uneven ground is the entire point — sampling per tile
     // would reproduce the hillside the platform exists to hide.
     float top = origin.y;
-    int tiles = LabGalleryPlan.PlatformTiles.Length;
+    int tiles = profile.PlatformTiles.Length;
     for (int i = 0; i < tiles; i += 7) {   // every seventh tile is plenty to find the max
-      Vector3 at = origin + new Vector3(LabGalleryPlan.PlatformTiles[i].X, 0f,
-                                        LabGalleryPlan.PlatformTiles[i].Z);
+      Vector3 at = origin + new Vector3(profile.PlatformTiles[i].X, 0f,
+                                        profile.PlatformTiles[i].Z);
       float ground;
       if (TryGroundHeight(at, out ground) && ground > top) {
         top = ground;
       }
     }
     float floorY = top + PlatformClearance;
-    Report("raising the gallery — floor at " + (floorY - origin.y).ToString("0.0")
-        + " m above you. Stand back.");
+    Report("raising " + profile.Id + " (" + _activeBuildId + ") — floor at "
+        + (floorY - origin.y).ToString("0.0", CultureInfo.InvariantCulture)
+        + " m above its origin. Stand back.");
 
     // Where the ground-level portal goes, sampled NOW — before a single floor tile
     // exists. TryGroundHeight asks for the SOLID height, which counts placed pieces and
@@ -209,7 +327,7 @@ public sealed class LabGalleryBuilder {
 
     // 1. the floor
     for (int i = 0; i < tiles; i++) {
-      LabGalleryPlan.Tile tile = LabGalleryPlan.PlatformTiles[i];
+      LabGalleryPlan.Tile tile = profile.PlatformTiles[i];
       // Drop the slab by its own half-thickness so the walking surface lands ON floorY,
       // which is what every other position in the plan is measured against.
       var at = new Vector3(origin.x + tile.X, floorY + SurfaceDrop(tile.Prefab),
@@ -217,7 +335,7 @@ public sealed class LabGalleryBuilder {
       if (Place(tile.Prefab, at, Quaternion.identity)) {
         placed++;
       }
-      if (placed % PiecesPerFrame == 0) {
+      if (placed % piecesPerFrame == 0) {
         yield return null;
       }
     }
@@ -253,7 +371,7 @@ public sealed class LabGalleryBuilder {
     // Two courses of marble a side and no roof: the corridor frames the glyph at its end
     // without enclosing it, which is the composition — read the sign, walk the throat,
     // and the rune is the lit thing against open sky.
-    foreach (LabGalleryPlan.Fixture fixture in LabGalleryPlan.Fixtures) {
+    foreach (LabGalleryPlan.Fixture fixture in profile.Fixtures) {
       bool panel = fixture.Orient == "panel";
 
       // Fixture.Y is where the piece's BOTTOM goes for anything standing on the floor: a
@@ -284,7 +402,7 @@ public sealed class LabGalleryBuilder {
       if (!string.IsNullOrEmpty(fixture.Text)) {
         WriteSign(built, fixture.Text);
       }
-      if (placed % PiecesPerFrame == 0) {
+      if (placed % piecesPerFrame == 0) {
         yield return null;
       }
     }
@@ -294,12 +412,12 @@ public sealed class LabGalleryBuilder {
     //
     // Which way a beam points is measured off the prefab, never assumed — see Measure.
     PieceMetrics beamShape = Measure("wood_beam");
-    foreach (LabGalleryPlan.Monument monument in LabGalleryPlan.Monuments) {
+    foreach (LabGalleryPlan.Monument monument in profile.Monuments) {
       // The lamp hangs on whichever beam lands nearest the middle of the glyph, so one
       // light covers the whole 11 m of strokes. Tracked as the beams go up rather than
       // computed afterwards, because the piece that gets marked has to be a real one.
       var runeCentre = new Vector3(origin.x + monument.Cx,
-                                   floorY + LabGalleryPlan.RuneHeight * 0.5f,
+                                   floorY + profile.RuneHeight * 0.5f,
                                    origin.z + monument.Cz);
       GameObject lampHost = null;
       float lampBest = float.MaxValue;
@@ -320,7 +438,7 @@ public sealed class LabGalleryBuilder {
             lampHost = piece;
           }
         }
-        if (placed % PiecesPerFrame == 0) {
+        if (placed % piecesPerFrame == 0) {
           yield return null;
         }
       }
@@ -348,7 +466,7 @@ public sealed class LabGalleryBuilder {
     }
 
     // 3. the armoury
-    foreach (LabGalleryPlan.RackItem item in LabGalleryPlan.Armoury) {
+    foreach (LabGalleryPlan.RackItem item in profile.Armoury) {
       var at = new Vector3(origin.x + item.X, floorY, origin.z + item.Z);
       GameObject stand = Place("itemstand", at, Quaternion.Euler(0f, item.Yaw, 0f));
       if (stand != null) {
@@ -388,7 +506,78 @@ public sealed class LabGalleryBuilder {
 
     SaveManifest();
     _running = false;
-    Report("gallery raised: " + placed + " pieces. questlab_gallery clear takes it down.");
+    Report("gallery raised: " + profile.Id + " build " + _activeBuildId + ", " + placed
+        + " objects. questlab_gallery identify reports it; clear " + profile.Id
+        + " takes that profile down.");
+  }
+
+  /// <summary>Raise two profiles around one captured origin. Both carry the same build id,
+  /// so one clear command can remove the comparison while profile marks still allow either
+  /// side to come down independently.</summary>
+  public IEnumerator Compare(MonoBehaviour host, string leftProfileId, string rightProfileId) {
+    if (_running) {
+      Report("already building.");
+      yield break;
+    }
+    Player player = Player.m_localPlayer;
+    if (player == null || ZNetScene.instance == null) {
+      Report("not in a world yet.");
+      yield break;
+    }
+
+    LabGalleryPlan.Profile left = LabGalleryPlan.Find(leftProfileId);
+    LabGalleryPlan.Profile right = LabGalleryPlan.Find(rightProfileId);
+    if (left == null) {
+      Report(UnknownProfile(leftProfileId));
+      yield break;
+    }
+    if (right == null) {
+      Report(UnknownProfile(rightProfileId));
+      yield break;
+    }
+
+    Vector3 anchor = player.transform.position;
+    Vector3 axis = player.transform.right;
+    float separation = left.FootprintRadius + right.FootprintRadius + 20f;
+    Vector3 leftOrigin = anchor - axis * (separation * 0.5f);
+    Vector3 rightOrigin = anchor + axis * (separation * 0.5f);
+    string comparisonId = NextBuildId("compare");
+    Report("raising comparison " + comparisonId + ": " + left.Id + " | " + right.Id
+        + ". Clear by that id, or clear either profile independently.");
+
+    IEnumerator first = Build(host, left.Id,
+        leftOrigin - Player.m_localPlayer.transform.position, false, comparisonId);
+    while (first.MoveNext()) {
+      yield return first.Current;
+    }
+
+    if (Player.m_localPlayer == null) {
+      Report("comparison stopped after " + left.Id + " because the player left the world.");
+      yield break;
+    }
+    IEnumerator second = Build(host, right.Id,
+        rightOrigin - Player.m_localPlayer.transform.position, true, comparisonId);
+    while (second.MoveNext()) {
+      yield return second.Current;
+    }
+    Report("comparison ready: " + comparisonId + " — " + left.Id + " | " + right.Id + ".");
+  }
+
+  public IEnumerator Rebuild(MonoBehaviour host, string profileId) {
+    if (_running) {
+      Report("already building.");
+      yield break;
+    }
+    LabGalleryPlan.Profile profile = LabGalleryPlan.Find(profileId);
+    if (profile == null) {
+      Report(UnknownProfile(profileId));
+      yield break;
+    }
+    Report(Clear(profile.Id));
+    IEnumerator build = Build(host, profile.Id);
+    while (build.MoveNext()) {
+      yield return build.Current;
+    }
   }
 
   /// <summary>Instantiate one piece and remember it.
@@ -438,7 +627,9 @@ public sealed class LabGalleryBuilder {
         ZDO zdo = view.GetZDO();
         // Mark it before the ZDO is shared, so the piece is identifiable as ours in this
         // session and every later one. Everything else keys off this, not off the id.
-        zdo.Set(GalleryMark, "1");
+        zdo.Set(GalleryMark, LabGalleryPlan.PlanVersion.ToString(CultureInfo.InvariantCulture));
+        zdo.Set(GalleryProfileMark, _activeProfileId);
+        zdo.Set(GalleryBuildMark, _activeBuildId);
         _placed.Add(zdo.m_uid);
       }
       return go;
@@ -458,33 +649,33 @@ public sealed class LabGalleryBuilder {
   /// could not have found it however hard it tried. What that looks like from inside the
   /// world is 1500 pieces of accumulated scaffolding and a clear that reports zero.
   ///
-  /// So the mark leads and the manifest follows. WearNTear.GetAllInstances() enumerates
-  /// every loaded piece, and every gallery piece has a WearNTear, so a sweep finds all of
-  /// them in any session no matter which build placed them. The manifest is still worth
-  /// consulting afterwards for marked pieces sitting in zones that are not loaded.
+  /// So the mark leads and the manifest follows. The loaded ZDO table includes structural
+  /// pieces, portals, stations, and loose supplies alike, so a sweep finds every kind of
+  /// gallery object in any session no matter which build placed it. The manifest is still
+  /// worth consulting afterwards for marked pieces sitting in zones that are not loaded.
   ///
   /// Blueprint pieces are deliberately not touched: this asks IsGalleryPiece, not
   /// LabMarks.IsLabBuilt, so clearing a gallery never takes somebody's blueprint with it.</summary>
-  public string Clear() {
+  public string Clear(string selector = null) {
     if (ZNetScene.instance == null) {
       return "not in a world yet.";
     }
+    if (_running) {
+      return "gallery build in progress — wait for it to finish before clearing.";
+    }
+
+    selector = string.IsNullOrWhiteSpace(selector) ? "all" : selector.Trim();
 
     // Collect first, destroy second. Destroying while walking the instance list mutates
     // the thing being walked.
-    var doomed = new List<ZNetView>();
+    var doomed = new List<ZDO>();
     var swept = new HashSet<ZDOID>();
     try {
-      foreach (WearNTear wear in WearNTear.GetAllInstances()) {
-        if (wear == null) {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        if (zdo == null || !IsGalleryPiece(zdo) || !MatchesSelector(zdo, selector)) {
           continue;
         }
-        var view = wear.GetComponent<ZNetView>();
-        ZDO zdo = view == null ? null : view.GetZDO();
-        if (zdo == null || !IsGalleryPiece(zdo)) {
-          continue;
-        }
-        doomed.Add(view);
+        doomed.Add(zdo);
         swept.Add(zdo.m_uid);
       }
     } catch (Exception ex) {
@@ -492,13 +683,18 @@ public sealed class LabGalleryBuilder {
     }
 
     int removed = 0;
-    foreach (ZNetView view in doomed) {
+    foreach (ZDO zdo in doomed) {
       try {
-        if (view == null) {
+        if (zdo == null) {
           continue;
         }
-        view.ClaimOwnership();
-        view.Destroy();
+        ZNetView view = ZNetScene.instance.FindInstance(zdo);
+        if (view != null) {
+          view.ClaimOwnership();
+          view.Destroy();
+        } else {
+          ZDOMan.instance.DestroyZDO(zdo);
+        }
         removed++;
       } catch (Exception) {
         // A piece somebody already broke is not an error worth stopping for.
@@ -507,6 +703,7 @@ public sealed class LabGalleryBuilder {
 
     LoadManifestIfEmpty();
     int notOurs = 0;
+    var kept = new List<ZDOID>();
     foreach (ZDOID id in _placed) {
       if (swept.Contains(id)) {
         continue;
@@ -524,6 +721,10 @@ public sealed class LabGalleryBuilder {
           notOurs++;
           continue;
         }
+        if (!MatchesSelector(zdo, selector)) {
+          kept.Add(id);
+          continue;
+        }
         ZNetView view = ZNetScene.instance.FindInstance(zdo);
         if (view != null) {
           view.ClaimOwnership();
@@ -538,13 +739,14 @@ public sealed class LabGalleryBuilder {
       }
     }
     _placed.Clear();
+    _placed.AddRange(kept);
     SaveManifest();
 
     if (removed == 0) {
-      return "no gallery pieces are loaded here. The sweep only sees zones the game has "
-           + "loaded, so stand in the gallery and run this again.";
+      return "no gallery pieces matching '" + selector + "' are loaded here. The sweep only "
+           + "sees zones the game has loaded, so stand in the gallery and run this again.";
     }
-    return "cleared " + removed + " piece(s)"
+    return "cleared " + removed + " piece(s) matching '" + selector + "'"
          + (notOurs > 0
             ? ", and left " + notOurs + " manifest entr" + (notOurs == 1 ? "y" : "ies")
               + " alone — those ids belong to something else now, which is what happens to "
@@ -552,6 +754,70 @@ public sealed class LabGalleryBuilder {
             : string.Empty)
          + ". Anything still standing is in a zone that is not loaded: walk toward it and "
          + "run this again.";
+  }
+
+  static bool MatchesSelector(ZDO zdo, string selector) {
+    if (string.IsNullOrWhiteSpace(selector)
+        || string.Equals(selector, "all", StringComparison.OrdinalIgnoreCase)) {
+      return true;
+    }
+    return string.Equals(GalleryProfile(zdo), selector, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(GalleryBuild(zdo), selector, StringComparison.OrdinalIgnoreCase);
+  }
+
+  /// <summary>Describe the loaded marked structures without relying on their prefab names
+  /// or transient ids. This is deliberately read-only and is the safe first step before a
+  /// selective clear after comparison testing.</summary>
+  public string Identify() {
+    if (ZNetScene.instance == null) {
+      return "not in a world yet.";
+    }
+
+    var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    var seen = new HashSet<ZDOID>();
+    try {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        AddIdentity(zdo, counts, seen);
+      }
+    } catch (Exception ex) {
+      LogOnce("could not identify loaded pieces: " + ex.Message);
+    }
+
+    LoadManifestIfEmpty();
+    foreach (ZDOID id in _placed) {
+      try {
+        if (ZDOMan.instance != null) {
+          AddIdentity(ZDOMan.instance.GetZDO(id), counts, seen);
+        }
+      } catch (Exception) {
+      }
+    }
+
+    if (counts.Count == 0) {
+      return "no marked gallery structures are loaded here.\n" + Profiles();
+    }
+    var keys = new List<string>(counts.Keys);
+    keys.Sort(StringComparer.OrdinalIgnoreCase);
+    var sb = new StringBuilder("loaded gallery structures:\n");
+    foreach (string key in keys) {
+      sb.Append("  ").Append(key.Replace("\t", " | build ")).Append(": ")
+        .Append(counts[key].ToString(CultureInfo.InvariantCulture)).AppendLine(" marked objects");
+    }
+    sb.Append("Clear with questlab_gallery clear <profile-or-build-id>.");
+    return sb.ToString();
+  }
+
+  static void AddIdentity(
+      ZDO zdo,
+      Dictionary<string, int> counts,
+      HashSet<ZDOID> seen) {
+    if (zdo == null || !IsGalleryPiece(zdo) || !seen.Add(zdo.m_uid)) {
+      return;
+    }
+    string key = GalleryProfile(zdo) + "\t" + GalleryBuild(zdo);
+    int count;
+    counts.TryGetValue(key, out count);
+    counts[key] = count + 1;
   }
 
   // ---- manifest --------------------------------------------------------------------
@@ -710,16 +976,11 @@ public sealed class LabGalleryBuilder {
   ///
   /// Only sees loaded zones, same as <see cref="Clear"/>; a gallery across the map reads as zero.
   /// That is the safe direction to be wrong in — it offers to build rather than refusing to.</summary>
-  public int StandingPieceCount() {
+  public int StandingPieceCount(string selector = null) {
     int n = 0;
     try {
-      foreach (WearNTear wear in WearNTear.GetAllInstances()) {
-        if (wear == null) {
-          continue;
-        }
-        var view = wear.GetComponent<ZNetView>();
-        ZDO zdo = view == null ? null : view.GetZDO();
-        if (zdo != null && IsGalleryPiece(zdo)) {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        if (zdo != null && IsGalleryPiece(zdo) && MatchesSelector(zdo, selector)) {
           n++;
         }
       }

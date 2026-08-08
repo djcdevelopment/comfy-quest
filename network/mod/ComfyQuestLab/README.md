@@ -21,10 +21,10 @@ did — and whether a quest could actually fire on it.
 > ```
 >
 > Stable event name, resolved target, skill, and verdict — a builder learns in one glance
-> that the game sees the hit and which quest vocabulary binds to it. The gallery also
-> builds (620 pieces), the ground-to-plaza portal pair connects, and the structure stands
-> rather than decaying. The monuments read as their glyphs, each lit in its school's
-> colour.
+> that the game sees the hit and which quest vocabulary binds to it. The original gallery
+> build also completed (620 pieces), its ground-to-plaza portal pair connected, and the
+> structure stood rather than decaying. Gallery v2 is now generated and headless-verified,
+> but its larger marble profiles still await the live comparison receipt described below.
 >
 > **Combat and the quest lane verified in game 2026-08-08.** All four combat seams fired in
 > one fight — `OnDeath`, `Damage`, `RPC_Damage`, `Stagger` — and the seeded quest completed
@@ -64,6 +64,13 @@ this?*
 | `questlab_seams` | which seams hooked on your game version, and which didn't |
 | `questlab_profile [core\|extended\|diagnostic]` | select stable-event breadth or inspect raw witnesses |
 | `questlab_clear` | empty the console |
+| `questlab_gallery profiles` | list the generated Gallery v2 geometry choices and counts |
+| `questlab_gallery check [profile]` | resolve every prefab without placing anything |
+| `questlab_gallery build [profile]` | raise one marked profile; default is `marble-wide` |
+| `questlab_gallery compare [left] [right]` | raise two profiles side by side under one build id |
+| `questlab_gallery identify` | report loaded profile and build marks before changing the world |
+| `questlab_gallery clear [profile-or-build-id]` | remove only matching marked gallery objects |
+| `questlab_gallery rebuild [profile]` | selectively clear and rebuild one profile |
 
 `lab_setup` is typed into **Valheim's** console, which is **F5**. **F6** opens the lab's own
 panel. Two different keys, and mixing them up is the most common first stumble.
@@ -108,6 +115,21 @@ Its generated capability manifest classifies every exact signature and names 34 
 creator events. The shared evaluator accepts all 34 (plus the schema-1 `hit` alias), and
 the lab routes every creator-safe signature through that same evaluator. The patch guard
 fails if any of the 57 safe or 86 practical signatures loses runtime coverage.
+
+## Gallery v2 profiles
+
+Gallery geometry is generated from the same eight rune definitions used by the panel.
+`classic` keeps the prior mixed-material shape as a comparison baseline. `marble-wide`
+is the default: a solid black-marble floor, 8 m halls, larger runes, and about 2,243
+placed objects. `marble-grand` expands that to 10 m halls and about 3,611 objects.
+
+Every object carries the plan version, profile id, and build id in its own ZDO. `identify`
+reads those durable marks from the loaded ZDO table; `clear` accepts either a profile or
+one comparison build id and refuses to touch anything unmarked. A comparison gives both
+sides one shared build id, so it can come down in one bounded operation. Generated counts
+and previews live in
+[`gallery-profiles.json`](../../../tools/component-packets/samples/gallery-profiles.json)
+and `gallery-plan-comparison.png`; `generate_gallery.py --check` guards plan drift.
 
 ## Writing a quest
 
@@ -188,6 +210,7 @@ and pausing drops nothing — the ring keeps collecting behind it.
 | `enabled` | `true` | Master switch. OFF drops every observation. |
 | `panelShortcut` | `F6` | F7 is taken by the retired control surface. `None` = console commands only. |
 | `consoleRows` | `18` | Rows on screen; the ring holds 8× that so you can scroll back. |
+| `galleryPiecesPerFrame` | `24` | Gallery objects placed per frame, clamped to 1–200. Lower it on a slower client. |
 | `verboseLogging` | `false` | Also write every event to the BepInEx log. Noisy in combat, good for pasting into a thread. |
 | `eventProfile` | `extended` | `core` is low-noise; `extended` adds safe high-frequency events; `diagnostic` also shows raw non-bindable witnesses. Hot-reloadable. |
 | `observeStamina` | `false` | `Player.UseStamina` fires on nearly every action including running. Turn it on to see the shape, then off again. **Needs a restart** — it decides whether the patch applies at all. |

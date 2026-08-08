@@ -203,7 +203,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
             }
 
             // Do NOT raise a second gallery through the first. Before this check, running
-            // lab_setup twice silently stacked another 620 pieces — and it is exactly the
+            // lab_setup twice silently stacked another full gallery — and it is exactly the
             // command a newcomer is most likely to re-run, because it is the one we tell them
             // to start with.
             int standing = _gallery.StandingPieceCount();
@@ -262,15 +262,26 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       // The gallery is the one thing here that changes the world, so it only ever moves
       // when somebody types one of these. check first, always.
       new Terminal.ConsoleCommand("questlab_gallery",
-          "raise the practice gallery: questlab_gallery <check|build|clear>",
+          "manage Gallery v2: questlab_gallery "
+          + "<profiles|check|build|compare|identify|clear|rebuild> [profile-or-build-id]",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "check";
+            string value = args.Length >= 3 ? args[2] : null;
             if (verb == "build") {
-              StartCoroutine(_gallery.Build(this));
+              StartCoroutine(_gallery.Build(this, value));
+            } else if (verb == "compare") {
+              string right = args.Length >= 4 ? args[3] : "marble-grand";
+              StartCoroutine(_gallery.Compare(this, value ?? "marble-wide", right));
             } else if (verb == "clear") {
-              Report(_gallery.Clear());
+              Report(_gallery.Clear(value));
+            } else if (verb == "rebuild") {
+              StartCoroutine(_gallery.Rebuild(this, value));
+            } else if (verb == "identify") {
+              Report(_gallery.Identify());
+            } else if (verb == "profiles") {
+              Report(LabGalleryBuilder.Profiles());
             } else {
-              Report(_gallery.Check());
+              Report(_gallery.Check(value));
             }
           });
 
@@ -338,7 +349,10 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
     sb.AppendLine("  questlab_profile [core|extended|diagnostic]   choose integration noise");
     sb.AppendLine("  questlab_clear   empty the live view");
-    sb.AppendLine("  questlab_gallery check | build | clear   raise the practice ground");
+    sb.AppendLine("  questlab_gallery profiles   list Gallery v2 geometry choices");
+    sb.AppendLine("  questlab_gallery check|build|rebuild [profile]   inspect or raise one profile");
+    sb.AppendLine("  questlab_gallery compare [left] [right]   raise two profiles side by side");
+    sb.AppendLine("  questlab_gallery identify|clear [profile-or-build-id]   inspect or remove marks safely");
     sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");
     sb.AppendLine("  questlab_prefabs <name>   search what this game build has; dump writes the catalog");
     sb.AppendLine("Try one action at a monument with the panel open; every school has bindable events.");
@@ -389,6 +403,7 @@ public static class LabConfig {
   public static ConfigEntry<bool> VerboseLogging { get; private set; }
   public static ConfigEntry<string> EventProfile { get; private set; }
   public static ConfigEntry<bool> ObserveStamina { get; private set; }
+  public static ConfigEntry<int> GalleryPiecesPerFrame { get; private set; }
   public static ConfigEntry<int> BlueprintPiecesPerFrame { get; private set; }
   public static ConfigEntry<bool> QuestsEnabled { get; private set; }
   public static ConfigEntry<float> QuestCooldownSeconds { get; private set; }
@@ -454,13 +469,23 @@ public static class LabConfig {
             + "Changing this needs a game restart, because it decides whether the patch "
             + "is applied at all.");
 
+    GalleryPiecesPerFrame =
+        config.Bind(
+            "Lab",
+            "galleryPiecesPerFrame",
+            24,
+            "How many Gallery v2 objects are placed per frame. 24 keeps the default "
+            + "2,200-piece marble build responsive while finishing in a few seconds. "
+            + "Lower it on slower clients or raise it for faster local comparisons. "
+            + "Hot-reloadable; clamped to 1-200.");
+
     BlueprintPiecesPerFrame =
         config.Bind(
             "Lab",
             "blueprintPiecesPerFrame",
             12,
             "How many blueprint pieces are placed per frame during questlab_blueprint "
-            + "build. 12 is the rate the 620-piece gallery build proved out. Raise it "
+            + "build. 12 is the conservative rate the original gallery proved out. Raise it "
             + "to build faster at the cost of frame hitches; a 2,000-piece blueprint "
             + "at 12/frame takes a few seconds. Hot-reloadable; clamped to 1-200.");
 
