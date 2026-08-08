@@ -84,6 +84,7 @@
     <Compile Include="..\ComfyNetworkSense\Core\Services\QuestTriggerEvaluator.cs" Link="Contract\QuestTriggerEvaluator.cs" />
     <Compile Include="..\ComfyNetworkSense\Core\Services\QuestEventCatalog.g.cs" Link="Contract\QuestEventCatalog.g.cs" />
     <None Include="CHANGELOG.md" />
+    <None Include="djcdevelopment.valheim.comfyquestlab.cfg" />
     <None Include="manifest.json" />
     <None Include="README.md" />
   </ItemGroup>

@@ -54,6 +54,19 @@ this?*
 
 ## Try it
 
+### Install once
+
+1. Close Valheim. Install BepInEx if it is not already present.
+2. Copy `ComfyQuestLab.dll` from the zip to `Valheim/BepInEx/plugins/`.
+3. Optionally copy `djcdevelopment.valheim.comfyquestlab.cfg` to
+   `Valheim/BepInEx/config/`. It contains the reviewed defaults; if you omit it, the mod
+   creates the same settings on first launch.
+4. Start Valheim and load a **private/local world**. This lab is not for a shared server.
+
+Updating is the same operation with Valheim closed: replace the DLL. Quest files under
+`BepInEx/config/comfy-quest-lab/quests/` are separate and are never overwritten by an
+update.
+
 | | |
 | --- | --- |
 | `lab_setup` | raise the practice gallery and write you a starter quest file. Do this first. |
@@ -236,12 +249,23 @@ and pausing drops nothing — the ring keeps collecting behind it.
 | `panelShortcut` | `F6` | F7 is taken by the retired control surface. `None` = console commands only. |
 | `consoleRows` | `18` | Rows on screen; the ring holds 8× that so you can scroll back. |
 | `galleryPiecesPerFrame` | `24` | Gallery objects placed per frame, clamped to 1–200. Lower it on a slower client. |
+| `blueprintPiecesPerFrame` | `12` | Blueprint objects placed per frame, clamped to 1–200. |
 | `verboseLogging` | `false` | Also write every event to the BepInEx log. Noisy in combat, good for pasting into a thread. |
 | `eventProfile` | `extended` | `core` is low-noise; `extended` adds safe high-frequency events; `diagnostic` also shows raw non-bindable witnesses. Hot-reloadable. |
 | `observeStamina` | `false` | `Player.UseStamina` fires on nearly every action including running. Turn it on to see the shape, then off again. **Needs a restart** — it decides whether the patch applies at all. |
 
 Hot-reloadable except `observeStamina` — every other read is live, so `Config.Reload()`
 lands on the next frame.
+
+## Config — `[Gallery]`
+
+| Key | Default | |
+| --- | --- | --- |
+| `runeLights` | `true` | Hang a client-only coloured light on each rune monument. |
+| `runeLightIntensity` | `3` | Brightness tuned for the black-marble backdrop. |
+| `runeLightRange` | `11` | Light reach in metres. |
+
+All three gallery light settings retune the standing monuments without a rebuild.
 
 ## For the next person to work on it
 

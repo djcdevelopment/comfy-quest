@@ -1,9 +1,10 @@
 # Changelog
 
-### Unreleased
+### 0.2.0 — 2026-08-08
 
-**Scaffold.** The project, the console, all eight hook categories, the journal, and the
-three tools that keep them honest. Nothing is published and there is no download.
+**Creator-event expansion.** The initial lab is now a release-cut, self-service package:
+all classified integration routes, the shared generic evaluator, Gallery v2, and bounded
+machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
 
 - New mod `ComfyQuestLab`, separate from ComfyNetworkSense on purpose: it hooks far more
   of the game and draws an overlay, and neither of those belongs in a mod that runs
