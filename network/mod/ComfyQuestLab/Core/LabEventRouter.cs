@@ -16,8 +16,9 @@ public static class LabEventRouter {
   static readonly LabActionDedupe ActionKeys = new LabActionDedupe();
   static readonly Dictionary<string, double> DisplayedActions =
       new Dictionary<string, double>(StringComparer.Ordinal);
+  static string _batchProfileOverride;
 
-  public static void Emit(
+  public static string Emit(
       string signatureId,
       string target,
       string detail,
@@ -36,14 +37,14 @@ public static class LabEventRouter {
             target,
             detail,
             LabUsability.LabCandidate));
-        return;
+        return null;
       }
 
-      string configured = LabConfig.EventProfile == null
+      string configured = _batchProfileOverride ?? (LabConfig.EventProfile == null
           ? LabRuntimeProfile.Extended
-          : LabConfig.EventProfile.Value;
+          : LabConfig.EventProfile.Value);
       if (!LabRuntimeProfile.Allows(configured, capability.Profile)) {
-        return;
+        return null;
       }
 
       double now = Time.realtimeSinceStartup;
@@ -78,8 +79,19 @@ public static class LabEventRouter {
             "[lab] coalesced " + capability.SignatureId + " into " + actionKey);
       }
 
+      if (capability.CreatorSafe && ComfyQuestLab.Batch != null) {
+        ComfyQuestLab.Batch.Observe(
+            capability.Category,
+            capability.CanonicalEvent,
+            capability.SignatureId,
+            target,
+            actionKey,
+            firstCreatorWitness,
+            evaluate);
+      }
+
       if (!evaluate || !capability.CreatorSafe) {
-        return;
+        return actionKey;
       }
 
       var gameplayEvent = new QuestEvent(
@@ -90,8 +102,10 @@ public static class LabEventRouter {
           actionKey,
           fields);
       LabQuestEngine.OnEvent(gameplayEvent, capability.Category, detail, now);
+      return actionKey;
     } catch (Exception) {
       // Every caller is inside a Valheim path. A lab event is never worth breaking it.
+      return null;
     }
   }
 
@@ -114,6 +128,15 @@ public static class LabEventRouter {
   public static void Reset() {
     ActionKeys.Clear();
     DisplayedActions.Clear();
+    _batchProfileOverride = null;
+  }
+
+  /// <summary>Use the stable extended event surface for one live suite without writing the
+  /// creator's config. Reset/quest reload removes the override.</summary>
+  public static void BeginBatchCapture() {
+    ActionKeys.Clear();
+    DisplayedActions.Clear();
+    _batchProfileOverride = LabRuntimeProfile.Extended;
   }
 
   static bool RememberDisplayed(string actionKey, double now) {

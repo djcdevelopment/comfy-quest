@@ -222,7 +222,7 @@ public static class LabQuestEngine {
   ///
   /// Called from <c>CombatPatches.OnDeathPostfix</c> after the seam row, so a quest firing reads
   /// as a consequence of the kill rather than as an unrelated event.</summary>
-  public static void OnKill(Character victim) {
+  public static void OnKill(Character victim, string actionKey = null) {
     try {
       if (!LabConfig.QuestsEnabled.Value) {
         return;
@@ -235,7 +235,7 @@ public static class LabQuestEngine {
 
       IReadOnlyList<QuestCompletion> completions = _evaluator.OnCreatureKilled(
           _set.Quests.Count == 0 ? EmptyQuests : TrackedQuests(),
-          kill.Creature, kill.WeaponSkill, kill.Ranged, now);
+          kill.Creature, kill.WeaponSkill, kill.Ranged, now, actionKey);
 
       _lastKillLine = DateTime.Now.ToString("HH:mm:ss") + " · " + kill.Display + " · "
           + kill.WeaponSkill + " · " + (kill.Ranged ? "ranged" : "melee") + " → "
@@ -243,7 +243,7 @@ public static class LabQuestEngine {
       _lastEventLine = _lastKillLine;
 
       foreach (QuestCompletion completion in completions) {
-        Credit(completion, kill);
+        Credit(completion, kill, actionKey);
       }
     } catch (Exception) {
       // A postfix that throws takes Valheim's death path down with it.
@@ -299,11 +299,11 @@ public static class LabQuestEngine {
   }
 
   /// <summary>Count the fire and put one row in the console beside the death that caused it.</summary>
-  static void Credit(QuestCompletion completion, LabKill kill) {
+  static void Credit(QuestCompletion completion, LabKill kill, string actionKey) {
     Credit(
         completion,
         LabCategory.Combat,
-        QuestEvent.CreatureKilled(kill.Creature, kill.WeaponSkill, kill.Ranged),
+        QuestEvent.CreatureKilled(kill.Creature, kill.WeaponSkill, kill.Ranged, actionKey),
         kill.WeaponSkill);
   }
 
@@ -313,6 +313,13 @@ public static class LabQuestEngine {
       if (string.Equals(quest.QuestId, completion.QuestId, StringComparison.OrdinalIgnoreCase)) {
         quest.Fires++;
       }
+    }
+
+    if (ComfyQuestLab.Batch != null) {
+      ComfyQuestLab.Batch.ObserveCompletion(
+          completion.QuestId,
+          gameplayEvent == null ? completion.EventName : gameplayEvent.Name,
+          gameplayEvent == null ? null : gameplayEvent.DedupeKey);
     }
 
     ComfyQuestLab.Observe(new LabEvent(
@@ -337,6 +344,18 @@ public static class LabQuestEngine {
   /// about timing is one you turn while watching the thing, not one that needs a reload.</summary>
   public static void RetuneCooldown() {
     _evaluator = new QuestTriggerEvaluator(CooldownSeconds());
+  }
+
+  /// <summary>Reset into an in-memory zero-cooldown evaluator for one bounded suite run.
+  /// No config value is changed or saved. The batch reset path calls Reload, restoring the
+  /// creator's configured cooldown and clearing this volatile mode.</summary>
+  public static void BeginBatchCapture() {
+    _evaluator = new QuestTriggerEvaluator(0.0, 1.0);
+    foreach (LabQuest quest in _set.Quests) {
+      quest.Fires = 0;
+    }
+    _lastKillLine = null;
+    _lastEventLine = null;
   }
 
   public static double CooldownRemaining(string questId) {

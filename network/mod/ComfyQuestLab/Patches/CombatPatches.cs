@@ -63,12 +63,12 @@ public static class CombatPatches {
     if (__instance == null || __instance.IsPlayer()) {
       return;   // the player dying is progression, not a kill
     }
-    LabObserve.Seam(
+    string actionKey = LabObserve.Seam(
         "Character.OnDeath()", Describe(__instance), "died", __instance, evaluate: false);
 
     // After the seam row on purpose, so a quest firing reads as a consequence of the
     // kill immediately above it rather than as an unrelated event.
-    LabQuestEngine.OnKill(__instance);
+    LabQuestEngine.OnKill(__instance, actionKey);
   }
 
   static void StaggerPostfix(Character __instance) {

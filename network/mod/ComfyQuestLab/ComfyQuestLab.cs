@@ -45,9 +45,11 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   LabEventRing _ring;
   LabPanel _panel;
   LabGalleryBuilder _gallery;
+  LabBatchController _batch;
   LabBlueprintBuilder _blueprints;
 
   public static LabEventRing Ring { get { return Instance == null ? null : Instance._ring; } }
+  public static LabBatchController Batch { get { return Instance == null ? null : Instance._batch; } }
   public static bool IsPanelOpen { get { return Instance != null && Instance._panel != null && Instance._panel.IsOpen; } }
 
   void Awake() {
@@ -58,6 +60,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     _ring = new LabEventRing(LabConfig.ConsoleRows.Value * 8);
     _panel = new LabPanel(_ring);
     _gallery = new LabGalleryBuilder();
+    _batch = new LabBatchController(_gallery);
     _blueprints = new LabBlueprintBuilder();
 
     // A dedicated server has no screen and no player to teach. Bail before patching so
@@ -102,6 +105,12 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   void Update() {
     if (!LabConfig.Enabled.Value || _panel == null) {
       return;
+    }
+
+    // Poll before the keyboard guard: a bounded request is filesystem input, not a key, and
+    // must continue while the F5 console or a text field has focus.
+    if (_batch != null) {
+      _batch.Poll(this);
     }
 
     // Every keystroke is a hotkey unless something says otherwise, and the console has a
@@ -232,6 +241,11 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       new Terminal.ConsoleCommand("lab_reload",
           "re-read your quest files and say what changed: lab_reload",
           delegate {
+            if (_batch != null && _batch.IsLiveCaptureRunning) {
+              Report("A live suite is running. Report/export/reset it before reloading quests; "
+                  + "reload would discard its zero-cooldown evaluator and action keys.");
+              return;
+            }
             string summary = LabQuestEngine.Reload();
             Report(summary);
             // One row in the event console so somebody watching it notices; the detail is
@@ -282,6 +296,27 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
               Report(LabGalleryBuilder.Profiles());
             } else {
               Report(_gallery.Check(value));
+            }
+          });
+
+      new Terminal.ConsoleCommand("questlab_batch",
+          "bounded integration suites: questlab_batch "
+          + "<suites|prepare|run|reset|report|export> [all-schools|creator-events]",
+          delegate (Terminal.ConsoleEventArgs args) {
+            string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "suites";
+            string suite = args.Length >= 3 ? args[2] : "all-schools";
+            if (verb == "prepare") {
+              StartCoroutine(_batch.Prepare(this, suite));
+            } else if (verb == "run") {
+              Report(_batch.Run(suite));
+            } else if (verb == "reset") {
+              Report(_batch.Reset());
+            } else if (verb == "report") {
+              Report(_batch.Report());
+            } else if (verb == "export") {
+              Report(_batch.Export());
+            } else {
+              Report(LabBatchContract.SuiteRoster());
             }
           });
 
@@ -353,6 +388,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_gallery check|build|rebuild [profile]   inspect or raise one profile");
     sb.AppendLine("  questlab_gallery compare [left] [right]   raise two profiles side by side");
     sb.AppendLine("  questlab_gallery identify|clear [profile-or-build-id]   inspect or remove marks safely");
+    sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   bounded evidence runs");
     sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");
     sb.AppendLine("  questlab_prefabs <name>   search what this game build has; dump writes the catalog");
     sb.AppendLine("Try one action at a monument with the panel open; every school has bindable events.");

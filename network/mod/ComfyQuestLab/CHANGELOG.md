@@ -34,6 +34,15 @@ three tools that keep them honest. Nothing is published and there is no download
   sweeps the loaded ZDO table so portals and loose supplies are covered alongside structure
   pieces without ever touching an unmarked object. Generated JSON/count/preview artifacts
   and seven drift tests agree. Live visual selection remains pending.
+- **Bounded batch evidence is self-service.** `questlab_batch` can prepare, run, reset,
+  report, and export two explicit suites. `all-schools` installs eight ordinary bindable
+  example quests, prepares the gallery and consumables, and receipts real router witnesses
+  separately from quest completions. `creator-events` probes all 34 safe events through the
+  shared evaluator and labels the result synthetic. The live lane temporarily uses zero
+  cooldown in memory so local/RPC double completion cannot hide behind normal cooldown, then
+  restores config through reload. An expiring fixed-file i5 request mailbox exposes ten
+  allowlisted suite/gallery operations—no console, keystrokes, arbitrary paths, or prefab
+  strings—and writes request/suite JSON plus relevant log evidence.
 - **The initial eight-category scaffold wired** 26 atlas integrations plus two panel/input support hooks:
   - **harvest** — `TreeBase.Damage`, `TreeLog.Damage`, `Destructible.Damage`,
     `Pickable.Interact`. The first three are what the retired ComfyControlSurface hooked,

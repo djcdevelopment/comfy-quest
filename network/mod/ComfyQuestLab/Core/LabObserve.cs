@@ -17,7 +17,7 @@ using UnityEngine;
 /// tool that can break someone's game is worse than no teaching tool.</summary>
 public static class LabObserve {
   /// <summary>Record something the local player caused.</summary>
-  public static void Seam(
+  public static string Seam(
       string signatureId,
       string target,
       string detail,
@@ -26,7 +26,7 @@ public static class LabObserve {
       IReadOnlyDictionary<string, string> fields = null,
       bool evaluate = true) {
     try {
-      LabEventRouter.Emit(
+      return LabEventRouter.Emit(
           signatureId,
           target,
           detail,
@@ -35,6 +35,7 @@ public static class LabObserve {
           fields: fields,
           evaluate: evaluate);
     } catch (Exception) {
+      return null;
     }
   }
 

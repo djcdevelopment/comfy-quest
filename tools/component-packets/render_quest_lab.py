@@ -190,6 +190,11 @@ html = [
     '<p>Puts a fresh practice target in front of you &mdash; <code>lab_target harvest</code> for '
     'a tree, and so on for all eight schools. You should never be walking across the map looking '
     'for the thing your quest is about; that is what the gallery is for.</p></li>',
+    '<li><strong>Want to prove every school? <code>questlab_batch prepare all-schools</code>.</strong>',
+    '<p>Then run <code>questlab_batch run all-schools</code> and follow the eight prepared prompts. '
+    '<code>report</code> shows what remains and <code>export</code> writes a JSON receipt. The separate '
+    '<code>creator-events</code> suite checks all 34 shared evaluator names, but labels itself synthetic '
+    'rather than claiming those actions happened in Valheim.</p></li>',
     '</ol>',
 
     '<p class="note"><strong>The starter file holds two backward-compatible quests.</strong> '

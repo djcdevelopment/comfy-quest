@@ -71,6 +71,10 @@ this?*
 | `questlab_gallery identify` | report loaded profile and build marks before changing the world |
 | `questlab_gallery clear [profile-or-build-id]` | remove only matching marked gallery objects |
 | `questlab_gallery rebuild [profile]` | selectively clear and rebuild one profile |
+| `questlab_batch suites` | list the two bounded evidence classes |
+| `questlab_batch prepare all-schools` | write eight ordinary example quests, raise a gallery if needed, and stage supplies |
+| `questlab_batch run [all-schools\|creator-events]` | start live witnessing or run the explicitly synthetic 34-event contract probe |
+| `questlab_batch reset\|report\|export` | reset safely, show progress, or write a machine-readable receipt |
 
 `lab_setup` is typed into **Valheim's** console, which is **F5**. **F6** opens the lab's own
 panel. Two different keys, and mixing them up is the most common first stumble.
@@ -131,6 +135,25 @@ and previews live in
 [`gallery-profiles.json`](../../../tools/component-packets/samples/gallery-profiles.json)
 and `gallery-plan-comparison.png`; `generate_gallery.py --check` guards plan drift.
 
+## Bounded suites and receipts
+
+`all-schools` prepares one schema-1, source-compatible example quest per school. A run
+clears router/evaluator state, uses a volatile zero cooldown without changing the creator's
+config, and waits for real game actions. The receipt requires both the canonical event and
+its example quest completion in every school. It records raw signatures, canonical action
+keys, coalesced local/RPC witnesses, and fails closed if the same action completes one quest
+twice. Passing runs export automatically; `report` and `export` also preserve incomplete work.
+
+`creator-events` is deliberately different: it exercises all 34 safe event names through
+the exact source-shared evaluator and labels its receipt `synthetic-contract`. It proves
+bindability, not that a Valheim player performed those actions. Receipts are ordinary JSON
+under `BepInEx/config/comfy-quest-lab/receipts/`.
+
+For an unattended i5 lane, [`Invoke-I5QuestLabBatch.ps1`](../../../tools/i5/Invoke-I5QuestLabBatch.ps1)
+deploys one expiring request through the SHA-verified config lane and collects its request,
+suite, and relevant-log receipts. Its ten operations, two suites, and three gallery profiles
+are fixed allowlists. The request schema has no console text, key, path, or prefab field.
+
 ## Writing a quest
 
 `lab_setup` writes `BepInEx/config/comfy-quest-lab/quests/starter.json` — but only into an
@@ -189,9 +212,11 @@ and pausing drops nothing — the ring keeps collecting behind it.
 
 ## What it will not do
 
-- **It never changes the game.** Every hook is a postfix that reads and records. If a
-  postfix throws it is swallowed, because a patch that throws takes Valheim's damage path
-  with it.
+- **Passive observation never changes the game.** Every integration hook is a postfix that
+  reads and records; if one throws it is swallowed, because a patch that throws takes
+  Valheim's own path with it. Gallery and suite preparation are the explicit exceptions:
+  they change a private world only after a typed command or validated bounded request, mark
+  everything they own, and expose selective cleanup.
 - **It mostly reports what *you* did.** Anything driven by a hit is filtered to the local
   player, because a world of creatures fighting each other buries the console within
   seconds of a fight starting. Five seams are deliberately *not* filtered, because they
@@ -231,11 +256,13 @@ predicate restating the matcher's rules is the thing that drifts silently, and "
 means fires there" is the only promise the lab makes. If the evaluator gains a lane, this
 answer changes with it for free.
 
-**`LabQuestSet`, `LabQuestAdvisor` and `LabQuestSeed` are Unity-free and linked into
+**`LabQuestSet`, `LabQuestAdvisor`, `LabQuestSeed`, and `LabBatchContract` are Unity-free and linked into
 ComfyNetworkSense.Tests**, so the logic a creator depends on is provable in seconds without a
 game install. `LabQuestSet.Build` takes file *contents*, not paths, for exactly that reason —
 keep disk IO in `LabQuestEngine`. `LabQuestAdvisor` takes world facts as injected delegates
 so every advisory has a test and none of them guess during `Awake`, before `ZNetScene` exists.
+`LabBatchController` is the deliberately thin runtime half; remote operations must remain in
+`LabBatchRequestPolicy`, whose closed allowlist is headlessly tested.
 
 **`LabCreatureNaming` holds a deliberate copy** of
 `GameplayEventProducer.NormalizeCreatureName`. It is Unity-free and linked into the test project
