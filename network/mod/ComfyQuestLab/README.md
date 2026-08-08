@@ -192,9 +192,14 @@ game install. `LabQuestSet.Build` takes file *contents*, not paths, for exactly 
 keep disk IO in `LabQuestEngine`. `LabQuestAdvisor` takes world facts as injected delegates
 so every advisory has a test and none of them guess during `Awake`, before `ZNetScene` exists.
 
-**`LabKillWatch` holds a deliberate copy** of `GameplayEventProducer.NormalizeCreatureName`.
-Extracting that rule into a Unity-free helper both mods can share is the right fix and is a
-change to the shipping mod, so it owes its own note.
+**`LabCreatureNaming` holds a deliberate copy** of
+`GameplayEventProducer.NormalizeCreatureName`. It is Unity-free and linked into the test project
+on purpose: this rule has been wrong once already, and while it lived beside `Character` the only
+way to check it was to launch the game and kill something. The Greydwarf_Elite case is a test now,
+and a mutation check confirms reintroducing the old behaviour fails three of them.
+
+Still owed: extracting that rule into a file **both mods** link, so the lab cannot drift from the
+producer at all. That is a change to the shipping mod and carries its own note.
 
 **Adding a category** is the shape of
 [`Patches/HarvestPatches.cs`](Patches/HarvestPatches.cs): one `LabPatching.TryPatch` per

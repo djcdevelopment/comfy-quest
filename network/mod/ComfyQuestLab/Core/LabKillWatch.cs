@@ -109,53 +109,23 @@ public static class LabKillWatch {
     _hits.Clear();
   }
 
-  /// <summary>The name the quest matcher will actually see.
-  ///
-  /// <b>This is the rule that used to be wrong here.</b> It mirrors
-  /// <c>GameplayEventProducer.NormalizeCreatureName</c> (ComfyNetworkSense, ~line 327): prefer
-  /// <c>m_name</c>, which is a localization token like <c>$enemy_greydwarfbrute</c>, and fall back
-  /// to the GameObject name only when it is empty. The lab's console previously showed the
-  /// GameObject name and claimed it was what a builder should type into <c>trigger.target</c> —
-  /// true for Neck and Boar by luck, false for Greydwarf_Elite, whose token shares no substring
-  /// with its prefab name at all.
-  ///
-  /// A deliberate copy rather than a link: extracting this into a Unity-free helper both mods can
-  /// share is the right fix and is a change to the shipping mod, so it owes its own note.</summary>
+  /// <summary>The name the quest matcher will actually see. The rule lives in
+  /// <see cref="LabCreatureNaming"/> — it is pure string work and belongs somewhere a test can
+  /// reach it, because it has been wrong once already.</summary>
   public static string MatcherName(Character creature) {
-    if (creature == null) {
-      return "unknown";
-    }
-
-    string name = creature.m_name;
-    if (string.IsNullOrWhiteSpace(name)) {
-      name = creature.name;
-    }
-
-    return LabObserve.Clean(name);
+    return creature == null
+        ? "unknown"
+        : LabCreatureNaming.Normalize(creature.m_name, creature.name);
   }
 
-  /// <summary>How a creature is shown anywhere in the lab: the name the matcher compares against,
-  /// with the prefab name beside it only when the two disagree.
-  ///
-  /// Showing both unconditionally would be noise on the ninety percent of creatures where the
-  /// token contains the prefab name; showing only one is how the console came to promise
-  /// something the matcher did not honour.</summary>
+  /// <summary>How a creature is shown anywhere in the lab: the matchable name, with the prefab
+  /// name beside it only when the two disagree.</summary>
   public static string DisplayName(Character creature) {
     if (creature == null) {
       return "unknown";
     }
-    return Display(MatcherName(creature), LabObserve.Clean(creature.name));
-  }
-
-  public static string Display(string matcherName, string prefabName) {
-    if (string.IsNullOrEmpty(matcherName)) {
-      return string.IsNullOrEmpty(prefabName) ? "unknown" : prefabName;
-    }
-    if (string.IsNullOrEmpty(prefabName)
-        || matcherName.ToLowerInvariant().Contains(prefabName.ToLowerInvariant())) {
-      return matcherName;
-    }
-    return matcherName + " (prefab " + prefabName + ")";
+    return LabCreatureNaming.Display(
+        MatcherName(creature), LabCreatureNaming.Clean(creature.name));
   }
 
   /// <summary>Drop everything already too old to matter; if that frees nothing (a long fight with
@@ -197,17 +167,12 @@ public struct LabKill {
   /// <summary>True when the name a builder reads off <c>questlab_prefabs</c> is not a substring of
   /// what the matcher compares against — the case where typing the obvious thing never works.</summary>
   public bool NamesDisagree {
-    get {
-      if (string.IsNullOrEmpty(Creature) || string.IsNullOrEmpty(PrefabName)) {
-        return false;
-      }
-      return !Creature.ToLowerInvariant().Contains(PrefabName.ToLowerInvariant());
-    }
+    get { return LabCreatureNaming.NamesDisagree(Creature, PrefabName); }
   }
 
   /// <summary>How the console shows the target: the matchable name, with the prefab name beside
   /// it only when they differ enough to matter.</summary>
   public string Display {
-    get { return LabKillWatch.Display(Creature, PrefabName); }
+    get { return LabCreatureNaming.Display(Creature, PrefabName); }
   }
 }

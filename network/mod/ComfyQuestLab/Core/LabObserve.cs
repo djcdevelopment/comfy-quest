@@ -60,12 +60,9 @@ public static class LabObserve {
   }
 
   /// <summary>Unity appends "(Clone)" to every spawned instance. A quest author never
-  /// types that, so the lab never shows it.</summary>
+  /// types that, so the lab never shows it. The rule itself lives in
+  /// <see cref="LabCreatureNaming"/>, where a test can reach it.</summary>
   public static string Clean(string name) {
-    if (string.IsNullOrEmpty(name)) {
-      return "unknown";
-    }
-    int marker = name.IndexOf("(Clone)", StringComparison.OrdinalIgnoreCase);
-    return (marker >= 0 ? name.Substring(0, marker) : name).Trim();
+    return LabCreatureNaming.Clean(name);
   }
 }
