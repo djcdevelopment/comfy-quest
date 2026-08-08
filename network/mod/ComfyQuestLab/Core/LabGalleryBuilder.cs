@@ -142,6 +142,9 @@ public sealed class LabGalleryBuilder {
     foreach (string supply in Supplies) {
       AddUnique(wanted, supply);
     }
+    foreach (string supply in LabBatchContract.PreparedSupplyPrefabs) {
+      AddUnique(wanted, supply);
+    }
 
     var found = new List<string>();
     var missing = new List<string>();
@@ -1054,29 +1057,29 @@ public sealed class LabGalleryBuilder {
     }
   }
 
-  /// <summary>Consumables the all-schools suite needs but the permanent armoury does not.
-  /// Fixed prefab allowlist, fixed stack sizes, placed at the local player's feet. These carry
+  /// <summary>Materials the all-schools suite needs, staged at the local player's feet so a
+  /// fresh character does not depend on prior inventory or finding the central supply stacks.
+  /// The pure contract owns the fixed prefab allowlist; stack sizes are fixed here. These carry
   /// the same gallery marks as every other lab-owned object, so normal selective clear removes
   /// them and no cleanup path needs to guess by prefab name.</summary>
   public string PrepareBatchSupplies() {
     if (ZNetScene.instance == null || Player.m_localPlayer == null) {
       return "Batch supplies were not placed because no player world is loaded.";
     }
-    string[] prefabs = { "Coal", "CopperOre" };
     int placed = 0;
     Player player = Player.m_localPlayer;
-    for (int i = 0; i < prefabs.Length; i++) {
+    for (int i = 0; i < LabBatchContract.PreparedSupplyPrefabs.Length; i++) {
       Vector3 at = player.transform.position + player.transform.forward * (2.0f + i * 0.8f)
           + player.transform.right * 1.5f;
       at.y += 0.5f;
-      GameObject drop = Place(prefabs[i], at, Quaternion.identity);
+      GameObject drop = Place(LabBatchContract.PreparedSupplyPrefabs[i], at, Quaternion.identity);
       if (drop != null) {
         SetStack(drop, 20);
         placed++;
       }
     }
-    return "Prepared " + placed + "/" + prefabs.Length
-        + " bounded supply stacks (coal and copper ore).";
+    return "Prepared " + placed + "/" + LabBatchContract.PreparedSupplyPrefabs.Length
+        + " bounded supply stacks (wood, coal, and copper ore).";
   }
 
   /// <summary>Far enough not to spawn inside the player, close enough to be obviously for them.</summary>
