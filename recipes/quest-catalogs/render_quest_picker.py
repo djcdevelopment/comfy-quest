@@ -217,7 +217,9 @@ PAGE = """<!DOCTYPE html>
   <span id="savednote"></span>
   <button class="savebtn" id="save" disabled>Save quest-view.json</button>
   <div class="hint">Drop the saved file into <b>Valheim/BepInEx/config/comfy-network-sense/quest-view.json</b> &#8212;
-    the in-game quest log (F7) shows exactly what you picked. Your selection stays saved in this page.</div>
+    the in-game quest log (F7) shows exactly what you picked. Your selection stays saved in this page.
+    Curious how these quests got here? <a href="provenance.html" style="color:var(--gold)">Every
+    guild's artifact has a receipt</a>.</div>
 </footer>
 <script>
 var CATALOGS = __CATALOGS__;
