@@ -94,6 +94,46 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
             self.assertEqual(envelope["operation"], "run")
             self.assertEqual(envelope["suite"], "creator-events")
 
+    def test_gallery_defaults_select_grand_but_compare_retains_wide_baseline(self) -> None:
+        cases = (
+            ("gallery_build", {"profile": "marble-grand"}),
+            (
+                "gallery_compare",
+                {"profile": "marble-wide", "compare_profile": "marble-grand"},
+            ),
+        )
+        for operation, expected in cases:
+            with (
+                self.subTest(operation=operation),
+                tempfile.TemporaryDirectory() as output_directory,
+            ):
+                result = subprocess.run(
+                    [
+                        "powershell.exe",
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(SCRIPT),
+                        operation,
+                        "-OutputDirectory",
+                        output_directory,
+                        "-DryRun",
+                        "-Lane",
+                        "omen",
+                    ],
+                    cwd=REPO,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                receipts = list(Path(output_directory).glob("*-request.json"))
+                self.assertEqual(len(receipts), 1)
+                envelope = json.loads(receipts[0].read_text(encoding="utf-8"))
+                for field, value in expected.items():
+                    self.assertEqual(envelope[field], value)
+
     def test_no_generic_execution_or_keystroke_primitive_exists(self) -> None:
         for forbidden in (
             "Invoke-Expression",

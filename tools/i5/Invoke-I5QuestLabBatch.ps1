@@ -24,7 +24,7 @@ param(
     [string]$Suite = 'all-schools',
 
     [ValidateSet('classic', 'marble-wide', 'marble-grand')]
-    [string]$Profile = 'marble-wide',
+    [string]$Profile = 'marble-grand',
 
     [ValidateSet('classic', 'marble-wide', 'marble-grand')]
     [string]$CompareProfile = 'marble-grand',
@@ -67,6 +67,10 @@ $request = [ordered]@{
     created_utc = $now.ToString('o')
     expires_utc = $now.AddMinutes($ExpiresMinutes).ToString('o')
 }
+$effectiveProfile = if (
+    $Operation -eq 'gallery_compare' -and
+    -not $PSBoundParameters.ContainsKey('Profile')
+) { 'marble-wide' } else { $Profile }
 
 switch ($Operation) {
     { $_ -in @('prepare', 'run') } {
@@ -74,11 +78,11 @@ switch ($Operation) {
         break
     }
     { $_ -in @('gallery_build', 'gallery_rebuild') } {
-        $request.profile = $Profile
+        $request.profile = $effectiveProfile
         break
     }
     'gallery_compare' {
-        $request.profile = $Profile
+        $request.profile = $effectiveProfile
         $request.compare_profile = $CompareProfile
         break
     }

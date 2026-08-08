@@ -34,7 +34,7 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_profile_contract_is_explicit(self) -> None:
         self.assertEqual(self.model["Schema"], "comfy-questlab-gallery-profiles/v2")
-        self.assertEqual(self.model["DefaultProfile"], "marble-wide")
+        self.assertEqual(self.model["DefaultProfile"], "marble-grand")
         self.assertEqual(self.model["ProfileCount"], 3)
         self.assertEqual(
             list(self.profiles), ["classic", "marble-wide", "marble-grand"]
@@ -56,6 +56,17 @@ class GalleryProfileTests(unittest.TestCase):
                 self.assertLess(classic[field], wide[field])
                 self.assertLess(wide[field], grand[field])
         self.assertGreaterEqual(wide["hallWidth"], classic["hallWidth"] * 2)
+        self.assertLess(classic["platformClearance"], wide["platformClearance"])
+        self.assertLess(wide["platformClearance"], grand["platformClearance"])
+        self.assertGreaterEqual(grand["platformClearance"], 3.0)
+
+    def test_v2_profiles_have_one_horizontal_header_per_rune(self) -> None:
+        self.assertEqual(self.profiles["classic"]["counts"]["runeNameSigns"], 0)
+        for profile_id in ("marble-wide", "marble-grand"):
+            with self.subTest(profile=profile_id):
+                self.assertEqual(
+                    self.profiles[profile_id]["counts"]["runeNameSigns"], 8
+                )
 
     def test_estimates_account_for_every_placed_object(self) -> None:
         # Build places one object for each generated floor/fixture/beam, two per armoury
@@ -77,9 +88,17 @@ class GalleryProfileTests(unittest.TestCase):
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
         self.assertIn("public const int PlanVersion = 2;", source)
-        self.assertIn('public const string DefaultProfileId = "marble-wide";', source)
+        self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
+        self.assertIn("public float PlatformClearance;", source)
+        self.assertIn("public int EstimatedPlacedObjects, RuneNameSigns;", source)
+        self.assertEqual(source.count('Orient = "rune-name"'), 16)
         self.assertIn("public static Profile Find(string id)", source)
         self.assertIn("public static Monument[] Monuments", source)
+
+    def test_runtime_reports_clearance_and_horizontal_headers(self) -> None:
+        source = BUILDER.read_text(encoding="utf-8")
+        self.assertIn('Append(" m terrain clearance, ")', source)
+        self.assertIn('+ " horizontal rune headers."', source)
 
     def test_preview_set_is_complete(self) -> None:
         for profile_id in self.profiles:

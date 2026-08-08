@@ -36,7 +36,9 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   structure pieces without ever touching an unmarked object. Uninstantiated marked ZDOs are
   explicitly claimed before destruction; the r3 live run exposed that Valheim otherwise
   ignores the delete while returning normally. Generated JSON/count/preview artifacts
-  and seven drift tests agree. Live visual selection remains pending.
+  and drift tests agree. Live comparison selected `marble-grand` as the direction; r5
+  raises it 3 m over the highest sampled terrain and puts horizontal school-name headers
+  above the large glowing runes. Those refinements remain subject to the final visual pass.
 - **Bounded batch evidence is self-service.** `questlab_batch` can prepare, run, reset,
   report, and export two explicit suites. `all-schools` installs eight ordinary bindable
   example quests, refreshes the consumable Greyling/birch targets, prepares the gallery and

@@ -32,7 +32,6 @@ using UnityEngine;
 /// A gallery is raised at the player's feet, so the plan stays origin-relative and the
 /// Tome is not tied to one world.</summary>
 public sealed class LabGalleryBuilder {
-  const float PlatformClearance = 0.6f;   // floor sits this far above the highest ground
 
   /// <summary>Portal tags. Two portals sharing a tag connect to each other; the pairing
   /// is a plain ZDO string field, per the component atlas.</summary>
@@ -169,6 +168,10 @@ public sealed class LabGalleryBuilder {
     sb.AppendLine(profile.HallWidth.ToString("0.#", CultureInfo.InvariantCulture)
         + " m halls; floor " + string.Join(", ", profile.FloorMaterials)
         + (profile.SolidMarbleFloor ? " (solid marble)" : " (mixed material)"));
+    sb.AppendLine(profile.PlatformClearance.ToString("0.#", CultureInfo.InvariantCulture)
+        + " m terrain clearance; "
+        + profile.RuneNameSigns.ToString(CultureInfo.InvariantCulture)
+        + " horizontal rune headers.");
     sb.Append(missing.Count == 0
         ? "Ready. questlab_gallery build " + profile.Id
         : "Not ready — fix the names above first.");
@@ -199,7 +202,12 @@ public sealed class LabGalleryBuilder {
         .Append(" objects, ")
         .Append(profile.HallWidth.ToString("0.#", CultureInfo.InvariantCulture))
         .Append(" m halls, ")
+        .Append(profile.PlatformClearance.ToString("0.#", CultureInfo.InvariantCulture))
+        .Append(" m terrain clearance, ")
         .Append(profile.SolidMarbleFloor ? "solid marble" : "mixed floor")
+        .Append(", ")
+        .Append(profile.RuneNameSigns.ToString(CultureInfo.InvariantCulture))
+        .Append(" horizontal rune headers")
         .AppendLine();
       sb.AppendLine("    " + profile.Description);
     }
@@ -310,7 +318,7 @@ public sealed class LabGalleryBuilder {
         top = ground;
       }
     }
-    float floorY = top + PlatformClearance;
+    float floorY = top + profile.PlatformClearance;
     Report("raising " + profile.Id + " (" + _activeBuildId + ") — floor at "
         + (floorY - origin.y).ToString("0.0", CultureInfo.InvariantCulture)
         + " m above its origin. Stand back.");

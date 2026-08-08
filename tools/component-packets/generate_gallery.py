@@ -87,7 +87,7 @@ COMMON_PALETTE = {
 
 # These are intentionally meaningfully different rather than tiny tuning variants. The
 # first preserves the already-proven build as a comparison baseline. Both v2 choices use
-# black marble for every walking-surface cell; the wider one is the reversible default.
+# black marble for every walking-surface cell; live comparison selected the grand profile.
 PROFILE_SPECS = [
     {
         "id": "classic",
@@ -97,6 +97,8 @@ PROFILE_SPECS = [
         "rune_width": 9.0,
         "rune_height": 11.0,
         "rune_base_y": 0.5,
+        "platform_clearance": 0.6,
+        "rune_name_headers": False,
         "beam_length": 2.0,
         "station_inset": 6.5,
         "rack_radius": 6.0,
@@ -119,11 +121,13 @@ PROFILE_SPECS = [
     {
         "id": "marble-wide",
         "name": "Marble wide",
-        "description": "Gallery v2 default: an all-marble floor, 8 m halls, and larger runes.",
+        "description": "All-marble floor, 8 m halls, larger runes, and horizontal rune headers.",
         "ring_radius": 50.0,
         "rune_width": 11.0,
         "rune_height": 14.0,
         "rune_base_y": 0.75,
+        "platform_clearance": 1.5,
+        "rune_name_headers": True,
         "beam_length": 2.0,
         "station_inset": 8.0,
         "rack_radius": 8.0,
@@ -146,11 +150,13 @@ PROFILE_SPECS = [
     {
         "id": "marble-grand",
         "name": "Marble grand",
-        "description": "A no-compromise all-marble court with 10 m halls and monumental runes.",
+        "description": "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and horizontal rune headers.",
         "ring_radius": 62.0,
         "rune_width": 14.0,
         "rune_height": 17.0,
         "rune_base_y": 1.0,
+        "platform_clearance": 3.0,
+        "rune_name_headers": True,
         "beam_length": 2.0,
         "station_inset": 10.0,
         "rack_radius": 10.0,
@@ -172,7 +178,7 @@ PROFILE_SPECS = [
     },
 ]
 
-DEFAULT_PROFILE = "marble-wide"
+DEFAULT_PROFILE = "marble-grand"
 PANEL_SIZE = 8.0
 BACKDROP_COLUMNS = 2
 BACKDROP_ROWS = 2
@@ -208,6 +214,11 @@ def sign_text(category: str, note: str) -> str:
         f"<size=28><b><color={heading}>{category.upper()}</color></b></size>\n"
         f"{note}\n<color=#8fdc8f>safe events can bind here</color>"
     )
+
+
+def rune_name_text(category: str) -> str:
+    heading = hex_of(SCHOOL_COLOURS[category])
+    return f"<size=36><b><color={heading}>{category.upper()}</color></b></size>"
 
 
 def monument_beams(segments, angle_deg: float, spec: dict):
@@ -413,6 +424,29 @@ def hall_signs(spec: dict, monuments: list[dict]):
     return signs
 
 
+def rune_name_signs(spec: dict, monuments: list[dict]):
+    if not spec["rune_name_headers"]:
+        return []
+    signs = []
+    along = spec["ring_radius"] + spec["rune_gap"] + spec["stage_depth"] / 2.0
+    y = spec["rune_base_y"] + spec["rune_height"] + 1.5
+    for monument in monuments:
+        angle = math.radians(monument["angle"])
+        sx, sz = math.sin(angle), math.cos(angle)
+        signs.append(
+            fixture(
+                COMMON_PALETTE["sign"],
+                sx * along,
+                y,
+                sz * along,
+                monument["angle"] + 180.0,
+                orient="rune-name",
+                text=rune_name_text(monument["category"]),
+            )
+        )
+    return signs
+
+
 def fixture(prefab, x, y, z, yaw, orient="", text=""):
     return {
         "prefab": prefab,
@@ -428,7 +462,12 @@ def fixture(prefab, x, y, z, yaw, orient="", text=""):
 def build_profile(spec: dict, segments: dict):
     monuments = build_monuments(spec, segments)
     tiles = platform_tiles(spec, monuments)
-    fixtures = hall_walls(spec, monuments) + backdrop_panels(spec, monuments) + hall_signs(spec, monuments)
+    fixtures = (
+        hall_walls(spec, monuments)
+        + backdrop_panels(spec, monuments)
+        + hall_signs(spec, monuments)
+        + rune_name_signs(spec, monuments)
+    )
     armoury = build_armoury(spec)
     beam_count = sum(len(monument["beams"]) for monument in monuments)
     footprint = (
@@ -445,6 +484,7 @@ def build_profile(spec: dict, segments: dict):
         "description": spec["description"],
         "ringRadius": spec["ring_radius"],
         "runeHeight": spec["rune_height"],
+        "platformClearance": spec["platform_clearance"],
         "beamLength": spec["beam_length"],
         "hallWidth": spec["hall_half_width"] * 2.0,
         "floorMaterials": floor_materials,
@@ -458,6 +498,9 @@ def build_profile(spec: dict, segments: dict):
             "floorTiles": len(tiles),
             "fixtures": len(fixtures),
             "runeBeams": beam_count,
+            "runeNameSigns": sum(
+                fixture["orient"] == "rune-name" for fixture in fixtures
+            ),
             "armouryStands": len(armoury),
             "estimatedPlacedObjects": len(tiles) + len(fixtures) + beam_count + EXTRA_PLACED_OBJECTS,
         },
@@ -490,10 +533,18 @@ def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
     if len(ids) != len(set(ids)) or DEFAULT_PROFILE not in ids:
         raise SystemExit("gallery profile ids must be unique and include the default")
     for profile in profiles:
+        if profile["platformClearance"] <= 0.0:
+            raise SystemExit(f"profile {profile['id']} has no platform clearance")
         if profile["id"] != "classic" and not profile["solidMarbleFloor"]:
             raise SystemExit(f"v2 profile {profile['id']} is not an all-marble floor")
         if profile["id"] != "classic" and profile["hallWidth"] <= 4.0:
             raise SystemExit(f"v2 profile {profile['id']} did not widen the classic halls")
+        expected_headers = 0 if profile["id"] == "classic" else len(ORDER)
+        if profile["counts"]["runeNameSigns"] != expected_headers:
+            raise SystemExit(
+                f"profile {profile['id']} has {profile['counts']['runeNameSigns']} "
+                f"rune headers, expected {expected_headers}"
+            )
     return len(entries)
 
 
@@ -542,8 +593,9 @@ def render_csharp(profiles: list[dict]) -> str:
         "  public sealed class Profile {",
         "    public string Id, Name, Description;",
         "    public float RingRadius, RuneHeight, BeamLength, HallWidth, FootprintRadius;",
+        "    public float PlatformClearance;",
         "    public bool SolidMarbleFloor;",
-        "    public int EstimatedPlacedObjects;",
+        "    public int EstimatedPlacedObjects, RuneNameSigns;",
         "    public string[] FloorMaterials;",
         "    public Monument[] Monuments;",
         "    public Tile[] PlatformTiles;",
@@ -561,9 +613,11 @@ def render_csharp(profiles: list[dict]) -> str:
                 f"      Description = {cs(profile['description'])},",
                 f"      RingRadius = {f(profile['ringRadius'])}, RuneHeight = {f(profile['runeHeight'])},",
                 f"      BeamLength = {f(profile['beamLength'])}, HallWidth = {f(profile['hallWidth'])},",
+                f"      PlatformClearance = {f(profile['platformClearance'])},",
                 f"      FootprintRadius = {f(profile['footprintRadius'])},",
                 f"      SolidMarbleFloor = {str(profile['solidMarbleFloor']).lower()},",
                 f"      EstimatedPlacedObjects = {profile['counts']['estimatedPlacedObjects']},",
+                f"      RuneNameSigns = {profile['counts']['runeNameSigns']},",
                 "      FloorMaterials = new[] { "
                 + ", ".join(cs(item) for item in profile["floorMaterials"])
                 + " },",
@@ -654,6 +708,7 @@ def summary_model(profiles: list[dict]) -> dict:
                     "description",
                     "ringRadius",
                     "runeHeight",
+                    "platformClearance",
                     "hallWidth",
                     "footprintRadius",
                     "floorMaterials",
@@ -704,6 +759,9 @@ def render_previews(profiles: list[dict]) -> None:
             px, pz = point(item["x"], item["z"])
             radius = 2 if item["text"] else 1
             draw.ellipse([px - radius, pz - radius, px + radius, pz + radius], fill=(105, 102, 118))
+            if item["orient"] == "rune-name":
+                label = re.sub(r"<[^>]+>", "", item["text"])
+                draw.text((px - len(label) * 3, pz - 6), label, fill=(210, 215, 220))
         for monument in profile["monuments"]:
             color = colors[monument["category"]]
             for beam in monument["beams"]:

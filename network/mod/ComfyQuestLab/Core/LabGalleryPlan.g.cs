@@ -11,7 +11,7 @@ using System;
 /// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>
 public static class LabGalleryPlan {
   public const int PlanVersion = 2;
-  public const string DefaultProfileId = "marble-wide";
+  public const string DefaultProfileId = "marble-grand";
 
   public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }
   public struct Station { public string Prefab, Kind, Note; public float X, Z; }
@@ -26,8 +26,9 @@ public static class LabGalleryPlan {
   public sealed class Profile {
     public string Id, Name, Description;
     public float RingRadius, RuneHeight, BeamLength, HallWidth, FootprintRadius;
+    public float PlatformClearance;
     public bool SolidMarbleFloor;
-    public int EstimatedPlacedObjects;
+    public int EstimatedPlacedObjects, RuneNameSigns;
     public string[] FloorMaterials;
     public Monument[] Monuments;
     public Tile[] PlatformTiles;
@@ -41,9 +42,11 @@ public static class LabGalleryPlan {
       Description = "The proven mixed stone/marble footprint retained for comparison.",
       RingRadius = 38f, RuneHeight = 11f,
       BeamLength = 2f, HallWidth = 4f,
+      PlatformClearance = 0.6f,
       FootprintRadius = 60f,
       SolidMarbleFloor = false,
       EstimatedPlacedObjects = 1405,
+      RuneNameSigns = 0,
       FloorMaterials = new[] { "blackmarble_floor", "stone_floor_2x2" },
       Monuments = new[] {
         new Monument {
@@ -1501,12 +1504,14 @@ public static class LabGalleryPlan {
     },
     new Profile {
       Id = "marble-wide", Name = "Marble wide",
-      Description = "Gallery v2 default: an all-marble floor, 8 m halls, and larger runes.",
+      Description = "All-marble floor, 8 m halls, larger runes, and horizontal rune headers.",
       RingRadius = 50f, RuneHeight = 14f,
       BeamLength = 2f, HallWidth = 8f,
+      PlatformClearance = 1.5f,
       FootprintRadius = 77f,
       SolidMarbleFloor = true,
-      EstimatedPlacedObjects = 2243,
+      EstimatedPlacedObjects = 2251,
+      RuneNameSigns = 8,
       FloorMaterials = new[] { "blackmarble_floor" },
       Monuments = new[] {
         new Monument {
@@ -3788,6 +3793,14 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "sign", X = -13.506f, Y = 1.2f, Z = -6.293f, Yaw = 45f, Orient = "", Text = "<size=28><b><color=#cc80ff>PROGRESSION</color></b></size>\na bench and room to raise a skill\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -14f, Y = 1.2f, Z = 5.1f, Yaw = 90f, Orient = "", Text = "<size=28><b><color=#59e6e6>WORLD</color></b></size>\na paired portal and world-state practice\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -6.293f, Y = 1.2f, Z = 13.506f, Yaw = 135f, Orient = "", Text = "<size=28><b><color=#ffb2d9>SOCIAL</color></b></size>\na sign to write and a place to speak\n<color=#8fdc8f>safe events can bind here</color>" },
+        new Fixture { Prefab = "sign", X = 0f, Y = 16.25f, Z = 60f, Yaw = 180f, Orient = "rune-name", Text = "<size=36><b><color=#ff4738>COMBAT</color></b></size>" },
+        new Fixture { Prefab = "sign", X = 42.426f, Y = 16.25f, Z = 42.426f, Yaw = 225f, Orient = "rune-name", Text = "<size=36><b><color=#73f266>HARVEST</color></b></size>" },
+        new Fixture { Prefab = "sign", X = 60f, Y = 16.25f, Z = 0f, Yaw = 270f, Orient = "rune-name", Text = "<size=36><b><color=#f2c74c>INVENTORY</color></b></size>" },
+        new Fixture { Prefab = "sign", X = 42.426f, Y = 16.25f, Z = -42.426f, Yaw = 315f, Orient = "rune-name", Text = "<size=36><b><color=#fa8c33>BUILDING</color></b></size>" },
+        new Fixture { Prefab = "sign", X = 0f, Y = 16.25f, Z = -60f, Yaw = 0f, Orient = "rune-name", Text = "<size=36><b><color=#8cccff>CRAFTING</color></b></size>" },
+        new Fixture { Prefab = "sign", X = -42.426f, Y = 16.25f, Z = -42.426f, Yaw = 45f, Orient = "rune-name", Text = "<size=36><b><color=#cc80ff>PROGRESSION</color></b></size>" },
+        new Fixture { Prefab = "sign", X = -60f, Y = 16.25f, Z = 0f, Yaw = 90f, Orient = "rune-name", Text = "<size=36><b><color=#59e6e6>WORLD</color></b></size>" },
+        new Fixture { Prefab = "sign", X = -42.426f, Y = 16.25f, Z = 42.426f, Yaw = 135f, Orient = "rune-name", Text = "<size=36><b><color=#ffb2d9>SOCIAL</color></b></size>" },
       },
       Armoury = new[] {
         new RackItem { Item = "AxeBronze", Note = "an axe, for trees", X = 0f, Z = 8f, Yaw = 180f },
@@ -3802,12 +3815,14 @@ public static class LabGalleryPlan {
     },
     new Profile {
       Id = "marble-grand", Name = "Marble grand",
-      Description = "A no-compromise all-marble court with 10 m halls and monumental runes.",
+      Description = "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and horizontal rune headers.",
       RingRadius = 62f, RuneHeight = 17f,
       BeamLength = 2f, HallWidth = 10f,
+      PlatformClearance = 3f,
       FootprintRadius = 98f,
       SolidMarbleFloor = true,
-      EstimatedPlacedObjects = 3611,
+      EstimatedPlacedObjects = 3619,
+      RuneNameSigns = 8,
       FloorMaterials = new[] { "blackmarble_floor" },
       Monuments = new[] {
         new Monument {
@@ -7457,6 +7472,14 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "sign", X = -17.041f, Y = 1.2f, Z = -8.415f, Yaw = 45f, Orient = "", Text = "<size=28><b><color=#cc80ff>PROGRESSION</color></b></size>\na bench and room to raise a skill\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -18f, Y = 1.2f, Z = 6.1f, Yaw = 90f, Orient = "", Text = "<size=28><b><color=#59e6e6>WORLD</color></b></size>\na paired portal and world-state practice\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -8.415f, Y = 1.2f, Z = 17.041f, Yaw = 135f, Orient = "", Text = "<size=28><b><color=#ffb2d9>SOCIAL</color></b></size>\na sign to write and a place to speak\n<color=#8fdc8f>safe events can bind here</color>" },
+        new Fixture { Prefab = "sign", X = 0f, Y = 19.5f, Z = 75f, Yaw = 180f, Orient = "rune-name", Text = "<size=36><b><color=#ff4738>COMBAT</color></b></size>" },
+        new Fixture { Prefab = "sign", X = 53.033f, Y = 19.5f, Z = 53.033f, Yaw = 225f, Orient = "rune-name", Text = "<size=36><b><color=#73f266>HARVEST</color></b></size>" },
+        new Fixture { Prefab = "sign", X = 75f, Y = 19.5f, Z = 0f, Yaw = 270f, Orient = "rune-name", Text = "<size=36><b><color=#f2c74c>INVENTORY</color></b></size>" },
+        new Fixture { Prefab = "sign", X = 53.033f, Y = 19.5f, Z = -53.033f, Yaw = 315f, Orient = "rune-name", Text = "<size=36><b><color=#fa8c33>BUILDING</color></b></size>" },
+        new Fixture { Prefab = "sign", X = 0f, Y = 19.5f, Z = -75f, Yaw = 0f, Orient = "rune-name", Text = "<size=36><b><color=#8cccff>CRAFTING</color></b></size>" },
+        new Fixture { Prefab = "sign", X = -53.033f, Y = 19.5f, Z = -53.033f, Yaw = 45f, Orient = "rune-name", Text = "<size=36><b><color=#cc80ff>PROGRESSION</color></b></size>" },
+        new Fixture { Prefab = "sign", X = -75f, Y = 19.5f, Z = 0f, Yaw = 90f, Orient = "rune-name", Text = "<size=36><b><color=#59e6e6>WORLD</color></b></size>" },
+        new Fixture { Prefab = "sign", X = -53.033f, Y = 19.5f, Z = 53.033f, Yaw = 135f, Orient = "rune-name", Text = "<size=36><b><color=#ffb2d9>SOCIAL</color></b></size>" },
       },
       Armoury = new[] {
         new RackItem { Item = "AxeBronze", Note = "an axe, for trees", X = 0f, Z = 10f, Yaw = 180f },

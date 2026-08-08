@@ -1,6 +1,6 @@
 {
   "Schema": "comfy-questlab-gallery-profiles/v2",
-  "DefaultProfile": "marble-wide",
+  "DefaultProfile": "marble-grand",
   "ProfileCount": 3,
   "Profiles": [
     {
@@ -9,6 +9,7 @@
       "description": "The proven mixed stone/marble footprint retained for comparison.",
       "ringRadius": 38.0,
       "runeHeight": 11.0,
+      "platformClearance": 0.6,
       "hallWidth": 4.0,
       "footprintRadius": 60.0,
       "floorMaterials": [
@@ -20,6 +21,7 @@
         "floorTiles": 796,
         "fixtures": 488,
         "runeBeams": 89,
+        "runeNameSigns": 0,
         "armouryStands": 8,
         "estimatedPlacedObjects": 1405
       }
@@ -27,9 +29,10 @@
     {
       "id": "marble-wide",
       "name": "Marble wide",
-      "description": "Gallery v2 default: an all-marble floor, 8 m halls, and larger runes.",
+      "description": "All-marble floor, 8 m halls, larger runes, and horizontal rune headers.",
       "ringRadius": 50.0,
       "runeHeight": 14.0,
+      "platformClearance": 1.5,
       "hallWidth": 8.0,
       "footprintRadius": 77.0,
       "floorMaterials": [
@@ -38,18 +41,20 @@
       "solidMarbleFloor": true,
       "counts": {
         "floorTiles": 1517,
-        "fixtures": 584,
+        "fixtures": 592,
         "runeBeams": 110,
+        "runeNameSigns": 8,
         "armouryStands": 8,
-        "estimatedPlacedObjects": 2243
+        "estimatedPlacedObjects": 2251
       }
     },
     {
       "id": "marble-grand",
       "name": "Marble grand",
-      "description": "A no-compromise all-marble court with 10 m halls and monumental runes.",
+      "description": "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and horizontal rune headers.",
       "ringRadius": 62.0,
       "runeHeight": 17.0,
+      "platformClearance": 3.0,
       "hallWidth": 10.0,
       "footprintRadius": 98.0,
       "floorMaterials": [
@@ -58,10 +63,11 @@
       "solidMarbleFloor": true,
       "counts": {
         "floorTiles": 2461,
-        "fixtures": 984,
+        "fixtures": 992,
         "runeBeams": 134,
+        "runeNameSigns": 8,
         "armouryStands": 8,
-        "estimatedPlacedObjects": 3611
+        "estimatedPlacedObjects": 3619
       }
     }
   ]

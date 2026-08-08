@@ -79,7 +79,7 @@ update.
 | `questlab_clear` | empty the console |
 | `questlab_gallery profiles` | list the generated Gallery v2 geometry choices and counts |
 | `questlab_gallery check [profile]` | resolve every prefab without placing anything |
-| `questlab_gallery build [profile]` | raise one marked profile; default is `marble-wide` |
+| `questlab_gallery build [profile]` | raise one marked profile; default is `marble-grand` |
 | `questlab_gallery compare [left] [right]` | raise two profiles side by side under one build id |
 | `questlab_gallery identify` | report loaded profile and build marks before changing the world |
 | `questlab_gallery clear [profile-or-build-id]` | remove only matching marked gallery objects |
@@ -137,8 +137,10 @@ fails if any of the 57 safe or 86 practical signatures loses runtime coverage.
 
 Gallery geometry is generated from the same eight rune definitions used by the panel.
 `classic` keeps the prior mixed-material shape as a comparison baseline. `marble-wide`
-is the default: a solid black-marble floor, 8 m halls, larger runes, and about 2,243
-placed objects. `marble-grand` expands that to 10 m halls and about 3,611 objects.
+has a solid black-marble floor, 8 m halls, larger runes, 1.5 m terrain clearance, and
+about 2,251 placed objects. The visually preferred `marble-grand` is now the default:
+10 m halls, a 3 m clearance over the highest sampled ground, monumental runes, horizontal
+school-name headers over those runes, and about 3,619 objects.
 
 Every object carries the plan version, profile id, and build id in its own ZDO. `identify`
 reads those durable marks from the locally known ZDO table; `clear` accepts either a profile or
