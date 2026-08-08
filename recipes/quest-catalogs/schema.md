@@ -59,7 +59,11 @@ That's the whole shape. If you need a field that isn't here, add it — then tea
 
 Catalogs are **harvested, not hand-written**. `harvest.py` reads `sources.json` (the
 configurator: which guild, which source, which adapter) and emits the catalog plus an
-**anomalies report**. Anything odd in the source — duplicate bot commands, mismatched
+**anomalies report**. A source may declare a `kind` — `"quest-catalog"` (the default)
+or `"rank-ladder"` — and the adapter emits that kind's artifact: ladder sources emit
+the shape in `../rank-ladders/schema.md` (plus `achievements` / `village_achievements`
+lists and an `entry_id` join key per entry) and are validated by that recipe's
+validator, not this one. `render_quest_picker.py` only embeds quest-catalog sources. Anything odd in the source — duplicate bot commands, mismatched
 evidence counts, unparseable rows — lands in the report for the guild to rule on. The
 harvester never silently fixes the guild's content.
 
@@ -79,11 +83,16 @@ Shape (schema_version 1):
 - `rows[]` — the fate of every row: `{row, outcome, quest_id?, reason?, cells?}`.
   `row` is always the **1-based spreadsheet row**, so a leader can open their own
   sheet and find it. `outcome` is one of `quest | skipped | blank | filler | header |
-  banner | section`. `cells` echoes only mapped columns, keyed by spreadsheet letter,
-  verbatim, truncated at 500 chars (`truncated: true` when cut).
+  banner | section` — plus, for rank-ladder sources, `rank | achievement | detail`
+  (`detail` rows carry `entry`, the owning entry's id; `quest_id` doubles as the
+  generic join key for ladder entries' `entry_id`). `cells` echoes only mapped
+  columns, keyed by spreadsheet letter, verbatim, truncated at 500 chars
+  (`truncated: true` when cut).
 - `anomalies` — the structured anomaly list (below).
-- `counts` — rows_seen / quests / skipped / blank / anomalies. `harvest.py` fails
-  loudly if these disagree with the catalog.
+- `counts` — rows_seen / quests / entries / skipped / blank / anomalies. `quests`
+  is the emitted-entry count for **every** kind (ladder entries included) so the
+  invariant and validator stay one code path. `harvest.py` fails loudly if these
+  disagree with the artifact.
 
 Anomalies are structured objects — `{kind, row, tab, quest_id, quest_name, message}` —
 with `kind` slugs like `skipped_row`, `duplicate_credit`, `credit_mismatch`,

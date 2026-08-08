@@ -44,6 +44,18 @@
       "note": "Etheiry pilot: Creator Events Tracker, Guidelines & Schedule (comfy comfy-etheiry-analysis/CreatorStuff)."
     },
     {
+      "id": "hobbits-ladder",
+      "kind": "rank-ladder",
+      "guild": "Hobbits",
+      "era": 17,
+      "adapter": "hobbit-ladder-xlsx",
+      "path": "../../data/raw/hobbit-reqs-rewards-reset.xlsx",
+      "tab": "E17 Reqs & Rewards",
+      "retrieved": "2026-08-07",
+      "output": "../../data/processed/rank-ladder-hobbits.json",
+      "note": "Luna's 'Hobbit Reqs & Rewards + Reset Checklist' drop (comfy-etheiry-analysis/CreatorStuff). Rewards harvested from the 'Proposed E17 Rewards' column."
+    },
+    {
       "id": "discord-channel-export",
       "guild": null,
       "era": null,

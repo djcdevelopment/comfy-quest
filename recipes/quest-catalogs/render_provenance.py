@@ -117,8 +117,10 @@ svg text{font-family:var(--mono)}
 .chip{font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   padding:.1rem .4rem;border-radius:999px;border:1px solid currentColor}
 .c-quest{color:var(--green)}
+.c-ach{color:var(--violet)}
 .c-skipped{color:var(--amber)}
 .c-dim{color:var(--dim)}
+.ledger details[data-outcome="detail"]{margin-left:1.4rem}
 .rname{color:var(--ink);font-weight:600}
 .rbecame{color:var(--muted)}
 .abadge{color:var(--amber);font-weight:700}
@@ -234,13 +236,16 @@ function el(tag, cls, text){
 }
 
 var OUTCOME_CHIP = {
-  quest:   ["c-quest", "quest"],
-  skipped: ["c-skipped", "skipped"],
-  blank:   ["c-dim", "blank"],
-  filler:  ["c-dim", "not harvested"],
-  banner:  ["c-dim", "banner"],
-  section: ["c-dim", "section"],
-  header:  ["c-dim", "header"]
+  quest:       ["c-quest", "quest"],
+  rank:        ["c-quest", "rank"],
+  achievement: ["c-ach", "achievement"],
+  detail:      ["c-dim", "detail"],
+  skipped:     ["c-skipped", "skipped"],
+  blank:       ["c-dim", "blank"],
+  filler:      ["c-dim", "not harvested"],
+  banner:      ["c-dim", "banner"],
+  section:     ["c-dim", "section"],
+  header:      ["c-dim", "header"]
 };
 
 // anomalies joined by (tab,row) and by quest_id
@@ -271,11 +276,11 @@ function renderRow(tab, ti, r){
   s.appendChild(el("span", "rowno", label));
   var chip = OUTCOME_CHIP[r.outcome] || ["c-dim", r.outcome];
   s.appendChild(el("span", "chip " + chip[0], chip[1]));
-  var q = r.quest_id ? DATA.quests[r.quest_id] : null;
+  var q = r.quest_id ? DATA.entries[r.quest_id] : null;
   var firstCell = r.cells ? r.cells[Object.keys(r.cells).sort()[0]] : "";
   var name = q ? q.name : (firstCell || "").split("\\n")[0];
   if (name) s.appendChild(el("span", "rname", name));
-  if (r.outcome === "quest" && q)
+  if (q && (r.outcome === "quest" || r.outcome === "rank" || r.outcome === "achievement"))
     s.appendChild(el("span", "rbecame", "\\u2192 " + r.quest_id));
   if (r.reason) s.appendChild(el("span", "rbecame", r.reason));
   // row-keyed anomalies may carry the tab name or not (single-tab adapters omit it)
@@ -302,19 +307,33 @@ function renderRow(tab, ti, r){
   if (q){
     var b = el("p", "became");
     b.appendChild(el("b", null, "Became: "));
-    b.appendChild(document.createTextNode(
-      q.name + " (" + r.quest_id + ")" +
-      (q.category ? " \\u00b7 " + q.category : "") +
-      (q.coopable ? " \\u00b7 coopable" : "") +
-      (q.auto_checked ? " \\u00b7 auto-checked" : "")));
-    if (q.bot_command){
-      b.appendChild(document.createElement("br"));
-      var cd = document.createElement("code"); cd.textContent = q.bot_command;
-      b.appendChild(cd);
-    }
-    if (q.reward){
-      b.appendChild(document.createElement("br"));
-      b.appendChild(document.createTextNode("Reward: " + q.reward));
+    if (q.kind === "quest"){
+      b.appendChild(document.createTextNode(
+        q.name + " (" + r.quest_id + ")" +
+        (q.category ? " \\u00b7 " + q.category : "") +
+        (q.coopable ? " \\u00b7 coopable" : "") +
+        (q.auto_checked ? " \\u00b7 auto-checked" : "")));
+      if (q.bot_command){
+        b.appendChild(document.createElement("br"));
+        var cd = document.createElement("code"); cd.textContent = q.bot_command;
+        b.appendChild(cd);
+      }
+      if (q.reward){
+        b.appendChild(document.createElement("br"));
+        b.appendChild(document.createTextNode("Reward: " + q.reward));
+      }
+    } else {
+      b.appendChild(document.createTextNode(
+        q.name + " (" + r.quest_id + ") \\u00b7 " +
+        (q.kind === "rank" ? "rank, tier " + q.tier : q.kind)));
+      if (q.requirements && q.requirements.length){
+        b.appendChild(document.createElement("br"));
+        b.appendChild(document.createTextNode("Requires: " + q.requirements.join(" ")));
+      }
+      if (q.rewards && q.rewards.length){
+        b.appendChild(document.createElement("br"));
+        b.appendChild(document.createTextNode("Rewards: " + q.rewards.join("; ")));
+      }
     }
     body.appendChild(b);
   }
@@ -495,7 +514,7 @@ def embed_json(obj):
     return json.dumps(obj, ensure_ascii=False).replace("</", "<\\/")
 
 
-def meta_rows(sidecar):
+def meta_rows(sidecar, kind="quest-catalog"):
     src = sidecar["source"]
     rows = [
         ("Artifact", os.path.basename(src["path"] or "") or "(inline template)"),
@@ -503,7 +522,7 @@ def meta_rows(sidecar):
         ("Adapter", src["adapter"]),
         ("Retrieved", src.get("retrieved") or "—"),
         ("Rows seen", str(sidecar["counts"]["rows_seen"])),
-        ("Quests", str(sidecar["counts"]["quests"])),
+        ("Quests" if kind == "quest-catalog" else "Entries", str(sidecar["counts"]["quests"])),
         ("Skipped", str(sidecar["counts"]["skipped"])),
         ("Anomalies", str(sidecar["counts"]["anomalies"])),
     ]
@@ -512,21 +531,70 @@ def meta_rows(sidecar):
     return "\n".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in rows)
 
 
-def quest_summaries(catalog):
+def entry_summaries(artifact):
+    """Per-entry facts for the ledger's 'Became:' panel, keyed by the join id.
+    Works for both artifact kinds."""
     out = {}
-    for q in catalog["quests"]:
-        out[q["quest_id"]] = {
-            "name": q["name"],
-            "category": q.get("category") or "",
-            "coopable": bool(q.get("coopable")),
-            "auto_checked": bool(q.get("auto_checked")),
-            "bot_command": q.get("bot_command"),
-            "reward": q.get("reward"),
+    if "quests" in artifact:
+        for q in artifact["quests"]:
+            out[q["quest_id"]] = {
+                "kind": "quest",
+                "name": q["name"],
+                "category": q.get("category") or "",
+                "coopable": bool(q.get("coopable")),
+                "auto_checked": bool(q.get("auto_checked")),
+                "bot_command": q.get("bot_command"),
+                "reward": q.get("reward"),
+            }
+        return out
+    for r in artifact.get("ranks", []):
+        out[r["entry_id"]] = {
+            "kind": "rank", "name": r["name"], "tier": r["tier"],
+            "requirements": r["requirements"], "rewards": r.get("rewards", []),
         }
+    for key, kind in (("achievements", "achievement"),
+                      ("village_achievements", "village achievement")):
+        for e in artifact.get(key, []):
+            out[e["entry_id"]] = {
+                "kind": kind, "name": e["name"],
+                "requirements": e["requirements"], "rewards": e.get("rewards", []),
+            }
     return out
 
 
-def render_source_page(sidecar, catalog, picker_total, out_path):
+def ladder_loop_svg(guild, n_ranks, n_ach, anomaly_count):
+    """The ladder's slice of the loop: artifact -> ladder JSON -> the rendered
+    ladder page and the mod's rank actions, anomalies branching back."""
+    return f"""<svg viewBox="0 0 960 210" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="lp" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5"
+ markerHeight="6.5" orient="auto-start-reverse">
+ <path d="M0 0L8 4L0 8z" fill="var(--dim)"/></marker></defs>
+<rect class="n-box" x="16" y="36" width="170" height="44" rx="5"/>
+<text class="t-ink" x="101" y="62" text-anchor="middle">your artifact</text>
+<rect class="n-box" x="256" y="36" width="200" height="44" rx="5"/>
+<text class="t-ink" x="356" y="56" text-anchor="middle">{esc(guild)} rank ladder</text>
+<text class="t-dim" x="356" y="71" text-anchor="middle">{n_ranks} ranks &#183; {n_ach} achievements</text>
+<rect class="n-box" x="546" y="16" width="200" height="44" rx="5"/>
+<text class="t-ink" x="646" y="36" text-anchor="middle">rendered ladder page</text>
+<text class="t-dim" x="646" y="51" text-anchor="middle">recipes/rank-ladders/render.py</text>
+<rect class="n-wood" x="546" y="86" width="200" height="44" rx="5"/>
+<text class="t-woodtxt" x="646" y="106" text-anchor="middle">in-game rank actions</text>
+<text class="t-dim" x="646" y="121" text-anchor="middle">one submit action per rank-up</text>
+<line class="edge" x1="186" y1="58" x2="252" y2="58" marker-end="url(#lp)"/>
+<line class="edge" x1="456" y1="50" x2="542" y2="38" marker-end="url(#lp)"/>
+<line class="edge-soft" x1="456" y1="66" x2="542" y2="105" marker-end="url(#lp)"/>
+<text class="t-dim" x="470" y="92">once the real</text>
+<text class="t-dim" x="470" y="106">command is known</text>
+<rect class="n-amber" x="256" y="140" width="200" height="44" rx="5"/>
+<text class="t-ambertxt" x="356" y="160" text-anchor="middle">anomalies</text>
+<text class="t-dim" x="356" y="175" text-anchor="middle">{anomaly_count} question(s) for you</text>
+<line class="edge" x1="356" y1="80" x2="356" y2="136" marker-end="url(#lp)"/>
+<path class="edge-soft" d="M252 162 C 120 162, 90 120, 96 84" marker-end="url(#lp)"/>
+<text class="t-dim" x="60" y="120">you rule on them</text>
+</svg>"""
+
+
+def render_source_page(sidecar, catalog, picker_total, out_path, kind="quest-catalog"):
     guild = sidecar["source"]["guild"] or "?"
     counts = sidecar["counts"]
 
@@ -557,23 +625,37 @@ def render_source_page(sidecar, catalog, picker_total, out_path):
         "No questions — nothing looked off" if n_anoms == 0
         else f"{n_anoms} question(s) the harvester routed back"
     )
+    if kind == "rank-ladder":
+        n_ranks = len(catalog.get("ranks", []))
+        n_ach = (len(catalog.get("achievements", []))
+                 + len(catalog.get("village_achievements", [])))
+        heading = f"How your artifact became the {guild} rank ladder"
+        loop_alt = (
+            f"Your artifact becomes the {guild} rank ladder of {n_ranks} ranks and "
+            f"{n_ach} achievements, feeding the rendered ladder page and the mod's "
+            f"rank submit actions. Anomalies branch back to you.")
+        the_loop_svg = ladder_loop_svg(guild, n_ranks, n_ach, n_anoms)
+    else:
+        heading = f"How your artifact became the {guild} catalog"
+        loop_alt = (
+            f"Your artifact becomes the {guild} catalog of {counts['quests']} quests, "
+            f"which joins the quest picker of {picker_total} quests; a player saves "
+            f"quest-view.json. Anomalies branch back to you.")
+        the_loop_svg = loop_svg(guild, counts["quests"], picker_total, n_anoms)
     data = {
         "provenance": sidecar,
-        "quests": quest_summaries(catalog),
+        "entries": entry_summaries(catalog),
     }
     page = (
         PAGE
         .replace("__CSS__", TOKENS_CSS)
         .replace("__TITLE__", esc(f"Provenance — {guild} ({sidecar['source']['id']})"))
-        .replace("__HEADING__", esc(f"How your artifact became the {guild} catalog"))
-        .replace("__META__", meta_rows(sidecar))
+        .replace("__HEADING__", esc(heading))
+        .replace("__META__", meta_rows(sidecar, kind))
         .replace("__COLUMN_MAPS__", column_maps)
         .replace("__ANOM_HEADING__", esc(anom_heading))
-        .replace("__LOOP_ALT__", esc(
-            f"Your artifact becomes the {guild} catalog of {counts['quests']} quests, "
-            f"which joins the quest picker of {picker_total} quests; a player saves "
-            f"quest-view.json. Anomalies branch back to you."))
-        .replace("__LOOP_SVG__", loop_svg(guild, counts["quests"], picker_total, n_anoms))
+        .replace("__LOOP_ALT__", esc(loop_alt))
+        .replace("__LOOP_SVG__", the_loop_svg)
         .replace("__PICKER_URL__", PICKER_URL)
         .replace("__DATA__", embed_json(data))
     )
@@ -585,14 +667,12 @@ def render_index(entries, out_path):
     cards = []
     for e in entries:
         if e.get("page"):
-            c = e["counts"]
             cards.append(
                 f'<a class="card" href="{esc(e["page"])}" style="border-bottom:1px solid var(--line)">'
                 f'<span class="tag t-run">harvested</span>'
                 f'<h3>{esc(e["guild"])}</h3>'
                 f'<p>{esc(e["artifact"])}</p>'
-                f'<p>{c["quests"]} quests &middot; {c["skipped"]} skipped &middot; '
-                f'{c["anomalies"]} question(s)</p>'
+                f'<p>{esc(e["counts_line"])}</p>'
                 f'<p class="muted" style="font-family:var(--mono);font-size:.68rem">'
                 f'retrieved {esc(e["retrieved"] or "—")}</p></a>'
             )
@@ -624,7 +704,8 @@ def main():
     if len(sys.argv) > 2:
         out, prov_path, cat_path = sys.argv[1], sys.argv[2], sys.argv[3]
         sidecar, catalog = load(prov_path), load(cat_path)
-        render_source_page(sidecar, catalog, len(catalog["quests"]), out)
+        kind = "rank-ladder" if "ranks" in catalog else "quest-catalog"
+        render_source_page(sidecar, catalog, len(catalog.get("quests", [])), out, kind=kind)
         print(f"provenance page -> {out}")
         return
 
@@ -645,16 +726,27 @@ def main():
             raise SystemExit(f"[{source['id']}] no provenance sidecar at {prov_path} — run harvest.py first")
         harvested.append((source, load(prov_path), load(cat_path)))
 
-    picker_total = sum(len(c["quests"]) for _, _, c in harvested)
+    picker_total = sum(len(c["quests"]) for _, _, c in harvested if "quests" in c)
     for source, sidecar, catalog in harvested:
+        kind = source.get("kind", "quest-catalog")
         page_name = f"provenance-{source['id']}.html"
-        render_source_page(sidecar, catalog, picker_total, os.path.join(out_dir, page_name))
+        render_source_page(sidecar, catalog, picker_total,
+                           os.path.join(out_dir, page_name), kind=kind)
+        c = sidecar["counts"]
+        if kind == "rank-ladder":
+            n_ach = (len(catalog.get("achievements", []))
+                     + len(catalog.get("village_achievements", [])))
+            counts_line = (f"{len(catalog.get('ranks', []))} ranks · {n_ach} achievements "
+                           f"· {c['anomalies']} question(s)")
+        else:
+            counts_line = (f"{c['quests']} quests · {c['skipped']} skipped "
+                           f"· {c['anomalies']} question(s)")
         entries.insert(
             sum(1 for e in entries if e.get("page")),  # keep harvested cards first
             {
                 "id": source["id"], "guild": sidecar["source"]["guild"],
                 "artifact": os.path.basename(sidecar["source"]["path"] or "") or "(inline)",
-                "counts": sidecar["counts"], "retrieved": sidecar["source"].get("retrieved"),
+                "counts_line": counts_line, "retrieved": sidecar["source"].get("retrieved"),
                 "page": page_name,
             },
         )

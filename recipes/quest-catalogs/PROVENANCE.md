@@ -1,5 +1,19 @@
 # Provenance — quest-catalogs recipe refresh
 
+## Refresh 2026-08-08 (comfy `a61aac6`)
+
+The absorption engine learned artifact **kinds**: sources may declare
+`"kind": "rank-ladder"` and emit a rank ladder instead of a quest catalog, with the
+same anomalies report + provenance sidecar. First ladder source: `hobbits-ladder`
+(Luna's workbook, `../../data/raw/hobbit-reqs-rewards-reset.xlsx`).
+
+Byte-exact from comfy `a61aac6`: `harvest.py`, `render_provenance.py`, `schema.md`,
+the hobbit workbook, and the whole `../rank-ladders/` recipe (pruned from baseline
+earlier; re-ported because the harvested ladder is validated/rendered by it).
+Merged (baseline stays ahead on the mod config path): `sources.json` (hobbits-ladder
+entry added), `render_quest_picker.py` (kind filter applied on top of baseline's
+copy).
+
 ## Origin
 
 Refreshed 2026-08-06 from the public comfy archive repository

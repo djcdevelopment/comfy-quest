@@ -133,7 +133,10 @@ class Provenance:
             "anomalies": anomalies,
             "counts": {
                 "rows_seen": sum(len(t["rows"]) for t in self.tabs),
+                # "quests" is the emitted-entry count for every kind (ladder entries
+                # included) so the invariant and validate.py stay one code path
                 "quests": quest_count,
+                "entries": tally("quest") + tally("rank") + tally("achievement"),
                 "skipped": tally("skipped"),
                 "blank": tally("blank"),
                 "anomalies": len(anomalies),
@@ -248,6 +251,55 @@ def finish_catalog(source, quests, anomalies):
             "retrieved": source.get("retrieved"),
         },
         "quests": quests,
+    }
+
+
+def finish_ladder(source, ranks, achievements, village, anomalies):
+    """Shared post-pass for rank-ladder sources: mirror rank-ladders/validate.py's
+    rules as anomalies (the leader's questions), wrap in the ladder envelope that
+    recipes/rank-ladders/{validate,render}.py and the mod's
+    generate-actions-from-rank-ladder.py already consume."""
+    seen_tiers = {}
+    for r in ranks:
+        if r["tier"] in seen_tiers:
+            anomalies.append(anom(
+                f"tier {r['tier']} collides with **{seen_tiers[r['tier']]}**.",
+                "duplicate_tier", quest_id=r["entry_id"], quest_name=r["name"],
+            ))
+        seen_tiers[r["tier"]] = r["name"]
+    seen_names = {}
+    for e in ranks + achievements + village:
+        if not e["requirements"]:
+            anomalies.append(anom(
+                "has no requirement text — what earns this?",
+                "empty_requirements", quest_id=e["entry_id"], quest_name=e["name"],
+            ))
+        key = e["name"].lower()
+        if key in seen_names:
+            anomalies.append(anom(
+                f"name collides with the entry at row {seen_names[key]}.",
+                "duplicate_name", quest_id=e["entry_id"], quest_name=e["name"],
+            ))
+        seen_names[key] = e.get("source_row")
+    guild_slug = re.sub(r"s$", "", source["guild"].lower())
+    anomalies.append(anom(
+        f"[need: the {source['guild']}' real submit command] — the "
+        f"bot_command_template in the ladder is a placeholder until the guild "
+        f"provides theirs.",
+        "needs_leader",
+    ))
+    return {
+        "schema_version": 1,
+        "kind": "rank-ladder",
+        "guild": source["guild"],
+        "era": source["era"],
+        "source": f"{os.path.basename(source.get('path') or '')} :: {source.get('tab', '')} "
+                  f"(retrieved {source.get('retrieved')}). {source.get('note', '')}".strip(),
+        "bot_command_template": f"/{guild_slug} submit rank:{{rank}} proof:{{proof}}",
+        "bot_command_is_placeholder": True,
+        "ranks": ranks,
+        "achievements": achievements,
+        "village_achievements": village,
     }
 
 
@@ -665,6 +717,126 @@ def adapt_creator_events_xlsx(source):
     return finish_catalog(source, quests, anomalies), anomalies, prov
 
 
+# which columns the hobbit-ladder adapter reads, and what they become
+HOBBIT_LADDER_COLUMNS = [
+    (1, "Rank / Requirements", ["name", "requirements"],
+     "a row with only this column filled names a rank/achievement; later rows in the "
+     "block carry its requirement text"),
+    (2, "Current era rewards", [],
+     "reference only — compared against the proposed column; differences become questions"),
+    (3, "Proposed rewards", ["rewards", "reward.bonus"],
+     "the harvested reward column, verbatim"),
+    (5, "Margin notes", [],
+     "annotations like 'New' / 'Modification' / 'New Scaling' — recorded as questions"),
+]
+
+
+def adapt_hobbit_ladder_xlsx(source):
+    """Harvest the Hobbit guild's rank ladder tab: blocks of [name row, then
+    requirement + two reward columns], split by section-header rows into ranks,
+    achievements, and village achievements. Rewards come from the proposed column;
+    where it differs from the current-era column, that's a question, not a choice."""
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        raise SystemExit("The hobbit-ladder-xlsx adapter needs openpyxl: pip install openpyxl")
+
+    path = os.path.normpath(os.path.join(HERE, source["path"]))
+    wb = load_workbook(path, read_only=True, data_only=True)
+    if source["tab"] not in wb.sheetnames:
+        raise SystemExit(f"tab {source['tab']!r} not found in {path}")
+    ws = wb[source["tab"]]
+    ws.reset_dimensions()
+
+    def text(row, i):
+        return str(row[i]).strip() if len(row) > i and row[i] is not None else ""
+
+    rows = list(ws.iter_rows(values_only=True))
+    anomalies = []
+    prov = Provenance(source)
+    prov.tab(source["tab"], HOBBIT_LADDER_COLUMNS)
+
+    # pass 1: cut the sheet into blocks. A "name row" has col B text and nothing in
+    # the reward columns; a name row whose block stays empty is a section header.
+    blocks = []
+    cur = None
+    for i, row in enumerate(rows, start=1):
+        name_like = text(row, 1) and not text(row, 2) and not text(row, 3)
+        if name_like:
+            cur = {"row": i, "name": text(row, 1), "requirements": [],
+                   "rewards": [], "rewards_current": [], "margin": [], "rows": [i]}
+            blocks.append(cur)
+        elif cur is not None and (text(row, 1) or text(row, 2) or text(row, 3)):
+            cur["rows"].append(i)
+            if text(row, 1):
+                cur["requirements"].append(text(row, 1))
+            if text(row, 3):
+                cur["rewards"].append(text(row, 3))
+            if text(row, 2):
+                cur["rewards_current"].append(text(row, 2))
+            if text(row, 5):
+                cur["margin"].append(text(row, 5))
+        elif cur is None and any(text(row, c) for c in range(len(row))):
+            is_header = "requirements" in text(row, 1).lower()
+            prov.row(i, row, "header" if is_header else "banner")
+
+    # pass 2: sections. The first section is the ladder; later headers open
+    # achievement groups.
+    sections = [("ranks", [])]
+    for b in blocks:
+        if not b["requirements"] and not b["rewards"] and not b["rewards_current"]:
+            title = b["name"].lower()
+            key = "village" if "village" in title else "achievements"
+            sections.append((key, []))
+            prov.row(b["row"], rows[b["row"] - 1], "section", category=b["name"])
+        else:
+            sections[-1][1].append(b)
+
+    grouped = {"ranks": [], "achievements": [], "village": []}
+    for key, blist in sections:
+        grouped[key].extend(blist)
+
+    def emit(b, outcome, extra):
+        entry_id = slugify(b["name"])
+        entry = {
+            "entry_id": entry_id,
+            "name": b["name"],
+            "requirements": b["requirements"],
+            "rewards": b["rewards"],
+            "source_row": b["row"],
+        }
+        entry.update(extra)
+        prov.row(b["row"], rows[b["row"] - 1], outcome, quest_id=entry_id)
+        for r in b["rows"][1:]:
+            prov.row(r, rows[r - 1], "detail", entry=entry_id)
+        if b["rewards_current"] and b["rewards_current"] != b["rewards"]:
+            anomalies.append(anom(
+                f"the proposed rewards differ from the current era's: "
+                f"{b['rewards_current']} -> {b['rewards']}. Deliberate re-scaling?",
+                "reward_rescale", quest_id=entry_id, quest_name=b["name"],
+            ))
+        for note in b["margin"]:
+            anomalies.append(anom(
+                f"margin note reads {note!r} — recorded verbatim, not interpreted.",
+                "margin_note", quest_id=entry_id, quest_name=b["name"],
+            ))
+        return entry
+
+    ranks = []
+    for tier, b in enumerate(grouped["ranks"]):
+        entry = emit(b, "rank", {
+            "tier": tier,
+            "reward": {"rank": b["name"], "bonus": "; ".join(b["rewards"])},
+        })
+        entry["requirements"] = entry["requirements"] or []
+        ranks.append(entry)
+    achievements = [emit(b, "achievement", {}) for b in grouped["achievements"]]
+    village = [emit(b, "achievement", {}) for b in grouped["village"]]
+
+    ladder = finish_ladder(source, ranks, achievements, village, anomalies)
+    return ladder, anomalies, prov
+
+
 def adapt_discord_export(source):
     """Reserved: harvest quests straight from a Discord channel export. This is where
     the absorption engine plugs in. Deliberately unimplemented."""
@@ -678,6 +850,7 @@ ADAPTERS = {
     "sheet-xlsx": adapt_sheet_xlsx,
     "ranger-xlsx": adapt_ranger_xlsx,
     "creator-events-xlsx": adapt_creator_events_xlsx,
+    "hobbit-ladder-xlsx": adapt_hobbit_ladder_xlsx,
     "gm-template": adapt_gm_template,
     "discord-export": adapt_discord_export,
 }
@@ -701,8 +874,9 @@ def format_anomaly(a):
 
 
 def write_anomalies(path, source, anomalies):
+    kind_word = "rank ladder" if source.get("kind") == "rank-ladder" else "quest catalog"
     lines = [
-        f"# Anomalies — {source['guild']} quest catalog ({source['id']})",
+        f"# Anomalies — {source['guild']} {kind_word} ({source['id']})",
         "",
         "The harvester copies the guild's content verbatim and flags what looks off.",
         "Nothing here was 'fixed' — these are questions for the guild to rule on.",
@@ -734,24 +908,31 @@ def harvest(source):
     write_anomalies(anomalies_path, source, anomalies)
 
     # the provenance sidecar: the leader-facing record of what the adapter did.
-    # It must agree with the catalog — a mismatch is a harvester bug, not an anomaly.
-    sidecar = prov.finish(anomalies, len(catalog["quests"]))
-    catalog_ids = {q["quest_id"] for q in catalog["quests"]}
+    # It must agree with the artifact — a mismatch is a harvester bug, not an anomaly.
+    if "quests" in catalog:
+        emitted = catalog["quests"]
+        artifact_ids = {q["quest_id"] for q in emitted}
+    else:  # rank ladder
+        emitted = (catalog.get("ranks", []) + catalog.get("achievements", [])
+                   + catalog.get("village_achievements", []))
+        artifact_ids = {e["entry_id"] for e in emitted}
+    sidecar = prov.finish(anomalies, len(emitted))
     prov_ids = [r["quest_id"] for t in sidecar["tabs"] for r in t["rows"]
-                if r["outcome"] == "quest"]
-    stray = [qid for qid in prov_ids if qid not in catalog_ids]
-    if stray or len(prov_ids) != len(catalog["quests"]):
+                if r["outcome"] in ("quest", "rank", "achievement")]
+    stray = [qid for qid in prov_ids if qid not in artifact_ids]
+    if stray or len(prov_ids) != len(emitted):
         raise SystemExit(
-            f"[{source['id']}] provenance disagrees with the catalog: "
-            f"{len(prov_ids)} recorded quest rows vs {len(catalog['quests'])} quests"
-            + (f"; unknown quest_ids {stray[:5]}" if stray else "")
+            f"[{source['id']}] provenance disagrees with the artifact: "
+            f"{len(prov_ids)} recorded entry rows vs {len(emitted)} entries"
+            + (f"; unknown ids {stray[:5]}" if stray else "")
         )
     provenance_path = stem + "-provenance.json"
     with open(provenance_path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(sidecar, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
-    print(f"[{source['id']}] {len(catalog['quests'])} quest(s) -> {os.path.relpath(out, HERE)}")
+    kind_word = "quest" if "quests" in catalog else "entry"
+    print(f"[{source['id']}] {len(emitted)} {kind_word}(s) -> {os.path.relpath(out, HERE)}")
     print(f"[{source['id']}] {len(anomalies)} anomaly(ies) -> {os.path.relpath(anomalies_path, HERE)}")
     print(f"[{source['id']}] provenance ({sidecar['counts']['rows_seen']} row(s)) -> {os.path.relpath(provenance_path, HERE)}")
     return catalog

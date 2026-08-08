@@ -547,6 +547,9 @@ def main():
             os.path.normpath(os.path.join(HERE, s["output"]))
             for s in config["sources"]
             if s.get("enabled", True) and s.get("output")
+            # the picker only speaks quest catalogs; other kinds (rank-ladder)
+            # have their own renderers
+            and s.get("kind", "quest-catalog") == "quest-catalog"
         ]
         out = os.path.normpath(os.path.join(HERE, "../../data/processed/quest-picker.html"))
 
