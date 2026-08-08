@@ -355,6 +355,11 @@ Two guards stop the build touching your live plugins folder: the path must exist
 `ComfyCopyToPlugins=true`. Both are shut by default, because an unguarded auto-copy once
 replaced a pinned DLL mid-programme.
 
+SourceLink is deliberately disabled for this directly distributed DLL. Its repository URL
+includes the containing commit, which made a documentation-only landing alter the PE debug
+checksum and therefore the package SHA. Deterministic path mapping remains enabled, and a
+guard requires the release setting so unchanged plugin source rebuilds to unchanged bytes.
+
 ## Licence
 
 BUSL-1.1 with the community-steward safe harbor, converting to AGPL-3.0-only. See

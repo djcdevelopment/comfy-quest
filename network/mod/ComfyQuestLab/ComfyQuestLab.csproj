@@ -8,6 +8,11 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <!-- SourceLink maps to the containing Git commit and therefore changes the DLL's
+         debug-directory checksum after documentation-only commits. Quest Lab ships one
+         SHA-verified DLL directly, so unchanged plugin source must rebuild to unchanged
+         bytes; local source paths remain deterministic through PathMap below. -->
+    <EnableSourceLink>false</EnableSourceLink>
     <PathMap Condition="'$(PathMap)' == ''">$(MSBuildProjectDirectory)=C:\src\ComfyQuestLab</PathMap>
     <Optimize>true</Optimize>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

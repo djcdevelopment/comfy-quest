@@ -86,6 +86,12 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   restores config through reload. An expiring fixed-file i5 request mailbox exposes ten
   allowlisted suite/gallery operations—no console, keystrokes, arbitrary paths, or prefab
   strings—and writes request/suite JSON plus relevant log evidence.
+- **Release DLL hashes are source-stable.** The project disables SourceLink for this
+  directly shipped DLL while retaining deterministic path mapping. Otherwise SourceLink
+  puts the containing Git revision into the debug record, so landing documentation alone
+  changes the plugin SHA despite identical compiled source and invalidates exact-package
+  deployment receipts. Rebuilds with different synthetic source revisions now match byte
+  for byte.
 - **The initial eight-category scaffold wired** 26 atlas integrations plus two panel/input support hooks:
   - **harvest** — `TreeBase.Damage`, `TreeLog.Damage`, `Destructible.Damage`,
     `Pickable.Interact`. The first three are what the retired ComfyControlSurface hooked,

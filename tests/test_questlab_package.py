@@ -12,6 +12,7 @@ REPO = Path(__file__).resolve().parents[1]
 MOD = REPO / "network" / "mod" / "ComfyQuestLab"
 CONFIG = MOD / "djcdevelopment.valheim.comfyquestlab.cfg"
 PACKAGER = REPO / "tools" / "workbench" / "New-WorkbenchZip.ps1"
+CSPROJ = MOD / "ComfyQuestLab.csproj"
 
 
 class QuestLabPackageTests(unittest.TestCase):
@@ -55,6 +56,14 @@ class QuestLabPackageTests(unittest.TestCase):
             source,
         )
         self.assertNotIn('$config = "enabled = true', source)
+
+    def test_release_dll_does_not_change_with_the_containing_git_commit(self) -> None:
+        # SourceLink puts the repository revision into the PDB and its checksum into the
+        # PE debug directory. That makes a docs-only landing change the DLL hash even when
+        # every compiled source byte is unchanged, defeating exact-package live receipts.
+        project = CSPROJ.read_text(encoding="utf-8")
+        self.assertIn("<Deterministic>true</Deterministic>", project)
+        self.assertIn("<EnableSourceLink>false</EnableSourceLink>", project)
 
     def test_release_metadata_agrees(self) -> None:
         source = (MOD / "ComfyQuestLab.cs").read_text(encoding="utf-8")
