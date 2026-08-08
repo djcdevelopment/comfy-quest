@@ -21,7 +21,9 @@
         "floorTiles": 796,
         "fixtures": 488,
         "runeBeams": 89,
+        "runeNameHeaders": 0,
         "runeNameSigns": 0,
+        "runeNameLights": 0,
         "armouryStands": 8,
         "estimatedPlacedObjects": 1405
       }
@@ -29,7 +31,7 @@
     {
       "id": "marble-wide",
       "name": "Marble wide",
-      "description": "All-marble floor, 8 m halls, larger runes, and horizontal rune headers.",
+      "description": "All-marble floor, 8 m halls, larger runes, and illuminated horizontal rune headers.",
       "ringRadius": 50.0,
       "runeHeight": 14.0,
       "platformClearance": 1.5,
@@ -41,17 +43,19 @@
       "solidMarbleFloor": true,
       "counts": {
         "floorTiles": 1517,
-        "fixtures": 592,
+        "fixtures": 644,
         "runeBeams": 110,
-        "runeNameSigns": 8,
+        "runeNameHeaders": 8,
+        "runeNameSigns": 60,
+        "runeNameLights": 8,
         "armouryStands": 8,
-        "estimatedPlacedObjects": 2251
+        "estimatedPlacedObjects": 2303
       }
     },
     {
       "id": "marble-grand",
       "name": "Marble grand",
-      "description": "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and horizontal rune headers.",
+      "description": "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and illuminated horizontal rune headers.",
       "ringRadius": 62.0,
       "runeHeight": 17.0,
       "platformClearance": 3.0,
@@ -63,11 +67,13 @@
       "solidMarbleFloor": true,
       "counts": {
         "floorTiles": 2461,
-        "fixtures": 992,
+        "fixtures": 1044,
         "runeBeams": 134,
-        "runeNameSigns": 8,
+        "runeNameHeaders": 8,
+        "runeNameSigns": 60,
+        "runeNameLights": 8,
         "armouryStands": 8,
-        "estimatedPlacedObjects": 3619
+        "estimatedPlacedObjects": 3671
       }
     }
   ]

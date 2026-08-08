@@ -37,8 +37,17 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   explicitly claimed before destruction; the r3 live run exposed that Valheim otherwise
   ignores the delete while returning normally. Generated JSON/count/preview artifacts
   and drift tests agree. Live comparison selected `marble-grand` as the direction; r5
-  raises it 3 m over the highest sampled terrain and puts horizontal school-name headers
-  above the large glowing runes. Those refinements remain subject to the final visual pass.
+  raised it 3 m over the highest sampled terrain. Its screenshot then caught the vanilla
+  one-metre sign wrapping whole school names vertically. r6 generates one sign per letter
+  in a centred horizontal row and gives each word one school-coloured light. The corrected
+  headers remain subject to the final visual pass.
+- **The panel is an interactive tool, not a translucent overlay.** r6 uses a nearly opaque
+  high-contrast surface, larger default dimensions, a bounded lower-right resize handle,
+  and a spreadsheet-style live-event grid with stable columns and explicit BINDABLE /
+  DIAGNOSTIC verdicts. Opening it now acquires cursor/input ownership, resets held buttons,
+  blocks camera/player actions, and restores the previous cursor state on F6, Escape, the
+  Close button, disable, or plugin teardown. It retains native IMGUI and adds no Jötunn
+  dependency.
 - **Bounded batch evidence is self-service.** `questlab_batch` can prepare, run, reset,
   report, and export two explicit suites. `all-schools` installs eight ordinary bindable
   example quests, refreshes the consumable Greyling/birch targets, prepares the gallery and

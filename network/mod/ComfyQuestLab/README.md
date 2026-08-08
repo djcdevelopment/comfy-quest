@@ -92,6 +92,11 @@ update.
 `lab_setup` is typed into **Valheim's** console, which is **F5**. **F6** opens the lab's own
 panel. Two different keys, and mixing them up is the most common first stumble.
 
+Opening the panel explicitly hands mouse and player input to the Lab: the cursor unlocks,
+camera look and gameplay clicks stop, and the previous cursor state is restored on **F6**,
+**Escape**, or the visible **Close** button. The high-contrast window opens at 900×620 and
+the lower-right handle resizes it within the current screen.
+
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Every page lists what the world answers to in that school and marks
 which ones this build will show you — so you can tell "Valheim can do this" from "the lab
@@ -104,10 +109,9 @@ tree.
 
 Open the live view and punch a tree. You should see:
 
-```
-[rune]  14:22:07  resource_damaged
-        Beech1 (tree)   skill Unarmed
-        -> a quest can be bound to this today
+```text
+TIME      SCHOOL    CREATOR EVENT       TARGET / DETAIL                QUEST USE
+14:22:07  Harvest   resource damaged    Beech1 (tree) · skill Unarmed  BINDABLE
 ```
 
 That third line is the point of the whole tool.
@@ -123,8 +127,8 @@ Every event ends in one of two creator-relevant verdicts:
 
 | Verdict | Means |
 | --- | --- |
-| **a quest can be bound to this today** | The witness normalized to one of the 34 safe canonical events and entered the shared evaluator. |
-| **diagnostic only** | Useful raw evidence under the diagnostic profile, but structurally barred from quest evaluation. |
+| **BINDABLE** | The witness normalized to one of the 34 safe canonical events and entered the shared evaluator. |
+| **DIAGNOSTIC** | Useful raw evidence under the diagnostic profile, but structurally barred from quest evaluation. |
 
 The full picture—91 atlas rows, 90 exact signatures, and 77 method IDs:
 [`tools/component-packets/EVENT-ATLAS.md`](../../../tools/component-packets/EVENT-ATLAS.md).
@@ -138,9 +142,10 @@ fails if any of the 57 safe or 86 practical signatures loses runtime coverage.
 Gallery geometry is generated from the same eight rune definitions used by the panel.
 `classic` keeps the prior mixed-material shape as a comparison baseline. `marble-wide`
 has a solid black-marble floor, 8 m halls, larger runes, 1.5 m terrain clearance, and
-about 2,251 placed objects. The visually preferred `marble-grand` is now the default:
+about 2,303 placed objects. The visually preferred `marble-grand` is now the default:
 10 m halls, a 3 m clearance over the highest sampled ground, monumental runes, horizontal
-school-name headers over those runes, and about 3,619 objects.
+school-name headers built from individually readable letters with one coloured light per
+word, and about 3,671 objects.
 
 Every object carries the plan version, profile id, and build id in its own ZDO. `identify`
 reads those durable marks from the locally known ZDO table; `clear` accepts either a profile or
@@ -309,9 +314,11 @@ because overloads are the norm — `Inventory.AddItem` has seven.
 the shipping mod, so it is far more exposed to a game update. A seam that vanishes shows
 up in `questlab_seams` as unavailable instead of taking the mod down.
 
-**The keystroke guard is load-bearing.** `InputGuard` is ported from the camera proof
-kit, plus an inverse it never needed. Without it, typing `bush` into the filter walks the
-player forward, swings whatever is equipped, and closes the panel on the `s`.
+**Panel input is an ownership lifecycle.** `InputGuard` snapshots the cursor, unlocks and
+maintains it while the panel is interactive, blocks the local player's gameplay input,
+resets held buttons at both transitions, and restores the prior state on close. This is
+the native IMGUI/Harmony equivalent of a GUI manager's block/unblock pair, without adding
+a Jötunn dependency to the package.
 
 **Known gap:** `GameplayEventTypes` is not linked — it shares a file with a 353-line
 Unity-dependent class. Extracting it to its own file in the shipping mod is a small

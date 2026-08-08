@@ -121,7 +121,7 @@ PROFILE_SPECS = [
     {
         "id": "marble-wide",
         "name": "Marble wide",
-        "description": "All-marble floor, 8 m halls, larger runes, and horizontal rune headers.",
+        "description": "All-marble floor, 8 m halls, larger runes, and illuminated horizontal rune headers.",
         "ring_radius": 50.0,
         "rune_width": 11.0,
         "rune_height": 14.0,
@@ -150,7 +150,7 @@ PROFILE_SPECS = [
     {
         "id": "marble-grand",
         "name": "Marble grand",
-        "description": "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and horizontal rune headers.",
+        "description": "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and illuminated horizontal rune headers.",
         "ring_radius": 62.0,
         "rune_width": 14.0,
         "rune_height": 17.0,
@@ -216,9 +216,9 @@ def sign_text(category: str, note: str) -> str:
     )
 
 
-def rune_name_text(category: str) -> str:
+def rune_letter_text(category: str, letter: str) -> str:
     heading = hex_of(SCHOOL_COLOURS[category])
-    return f"<size=36><b><color={heading}>{category.upper()}</color></b></size>"
+    return f"<size=44><b><color={heading}>{letter}</color></b></size>"
 
 
 def monument_beams(segments, angle_deg: float, spec: dict):
@@ -433,21 +433,32 @@ def rune_name_signs(spec: dict, monuments: list[dict]):
     for monument in monuments:
         angle = math.radians(monument["angle"])
         sx, sz = math.sin(angle), math.cos(angle)
-        signs.append(
-            fixture(
-                COMMON_PALETTE["sign"],
-                sx * along,
-                y,
-                sz * along,
-                monument["angle"] + 180.0,
-                orient="rune-name",
-                text=rune_name_text(monument["category"]),
+        px, pz = math.cos(angle), -math.sin(angle)
+        name = monument["category"].upper()
+        # A vanilla sign is only one metre wide. Putting the whole school name on it
+        # makes Valheim wrap one character per line at this display size, which the r5
+        # live screenshot caught immediately. One letter per sign produces a durable,
+        # genuinely horizontal word without relying on unsaved transform scaling.
+        spacing = min(1.3, (spec["rune_width"] - 1.0) / max(1, len(name) - 1))
+        lit_index = len(name) // 2
+        for index, letter in enumerate(name):
+            offset = (index - (len(name) - 1) / 2.0) * spacing
+            signs.append(
+                fixture(
+                    COMMON_PALETTE["sign"],
+                    sx * along + px * offset,
+                    y,
+                    sz * along + pz * offset,
+                    monument["angle"] + 180.0,
+                    orient="rune-name-lit" if index == lit_index else "rune-name",
+                    text=rune_letter_text(monument["category"], letter),
+                    light_school=monument["category"].lower() if index == lit_index else "",
+                )
             )
-        )
     return signs
 
 
-def fixture(prefab, x, y, z, yaw, orient="", text=""):
+def fixture(prefab, x, y, z, yaw, orient="", text="", light_school=""):
     return {
         "prefab": prefab,
         "x": round(x, 3),
@@ -456,6 +467,7 @@ def fixture(prefab, x, y, z, yaw, orient="", text=""):
         "yaw": round(yaw % 360.0, 3),
         "orient": orient,
         "text": text,
+        "lightSchool": light_school,
     }
 
 
@@ -498,9 +510,11 @@ def build_profile(spec: dict, segments: dict):
             "floorTiles": len(tiles),
             "fixtures": len(fixtures),
             "runeBeams": beam_count,
+            "runeNameHeaders": len(ORDER) if spec["rune_name_headers"] else 0,
             "runeNameSigns": sum(
-                fixture["orient"] == "rune-name" for fixture in fixtures
+                fixture["orient"].startswith("rune-name") for fixture in fixtures
             ),
+            "runeNameLights": sum(bool(fixture["lightSchool"]) for fixture in fixtures),
             "armouryStands": len(armoury),
             "estimatedPlacedObjects": len(tiles) + len(fixtures) + beam_count + EXTRA_PLACED_OBJECTS,
         },
@@ -540,10 +554,21 @@ def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
         if profile["id"] != "classic" and profile["hallWidth"] <= 4.0:
             raise SystemExit(f"v2 profile {profile['id']} did not widen the classic halls")
         expected_headers = 0 if profile["id"] == "classic" else len(ORDER)
-        if profile["counts"]["runeNameSigns"] != expected_headers:
+        expected_signs = 0 if profile["id"] == "classic" else sum(map(len, ORDER))
+        if profile["counts"]["runeNameHeaders"] != expected_headers:
+            raise SystemExit(
+                f"profile {profile['id']} has {profile['counts']['runeNameHeaders']} "
+                f"rune headers, expected {expected_headers}"
+            )
+        if profile["counts"]["runeNameSigns"] != expected_signs:
             raise SystemExit(
                 f"profile {profile['id']} has {profile['counts']['runeNameSigns']} "
-                f"rune headers, expected {expected_headers}"
+                f"rune-name signs, expected {expected_signs}"
+            )
+        if profile["counts"]["runeNameLights"] != expected_headers:
+            raise SystemExit(
+                f"profile {profile['id']} has {profile['counts']['runeNameLights']} "
+                f"rune-name lights, expected {expected_headers}"
             )
     return len(entries)
 
@@ -588,14 +613,14 @@ def render_csharp(profiles: list[dict]) -> str:
         "  public struct RackItem { public string Item, Note; public float X, Z, Yaw; }",
         "  public struct Tile { public float X, Z; public string Prefab; }",
         "  public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;",
-        "                          public string Orient, Text; }",
+        "                          public string Orient, Text, LightSchool; }",
         "",
         "  public sealed class Profile {",
         "    public string Id, Name, Description;",
         "    public float RingRadius, RuneHeight, BeamLength, HallWidth, FootprintRadius;",
         "    public float PlatformClearance;",
         "    public bool SolidMarbleFloor;",
-        "    public int EstimatedPlacedObjects, RuneNameSigns;",
+        "    public int EstimatedPlacedObjects, RuneNameHeaders, RuneNameSigns, RuneNameLights;",
         "    public string[] FloorMaterials;",
         "    public Monument[] Monuments;",
         "    public Tile[] PlatformTiles;",
@@ -617,7 +642,9 @@ def render_csharp(profiles: list[dict]) -> str:
                 f"      FootprintRadius = {f(profile['footprintRadius'])},",
                 f"      SolidMarbleFloor = {str(profile['solidMarbleFloor']).lower()},",
                 f"      EstimatedPlacedObjects = {profile['counts']['estimatedPlacedObjects']},",
+                f"      RuneNameHeaders = {profile['counts']['runeNameHeaders']},",
                 f"      RuneNameSigns = {profile['counts']['runeNameSigns']},",
+                f"      RuneNameLights = {profile['counts']['runeNameLights']},",
                 "      FloorMaterials = new[] { "
                 + ", ".join(cs(item) for item in profile["floorMaterials"])
                 + " },",
@@ -653,11 +680,16 @@ def render_csharp(profiles: list[dict]) -> str:
             )
         lines.extend(["      },", "      Fixtures = new[] {"])
         for item in profile["fixtures"]:
+            light = (
+                f", LightSchool = {cs(item['lightSchool'])}"
+                if item["lightSchool"]
+                else ""
+            )
             lines.append(
                 "        new Fixture { "
                 f"Prefab = {cs(item['prefab'])}, X = {f(item['x'])}, Y = {f(item['y'])}, "
                 f"Z = {f(item['z'])}, Yaw = {f(item['yaw'])}, "
-                f"Orient = {cs(item['orient'])}, Text = {cs(item['text'])} }},"
+                f"Orient = {cs(item['orient'])}, Text = {cs(item['text'])}{light} }},"
             )
         lines.extend(["      },", "      Armoury = new[] {"])
         for item in profile["armoury"]:
@@ -759,7 +791,7 @@ def render_previews(profiles: list[dict]) -> None:
             px, pz = point(item["x"], item["z"])
             radius = 2 if item["text"] else 1
             draw.ellipse([px - radius, pz - radius, px + radius, pz + radius], fill=(105, 102, 118))
-            if item["orient"] == "rune-name":
+            if item["orient"].startswith("rune-name"):
                 label = re.sub(r"<[^>]+>", "", item["text"])
                 draw.text((px - len(label) * 3, pz - 6), label, fill=(210, 215, 220))
         for monument in profile["monuments"]:

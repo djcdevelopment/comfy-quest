@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260808-r5";
+  public const string ReleaseId = "questlab-v0.2.0-20260808-r6";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -103,7 +103,13 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   }
 
   void Update() {
-    if (!LabConfig.Enabled.Value || _panel == null) {
+    if (_panel == null) {
+      return;
+    }
+    if (!LabConfig.Enabled.Value) {
+      if (_panel.IsOpen) {
+        _panel.Close();
+      }
       return;
     }
 
@@ -113,19 +119,19 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       _batch.Poll(this);
     }
 
-    // Every keystroke is a hotkey unless something says otherwise, and the console has a
-    // text field. Without this, typing "bush" into the filter walks the player forward,
-    // swings whatever is equipped, and closes the panel on the "s".
-    if (InputGuard.ShouldIgnoreKeystrokes()) {
+    if (_panel.IsOpen) {
+      InputGuard.MaintainPanelInput();
+      // Closing is an ownership release, not an ordinary text-field hotkey. Escape and
+      // the activation key therefore work even while the match box has IMGUI focus.
+      if (Input.GetKeyDown(KeyCode.Escape) || LabConfig.PanelShortcut.Value.IsDown()) {
+        _panel.Close();
+      }
       return;
     }
 
-    if (LabConfig.PanelShortcut.Value.IsDown()) {
+    // Every remaining keystroke is a hotkey unless something says otherwise.
+    if (!InputGuard.ShouldIgnoreKeystrokes() && LabConfig.PanelShortcut.Value.IsDown()) {
       _panel.Toggle();
-    }
-
-    if (_panel.IsOpen && Input.GetKeyDown(KeyCode.Escape)) {
-      _panel.Close();
     }
   }
 
@@ -137,6 +143,11 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   }
 
   void OnDestroy() {
+    if (_panel != null) {
+      _panel.Dispose();
+    } else {
+      InputGuard.ReleasePanelInput();
+    }
     if (_harmony != null) {
       _harmony.UnpatchSelf();
       _harmony = null;

@@ -9,7 +9,7 @@ using HarmonyLib;
 
 using UnityEngine;
 
-/// <summary>Light the monuments, one coloured lamp per school.
+/// <summary>Light the monuments and their long-form school headers.
 ///
 /// There is no Valheim knob for this, which is worth stating plainly because it is the
 /// first thing anyone looks for. The component atlas has `LightFlicker` (flicker speed,
@@ -25,12 +25,13 @@ using UnityEngine;
 /// had, so the same shape of answer — one beam per monument carries a mark naming its
 /// school, and the lamp is re-hung from that mark whenever the piece is constructed.
 ///
-/// One lamp per monument, not per beam: 89 realtime point lights would be a frame-rate
-/// bill for no visual gain, and a rune is 11 m of strokes that a single lamp at its middle
-/// covers.</summary>
+/// One lamp per monument, not per beam: scores of realtime point lights would be a
+/// frame-rate bill for no visual gain, and one at the rune's middle covers its strokes.
+/// Gallery v2 adds one more at the middle of each lettered header, still one per word
+/// rather than one per letter.</summary>
 public static class LabRuneLight {
-  /// <summary>ZDO string field on the one beam per monument that carries the lamp; the
-  /// value is the school, so the colour survives a reload without a lookup table on disk.</summary>
+  /// <summary>ZDO string field on a rune beam or central header sign that carries a lamp;
+  /// the value is the school, so the colour survives a reload without a lookup table.</summary>
   public const string RuneLightMark = "comfyQuestLabRuneLight";
 
   const string LampChildName = "comfy-quest-lab-rune-lamp";
@@ -63,7 +64,7 @@ public static class LabRuneLight {
       return;
     }
     Enabled = config.Bind("Gallery", "runeLights", true,
-        "Hang a coloured light on each monument, one per school. Client-side only — the "
+        "Hang a coloured light on each monument and long-form header. Client-side only — the "
         + "lamps are not networked and nobody else sees them. Hot-reloadable.");
     // 3 / 11, dialled in against the marble backdrop rather than guessed.
     //

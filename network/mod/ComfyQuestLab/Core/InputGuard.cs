@@ -2,6 +2,8 @@ namespace ComfyQuestLab;
 
 using System;
 
+using UnityEngine;
+
 /// <summary>Is the player typing into something that is not us?
 ///
 /// Ported from the camera proof kit (comfy/handoffs/valheim-camera-proof/Plugin.cs:105),
@@ -17,6 +19,68 @@ using System;
 /// types, and a missing type must degrade to "not typing" rather than throw on every
 /// frame of Update().</summary>
 public static class InputGuard {
+  static bool _panelOwnsInput;
+  static CursorLockMode _previousCursorLock;
+  static bool _previousCursorVisible;
+
+  /// <summary>True only while the interactive Lab window owns pointer and player input.
+  /// This is deliberately stronger than "the cursor happens to be visible": ownership is
+  /// an acquire/release lifecycle, so opening and closing cannot leave Valheim in a
+  /// half-GUI, half-camera state.</summary>
+  public static bool PanelOwnsInput { get { return _panelOwnsInput; } }
+
+  public static void AcquirePanelInput() {
+    if (!_panelOwnsInput) {
+      _previousCursorLock = Cursor.lockState;
+      _previousCursorVisible = Cursor.visible;
+      _panelOwnsInput = true;
+      ResetButtons();
+    }
+    MaintainPanelInput();
+  }
+
+  /// <summary>Valheim evaluates mouse capture every frame. Reassert ownership after its
+  /// decision as well as from the panel's own Update/OnGUI path, making the pointer
+  /// usable immediately without opening inventory as an accidental workaround.</summary>
+  public static void MaintainPanelInput() {
+    if (!_panelOwnsInput) {
+      return;
+    }
+    try {
+      Cursor.lockState = CursorLockMode.None;
+      Cursor.visible = true;
+    } catch (Exception) {
+    }
+  }
+
+  public static void ReleasePanelInput() {
+    if (!_panelOwnsInput) {
+      TypingInLab = false;
+      return;
+    }
+    _panelOwnsInput = false;
+    TypingInLab = false;
+    ResetButtons();
+    try {
+      Cursor.lockState = _previousCursorLock;
+      Cursor.visible = _previousCursorVisible;
+    } catch (Exception) {
+    }
+  }
+
+  static void ResetButtons() {
+    try {
+      // Prevent a movement or attack button held during the ownership transition from
+      // sticking for one frame on either side of the panel.
+      ZInput.ResetAllButtonStates();
+    } catch (Exception) {
+    }
+    try {
+      Input.ResetInputAxes();
+    } catch (Exception) {
+    }
+  }
+
   /// <summary>True when the game's own console, a text-input dialog, or chat has focus.
   /// Check this before acting on any hotkey.</summary>
   public static bool TypingInGame() {

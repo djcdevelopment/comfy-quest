@@ -3,7 +3,6 @@ namespace ComfyQuestLab;
 using System;
 
 using HarmonyLib;
-using UnityEngine;
 
 /// <summary>Make the panel usable without making the player flail.
 ///
@@ -11,8 +10,8 @@ using UnityEngine;
 /// the same shape ComfyNetworkSense and the retired ComfyControlSurface use — this is a
 /// solved problem in this codebase and the solution is worth copying exactly.
 ///
-/// If either fails to apply, the documented fallback still works: open your inventory
-/// (Tab) while the panel is up, which frees the cursor by other means.</summary>
+/// InputGuard also acquires and maintains the cursor directly; these patches compose
+/// that lifecycle with Valheim's own per-frame capture and player-input decisions.</summary>
 public static class LabPanelInputPatches {
   public static void Apply(Harmony harmony) {
     LabPatching.TryPatch(harmony, typeof(GameCamera), "UpdateMouseCapture", Type.EmptyTypes,
@@ -25,11 +24,7 @@ public static class LabPanelInputPatches {
   /// can actually be clicked.</summary>
   static void UpdateMouseCapturePostfix() {
     try {
-      if (!ComfyQuestLab.IsPanelOpen) {
-        return;
-      }
-      Cursor.lockState = CursorLockMode.None;
-      Cursor.visible = true;
+      InputGuard.MaintainPanelInput();
     } catch (Exception) {
     }
   }
@@ -38,7 +33,7 @@ public static class LabPanelInputPatches {
   /// clicking a filter button also swings whatever is equipped.</summary>
   static void TakeInputPostfix(Character __instance, ref bool __result) {
     try {
-      if (ComfyQuestLab.IsPanelOpen && __instance == Player.m_localPlayer) {
+      if (InputGuard.PanelOwnsInput && __instance == Player.m_localPlayer) {
         __result = false;
       }
     } catch (Exception) {

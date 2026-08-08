@@ -21,11 +21,20 @@ using UnityEngine;
 public sealed class LabPanel {
   const int WindowId = 481922;   // 481620 = retired control surface, 481921 = NetworkSense
   const string FilterControlName = "questlab_filter";
+  const float DefaultWidth = 900f;
+  const float DefaultHeight = 620f;
+  const float MinWidth = 700f;
+  const float MinHeight = 440f;
+  const float ResizeHandle = 20f;
+  const float TimeColumn = 62f;
+  const float SchoolColumn = 112f;
+  const float EventColumn = 180f;
+  const float UseColumn = 116f;
 
   readonly LabEventRing _ring;
   readonly HashSet<string> _visible = new HashSet<string>(LabCategory.DefaultVisible);
 
-  Rect _window = new Rect(120f, 140f, 620f, 500f);
+  Rect _window = new Rect(80f, 90f, DefaultWidth, DefaultHeight);
   Vector2 _scroll;
   Vector2 _journalScroll;
   Vector2 _questScroll;
@@ -33,6 +42,21 @@ public sealed class LabPanel {
   string _filterText = string.Empty;
   bool _paused;
   bool _showTrueNames;
+  bool _resizing;
+  Vector2 _resizeStartMouse;
+  Vector2 _resizeStartSize;
+  float _requestedWidth = -1f;
+  float _requestedHeight = -1f;
+  Texture2D _windowBackground;
+  Texture2D _gridHeaderBackground;
+  Texture2D _gridEvenBackground;
+  Texture2D _gridOddBackground;
+  Texture2D _resizeBackground;
+  GUIStyle _windowStyle;
+  GUIStyle _gridHeaderStyle;
+  GUIStyle _gridEvenStyle;
+  GUIStyle _gridOddStyle;
+  GUIStyle _resizeStyle;
   Tab _tab = Tab.Console;
 
   enum Tab { Console, Spellbook, Quests }
@@ -43,7 +67,7 @@ public sealed class LabPanel {
   static bool RuneToggle(bool on, string category, string label, float width) {
     Color previous = GUI.color;
     // A rune that is switched off is still legible, just quiet.
-    GUI.color = on ? Color.white : new Color(1f, 1f, 1f, 0.45f);
+    GUI.color = on ? Color.white : new Color(1f, 1f, 1f, 0.68f);
     bool now = GUILayout.Toggle(on, new GUIContent(" " + label, LabRunes.For(category)),
         GUI.skin.button, GUILayout.Width(width), GUILayout.Height(24f));
     GUI.color = previous;
@@ -57,15 +81,27 @@ public sealed class LabPanel {
   }
 
   public void Toggle() {
-    IsOpen = !IsOpen;
-    if (!IsOpen) {
-      InputGuard.TypingInLab = false;
+    if (IsOpen) {
+      Close();
+      return;
     }
+    IsOpen = true;
+    InputGuard.AcquirePanelInput();
   }
 
   public void Close() {
     IsOpen = false;
-    InputGuard.TypingInLab = false;
+    _resizing = false;
+    InputGuard.ReleasePanelInput();
+  }
+
+  public void Dispose() {
+    Close();
+    DestroyTexture(ref _windowBackground);
+    DestroyTexture(ref _gridHeaderBackground);
+    DestroyTexture(ref _gridEvenBackground);
+    DestroyTexture(ref _gridOddBackground);
+    DestroyTexture(ref _resizeBackground);
   }
 
   public void Draw() {
@@ -73,11 +109,38 @@ public sealed class LabPanel {
       InputGuard.TypingInLab = false;
       return;
     }
-    _window = GUILayout.Window(WindowId, _window, DrawWindow, "Quest Lab");
+    InputGuard.MaintainPanelInput();
+    EnsureStyles();
+
+    GUIStyle label = GUI.skin.label;
+    int oldFontSize = label.fontSize;
+    bool oldWordWrap = label.wordWrap;
+    Color oldLabelColor = label.normal.textColor;
+    Color oldContentColor = GUI.contentColor;
+    try {
+      label.fontSize = 14;
+      label.wordWrap = true;
+      label.normal.textColor = new Color(0.94f, 0.96f, 1f, 1f);
+      GUI.contentColor = Color.white;
+      _window = GUILayout.Window(WindowId, ClampWindow(_window), DrawWindow, "Quest Lab",
+          _windowStyle, GUILayout.MinWidth(MinWidth), GUILayout.MinHeight(MinHeight));
+      if (_requestedWidth > 0f && _requestedHeight > 0f) {
+        _window.width = _requestedWidth;
+        _window.height = _requestedHeight;
+      }
+      _window = ClampWindow(_window);
+    } finally {
+      label.fontSize = oldFontSize;
+      label.wordWrap = oldWordWrap;
+      label.normal.textColor = oldLabelColor;
+      GUI.contentColor = oldContentColor;
+    }
   }
 
   void DrawWindow(int id) {
-    DrawTabs();
+    if (DrawTabs()) {
+      return;
+    }
     GUILayout.Space(4f);
 
     if (_tab == Tab.Console) {
@@ -88,11 +151,11 @@ public sealed class LabPanel {
       DrawQuests();
     }
 
-    // Drag by the title bar, same as every other panel here.
-    GUI.DragWindow(new Rect(0f, 0f, 10000f, 22f));
+    DrawResizeHandle();
+    GUI.DragWindow(new Rect(0f, 0f, Mathf.Max(0f, _window.width - ResizeHandle), 24f));
   }
 
-  void DrawTabs() {
+  bool DrawTabs() {
     GUILayout.BeginHorizontal();
     if (GUILayout.Toggle(_tab == Tab.Console, "What just happened", GUI.skin.button)) {
       _tab = Tab.Console;
@@ -104,8 +167,14 @@ public sealed class LabPanel {
       _tab = Tab.Quests;
     }
     GUILayout.FlexibleSpace();
-    GUILayout.Label(_ring.Count + " held · " + _ring.TotalSeen + " seen");
+    GUILayout.Label(_ring.Count + " held · " + _ring.TotalSeen + " seen · mouse active");
+    if (GUILayout.Button("Close", GUILayout.Width(58f))) {
+      GUILayout.EndHorizontal();
+      Close();
+      return true;
+    }
     GUILayout.EndHorizontal();
+    return false;
   }
 
   void DrawConsole() {
@@ -143,9 +212,11 @@ public sealed class LabPanel {
     }
     GUILayout.EndHorizontal();
 
-    GUILayout.Space(4f);
+    GUILayout.Space(3f);
+    GUILayout.Label("BINDABLE enters the shared quest evaluator · DIAGNOSTIC is observation only");
 
-    // --- rows ----------------------------------------------------------------------
+    // --- spreadsheet ---------------------------------------------------------------
+    DrawGridHeader();
     _scroll = GUILayout.BeginScrollView(_scroll);
     List<LabEvent> rows = _paused
         ? new List<LabEvent>()
@@ -156,19 +227,86 @@ public sealed class LabPanel {
     } else if (rows.Count == 0) {
       GUILayout.Label(EmptyMessage());
     } else {
-      foreach (LabEvent row in rows) {
-        GUILayout.BeginHorizontal();
-        GUILayout.Label(new GUIContent(LabRunes.For(row.Category)),
-            GUILayout.Width(18f), GUILayout.Height(18f));
-        string creatorName = string.IsNullOrWhiteSpace(row.EventName) ? row.Seam : row.EventName;
-        GUILayout.Label(row.At + "  " + LabSpellNames.For(creatorName));
-        GUILayout.EndHorizontal();
-        GUILayout.Label("        " + row.Target + "   " + row.Detail);
-        GUILayout.Label("        " + UsabilityLine(row.Usability));
-        GUILayout.Space(3f);
+      for (int i = 0; i < rows.Count; i++) {
+        DrawGridRow(rows[i], i);
       }
     }
     GUILayout.EndScrollView();
+  }
+
+  void DrawGridHeader() {
+    GUILayout.BeginHorizontal();
+    GridCell(new GUIContent("TIME"), _gridHeaderStyle, TimeColumn);
+    GridCell(new GUIContent("SCHOOL"), _gridHeaderStyle, SchoolColumn);
+    GridCell(new GUIContent("CREATOR EVENT"), _gridHeaderStyle, EventColumn);
+    GridCell(new GUIContent("TARGET / DETAIL"), _gridHeaderStyle, -1f);
+    GridCell(new GUIContent("QUEST USE"), _gridHeaderStyle, UseColumn);
+    GUILayout.EndHorizontal();
+  }
+
+  void DrawGridRow(LabEvent row, int index) {
+    GUIStyle style = index % 2 == 0 ? _gridEvenStyle : _gridOddStyle;
+    string creatorName = string.IsNullOrWhiteSpace(row.EventName) ? row.Seam : row.EventName;
+    string targetDetail = row.Target ?? string.Empty;
+    if (!string.IsNullOrWhiteSpace(row.Detail)) {
+      targetDetail += (targetDetail.Length == 0 ? string.Empty : " · ") + row.Detail;
+    }
+
+    GUILayout.BeginHorizontal();
+    GridCell(new GUIContent(row.At ?? string.Empty), style, TimeColumn);
+
+    Color prior = style.normal.textColor;
+    Color priorHover = style.hover.textColor;
+    Color schoolColor = LabRunes.ColorFor(row.Category);
+    style.normal.textColor = schoolColor;
+    style.hover.textColor = schoolColor;
+    GridCell(new GUIContent(LabJournal.For(row.Category).Title,
+        LabRunes.For(row.Category), row.Category), style, SchoolColumn);
+    style.normal.textColor = prior;
+    style.hover.textColor = priorHover;
+
+    GridCell(new GUIContent(LabSpellNames.For(creatorName), row.Seam), style, EventColumn);
+    GridCell(new GUIContent(targetDetail, targetDetail), style, -1f);
+
+    Color usabilityColor = UsabilityColor(row.Usability);
+    style.normal.textColor = usabilityColor;
+    style.hover.textColor = usabilityColor;
+    GridCell(new GUIContent(UsabilityLabel(row.Usability), UsabilityLine(row.Usability)),
+        style, UseColumn);
+    style.normal.textColor = prior;
+    style.hover.textColor = priorHover;
+    GUILayout.EndHorizontal();
+  }
+
+  static void GridCell(GUIContent content, GUIStyle style, float width) {
+    if (width > 0f) {
+      GUILayout.Label(content, style, GUILayout.Width(width), GUILayout.Height(28f));
+    } else {
+      GUILayout.Label(content, style, GUILayout.MinWidth(120f), GUILayout.ExpandWidth(true),
+          GUILayout.Height(28f));
+    }
+  }
+
+  static string UsabilityLabel(string usability) {
+    switch (usability) {
+      case LabUsability.Today:
+        return "BINDABLE";
+      case LabUsability.DiagnosticOnly:
+        return "DIAGNOSTIC";
+      default:
+        return "NO TRIGGER";
+    }
+  }
+
+  static Color UsabilityColor(string usability) {
+    switch (usability) {
+      case LabUsability.Today:
+        return new Color(0.55f, 1f, 0.64f, 1f);
+      case LabUsability.DiagnosticOnly:
+        return new Color(1f, 0.78f, 0.38f, 1f);
+      default:
+        return new Color(0.72f, 0.76f, 0.82f, 1f);
+    }
   }
 
   string EmptyMessage() {
@@ -251,7 +389,7 @@ public sealed class LabPanel {
       // The same dimming the spellbook uses for a seam it cannot witness: real, but not
       // available to you. A creator should be able to tell at a glance without reading.
       if (!quest.IsArmed) {
-        GUI.color = new Color(1f, 1f, 1f, 0.45f);
+        GUI.color = new Color(1f, 1f, 1f, 0.68f);
       }
 
       GUILayout.Label("  " + (quest.IsArmed ? "*" : "-") + "  " + quest.Quest.Name
@@ -348,7 +486,7 @@ public sealed class LabPanel {
     foreach (LabJournal.Spell spell in current.Spells) {
       Color before = GUI.color;
       if (!spell.Bound) {
-        GUI.color = new Color(1f, 1f, 1f, 0.45f);
+        GUI.color = new Color(1f, 1f, 1f, 0.68f);
       }
       GUILayout.Label("  " + (spell.Bound ? "*" : "-") + "  " + spell.Name);
       GUILayout.Label("        " + spell.Verdict
@@ -369,5 +507,117 @@ public sealed class LabPanel {
     }
 
     GUILayout.EndScrollView();
+  }
+
+  void EnsureStyles() {
+    if (_windowStyle != null) {
+      return;
+    }
+
+    _windowBackground = SolidTexture("questlab-window", new Color(0.02f, 0.03f, 0.05f, 0.97f));
+    _gridHeaderBackground = SolidTexture(
+        "questlab-grid-header", new Color(0.10f, 0.16f, 0.24f, 1f));
+    _gridEvenBackground = SolidTexture(
+        "questlab-grid-even", new Color(0.035f, 0.05f, 0.075f, 0.97f));
+    _gridOddBackground = SolidTexture(
+        "questlab-grid-odd", new Color(0.065f, 0.085f, 0.12f, 0.97f));
+    _resizeBackground = SolidTexture(
+        "questlab-resize", new Color(0.22f, 0.34f, 0.48f, 1f));
+
+    _windowStyle = new GUIStyle(GUI.skin.window);
+    _windowStyle.normal.background = _windowBackground;
+    _windowStyle.onNormal.background = _windowBackground;
+    _windowStyle.normal.textColor = Color.white;
+    _windowStyle.onNormal.textColor = Color.white;
+    _windowStyle.border = new RectOffset(1, 1, 1, 1);
+    _windowStyle.padding = new RectOffset(12, 12, 30, 12);
+    _windowStyle.fontSize = 15;
+    _windowStyle.fontStyle = FontStyle.Bold;
+
+    _gridHeaderStyle = GridStyle(_gridHeaderBackground, Color.white, FontStyle.Bold);
+    _gridEvenStyle = GridStyle(
+        _gridEvenBackground, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal);
+    _gridOddStyle = GridStyle(
+        _gridOddBackground, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal);
+
+    _resizeStyle = new GUIStyle(GUI.skin.box);
+    _resizeStyle.normal.background = _resizeBackground;
+    _resizeStyle.normal.textColor = Color.white;
+    _resizeStyle.alignment = TextAnchor.MiddleCenter;
+    _resizeStyle.fontSize = 15;
+    _resizeStyle.fontStyle = FontStyle.Bold;
+  }
+
+  static GUIStyle GridStyle(Texture2D background, Color text, FontStyle weight) {
+    var style = new GUIStyle(GUI.skin.label);
+    style.normal.background = background;
+    style.normal.textColor = text;
+    style.hover.background = background;
+    style.hover.textColor = text;
+    style.padding = new RectOffset(6, 6, 4, 4);
+    style.margin = new RectOffset(1, 1, 1, 1);
+    style.alignment = TextAnchor.MiddleLeft;
+    style.imagePosition = ImagePosition.ImageLeft;
+    style.fontSize = 13;
+    style.fontStyle = weight;
+    style.wordWrap = false;
+    style.clipping = TextClipping.Clip;
+    return style;
+  }
+
+  static Texture2D SolidTexture(string name, Color color) {
+    var texture = new Texture2D(1, 1, TextureFormat.ARGB32, false);
+    texture.name = name;
+    texture.hideFlags = HideFlags.HideAndDontSave;
+    texture.SetPixel(0, 0, color);
+    texture.Apply();
+    return texture;
+  }
+
+  static void DestroyTexture(ref Texture2D texture) {
+    if (texture != null) {
+      UnityEngine.Object.Destroy(texture);
+      texture = null;
+    }
+  }
+
+  void DrawResizeHandle() {
+    var handle = new Rect(
+        Mathf.Max(0f, _window.width - ResizeHandle - 3f),
+        Mathf.Max(0f, _window.height - ResizeHandle - 3f),
+        ResizeHandle,
+        ResizeHandle);
+    GUI.Box(handle, "↘", _resizeStyle);
+
+    Event current = Event.current;
+    if (current.type == EventType.MouseDown && current.button == 0
+        && handle.Contains(current.mousePosition)) {
+      _resizing = true;
+      _resizeStartMouse = GUIUtility.GUIToScreenPoint(current.mousePosition);
+      _resizeStartSize = new Vector2(_window.width, _window.height);
+      current.Use();
+      return;
+    }
+
+    if (_resizing && current.type == EventType.MouseDrag) {
+      Vector2 mouse = GUIUtility.GUIToScreenPoint(current.mousePosition);
+      Vector2 delta = mouse - _resizeStartMouse;
+      _requestedWidth = _resizeStartSize.x + delta.x;
+      _requestedHeight = _resizeStartSize.y + delta.y;
+      current.Use();
+    }
+    if (_resizing && current.rawType == EventType.MouseUp) {
+      _resizing = false;
+    }
+  }
+
+  static Rect ClampWindow(Rect rect) {
+    float maxWidth = Mathf.Max(360f, Screen.width - 24f);
+    float maxHeight = Mathf.Max(280f, Screen.height - 24f);
+    rect.width = Mathf.Clamp(rect.width, Mathf.Min(MinWidth, maxWidth), maxWidth);
+    rect.height = Mathf.Clamp(rect.height, Mathf.Min(MinHeight, maxHeight), maxHeight);
+    rect.x = Mathf.Clamp(rect.x, 0f, Mathf.Max(0f, Screen.width - rect.width));
+    rect.y = Mathf.Clamp(rect.y, 0f, Mathf.Max(0f, Screen.height - rect.height));
+    return rect;
   }
 }

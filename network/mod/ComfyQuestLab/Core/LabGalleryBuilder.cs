@@ -170,8 +170,10 @@ public sealed class LabGalleryBuilder {
         + (profile.SolidMarbleFloor ? " (solid marble)" : " (mixed material)"));
     sb.AppendLine(profile.PlatformClearance.ToString("0.#", CultureInfo.InvariantCulture)
         + " m terrain clearance; "
-        + profile.RuneNameSigns.ToString(CultureInfo.InvariantCulture)
-        + " horizontal rune headers.");
+        + profile.RuneNameHeaders.ToString(CultureInfo.InvariantCulture)
+        + " horizontal rune headers ("
+        + profile.RuneNameSigns.ToString(CultureInfo.InvariantCulture) + " letter signs, "
+        + profile.RuneNameLights.ToString(CultureInfo.InvariantCulture) + " lights).");
     sb.Append(missing.Count == 0
         ? "Ready. questlab_gallery build " + profile.Id
         : "Not ready — fix the names above first.");
@@ -206,7 +208,7 @@ public sealed class LabGalleryBuilder {
         .Append(" m terrain clearance, ")
         .Append(profile.SolidMarbleFloor ? "solid marble" : "mixed floor")
         .Append(", ")
-        .Append(profile.RuneNameSigns.ToString(CultureInfo.InvariantCulture))
+        .Append(profile.RuneNameHeaders.ToString(CultureInfo.InvariantCulture))
         .Append(" horizontal rune headers")
         .AppendLine();
       sb.AppendLine("    " + profile.Description);
@@ -412,6 +414,17 @@ public sealed class LabGalleryBuilder {
       placed++;
       if (!string.IsNullOrEmpty(fixture.Text)) {
         WriteSign(built, fixture.Text);
+      }
+      if (!string.IsNullOrEmpty(fixture.LightSchool)) {
+        // r5 proved that colour alone does not survive distance and mist: the long-form
+        // school names were dark vertical threads over otherwise readable runes. The
+        // generator now uses one sign per letter and marks only the central letter, so
+        // each word gets one coloured light rather than one costly light per character.
+        var headerView = built.GetComponent<ZNetView>();
+        if (headerView != null && headerView.GetZDO() != null) {
+          LabRuneLight.Mark(headerView.GetZDO(), fixture.LightSchool);
+          LabRuneLight.Apply(built, fixture.LightSchool);
+        }
       }
       if (placed % piecesPerFrame == 0) {
         yield return null;

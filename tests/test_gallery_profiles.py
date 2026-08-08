@@ -61,12 +61,31 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertGreaterEqual(grand["platformClearance"], 3.0)
 
     def test_v2_profiles_have_one_horizontal_header_per_rune(self) -> None:
-        self.assertEqual(self.profiles["classic"]["counts"]["runeNameSigns"], 0)
+        # Profile ids are not school names; pin the generated eight-school lettering
+        # explicitly so adding a school or renaming one changes the physical count.
+        expected_signs = sum(
+            map(
+                len,
+                (
+                    "combat",
+                    "harvest",
+                    "inventory",
+                    "building",
+                    "crafting",
+                    "progression",
+                    "world",
+                    "social",
+                ),
+            )
+        )
+        for field in ("runeNameHeaders", "runeNameSigns", "runeNameLights"):
+            self.assertEqual(self.profiles["classic"]["counts"][field], 0)
         for profile_id in ("marble-wide", "marble-grand"):
             with self.subTest(profile=profile_id):
-                self.assertEqual(
-                    self.profiles[profile_id]["counts"]["runeNameSigns"], 8
-                )
+                counts = self.profiles[profile_id]["counts"]
+                self.assertEqual(counts["runeNameHeaders"], 8)
+                self.assertEqual(counts["runeNameSigns"], expected_signs)
+                self.assertEqual(counts["runeNameLights"], 8)
 
     def test_estimates_account_for_every_placed_object(self) -> None:
         # Build places one object for each generated floor/fixture/beam, two per armoury
@@ -90,15 +109,19 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("public const int PlanVersion = 2;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
         self.assertIn("public float PlatformClearance;", source)
-        self.assertIn("public int EstimatedPlacedObjects, RuneNameSigns;", source)
-        self.assertEqual(source.count('Orient = "rune-name"'), 16)
+        self.assertIn("RuneNameHeaders, RuneNameSigns, RuneNameLights;", source)
+        self.assertEqual(source.count('Orient = "rune-name-lit"'), 16)
+        self.assertEqual(source.count('Orient = "rune-name",'), 104)
+        self.assertEqual(source.count('LightSchool = "combat"'), 2)
         self.assertIn("public static Profile Find(string id)", source)
         self.assertIn("public static Monument[] Monuments", source)
 
     def test_runtime_reports_clearance_and_horizontal_headers(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")
         self.assertIn('Append(" m terrain clearance, ")', source)
-        self.assertIn('+ " horizontal rune headers."', source)
+        self.assertIn('+ " horizontal rune headers ("', source)
+        self.assertIn("LabRuneLight.Mark(headerView.GetZDO(), fixture.LightSchool)", source)
+        self.assertIn("LabRuneLight.Apply(built, fixture.LightSchool)", source)
 
     def test_preview_set_is_complete(self) -> None:
         for profile_id in self.profiles:
