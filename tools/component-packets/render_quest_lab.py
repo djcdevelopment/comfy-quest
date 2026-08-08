@@ -178,10 +178,15 @@ html = [
     '<p>No restart. The <em>Quests</em> tab names what changed, what will fire, and what '
     'cannot &mdash; and shows the last kill the matcher was actually handed, which is how you '
     'find out why something did not fire.</p></li>',
+    '<li><strong>Need another target? <code>lab_target</code>.</strong>',
+    '<p>Puts a fresh practice target in front of you &mdash; <code>lab_target harvest</code> for '
+    'a tree, and so on for all eight schools. You should never be walking across the map looking '
+    'for the thing your quest is about; that is what the gallery is for.</p></li>',
     '</ol>',
 
     '<p class="note"><strong>The starter file holds two quests that disagree on purpose.</strong> '
-    '<code>neck_romancer</code> is armed: kill a Neck and it fires. <code>punchwood</code> is not, '
+    '<code>first_blood</code> is armed: kill the Greyling standing under the combat monument and it '
+    'fires &mdash; and <code>lab_target</code> puts a fresh one in front of you whenever you need another, so testing twice never means going to look for a second one. <code>punchwood</code> is not, '
     'and nothing errors to tell you &mdash; a <code>hit</code> trigger parses perfectly and can '
     'never fire, because only a creature kill can complete a quest today. All eight schools below '
     'are <em>hooked</em>, meaning the lab can show you every one of them. Exactly one can have a '

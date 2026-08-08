@@ -49,6 +49,7 @@ this?*
 | `lab_setup` | raise the practice gallery and write you a starter quest file. Do this first. |
 | **F6** | open the console (or `questlab_panel`) |
 | `lab_reload` | re-read your quest files and say what changed |
+| `lab_target [school]` | put a fresh practice target in front of you (default: combat) |
 | `questlab_help` | what this build can do |
 | `questlab_seams` | which seams hooked on your game version, and which didn't |
 | `questlab_clear` | empty the console |
@@ -109,8 +110,13 @@ The starter file holds two quests that disagree with each other on purpose:
 
 | | |
 | --- | --- |
-| `neck_romancer` — `kill` / `Neck` | **armed.** Kill a Neck and watch the console. |
+| `first_blood` — `kill` / `Greyling` | **armed.** Kill the Greyling under the combat monument. |
 | `punchwood` — `hit` / `tree_or_bush` | **not armed**, and nothing errors. |
+
+**You never have to go hunting.** `lab_target` puts a fresh practice target in front of you —
+`lab_target harvest` for a tree, `lab_target crafting` for a smelter, and so on for all eight
+schools. The gallery's stations are placed once; this is how you get another one after you've
+killed, chopped or otherwise consumed the first.
 
 That second one is the whole lesson. `QuestTriggerEvaluator` matches `kill` triggers only,
 so a `hit` quest parses cleanly, reports no problem, and can never fire. All eight schools

@@ -8,9 +8,11 @@ using System.Text;
 /// <b>The seed is a lesson, not a template.</b> It holds exactly two quests and they are chosen
 /// to disagree with each other:
 ///
-///   neck_romancer  kill / Neck / Unarmed  → ARMED. The gallery already puts a Greyling and a
-///                                            practice ground in front of you; a Neck is a swim
-///                                            away. This one fires.
+///   first_blood    kill / Greyling        → ARMED, and it targets the creature standing under
+///                                            the combat monument the gallery just raised. No
+///                                            filters, so any kill fires it on the first try;
+///                                            the requirements text names adding weapon_skill as
+///                                            the next edit to make.
 ///   punchwood      hit / tree_or_bush     → NOT ARMED, on purpose. The quest loader accepts
 ///                                            "hit" without complaint and QuestTriggerEvaluator
 ///                                            matches "kill" only, so a bush quest produces no
@@ -21,8 +23,13 @@ using System.Text;
 /// So a creator's first launch shows one quest that works, one that silently cannot, and the
 /// panel explaining the difference — against real files they can edit rather than prose.
 ///
-/// Both quests are copied from the fixture already pinned in <c>QuestViewLoaderTests</c>, so the
-/// seed is provably schema-valid; a test parses this exact string and asserts the two verdicts.
+/// <b>The armed quest must target something the gallery supplies.</b> It first targeted a Neck,
+/// lifted from the test fixture because that was provably schema-valid — and the note here even
+/// said "a Neck is a swim away" while shipping it anyway. A creator's first act would have been
+/// to leave the practice ground they had just raised and go find a shoreline. Building hallways
+/// and stations exists precisely so nobody has to go hunting for the thing their quest is about;
+/// a seed that sends them hunting cancels the gallery. If this changes again, it changes to
+/// something <see cref="LabGalleryBuilder.Restock"/> can put back in front of them.
 ///
 /// Unity-free by construction, so it links into the test project.</summary>
 public static class LabQuestSeed {
@@ -40,14 +47,14 @@ public static class LabQuestSeed {
     "picker_version": 1,
     "quests": [
       {
-        "quest_id": "neck_romancer",
-        "name": "Neck Romancer",
+        "quest_id": "first_blood",
+        "name": "First Blood",
         "category": "Starter",
-        "requirements": "Kill a Neck with your bare fists. This one is ARMED - open the Quests tab (F6) and you will see it say so. Kill a Neck and watch the console.",
-        "bot_command": "/comfy test summons_type:Neck Romancer image:",
+        "requirements": "Kill the Greyling standing under the combat monument. This one is ARMED - open the Quests tab (F6) and you will see it say so. Killed it already? Type lab_target for a fresh one; you never have to go hunting. Next edit to try: add \"weapon_skill\": \"Unarmed\" to the trigger, run lab_reload, and watch it stop firing unless you punch.",
+        "bot_command": "/comfy test summons_type:First Blood image:",
         "auto_checked": false,
         "venue": "in_game",
-        "trigger": { "event": "kill", "target": "Neck", "weapon_skill": "Unarmed" },
+        "trigger": { "event": "kill", "target": "Greyling" },
         "guild": "Starter",
         "era": 17
       },
@@ -56,6 +63,7 @@ public static class LabQuestSeed {
         "name": "Punchwood",
         "category": "Starter",
         "requirements": "Punch a tree with your bare hands. This one is NOT armed, deliberately. Nothing binds a 'hit' trigger to a quest today, so it will never fire - and nothing errors to tell you. That is the trap this lab exists to make visible. Change event to 'kill' and target to 'Greyling', then run lab_reload.",
+        "_note": "Every station in the gallery is one lab_target away from being replaced, so nothing here needs you to go looking for it.",
         "bot_command": "/comfy test summons_type:Punchwood image:",
         "auto_checked": false,
         "venue": "in_game",

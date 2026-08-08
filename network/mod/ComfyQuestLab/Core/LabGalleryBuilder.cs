@@ -701,6 +701,73 @@ public sealed class LabGalleryBuilder {
     }
   }
 
+  /// <summary>Put a fresh practice target in front of the player.
+  ///
+  /// The gallery plan has always declared <c>Kind = "spawner"</c> and a note reading "respawned
+  /// on demand", and nothing ever read either — the builder places each station exactly once. So
+  /// the combat target was a single Greyling: kill it and the practice ground had nothing left to
+  /// kill, which breaks the authoring loop on its second iteration. Harvest has the same problem
+  /// the moment you fell the birch.
+  ///
+  /// The whole reason for building hallways and stations is that a creator should not have to go
+  /// hunting for the thing their quest is about. A one-word command is the smallest honest way to
+  /// keep that true.
+  ///
+  /// Spawns ahead of the player rather than at the monument's pad, deliberately: someone testing
+  /// a quest is standing wherever they are standing, and making them walk back to the ring is the
+  /// same wasted minute in a different costume.</summary>
+  public string Restock(string category) {
+    try {
+      if (ZNetScene.instance == null || Player.m_localPlayer == null) {
+        return "not in a world yet.";
+      }
+
+      category = string.IsNullOrEmpty(category)
+          ? LabCategory.Combat
+          : category.ToLowerInvariant();
+
+      // Monument is a struct, so "not found" is a flag rather than a null.
+      LabGalleryPlan.Monument monument = default(LabGalleryPlan.Monument);
+      bool found = false;
+      foreach (LabGalleryPlan.Monument m in LabGalleryPlan.Monuments) {
+        if (m.Category == category) {
+          monument = m;
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        return "no practice target for '" + category + "'. One of: "
+            + string.Join(", ", LabCategory.All);
+      }
+
+      Player player = Player.m_localPlayer;
+      Vector3 at = player.transform.position + player.transform.forward * RestockDistance;
+      if (TryGroundHeight(at, out float ground)) {
+        at.y = ground;
+      }
+
+      // Face the player, so a target that fights back does not spawn with its back turned.
+      Quaternion facing = Quaternion.LookRotation(
+          new Vector3(player.transform.position.x - at.x, 0f, player.transform.position.z - at.z));
+
+      GameObject spawned = Place(monument.Station.Prefab, at, facing);
+      if (spawned == null) {
+        return "could not place " + monument.Station.Prefab
+            + " — run questlab_gallery check to see what this build has.";
+      }
+
+      return "placed a " + monument.Station.Prefab + " in front of you (" + category + "). "
+          + monument.Station.Note;
+    } catch (Exception ex) {
+      return "could not restock: " + ex.Message;
+    }
+  }
+
+  /// <summary>Far enough not to spawn inside the player, close enough to be obviously for them.</summary>
+  const float RestockDistance = 4f;
+
   static bool TryGroundHeight(Vector3 at, out float height) {
     height = at.y;
     try {

@@ -195,13 +195,13 @@ what the game said and had no idea what a quest was.
   of eight hooked schools exactly one can have a quest bound to it. A `hit` trigger parses
   cleanly, errors nowhere, and can never fire. The **Quests tab** says which, and why, per
   quest.
-- **`lab_reload`** re-reads and **diffs by name** — `+ neck_romancer`, `~ punchwood (trigger
+- **`lab_reload`** re-reads and **diffs by name** — `+ first_blood`, `~ punchwood (trigger
   changed)`, `= 3 unchanged`. "Reloaded" alone never tells a creator the file they just saved
   is the file the lab just read. It also builds a fresh evaluator, dropping cooldowns: a
   deliberate divergence from the shipping mod's session-long 60 s, because waiting a minute to
   retest an edit is precisely the flow `lab_reload` exists to protect.
 - **The seed is a lesson, not a template.** `lab_setup` writes `starter.json` — only into an
-  empty folder, never overwriting — holding `neck_romancer` (armed) beside `punchwood` (`hit`,
+  empty folder, never overwriting — holding `first_blood` (armed) beside `punchwood` (`hit`,
   silently unfireable). A test parses that exact string through the real contract and asserts
   both verdicts, so it goes red the day either side moves. Reading about the trap in a README
   teaches far less than opening the file it happens in.

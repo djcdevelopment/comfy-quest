@@ -208,6 +208,15 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
                 + "Learn the spells at djcdevelopment.github.io/baseline/questlab/");
           });
 
+      // The third of the three one-word commands, and it exists because the other two left a
+      // hole: you edit a quest, reload it, and then need something to kill again. Chasing a mob
+      // across the map is exactly the minute the practice gallery was built to give back.
+      new Terminal.ConsoleCommand("lab_target",
+          "put a fresh practice target in front of you: lab_target [school]",
+          delegate (Terminal.ConsoleEventArgs args) {
+            Report(_gallery.Restock(args.Length >= 2 ? args[1] : null));
+          });
+
       new Terminal.ConsoleCommand("lab_reload",
           "re-read your quest files and say what changed: lab_reload",
           delegate {
@@ -302,6 +311,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("ComfyQuestLab " + PluginVersion + " — learn what the game can trigger a quest on.");
     sb.AppendLine("  lab_setup        set up the practice area (do this first)");
     sb.AppendLine("  lab_reload       re-read your quest files and say what changed");
+    sb.AppendLine("  lab_target [school]   put a fresh practice target in front of you");
     sb.AppendLine("  questlab_panel   open the live event console (" + LabConfig.PanelShortcut.Value + ")");
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
     sb.AppendLine("  questlab_clear   empty the live view");
