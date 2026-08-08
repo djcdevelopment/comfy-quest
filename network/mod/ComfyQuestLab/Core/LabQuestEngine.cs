@@ -181,7 +181,7 @@ public static class LabQuestEngine {
 
       _lastKillLine = DateTime.Now.ToString("HH:mm:ss") + " · " + kill.Display + " · "
           + kill.WeaponSkill + " · " + (kill.Ranged ? "ranged" : "melee") + " → "
-          + (completions.Count == 0 ? "matched nothing" : "fired " + completions.Count);
+          + Outcome(completions, kill, now);
 
       foreach (QuestCompletion completion in completions) {
         Credit(completion, kill);
@@ -189,6 +189,44 @@ public static class LabQuestEngine {
     } catch (Exception) {
       // A postfix that throws takes Valheim's death path down with it.
     }
+  }
+
+  /// <summary>What actually became of this kill, in terms a creator can act on.
+  ///
+  /// <c>OnCreatureKilled</c> returns an empty list for two completely different situations: no
+  /// quest wanted this kill, and a quest wanted it but is still on cooldown. Reporting both as
+  /// "matched nothing" sends somebody off to edit a target that was never the problem — which is
+  /// precisely the wrong-place-to-look failure this whole tool exists to prevent. Caught in game
+  /// on 2026-08-08, one line under a roster that was simultaneously reporting "re-arms in 22s".</summary>
+  static string Outcome(IReadOnlyList<QuestCompletion> completions, LabKill kill, double now) {
+    if (completions.Count > 0) {
+      return "fired " + completions.Count;
+    }
+
+    var cooling = new List<string>();
+    foreach (LabQuest quest in _set.Quests) {
+      if (!quest.IsArmed) {
+        continue;
+      }
+
+      double remaining = _evaluator.CooldownRemaining(quest.QuestId, now);
+      if (remaining > 0.0 && WouldMatch(quest.Quest, kill)) {
+        cooling.Add(quest.Quest.Name + " re-arms in " + Mathf.CeilToInt((float) remaining) + "s");
+      }
+    }
+
+    return cooling.Count == 0
+        ? "matched nothing"
+        : "matched, but still cooling down — " + string.Join(", ", cooling);
+  }
+
+  /// <summary>Would this quest have taken this kill, cooldown aside? Asked by dry-firing the real
+  /// matcher on a throwaway zero-cooldown evaluator, so the answer cannot drift from the one that
+  /// actually decides.</summary>
+  static bool WouldMatch(TrackedQuest quest, LabKill kill) {
+    var probe = new QuestTriggerEvaluator(0.0);
+    return probe.OnCreatureKilled(
+        new[] { quest }, kill.Creature, kill.WeaponSkill, kill.Ranged, 0.0).Count > 0;
   }
 
   static readonly TrackedQuest[] EmptyQuests = new TrackedQuest[0];

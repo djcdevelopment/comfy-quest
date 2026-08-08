@@ -168,10 +168,10 @@ beyond any reach, and the pieces accumulated to 1527 before anyone noticed a cle
 reporting zero. `WearNTear.GetAllInstances()` enumerates every loaded piece, so the sweep
 finds all lab-marked galleries in any session. It only sees loaded zones, and says so.
 
-**Still not verified in game:** only harvest has been witnessed. The other seven
-categories are patched but no event from them has been seen. Item stands stay bare;
-`SetVisualItem` is a registered RPC rather than a callable method, so the gear is dropped
-beside them.
+**Still unwitnessed at that point:** only harvest. Combat and the quest lane were witnessed
+on 2026-08-08 — see the end of this file. Six categories remain unseen. Item stands stay
+bare; `SetVisualItem` is a registered RPC rather than a callable method, so the gear is
+dropped beside them.
 
 **The lab can read a quest now — and say when it never could.**
 
@@ -238,3 +238,35 @@ names the real string. `LabKillWatch` mirrors the producer's rule with the sourc
   *bound*, which is now what they say.
 
 231 tests pass, 28 of them new.
+
+**Verified in game 2026-08-08 — combat, and the whole quest lane.**
+
+Two firsts in one session. Every combat seam fired in a single fight — `Character.OnDeath`,
+`Damage`, `RPC_Damage` and `Stagger`, all four rows against `$enemy_greyling` — so combat
+joins harvest as a witnessed category and the console's three different verdicts appeared
+side by side, which is the lesson that was previously only describable.
+
+And the quest lane ran end to end: `2 quests loaded (1 armed)` at startup, then
+`quest fired: First Blood` twice, with the Quests tab reporting `fired 2 times since the
+last reload · re-arms in 22s` and Punchwood dimmed beneath it carrying the verb explanation.
+Seed → parse → armed probe → hit attribution → `OnDeath` → the real evaluator → credit,
+proven in the game rather than only against the contract.
+
+The naming fix showed correct in the same shot: the console printed `$enemy_greyling` with
+**no** prefab name beside it, because that token already contains `Greyling`. The quiet case
+is as important as the loud one — showing both names unconditionally would have been noise.
+
+**And the session found a bug in the diagnostic itself.** The "last kill" line read
+`$enemy_greyling · Axes · melee → matched nothing` for a kill that matched perfectly well —
+the quest was simply still cooling down, as the roster two lines above was saying at that
+exact moment. `QuestTriggerEvaluator.OnCreatureKilled` returns an empty list both when no
+quest wants a kill and when one wants it but is on cooldown, and collapsing those into
+"matched nothing" sends a creator off to edit a target that was never wrong. That is the
+wrong-place-to-look failure this entire tool exists to prevent, sitting in the line built to
+prevent it. It now distinguishes them and names the quest and the seconds remaining, deciding
+"would this have matched?" by dry-firing the real matcher on a throwaway zero-cooldown
+evaluator so the answer cannot drift.
+
+Independent corroboration worth recording: ComfyNetworkSense was running alongside and
+completed its own `greyling_cull` quest off the same kill, from its own quest-view.json. Two
+mods, one linked contract, same verdict — which is the promise the source-link exists to make.

@@ -25,10 +25,17 @@ did — and whether a quest could actually fire on it.
 > rather than decaying. The monuments read as their glyphs, each lit in its school's
 > colour.
 >
-> **Not verified in game:** only the harvest category has been observed firing; the other
-> seven are patched but unwitnessed. Item stands stay bare (`SetVisualItem` is a registered
-> RPC, not a callable method; the gear is dropped beside them instead). This README
-> describes what is here, not what is planned.
+> **Combat and the quest lane verified in game 2026-08-08.** All four combat seams fired in
+> one fight — `OnDeath`, `Damage`, `RPC_Damage`, `Stagger` — and the seeded quest completed
+> on the kill: `quest fired: First Blood`, twice, with the roster reporting `fired 2 times`
+> and a live cooldown. The naming fix is visible and correct: the console shows
+> `$enemy_greyling` with no prefab name beside it, because that token already contains
+> `Greyling` — the "stay quiet when they agree" case.
+>
+> **Still unwitnessed:** inventory, building, crafting, progression, world, social. Patched
+> and reported hooked, but no event from them has been seen. Item stands stay bare
+> (`SetVisualItem` is a registered RPC, not a callable method; the gear is dropped beside
+> them instead). This README describes what is here, not what is planned.
 
 ## Why this exists
 
