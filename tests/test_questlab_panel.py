@@ -74,8 +74,21 @@ class QuestLabPanelTests(unittest.TestCase):
             "GUIUtility.GUIToScreenPoint",
             "_requestedWidth",
             "_requestedHeight",
-            "ClampWindow(_window)",
+            "ClampWindow(_window, _drawScale)",
             "Mathf.Min(MinWidth, maxWidth)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+
+    def test_panel_zoom_scales_layout_mouse_and_persists_in_config(self) -> None:
+        self.assertIn('"panelScale"', self.plugin)
+        for marker in (
+            'GUILayout.Button("-"',
+            'GUILayout.Button("+"',
+            "Matrix4x4.Scale(new Vector3(_drawScale, _drawScale, 1f))",
+            "(mouse - _resizeStartMouse) / _drawScale",
+            "Screen.width / Mathf.Max(MinPanelScale, scale)",
+            "LabConfig.PanelScale.Value = scale",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.panel)

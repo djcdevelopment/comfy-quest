@@ -43,6 +43,7 @@ class QuestLabPackageTests(unittest.TestCase):
         parser.optionxform = str
         parser.read(CONFIG, encoding="utf-8")
         self.assertEqual(parser["Lab"]["eventProfile"], "extended")
+        self.assertEqual(parser["Lab"]["panelScale"], "1")
         self.assertEqual(parser["Lab"]["observeStamina"], "false")
         self.assertEqual(parser["Lab"]["galleryPiecesPerFrame"], "24")
         self.assertEqual(parser["Quests"]["questCooldownSeconds"], "60")

@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260808-r7";
+  public const string ReleaseId = "questlab-v0.2.0-20260808-r8";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -222,19 +222,14 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
               LabQuestEngine.Reload();
             }
 
-            // Do NOT raise a second gallery through the first. Before this check, running
-            // lab_setup twice silently stacked another full gallery — and it is exactly the
-            // command a newcomer is most likely to re-run, because it is the one we tell them
-            // to start with.
-            int standing = _gallery.StandingPieceCount();
-            if (standing > 0) {
-              Report("A lab gallery is already standing here (" + standing + " pieces) — leaving "
-                  + "it alone. questlab_gallery clear removes it, or lab_target puts a fresh "
-                  + "practice target in front of you.");
-            } else {
-              StartCoroutine(_gallery.Build(this));
-              Report("Quest lab setup started! The gallery is being raised.");
-            }
+            // A setup is a clean, repeatable course rather than "build if absent". The safe
+            // lifecycle returns anyone on the old deck to natural terrain, clears only marked
+            // Lab objects, then rebuilds fresh targets and interaction-local supplies at the
+            // same site. Re-running the first command can neither stack galleries nor inherit
+            // a Greyling/tree somebody consumed last time.
+            StartCoroutine(_gallery.ResetSite(this, LabGalleryPlan.DefaultProfileId));
+            Report("Quest lab reset started: safely clearing marked builds, then raising a fresh "
+                + LabGalleryPlan.DefaultProfileId + " course on this site.");
 
             Report("Press " + LabConfig.PanelShortcut.Value + " to open the lab console. "
                 + "Learn the spells at djcdevelopment.github.io/baseline/questlab/");
@@ -446,6 +441,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 public static class LabConfig {
   public static ConfigEntry<bool> Enabled { get; private set; }
   public static ConfigEntry<KeyboardShortcut> PanelShortcut { get; private set; }
+  public static ConfigEntry<float> PanelScale { get; private set; }
   public static ConfigEntry<int> ConsoleRows { get; private set; }
   public static ConfigEntry<bool> VerboseLogging { get; private set; }
   public static ConfigEntry<string> EventProfile { get; private set; }
@@ -473,6 +469,16 @@ public static class LabConfig {
             "Opens and closes the live event console. F6 by default because "
             + "ComfyControlSurface used F7 and the camera kit warns against reusing it. "
             + "Set to None to use questlab_panel from the console instead.");
+
+    PanelScale =
+        config.Bind(
+            "Lab",
+            "panelScale",
+            1f,
+            new ConfigDescription(
+                "Quest Lab panel zoom. Use the - and + controls inside the panel to tune "
+                + "windowed, 1080p, and 4K layouts; the choice is saved here. Hot-reloadable.",
+                new AcceptableValueRange<float>(0.65f, 2f)));
 
     ConsoleRows =
         config.Bind(
@@ -522,7 +528,7 @@ public static class LabConfig {
             "galleryPiecesPerFrame",
             24,
             "How many Gallery v2 objects are placed per frame. 24 keeps the default "
-            + "2,200-piece marble build responsive while finishing in a few seconds. "
+            + "1,350-piece compact marble build responsive while finishing in a few seconds. "
             + "Lower it on slower clients or raise it for faster local comparisons. "
             + "Hot-reloadable; clamped to 1-200.");
 

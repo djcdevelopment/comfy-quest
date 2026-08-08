@@ -17,26 +17,26 @@ public static class LabBatchContract {
   public const string ReceiptSchema = "comfy-questlab-suite-receipt/v1";
   public const string RequestSchema = "comfy-questlab-batch-request/v1";
   public const int MaxWitnesses = 256;
-  public static readonly string[] PreparedSupplyPrefabs = { "Wood", "Coal", "CopperOre" };
-
   static readonly LabBatchSuite AllSchoolsSuite = new LabBatchSuite {
     Id = "all-schools",
     Name = "All schools live witness",
     Description = "One bindable example quest and one real canonical witness in every school.",
     EvidenceKind = "live-gameplay",
     Expectations = new[] {
-      Expect(LabCategory.Combat, "kill", "Kill the Greyling at the combat rune."),
+      Expect(LabCategory.Combat, "kill",
+          "Pick up the bow and arrows at the combat spoke mouth; shoot the Greyling at its rune."),
       Expect(LabCategory.Harvest, "resource_damaged",
-          "Use the central bronze axe to strike the birch at the harvest rune."),
+          "Pick up the bronze axe beside the arrival portal and strike the adjacent birch."),
       Expect(LabCategory.Inventory, "item_picked_up",
-          "Pick up any staged supply or central armoury item."),
+          "Pick up any staged tool, supply, fuel, or food."),
       Expect(LabCategory.Building, "piece_placed",
-          "Pick up the central Hammer and staged Wood, then place any piece."),
+          "Pick up the Hammer and Wood in front of the building bench, then place any piece."),
       Expect(LabCategory.Crafting, "station_fuel_added",
-          "Add staged Coal to the smelter at the crafting rune."),
-      Expect(LabCategory.Progression, "skill_raised", "Use any skill once."),
+          "Pick up the Coal directly in front of the crafting smelter and add it as fuel."),
+      Expect(LabCategory.Progression, "skill_raised",
+          "The bow, axe, or building lap normally raises a skill; otherwise use any skill once."),
       Expect(LabCategory.World, "player_teleported", "Take either paired gallery portal."),
-      Expect(LabCategory.Social, "sign_written", "Write the sign at the social rune."),
+      Expect(LabCategory.Social, "sign_written", "Edit the hub sign that says sign here."),
     },
   };
 

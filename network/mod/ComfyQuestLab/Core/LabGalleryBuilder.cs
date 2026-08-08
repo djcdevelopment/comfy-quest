@@ -14,13 +14,14 @@ using UnityEngine;
 /// <summary>Raises the gallery described by <see cref="LabGalleryPlan"/>.
 ///
 /// This is the one part of the Tome that changes the world rather than witnessing it,
-/// and it only ever does so when a person types a command. Nothing here runs on its own.
+/// and it only ever does so after a typed command or validated bounded batch request. Nothing
+/// here runs on its own.
 ///
 /// Gallery v2 commands, in the order you should use them:
 ///
 ///   check   resolve every prefab the plan names and report what is missing. Places
 ///           nothing. Prefab names are the one thing in this project NOT read out of the
-///           game assembly, so this exists to turn a guess into a fact before 600 pieces
+///           game assembly, so this exists to turn a guess into a fact before 1,350 pieces
 ///           are committed to somebody's world.
 ///   profiles list the reversible geometry choices and their exact generated counts.
 ///   build   raise one profile, spread across frames so the game does not hitch.
@@ -37,11 +38,6 @@ public sealed class LabGalleryBuilder {
   /// is a plain ZDO string field, per the component atlas.</summary>
   const string GalleryTag = "gallery";
   const string WorldTag = "gallery world";
-
-  /// <summary>Materials, so the gallery can be extended, repaired, or stair-cased by
-  /// hand. Stacks rather than singles — a student who wants to build should not have to
-  /// go logging first.</summary>
-  static readonly string[] Supplies = { "Wood", "Wood", "FineWood", "RoundLog", "Stone" };
 
   readonly List<ZDOID> _placed = new List<ZDOID>();
   static readonly AccessTools.FieldRef<ZDOMan, Dictionary<ZDOID, ZDO>> _objectsByIdRef =
@@ -125,7 +121,7 @@ public sealed class LabGalleryBuilder {
       return UnknownProfile(profileId);
     }
 
-    var wanted = new List<string> { "wood_beam", "portal_wood", "itemstand" };
+    var wanted = new List<string> { "wood_beam", "portal_wood" };
     foreach (LabGalleryPlan.Tile tile in profile.PlatformTiles) {
       AddUnique(wanted, tile.Prefab);
     }
@@ -137,16 +133,8 @@ public sealed class LabGalleryBuilder {
         wanted.Add(m.Station.Prefab);
       }
     }
-    foreach (LabGalleryPlan.RackItem r in profile.Armoury) {
-      if (!wanted.Contains(r.Item)) {
-        wanted.Add(r.Item);
-      }
-    }
-    foreach (string supply in Supplies) {
-      AddUnique(wanted, supply);
-    }
-    foreach (string supply in LabBatchContract.PreparedSupplyPrefabs) {
-      AddUnique(wanted, supply);
+    foreach (LabGalleryPlan.CourseDrop drop in profile.CourseDrops) {
+      AddUnique(wanted, drop.Prefab);
     }
 
     var found = new List<string>();
@@ -167,10 +155,12 @@ public sealed class LabGalleryBuilder {
     }
     sb.AppendLine(profile.PlatformTiles.Length + " floor tiles, "
         + profile.Fixtures.Length + " fixtures, "
-        + CountBeams(profile) + " beams, " + profile.Armoury.Length + " stands; about "
+        + CountBeams(profile) + " beams, " + profile.CourseDrops.Length
+        + " interaction-local drops; about "
         + profile.EstimatedPlacedObjects + " placed objects.");
     sb.AppendLine(profile.HallWidth.ToString("0.#", CultureInfo.InvariantCulture)
-        + " m halls; floor " + string.Join(", ", profile.FloorMaterials)
+        + " m halls; " + profile.SpokeLength.ToString("0.#", CultureInfo.InvariantCulture)
+        + " m hub-to-station walks; floor " + string.Join(", ", profile.FloorMaterials)
         + (profile.SolidMarbleFloor ? " (solid marble)" : " (mixed material)"));
     sb.AppendLine(profile.PlatformClearance.ToString("0.#", CultureInfo.InvariantCulture)
         + " m terrain clearance; "
@@ -208,6 +198,8 @@ public sealed class LabGalleryBuilder {
         .Append(" objects, ")
         .Append(profile.HallWidth.ToString("0.#", CultureInfo.InvariantCulture))
         .Append(" m halls, ")
+        .Append(profile.SpokeLength.ToString("0.#", CultureInfo.InvariantCulture))
+        .Append(" m hub-to-station walks, ")
         .Append(profile.PlatformClearance.ToString("0.#", CultureInfo.InvariantCulture))
         .Append(" m terrain clearance, ")
         .Append(profile.SolidMarbleFloor ? "solid marble" : "mixed floor")
@@ -483,51 +475,31 @@ public sealed class LabGalleryBuilder {
 
       var stationAt = new Vector3(origin.x + monument.Station.X, floorY,
                                   origin.z + monument.Station.Z);
-      GameObject station = Place(monument.Station.Prefab, stationAt, Quaternion.identity);
+      GameObject station = Place(monument.Station.Prefab, stationAt,
+          Quaternion.Euler(0f, monument.Station.Yaw, 0f));
       if (station != null) {
         placed++;
         if (monument.Station.Prefab == "portal_wood") {
           TagPortal(station, WorldTag);
         }
+        if (!string.IsNullOrEmpty(monument.Station.Text)) {
+          WriteSign(station, monument.Station.Text);
+        }
       }
       yield return null;
     }
 
-    // 3. the armoury
-    foreach (LabGalleryPlan.RackItem item in profile.Armoury) {
-      var at = new Vector3(origin.x + item.X, floorY, origin.z + item.Z);
-      GameObject stand = Place("itemstand", at, Quaternion.Euler(0f, item.Yaw, 0f));
-      if (stand != null) {
-        placed++;
-        // ItemStand exposes SetVisualItem only as an RPC, and an RPC signature is not
-        // something to guess at from outside the game. Try it, and do not care if it
-        // fails — the real gear is placed below either way, so a bare stand is a
-        // cosmetic loss rather than a student with no axe.
-        TryDressStand(stand, item.Item);
-      }
-
-      // The gear itself, on the floor beside its stand. Instantiating an item prefab
-      // gives a real ItemDrop, which needs no API this could get wrong — and picking it
-      // up is itself one of the inventory school's spells, so the first thing a student
-      // does in the gallery already makes the live view move.
-      var loose = new Vector3(origin.x + item.X * 0.82f, floorY + 0.4f,
-                              origin.z + item.Z * 0.82f);
-      if (Place(item.Item, loose, Quaternion.identity) != null) {
-        placed++;
-      }
-      yield return null;
-    }
-
-    // Materials, so the gallery can be extended or repaired by hand without a
-    // logging trip first.
-    for (int i = 0; i < Supplies.Length; i++) {
-      float a = 2f * Mathf.PI * i / Supplies.Length;
-      var at = new Vector3(origin.x + Mathf.Sin(a) * 3.0f, floorY + 0.4f,
-                           origin.z + Mathf.Cos(a) * 3.0f);
-      GameObject drop = Place(Supplies[i], at, Quaternion.identity);
+    // 3. the course kit. Every item is beside the interaction that consumes it: axe by
+    // the arrival birch, bow and arrows on the player's side of Combat, coal directly in
+    // front of the smelter, hammer and wood at Building, and three foods in the hub.
+    // Dropped items glint and pick up normally, which is both more discoverable than an
+    // uncertain item-stand RPC and an Inventory-school witness for free.
+    foreach (LabGalleryPlan.CourseDrop item in profile.CourseDrops) {
+      var at = new Vector3(origin.x + item.X, floorY + item.Y, origin.z + item.Z);
+      GameObject drop = Place(item.Prefab, at, Quaternion.identity);
       if (drop != null) {
         placed++;
-        SetStack(drop, 50);
+        SetStack(drop, item.Stack);
       }
       yield return null;
     }
@@ -615,6 +587,34 @@ public sealed class LabGalleryBuilder {
     }
   }
 
+  /// <summary>Start a clean creator course: safely remove every marked Gallery profile,
+  /// then raise one fresh profile at the same reusable site. Unlike selective rebuild,
+  /// this is the lifecycle used by lab_setup and all-schools preparation, where stale
+  /// targets, supplies, or comparison structures would make the exercise ambiguous.</summary>
+  public IEnumerator ResetSite(MonoBehaviour host, string profileId) {
+    if (_running) {
+      Report("gallery lifecycle operation already in progress.");
+      yield break;
+    }
+    LabGalleryPlan.Profile profile = LabGalleryPlan.Find(profileId);
+    if (profile == null) {
+      Report(UnknownProfile(profileId));
+      yield break;
+    }
+    IEnumerator clear = ClearSafely("all");
+    while (clear.MoveNext()) {
+      yield return clear.Current;
+    }
+    if (!LastLifecycleSucceeded) {
+      Report("lab reset stopped because the old marked Gallery could not be cleared safely.");
+      yield break;
+    }
+    IEnumerator build = Build(host, profile.Id);
+    while (build.MoveNext()) {
+      yield return build.Current;
+    }
+  }
+
   /// <summary>Instantiate one piece and remember it.
   ///
   /// Support wear is switched off on everything placed. A platform standing clear of the
@@ -682,6 +682,7 @@ public sealed class LabGalleryBuilder {
   const float TerrainRetreatLift = 0.5f;
   const float TeleportAcceptTimeout = 4f;
   const float TeleportFinishTimeout = 18f;
+  const float DestroySettleTimeout = 5f;
 
   /// <summary>Return a player standing on the selected gallery to the natural terrain at
   /// the same X/Z, then remove every matching marked object.
@@ -755,7 +756,17 @@ public sealed class LabGalleryBuilder {
       }
 
       _lastLifecycleResult = ClearMarked(selector);
-      _lastLifecycleSucceeded = true;
+      float settleDeadline = Time.realtimeSinceStartup + DestroySettleTimeout;
+      while (StandingPieceCount(selector) > 0
+          && Time.realtimeSinceStartup < settleDeadline) {
+        yield return null;
+      }
+      int remaining = StandingPieceCount(selector);
+      _lastLifecycleSucceeded = remaining == 0;
+      if (remaining > 0) {
+        _lastLifecycleResult += " " + remaining + " matching marked piece(s) remained locally "
+            + "known after the bounded destroy-settle window.";
+      }
       Report(_lastLifecycleResult);
     } finally {
       _running = false;
@@ -1147,10 +1158,10 @@ public sealed class LabGalleryBuilder {
 
   /// <summary>How many lab-marked pieces are present in the locally known ZDO table.
   ///
-  /// Exists so <c>lab_setup</c> can tell a first run from a second one. It could not before, and
-  /// a second <c>lab_setup</c> silently raised another 620 pieces through the first — the same
-  /// mistake that once let the count reach 1527 before anybody noticed. "The one command a
-  /// newcomer needs" should not be a command that punishes running it twice.
+  /// Setup and batch preparation use this after clear and after build to verify that their
+  /// clean-course lifecycle actually reached zero and then produced a marked structure. Before
+  /// that lifecycle existed, a second <c>lab_setup</c> silently raised another 620 pieces through
+  /// the first — the same mistake that once let the count reach 1527 before anybody noticed.
   ///
   /// A local world knows its complete table; a remote client can only answer for synchronized
   /// objects. That is the safe direction to be wrong in — it offers to build rather than
@@ -1231,39 +1242,6 @@ public sealed class LabGalleryBuilder {
     } catch (Exception ex) {
       return "could not restock: " + ex.Message;
     }
-  }
-
-  /// <summary>Materials the all-schools suite needs, staged at the local player's feet so a
-  /// fresh character does not depend on prior inventory or finding the central supply stacks.
-  /// The pure contract owns the fixed prefab allowlist; stack sizes are fixed here. These carry
-  /// the same gallery marks as every other lab-owned object, so normal selective clear removes
-  /// them and no cleanup path needs to guess by prefab name.</summary>
-  public string PrepareBatchSupplies() {
-    if (ZNetScene.instance == null || Player.m_localPlayer == null) {
-      return "Batch supplies were not placed because no player world is loaded.";
-    }
-    int placed = 0;
-    Player player = Player.m_localPlayer;
-    for (int i = 0; i < LabBatchContract.PreparedSupplyPrefabs.Length; i++) {
-      Vector3 at = player.transform.position + player.transform.forward * (2.0f + i * 0.8f)
-          + player.transform.right * 1.5f;
-      at.y += 0.5f;
-      GameObject drop = Place(LabBatchContract.PreparedSupplyPrefabs[i], at, Quaternion.identity);
-      if (drop != null) {
-        SetStack(drop, 20);
-        placed++;
-      }
-    }
-    return "Prepared " + placed + "/" + LabBatchContract.PreparedSupplyPrefabs.Length
-        + " bounded supply stacks (wood, coal, and copper ore).";
-  }
-
-  /// <summary>Refresh the two consumable targets required by the all-schools suite.
-  /// A standing gallery is not proof that its Greyling or birch survived an earlier run.</summary>
-  public string PrepareBatchTargets() {
-    string combat = Restock(LabCategory.Combat);
-    string harvest = Restock(LabCategory.Harvest);
-    return "Refreshed bounded practice targets. " + combat + " " + harvest;
   }
 
   /// <summary>Far enough not to spawn inside the player, close enough to be obviously for them.</summary>
@@ -1355,27 +1333,9 @@ public sealed class LabGalleryBuilder {
     }
   }
 
-  /// <summary>Ask a stand to display an item, without depending on being right.
-  ///
-  /// The extractor says SetVisualItem is a registered RPC rather than a callable method,
-  /// and its parameter list is not something to guess at from outside a running game. So
-  /// this attempts the most likely shape, gives up quietly, and says so once.</summary>
-  void TryDressStand(GameObject stand, string itemName) {
-    try {
-      var view = stand.GetComponent<ZNetView>();
-      if (view == null) {
-        return;
-      }
-      view.InvokeRPC(ZNetView.Everybody, "SetVisualItem", new object[] { itemName, 0, 1 });
-    } catch (Exception ex) {
-      LogOnce("stands are staying bare — SetVisualItem did not take (" + ex.Message
-          + "). The gear is on the floor beside them, which is what matters.");
-    }
-  }
-
   readonly HashSet<string> _logged = new HashSet<string>();
 
-  /// <summary>Six hundred pieces means six hundred chances to say the same thing. Say it
+  /// <summary>A thousand pieces means a thousand chances to say the same thing. Say it
   /// once.</summary>
   void LogOnce(string message) {
     if (_logged.Add(message)) {

@@ -11,6 +11,7 @@
       "runeHeight": 11.0,
       "platformClearance": 0.6,
       "hallWidth": 4.0,
+      "spokeLength": 24.5,
       "footprintRadius": 60.0,
       "floorMaterials": [
         "blackmarble_floor",
@@ -24,8 +25,8 @@
         "runeNameHeaders": 0,
         "runeNameSigns": 0,
         "runeNameLights": 0,
-        "armouryStands": 8,
-        "estimatedPlacedObjects": 1405
+        "courseDrops": 9,
+        "estimatedPlacedObjects": 1393
       }
     },
     {
@@ -36,6 +37,7 @@
       "runeHeight": 14.0,
       "platformClearance": 1.5,
       "hallWidth": 8.0,
+      "spokeLength": 30.0,
       "footprintRadius": 77.0,
       "floorMaterials": [
         "blackmarble_floor"
@@ -48,32 +50,33 @@
         "runeNameHeaders": 8,
         "runeNameSigns": 60,
         "runeNameLights": 8,
-        "armouryStands": 8,
-        "estimatedPlacedObjects": 2303
+        "courseDrops": 9,
+        "estimatedPlacedObjects": 2291
       }
     },
     {
       "id": "marble-grand",
       "name": "Marble grand",
-      "description": "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and illuminated horizontal rune headers.",
-      "ringRadius": 62.0,
+      "description": "Selected compact court: 10 m halls with quarter-length walks, a raised all-marble floor, monumental runes, and interaction-local supplies.",
+      "ringRadius": 27.0,
       "runeHeight": 17.0,
       "platformClearance": 3.0,
       "hallWidth": 10.0,
-      "footprintRadius": 98.0,
+      "spokeLength": 9.0,
+      "footprintRadius": 48.0,
       "floorMaterials": [
         "blackmarble_floor"
       ],
       "solidMarbleFloor": true,
       "counts": {
-        "floorTiles": 2461,
-        "fixtures": 1044,
+        "floorTiles": 823,
+        "fixtures": 372,
         "runeBeams": 134,
         "runeNameHeaders": 8,
         "runeNameSigns": 60,
         "runeNameLights": 8,
-        "armouryStands": 8,
-        "estimatedPlacedObjects": 3671
+        "courseDrops": 9,
+        "estimatedPlacedObjects": 1349
       }
     }
   ]

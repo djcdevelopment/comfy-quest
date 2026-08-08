@@ -177,11 +177,13 @@ html = [
     '<p>The lab is client-only and does nothing at all on a dedicated server. Nothing '
     'it does touches anyone else, and uninstalling it changes nothing about your game.</p></li>',
     '<li><strong>Press <kbd>F5</kbd> and type <code>lab_setup</code>.</strong>',
-    '<p>This raises the practice gallery &mdash; eight rune monuments, a station under each, '
-    'and an armoury &mdash; and writes you a starter quest file.</p></li>',
+    '<p>This writes a starter quest, safely clears marked old builds, and raises a fresh compact '
+    'black-marble course with eight rune monuments and each target/tool at its point of use.</p></li>',
     '<li><strong>Press <kbd>F6</kbd> to open the lab panel.</strong>',
     '<p><kbd>F5</kbd> is Valheim&rsquo;s console, where you type commands. <kbd>F6</kbd> is the '
-    'lab&rsquo;s own window. Two different keys, and mixing them up is the usual first stumble.</p></li>',
+    'lab&rsquo;s own window. Two different keys, and mixing them up is the usual first stumble. '
+    'The window owns the mouse while open; its &minus; / + controls persistently tune the whole '
+    'panel from 65% to 200% for windowed, 1080p, or 4K play.</p></li>',
     '<li><strong>Edit <code>BepInEx/config/comfy-quest-lab/quests/starter.json</code>, then '
     'run <code>lab_reload</code>.</strong>',
     '<p>No restart. The <em>Quests</em> tab names what changed, what will fire, and what '
@@ -192,7 +194,9 @@ html = [
     'a tree, and so on for all eight schools. You should never be walking across the map looking '
     'for the thing your quest is about; that is what the gallery is for.</p></li>',
     '<li><strong>Want to prove every school? <code>questlab_batch prepare all-schools</code>.</strong>',
-    '<p>Then run <code>questlab_batch run all-schools</code> and follow the eight prepared prompts. '
+    '<p>Prepare safely clears marked old builds and raises one fresh compact course with targets, '
+    'tools, food, building materials, fuel, and the hub sign staged at point of use. Then run '
+    '<code>questlab_batch run all-schools</code> and follow the eight prepared prompts. '
     '<code>report</code> shows what remains and <code>export</code> writes a JSON receipt. The separate '
     '<code>creator-events</code> suite checks all 34 shared evaluator names, but labels itself synthetic '
     'rather than claiming those actions happened in Valheim.</p></li>',

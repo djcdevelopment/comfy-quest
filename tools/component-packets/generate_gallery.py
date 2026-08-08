@@ -55,16 +55,14 @@ STATIONS = {
     "Social": ("sign", "piece", "a sign to write and a place to speak"),
 }
 
-ARMOURY = [
-    ("AxeBronze", "an axe, for trees"),
-    ("Club", "a club, for creatures"),
-    ("Bow", "a bow"),
-    ("ArrowWood", "arrows for it"),
-    ("PickaxeBronze", "a pickaxe, for rock"),
-    ("Hammer", "a hammer, for building"),
-    ("Cultivator", "a cultivator"),
-    ("Torch", "a torch"),
-]
+COMPACT_STATION_NOTES = {
+    "Combat": "Greyling at the rune; bow and arrows at the spoke mouth",
+    "Harvest": "birch and bronze axe beside the arrival portal",
+    "Building": "hammer and wood directly in front of the bench",
+    "Crafting": "coal directly in front of the smelter",
+    "Progression": "nearby course actions raise skills",
+    "Social": "the hub sign says sign here",
+}
 
 SCHOOL_COLOURS = {
     "Combat": (1.00, 0.28, 0.22),
@@ -150,24 +148,24 @@ PROFILE_SPECS = [
     {
         "id": "marble-grand",
         "name": "Marble grand",
-        "description": "Selected large court: 10 m halls, a raised all-marble floor, monumental runes, and illuminated horizontal rune headers.",
-        "ring_radius": 62.0,
+        "description": "Selected compact court: 10 m halls with quarter-length walks, a raised all-marble floor, monumental runes, and interaction-local supplies.",
+        "ring_radius": 27.0,
         "rune_width": 14.0,
         "rune_height": 17.0,
         "rune_base_y": 1.0,
         "platform_clearance": 3.0,
         "rune_name_headers": True,
+        "compact_course": True,
         "beam_length": 2.0,
-        "station_inset": 10.0,
-        "rack_radius": 10.0,
+        "station_inset": 3.0,
         "tile": 2.0,
-        "plaza_radius": 17.0,
+        "plaza_radius": 14.0,
         "hall_half_width": 5.0,
-        "pad_half_width": 13.0,
-        "pad_depth": 16.0,
-        "rune_gap": 6.0,
-        "stage_depth": 14.0,
-        "stage_half_width": 14.0,
+        "pad_half_width": 8.0,
+        "pad_depth": 8.0,
+        "rune_gap": 3.0,
+        "stage_depth": 8.0,
+        "stage_half_width": 8.0,
         "wall_courses": 3,
         "floor": {
             "plaza": "blackmarble_floor",
@@ -185,7 +183,7 @@ BACKDROP_ROWS = 2
 WING_ROWS = 2
 WALL_INSET = 0.5
 WALL_YAW_OFFSET = 90.0
-EXTRA_PLACED_OBJECTS = 32  # 3 portals + 8 stations + 8 stands + 8 items + 5 supplies
+FIXED_PLACED_OBJECTS = 11  # 3 portals + 8 school stations
 
 
 def read_rune_segments(path: Path) -> dict[str, list[tuple[float, float, float, float]]]:
@@ -258,6 +256,18 @@ def build_monuments(spec: dict, segments: dict):
         beams, (cx, cz) = monument_beams(segments[category], angle, spec)
         radians = math.radians(angle)
         prefab, kind, note = STATIONS[category]
+        if spec.get("compact_course"):
+            note = COMPACT_STATION_NOTES.get(category, note)
+        station_radius = spec["ring_radius"] - spec["station_inset"]
+        station_x = station_radius * math.sin(radians)
+        station_z = station_radius * math.cos(radians)
+        station_yaw = (angle + 180.0) % 360.0
+        station_text = ""
+        if spec.get("compact_course") and category == "Harvest":
+            station_x, station_z, station_yaw = 8.0, 0.0, 0.0
+        elif spec.get("compact_course") and category == "Social":
+            station_x, station_z, station_yaw = 3.5, 6.0, 180.0
+            station_text = "sign here"
         monuments.append(
             {
                 "category": category,
@@ -269,28 +279,59 @@ def build_monuments(spec: dict, segments: dict):
                     "prefab": prefab,
                     "kind": kind,
                     "note": note,
-                    "x": round((spec["ring_radius"] - spec["station_inset"]) * math.sin(radians), 3),
-                    "z": round((spec["ring_radius"] - spec["station_inset"]) * math.cos(radians), 3),
+                    "x": round(station_x, 3),
+                    "z": round(station_z, 3),
+                    "yaw": round(station_yaw, 3),
+                    "text": station_text,
                 },
             }
         )
     return monuments
 
 
-def build_armoury(spec: dict):
-    rack = []
-    for index, (item, note) in enumerate(ARMOURY):
-        angle = 2.0 * math.pi * index / len(ARMOURY)
-        rack.append(
-            {
-                "item": item,
-                "note": note,
-                "x": round(spec["rack_radius"] * math.sin(angle), 3),
-                "z": round(spec["rack_radius"] * math.cos(angle), 3),
-                "yaw": round((math.degrees(angle) + 180.0) % 360.0, 1),
-            }
-        )
-    return rack
+def build_course_drops(spec: dict):
+    """Put each consumable where its interaction happens, not in a central gear ring."""
+
+    def spoke(category: str, along: float, across: float = 0.0) -> tuple[float, float]:
+        angle = math.radians(ORDER.index(category) * (360.0 / len(ORDER)))
+        sx, sz = math.sin(angle), math.cos(angle)
+        px, pz = math.cos(angle), -math.sin(angle)
+        return sx * along + px * across, sz * along + pz * across
+
+    def item(prefab: str, x: float, z: float, stack: int, note: str) -> dict:
+        return {
+            "prefab": prefab,
+            "note": note,
+            "x": round(x, 3),
+            "y": 0.4,
+            "z": round(z, 3),
+            "stack": stack,
+        }
+
+    station_radius = spec["ring_radius"] - spec["station_inset"]
+    combat_ready = spec["plaza_radius"] + 2.0
+    building_ready = station_radius - 3.0
+    crafting_ready = station_radius - 3.0
+    bow_x, bow_z = spoke("Combat", combat_ready, -1.2)
+    arrow_x, arrow_z = spoke("Combat", combat_ready, 1.2)
+    hammer_x, hammer_z = spoke("Building", building_ready, -1.2)
+    wood_x, wood_z = spoke("Building", building_ready, 1.2)
+    coal_x, coal_z = spoke("Crafting", crafting_ready)
+    axe_x, axe_z = (6.2, 1.4) if spec.get("compact_course") else spoke(
+        "Harvest", station_radius - 3.0
+    )
+
+    return [
+        item("AxeBronze", axe_x, axe_z, 1, "bronze axe beside the arrival birch"),
+        item("Bow", bow_x, bow_z, 1, "bow on the player side of the combat spoke"),
+        item("ArrowWood", arrow_x, arrow_z, 100, "arrows beside the combat bow"),
+        item("Hammer", hammer_x, hammer_z, 1, "hammer in front of the building bench"),
+        item("Wood", wood_x, wood_z, 50, "wood beside the building hammer"),
+        item("Coal", coal_x, coal_z, 20, "coal directly in front of the smelter"),
+        item("CookedMeat", 1.5, 3.5, 10, "health food at the arrival hub"),
+        item("QueensJam", 3.5, 3.5, 10, "stamina food at the arrival hub"),
+        item("Honey", 5.5, 3.5, 10, "quick stamina food at the arrival hub"),
+    ]
 
 
 def platform_tiles(spec: dict, monuments: list[dict]):
@@ -480,7 +521,7 @@ def build_profile(spec: dict, segments: dict):
         + hall_signs(spec, monuments)
         + rune_name_signs(spec, monuments)
     )
-    armoury = build_armoury(spec)
+    course_drops = build_course_drops(spec)
     beam_count = sum(len(monument["beams"]) for monument in monuments)
     footprint = (
         spec["ring_radius"]
@@ -499,13 +540,16 @@ def build_profile(spec: dict, segments: dict):
         "platformClearance": spec["platform_clearance"],
         "beamLength": spec["beam_length"],
         "hallWidth": spec["hall_half_width"] * 2.0,
+        "spokeLength": (
+            spec["ring_radius"] - spec["pad_depth"] / 2.0 - spec["plaza_radius"]
+        ),
         "floorMaterials": floor_materials,
         "solidMarbleFloor": floor_materials == ["blackmarble_floor"],
         "footprintRadius": footprint,
         "monuments": monuments,
         "tiles": tiles,
         "fixtures": fixtures,
-        "armoury": armoury,
+        "courseDrops": course_drops,
         "counts": {
             "floorTiles": len(tiles),
             "fixtures": len(fixtures),
@@ -515,8 +559,14 @@ def build_profile(spec: dict, segments: dict):
                 fixture["orient"].startswith("rune-name") for fixture in fixtures
             ),
             "runeNameLights": sum(bool(fixture["lightSchool"]) for fixture in fixtures),
-            "armouryStands": len(armoury),
-            "estimatedPlacedObjects": len(tiles) + len(fixtures) + beam_count + EXTRA_PLACED_OBJECTS,
+            "courseDrops": len(course_drops),
+            "estimatedPlacedObjects": (
+                len(tiles)
+                + len(fixtures)
+                + beam_count
+                + len(course_drops)
+                + FIXED_PLACED_OBJECTS
+            ),
         },
     }
 
@@ -524,11 +574,11 @@ def build_profile(spec: dict, segments: dict):
 def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
     data = json.loads(dump_path.read_text(encoding="utf-8"))
     entries = {entry["name"]: entry for entry in data.get("prefabs", [])}
-    wanted = set(COMMON_PALETTE.values()) | {"itemstand", "wood_floor", "wood_pole"}
+    wanted = set(COMMON_PALETTE.values()) | {"wood_floor", "wood_pole"}
     wanted.update(prefab for prefab, _, _ in STATIONS.values())
-    wanted.update(item for item, _ in ARMOURY)
     for profile in profiles:
         wanted.update(profile["floorMaterials"])
+        wanted.update(item["prefab"] for item in profile["courseDrops"])
     missing = sorted(wanted - set(entries))
     if missing:
         raise SystemExit("gallery prefab(s) absent from dump: " + ", ".join(missing))
@@ -602,22 +652,24 @@ def render_csharp(profiles: list[dict]) -> str:
         "",
         "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
         "public static class LabGalleryPlan {",
-        "  public const int PlanVersion = 2;",
+        "  public const int PlanVersion = 3;",
         f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
         "",
         "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",
-        "  public struct Station { public string Prefab, Kind, Note; public float X, Z; }",
+        "  public struct Station { public string Prefab, Kind, Note, Text;",
+        "                          public float X, Z, Yaw; }",
         "  public struct Monument { public string Category; public float Angle, Cx, Cz;",
         "                           public float R, G, B;",
         "                           public Beam[] Beams; public Station Station; }",
-        "  public struct RackItem { public string Item, Note; public float X, Z, Yaw; }",
+        "  public struct CourseDrop { public string Prefab, Note;",
+        "                             public float X, Y, Z; public int Stack; }",
         "  public struct Tile { public float X, Z; public string Prefab; }",
         "  public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;",
         "                          public string Orient, Text, LightSchool; }",
         "",
         "  public sealed class Profile {",
         "    public string Id, Name, Description;",
-        "    public float RingRadius, RuneHeight, BeamLength, HallWidth, FootprintRadius;",
+        "    public float RingRadius, RuneHeight, BeamLength, HallWidth, SpokeLength, FootprintRadius;",
         "    public float PlatformClearance;",
         "    public bool SolidMarbleFloor;",
         "    public int EstimatedPlacedObjects, RuneNameHeaders, RuneNameSigns, RuneNameLights;",
@@ -625,7 +677,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "    public Monument[] Monuments;",
         "    public Tile[] PlatformTiles;",
         "    public Fixture[] Fixtures;",
-        "    public RackItem[] Armoury;",
+        "    public CourseDrop[] CourseDrops;",
         "  }",
         "",
         "  public static readonly Profile[] Profiles = {",
@@ -638,6 +690,7 @@ def render_csharp(profiles: list[dict]) -> str:
                 f"      Description = {cs(profile['description'])},",
                 f"      RingRadius = {f(profile['ringRadius'])}, RuneHeight = {f(profile['runeHeight'])},",
                 f"      BeamLength = {f(profile['beamLength'])}, HallWidth = {f(profile['hallWidth'])},",
+                f"      SpokeLength = {f(profile['spokeLength'])},",
                 f"      PlatformClearance = {f(profile['platformClearance'])},",
                 f"      FootprintRadius = {f(profile['footprintRadius'])},",
                 f"      SolidMarbleFloor = {str(profile['solidMarbleFloor']).lower()},",
@@ -662,7 +715,8 @@ def render_csharp(profiles: list[dict]) -> str:
                     f"          R = {f(red)}, G = {f(green)}, B = {f(blue)},",
                     "          Station = new Station { "
                     f"Prefab = {cs(station['prefab'])}, Kind = {cs(station['kind'])}, "
-                    f"Note = {cs(station['note'])}, X = {f(station['x'])}, Z = {f(station['z'])} }},",
+                    f"Note = {cs(station['note'])}, Text = {cs(station['text'])}, "
+                    f"X = {f(station['x'])}, Z = {f(station['z'])}, Yaw = {f(station['yaw'])} }},",
                     "          Beams = new[] {",
                 ]
             )
@@ -691,12 +745,13 @@ def render_csharp(profiles: list[dict]) -> str:
                 f"Z = {f(item['z'])}, Yaw = {f(item['yaw'])}, "
                 f"Orient = {cs(item['orient'])}, Text = {cs(item['text'])}{light} }},"
             )
-        lines.extend(["      },", "      Armoury = new[] {"])
-        for item in profile["armoury"]:
+        lines.extend(["      },", "      CourseDrops = new[] {"])
+        for item in profile["courseDrops"]:
             lines.append(
-                "        new RackItem { "
-                f"Item = {cs(item['item'])}, Note = {cs(item['note'])}, X = {f(item['x'])}, "
-                f"Z = {f(item['z'])}, Yaw = {f(item['yaw'])} }},"
+                "        new CourseDrop { "
+                f"Prefab = {cs(item['prefab'])}, Note = {cs(item['note'])}, "
+                f"X = {f(item['x'])}, Y = {f(item['y'])}, Z = {f(item['z'])}, "
+                f"Stack = {item['stack']} }},"
             )
         lines.extend(["      },", "    },"])
     lines.extend(
@@ -717,7 +772,7 @@ def render_csharp(profiles: list[dict]) -> str:
             "  public static Monument[] Monuments { get { return Find(DefaultProfileId).Monuments; } }",
             "  public static Tile[] PlatformTiles { get { return Find(DefaultProfileId).PlatformTiles; } }",
             "  public static Fixture[] Fixtures { get { return Find(DefaultProfileId).Fixtures; } }",
-            "  public static RackItem[] Armoury { get { return Find(DefaultProfileId).Armoury; } }",
+            "  public static CourseDrop[] CourseDrops { get { return Find(DefaultProfileId).CourseDrops; } }",
             "  public static float RuneHeight { get { return Find(DefaultProfileId).RuneHeight; } }",
             "}",
             "",
@@ -742,6 +797,7 @@ def summary_model(profiles: list[dict]) -> dict:
                     "runeHeight",
                     "platformClearance",
                     "hallWidth",
+                    "spokeLength",
                     "footprintRadius",
                     "floorMaterials",
                     "solidMarbleFloor",
@@ -796,13 +852,25 @@ def render_previews(profiles: list[dict]) -> None:
                 draw.text((px - len(label) * 3, pz - 6), label, fill=(210, 215, 220))
         for monument in profile["monuments"]:
             color = colors[monument["category"]]
+            station_x, station_z = point(
+                monument["station"]["x"], monument["station"]["z"]
+            )
+            draw.rectangle(
+                [station_x - 4, station_z - 4, station_x + 4, station_z + 4],
+                fill=color,
+                outline=(245, 245, 245),
+            )
             for beam in monument["beams"]:
                 px, pz = point(beam["x"], beam["z"])
                 draw.ellipse([px - 2, pz - 2, px + 2, pz + 2], fill=color)
+        for drop in profile["courseDrops"]:
+            px, pz = point(drop["x"], drop["z"])
+            draw.ellipse([px - 3, pz - 3, px + 3, pz + 3], fill=(255, 220, 90))
         draw.text((12, 10), f"{profile['name']} ({profile['id']})", fill=(235, 240, 238))
         draw.text(
             (12, size - 24),
-            f"{profile['hallWidth']:.0f} m halls | {profile['counts']['estimatedPlacedObjects']} objects",
+            f"{profile['hallWidth']:.0f} m halls | {profile['spokeLength']:.0f} m walks | "
+            f"{profile['counts']['estimatedPlacedObjects']} objects",
             fill=(155, 170, 167),
         )
         path = HERE / "samples" / f"gallery-plan-{profile['id']}.png"

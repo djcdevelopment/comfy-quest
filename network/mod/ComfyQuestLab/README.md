@@ -22,9 +22,10 @@ did — and whether a quest could actually fire on it.
 >
 > Stable event name, resolved target, skill, and verdict — a builder learns in one glance
 > that the game sees the hit and which quest vocabulary binds to it. The original gallery
-> build also completed (620 pieces), its ground-to-plaza portal pair connected, and the
-> structure stood rather than decaying. Gallery v2 is now generated and headless-verified,
-> but its larger marble profiles still await the live comparison receipt described below.
+> build completed (620 pieces), its ground-to-plaza portal pair connected, and the structure
+> stood rather than decaying. Live comparison then selected the raised `marble-grand` court;
+> its marked-object clear/rebuild lifecycle has returned a player safely to terrain and
+> removed 5,860 accumulated objects without requiring a new patch of ground.
 >
 > **Combat and the quest lane verified in game 2026-08-08.** All four combat seams fired in
 > one fight — `OnDeath`, `Damage`, `RPC_Damage`, `Stagger` — and the seeded quest completed
@@ -33,12 +34,12 @@ did — and whether a quest could actually fire on it.
 > `$enemy_greyling` with no prefab name beside it, because that token already contains
 > `Greyling` — the "stay quiet when they agree" case.
 >
-> **Live receipt boundary:** combat, harvest, gallery construction, and the original kill
-> quest have in-game receipts. The 2026-08-08 expansion has headless coverage and a clean
-> game-assembly build; inventory, building, crafting, progression, world, and social still
-> require the bounded i5 live suite before they become witnessed claims. Item stands stay bare
-> (`SetVisualItem` is a registered RPC, not a callable method; the gear is dropped beside
-> them instead). This README describes what is here, not what is planned.
+> **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
+> events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
+> and zero same-action double completions. The synthetic shared-contract suite also passed
+> 34/34 creator events. r8 changes presentation and course layout, so those same suites must
+> be re-witnessed against the exact r8 DLL before the release cut is final. This README
+> distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
 ## Why this exists
 
@@ -69,7 +70,7 @@ update.
 
 | | |
 | --- | --- |
-| `lab_setup` | raise the practice gallery and write you a starter quest file. Do this first. |
+| `lab_setup` | write the starter quest, safely clear marked old builds, and raise one fresh compact practice course on the same site. Do this first. |
 | **F6** | open the console (or `questlab_panel`) |
 | `lab_reload` | re-read your quest files and say what changed |
 | `lab_target [school]` | put a fresh practice target in front of you (default: combat) |
@@ -85,7 +86,7 @@ update.
 | `questlab_gallery clear [profile-or-build-id]` | return safely to the terrain below, then remove only matching marked gallery objects |
 | `questlab_gallery rebuild [profile]` | safely clear and rebuild one profile at the same reusable site |
 | `questlab_batch suites` | list the two bounded evidence classes |
-| `questlab_batch prepare all-schools` | write eight ordinary example quests, raise a gallery if needed, refresh the Greyling and birch, and stage supplies |
+| `questlab_batch prepare all-schools` | write eight ordinary example quests, safely reset the marked site, and raise one fresh compact course with targets and supplies at point of use |
 | `questlab_batch run [all-schools\|creator-events]` | start live witnessing or run the explicitly synthetic 34-event contract probe |
 | `questlab_batch reset\|report\|export` | reset safely, show progress, or write a machine-readable receipt |
 
@@ -95,7 +96,9 @@ panel. Two different keys, and mixing them up is the most common first stumble.
 Opening the panel explicitly hands mouse and player input to the Lab: the cursor unlocks,
 camera look and gameplay clicks stop, and the previous cursor state is restored on **F6**,
 **Escape**, or the visible **Close** button. The high-contrast window opens at 900×620 and
-the lower-right handle resizes it within the current screen.
+the lower-right handle resizes it within the current screen. The visible **− / +** controls
+zoom the whole panel from 65–200% in 10% steps; the choice is saved as `panelScale`, so a
+windowed/1080p creator and a 4K creator can tune the same grid independently.
 
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Every page lists what the world answers to in that school and marks
@@ -142,10 +145,18 @@ fails if any of the 57 safe or 86 practical signatures loses runtime coverage.
 Gallery geometry is generated from the same eight rune definitions used by the panel.
 `classic` keeps the prior mixed-material shape as a comparison baseline. `marble-wide`
 has a solid black-marble floor, 8 m halls, larger runes, 1.5 m terrain clearance, and
-about 2,303 placed objects. The visually preferred `marble-grand` is now the default:
-10 m halls, a 3 m clearance over the highest sampled ground, monumental runes, horizontal
+about 2,291 placed objects. The selected `marble-grand` direction is the default: it keeps
+10 m halls, 3 m clearance over the highest sampled ground, monumental runes, and horizontal
 school-name headers built from individually readable letters with one coloured light per
-word, and about 3,671 objects.
+word, but compresses each hub-to-station walk from 37 m to 9 m. Its 1,349 marked objects fit
+within a 48 m footprint.
+
+The default is a course rather than an empty monument. The arrival portal puts a birch,
+bronze axe, and cooked meat/Queens Jam/honey within a few steps. Combat leaves a bow and 100
+wood arrows on the player's side with its Greyling at the rune. Building pairs its hammer
+and wood, Crafting puts coal directly in front of the smelter, and Social puts a `sign here`
+signpost in the hub. Every consumable is recreated by `lab_setup` or batch `prepare`, so a
+creator never needs prior inventory or a scavenger hunt.
 
 Every object carries the plan version, profile id, and build id in its own ZDO. `identify`
 reads those durable marks from the locally known ZDO table; `clear` accepts either a profile or
@@ -154,6 +165,9 @@ sides one shared build id, so it can come down in one bounded operation. If the 
 is standing on the selected raised floor, `clear` first uses Valheim's replicated teleport to
 return them to the natural terrain at the same X/Z; deletion starts only after that target is
 verified. `rebuild` inherits the same lifecycle, allowing one patch of ground to be reused.
+`lab_setup` and `questlab_batch prepare all-schools` apply that lifecycle to selector `all`
+before every build, so old comparisons, spent targets, and abandoned drops cannot leak into
+the next test.
 Generated counts
 and previews live in
 [`gallery-profiles.json`](../../../tools/component-packets/samples/gallery-profiles.json)
@@ -161,8 +175,8 @@ and `gallery-plan-comparison.png`; `generate_gallery.py --check` guards plan dri
 
 ## Bounded suites and receipts
 
-`all-schools` prepares one schema-1, source-compatible example quest per school, fresh
-combat/harvest targets, and the fixed supply stacks. A run
+`all-schools` prepares one schema-1, source-compatible example quest per school and safely
+rebuilds the compact course with fresh targets and interaction-local supplies. A run
 clears router/evaluator state, uses a volatile zero cooldown without changing the creator's
 config, and waits for real game actions. The receipt requires both the canonical event and
 its example quest completion in every school. It records raw signatures, canonical action
@@ -259,6 +273,7 @@ and pausing drops nothing — the ring keeps collecting behind it.
 | --- | --- | --- |
 | `enabled` | `true` | Master switch. OFF drops every observation. |
 | `panelShortcut` | `F6` | F7 is taken by the retired control surface. `None` = console commands only. |
+| `panelScale` | `1` | Whole-panel zoom, 0.65–2.00. The in-panel − / + buttons change and persist it in 10% steps. |
 | `consoleRows` | `18` | Rows on screen; the ring holds 8× that so you can scroll back. |
 | `galleryPiecesPerFrame` | `24` | Gallery objects placed per frame, clamped to 1–200. Lower it on a slower client. |
 | `blueprintPiecesPerFrame` | `12` | Blueprint objects placed per frame, clamped to 1–200. |

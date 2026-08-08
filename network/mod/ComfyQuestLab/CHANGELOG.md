@@ -26,7 +26,8 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   core/extended/diagnostic profiles, emits stable event names, and coalesces local/RPC or overload
   witnesses before quest evaluation. Diagnostic-only witnesses are structurally non-bindable;
   four query/cheat signatures remain deliberately disabled. Headless and assembly-build receipts
-  are complete; the six schools beyond combat and harvest still need bounded i5 live receipts.
+  are complete. An exact-r4 OMEN run witnessed 8/8 schools and completed 8/8 ordinary example
+  quests with zero same-action doubles; the final r8 cut still owes its exact-release re-witness.
 - **Gallery v2 is profile-driven and reversible.** The generated `classic`, `marble-wide`,
   and `marble-grand` plans retain the proven geometry as a baseline while adding solid
   black-marble floors, 8–10 m halls, larger rings, and larger runes. Runtime commands can
@@ -40,24 +41,33 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
   raised it 3 m over the highest sampled terrain. Its screenshot then caught the vanilla
   one-metre sign wrapping whole school names vertically. r6 generates one sign per letter
   in a centred horizontal row and gives each word one school-coloured light. The corrected
-  headers remain subject to the final visual pass.
+  headers remain subject to the final visual pass. r8 keeps the selected 10 m halls and
+  monumental runes while shortening each grand hub-to-station walk from 37 m to 9 m and
+  reducing the marked build from 3,671 to 1,349 objects. Its portal-side birch/axe/food,
+  player-side bow/arrows, building hammer/wood, smelter coal, and hub `sign here` sign turn
+  the court into a short self-explaining course rather than a supply hunt.
 - **Gallery sites are reusable.** r7 makes console and batch clear asynchronous and safe:
   when the local player is standing on the selected raised floor, the command finds the
   terrain-only height at the same X/Z, completes and verifies Valheim's own replicated
   teleport, and only then removes marked objects. `rebuild` uses the same lifecycle. A
   refused or incomplete terrain return leaves the gallery standing instead of dropping the
   player, so repeated visual batches no longer require fresh ground or a manual portal exit.
+  The first exact-r7 live clear returned to terrain and removed all 5,860 accumulated pieces,
+  then exposed that the request receipt sampled the ZDO table before Valheim retired queued
+  destroys. r8 waits a bounded five seconds for that retirement and only passes the lifecycle
+  when no matching marked object remains.
 - **The panel is an interactive tool, not a translucent overlay.** r6 uses a nearly opaque
   high-contrast surface, larger default dimensions, a bounded lower-right resize handle,
   and a spreadsheet-style live-event grid with stable columns and explicit BINDABLE /
   DIAGNOSTIC verdicts. Opening it now acquires cursor/input ownership, resets held buttons,
   blocks camera/player actions, and restores the previous cursor state on F6, Escape, the
   Close button, disable, or plugin teardown. It retains native IMGUI and adds no Jötunn
-  dependency.
+  dependency. r8 adds visible − / + whole-panel zoom from 65–200%, persisted in config, so
+  creators can tune windowed, 1080p, and 4K layouts without editing a file.
 - **Bounded batch evidence is self-service.** `questlab_batch` can prepare, run, reset,
   report, and export two explicit suites. `all-schools` installs eight ordinary bindable
-  example quests, refreshes the consumable Greyling/birch targets, prepares the gallery and
-  supplies, and receipts real router witnesses
+  example quests, safely clears every marked old build, raises a fresh compact course with
+  targets and supplies staged at point of use, and receipts real router witnesses
   separately from quest completions. `creator-events` probes all 34 safe events through the
   shared evaluator and labels the result synthetic. The live lane temporarily uses zero
   cooldown in memory so local/RPC double completion cannot hide behind normal cooldown, then

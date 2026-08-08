@@ -106,32 +106,33 @@ public sealed class LabBatchController {
       yield break;
     }
 
-    if (_gallery.StandingPieceCount() == 0) {
-      ComfyQuestLab.Report("No gallery is standing here; preparing the default "
-          + LabGalleryPlan.DefaultProfileId + " profile as this suite's practice ground.");
-      IEnumerator build = _gallery.Build(host, LabGalleryPlan.DefaultProfileId);
-      while (true) {
-        bool moved;
-        object current = null;
-        try {
-          moved = build.MoveNext();
-          if (moved) current = build.Current;
-        } catch (Exception ex) {
-          _preparing = false;
-          ComfyQuestLab.Report("gallery preparation failed: " + ex.Message);
-          yield break;
-        }
-        if (!moved) break;
-        yield return current;
+    ComfyQuestLab.Report("Resetting marked Gallery objects and raising one fresh compact course "
+        + "with targets, tools, fuel, building materials, and food staged in place.");
+    IEnumerator reset = _gallery.ResetSite(host, LabGalleryPlan.DefaultProfileId);
+    while (true) {
+      bool moved;
+      object current = null;
+      try {
+        moved = reset.MoveNext();
+        if (moved) current = reset.Current;
+      } catch (Exception ex) {
+        _preparing = false;
+        ComfyQuestLab.Report("gallery preparation failed: " + ex.Message);
+        yield break;
       }
+      if (!moved) break;
+      yield return current;
+    }
+    if (!_gallery.LastLifecycleSucceeded || _gallery.StandingPieceCount() == 0) {
+      _preparing = false;
+      ComfyQuestLab.Report("gallery preparation did not produce a verified fresh course.");
+      yield break;
     }
 
-    string targets = _gallery.PrepareBatchTargets();
-    string supplies = _gallery.PrepareBatchSupplies();
     _preparedSuiteId = suite.Id;
     _preparing = false;
-    ComfyQuestLab.Report("prepared " + suite.Id + ": " + reload + " " + targets + " "
-        + supplies + "\n"
+    ComfyQuestLab.Report("prepared " + suite.Id + ": " + reload
+        + " Fresh compact course verified.\n"
         + Instructions(suite));
   }
 

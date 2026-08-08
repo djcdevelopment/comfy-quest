@@ -48,15 +48,19 @@ class GalleryProfileTests(unittest.TestCase):
                 self.assertTrue(profile["solidMarbleFloor"])
                 self.assertEqual(profile["floorMaterials"], ["blackmarble_floor"])
 
-    def test_scale_and_halls_grow_monotonically(self) -> None:
+    def test_selected_profile_keeps_scale_but_quarters_the_walk(self) -> None:
         classic = self.profiles["classic"]
         wide = self.profiles["marble-wide"]
         grand = self.profiles["marble-grand"]
-        for field in ("ringRadius", "runeHeight", "hallWidth", "footprintRadius"):
+        for field in ("runeHeight", "hallWidth"):
             with self.subTest(field=field):
                 self.assertLess(classic[field], wide[field])
                 self.assertLess(wide[field], grand[field])
         self.assertGreaterEqual(wide["hallWidth"], classic["hallWidth"] * 2)
+        self.assertEqual(grand["ringRadius"], 27.0)
+        self.assertEqual(grand["spokeLength"], 9.0)
+        self.assertLessEqual(grand["spokeLength"], 37.0 / 4.0)
+        self.assertLess(grand["footprintRadius"], classic["footprintRadius"])
         self.assertLess(classic["platformClearance"], wide["platformClearance"])
         self.assertLess(wide["platformClearance"], grand["platformClearance"])
         self.assertGreaterEqual(grand["platformClearance"], 3.0)
@@ -89,27 +93,26 @@ class GalleryProfileTests(unittest.TestCase):
                 self.assertEqual(counts["runeNameLights"], 8)
 
     def test_estimates_account_for_every_placed_object(self) -> None:
-        # Build places one object for each generated floor/fixture/beam, two per armoury
-        # entry (stand + loose item), eight stations, three entrance/arrival portals,
-        # and five material supplies.
+        # Build places one object for each generated floor/fixture/beam/course drop,
+        # plus eight school stations and three entrance/arrival portals.
         for profile in self.profiles.values():
             counts = profile["counts"]
             expected = (
                 counts["floorTiles"]
                 + counts["fixtures"]
                 + counts["runeBeams"]
-                + counts["armouryStands"] * 2
-                + 8
-                + 3
-                + 5
+                + counts["courseDrops"]
+                + 11
             )
             self.assertEqual(counts["estimatedPlacedObjects"], expected)
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 2;", source)
+        self.assertIn("public const int PlanVersion = 3;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
         self.assertIn("public float PlatformClearance;", source)
+        self.assertIn("HallWidth, SpokeLength, FootprintRadius", source)
+        self.assertIn("public CourseDrop[] CourseDrops;", source)
         self.assertIn("RuneNameHeaders, RuneNameSigns, RuneNameLights;", source)
         self.assertEqual(source.count('Orient = "rune-name-lit"'), 16)
         self.assertEqual(source.count('Orient = "rune-name",'), 104)
@@ -117,9 +120,30 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("public static Profile Find(string id)", source)
         self.assertIn("public static Monument[] Monuments", source)
 
+    def test_compact_course_stages_every_interaction_at_point_of_use(self) -> None:
+        plan = PLAN.read_text(encoding="utf-8")
+        builder = BUILDER.read_text(encoding="utf-8")
+        for marker in (
+            'Text = "sign here", X = 3.5f, Z = 6f',
+            'Prefab = "AxeBronze", Note = "bronze axe beside the arrival birch", X = 6.2f',
+            'Prefab = "Bow", Note = "bow on the player side of the combat spoke"',
+            'Prefab = "ArrowWood", Note = "arrows beside the combat bow"',
+            'Prefab = "Hammer", Note = "hammer in front of the building bench"',
+            'Prefab = "Wood", Note = "wood beside the building hammer"',
+            'Prefab = "Coal", Note = "coal directly in front of the smelter"',
+            'Prefab = "CookedMeat"',
+            'Prefab = "QueensJam"',
+            'Prefab = "Honey"',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, plan)
+        self.assertIn("foreach (LabGalleryPlan.CourseDrop item", builder)
+        self.assertIn("SetStack(drop, item.Stack)", builder)
+
     def test_runtime_reports_clearance_and_horizontal_headers(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")
         self.assertIn('Append(" m terrain clearance, ")', source)
+        self.assertIn('Append(" m hub-to-station walks, ")', source)
         self.assertIn('+ " horizontal rune headers ("', source)
         self.assertIn("LabRuneLight.Mark(headerView.GetZDO(), fixture.LightSchool)", source)
         self.assertIn("LabRuneLight.Apply(built, fixture.LightSchool)", source)
@@ -174,6 +198,11 @@ class GalleryProfileTests(unittest.TestCase):
             lifecycle.index("ReachedTerrainRetreat(player, retreat)"),
             lifecycle.index("ClearMarked(selector)"),
         )
+        self.assertIn("while (StandingPieceCount(selector) > 0", lifecycle)
+        self.assertLess(
+            lifecycle.index("ClearMarked(selector)"),
+            lifecycle.index("_lastLifecycleSucceeded = remaining == 0"),
+        )
         self.assertIn("ZoneSystem.instance.GetGroundHeight(at, out height)", source)
         self.assertIn("finally {\n      _running = false;", lifecycle)
 
@@ -184,13 +213,16 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("_gallery.LastLifecycleSucceeded", controller)
         self.assertIn("StartCoroutine(_gallery.ClearSafely(value));", plugin)
 
-    def test_batch_prepare_refreshes_consumable_targets(self) -> None:
+    def test_setup_and_batch_prepare_reset_one_fresh_course(self) -> None:
         builder = BUILDER.read_text(encoding="utf-8")
         controller = CONTROLLER.read_text(encoding="utf-8")
-        self.assertIn("public string PrepareBatchTargets()", builder)
-        self.assertIn("Restock(LabCategory.Combat)", builder)
-        self.assertIn("Restock(LabCategory.Harvest)", builder)
-        self.assertIn("_gallery.PrepareBatchTargets()", controller)
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        self.assertIn("public IEnumerator ResetSite", builder)
+        self.assertIn('IEnumerator clear = ClearSafely("all")', builder)
+        self.assertIn("_gallery.ResetSite(host, LabGalleryPlan.DefaultProfileId)", controller)
+        self.assertIn("_gallery.ResetSite(this, LabGalleryPlan.DefaultProfileId)", plugin)
+        self.assertNotIn("PrepareBatchTargets", controller)
+        self.assertNotIn("PrepareBatchSupplies", controller)
 
     def test_request_receipts_pin_release_and_do_not_leak_stale_suite_paths(self) -> None:
         controller = CONTROLLER.read_text(encoding="utf-8")

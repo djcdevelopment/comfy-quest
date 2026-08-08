@@ -30,6 +30,9 @@ public sealed class LabPanel {
   const float SchoolColumn = 112f;
   const float EventColumn = 180f;
   const float UseColumn = 116f;
+  const float MinPanelScale = 0.65f;
+  const float MaxPanelScale = 2f;
+  const float PanelScaleStep = 0.1f;
 
   readonly LabEventRing _ring;
   readonly HashSet<string> _visible = new HashSet<string>(LabCategory.DefaultVisible);
@@ -47,6 +50,7 @@ public sealed class LabPanel {
   Vector2 _resizeStartSize;
   float _requestedWidth = -1f;
   float _requestedHeight = -1f;
+  float _drawScale = 1f;
   Texture2D _windowBackground;
   Texture2D _gridHeaderBackground;
   Texture2D _gridEvenBackground;
@@ -112,28 +116,32 @@ public sealed class LabPanel {
     InputGuard.MaintainPanelInput();
     EnsureStyles();
 
+    _drawScale = CurrentPanelScale();
+    Matrix4x4 oldMatrix = GUI.matrix;
     GUIStyle label = GUI.skin.label;
     int oldFontSize = label.fontSize;
     bool oldWordWrap = label.wordWrap;
     Color oldLabelColor = label.normal.textColor;
     Color oldContentColor = GUI.contentColor;
     try {
+      GUI.matrix = Matrix4x4.Scale(new Vector3(_drawScale, _drawScale, 1f)) * oldMatrix;
       label.fontSize = 14;
       label.wordWrap = true;
       label.normal.textColor = new Color(0.94f, 0.96f, 1f, 1f);
       GUI.contentColor = Color.white;
-      _window = GUILayout.Window(WindowId, ClampWindow(_window), DrawWindow, "Quest Lab",
+      _window = GUILayout.Window(WindowId, ClampWindow(_window, _drawScale), DrawWindow, "Quest Lab",
           _windowStyle, GUILayout.MinWidth(MinWidth), GUILayout.MinHeight(MinHeight));
       if (_requestedWidth > 0f && _requestedHeight > 0f) {
         _window.width = _requestedWidth;
         _window.height = _requestedHeight;
       }
-      _window = ClampWindow(_window);
+      _window = ClampWindow(_window, _drawScale);
     } finally {
       label.fontSize = oldFontSize;
       label.wordWrap = oldWordWrap;
       label.normal.textColor = oldLabelColor;
       GUI.contentColor = oldContentColor;
+      GUI.matrix = oldMatrix;
     }
   }
 
@@ -168,6 +176,13 @@ public sealed class LabPanel {
     }
     GUILayout.FlexibleSpace();
     GUILayout.Label(_ring.Count + " held · " + _ring.TotalSeen + " seen · mouse active");
+    if (GUILayout.Button("-", GUILayout.Width(28f))) {
+      SetPanelScale(_drawScale - PanelScaleStep);
+    }
+    GUILayout.Label(Mathf.RoundToInt(_drawScale * 100f) + "%", GUILayout.Width(44f));
+    if (GUILayout.Button("+", GUILayout.Width(28f))) {
+      SetPanelScale(_drawScale + PanelScaleStep);
+    }
     if (GUILayout.Button("Close", GUILayout.Width(58f))) {
       GUILayout.EndHorizontal();
       Close();
@@ -601,7 +616,7 @@ public sealed class LabPanel {
 
     if (_resizing && current.type == EventType.MouseDrag) {
       Vector2 mouse = GUIUtility.GUIToScreenPoint(current.mousePosition);
-      Vector2 delta = mouse - _resizeStartMouse;
+      Vector2 delta = (mouse - _resizeStartMouse) / _drawScale;
       _requestedWidth = _resizeStartSize.x + delta.x;
       _requestedHeight = _resizeStartSize.y + delta.y;
       current.Use();
@@ -611,13 +626,32 @@ public sealed class LabPanel {
     }
   }
 
-  static Rect ClampWindow(Rect rect) {
-    float maxWidth = Mathf.Max(360f, Screen.width - 24f);
-    float maxHeight = Mathf.Max(280f, Screen.height - 24f);
+  static float CurrentPanelScale() {
+    try {
+      return Mathf.Clamp(LabConfig.PanelScale.Value, MinPanelScale, MaxPanelScale);
+    } catch (Exception) {
+      return 1f;
+    }
+  }
+
+  void SetPanelScale(float scale) {
+    scale = Mathf.Clamp(Mathf.Round(scale * 10f) / 10f, MinPanelScale, MaxPanelScale);
+    try {
+      LabConfig.PanelScale.Value = scale;
+    } catch (Exception) {
+    }
+    _window = ClampWindow(_window, scale);
+  }
+
+  static Rect ClampWindow(Rect rect, float scale) {
+    float logicalWidth = Screen.width / Mathf.Max(MinPanelScale, scale);
+    float logicalHeight = Screen.height / Mathf.Max(MinPanelScale, scale);
+    float maxWidth = Mathf.Max(360f, logicalWidth - 24f);
+    float maxHeight = Mathf.Max(280f, logicalHeight - 24f);
     rect.width = Mathf.Clamp(rect.width, Mathf.Min(MinWidth, maxWidth), maxWidth);
     rect.height = Mathf.Clamp(rect.height, Mathf.Min(MinHeight, maxHeight), maxHeight);
-    rect.x = Mathf.Clamp(rect.x, 0f, Mathf.Max(0f, Screen.width - rect.width));
-    rect.y = Mathf.Clamp(rect.y, 0f, Mathf.Max(0f, Screen.height - rect.height));
+    rect.x = Mathf.Clamp(rect.x, 0f, Mathf.Max(0f, logicalWidth - rect.width));
+    rect.y = Mathf.Clamp(rect.y, 0f, Mathf.Max(0f, logicalHeight - rect.height));
     return rect;
   }
 }
