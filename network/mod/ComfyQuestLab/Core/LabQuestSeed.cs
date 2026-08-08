@@ -5,23 +5,19 @@ using System.Text;
 
 /// <summary>The starter quest file <c>lab_setup</c> leaves behind, and the rule for writing it.
 ///
-/// <b>The seed is a lesson, not a template.</b> It holds exactly two quests and they are chosen
-/// to disagree with each other:
+/// <b>The seed is a lesson, not a template.</b> It holds two quests in different schools so the
+/// first authoring session proves that the contract is no longer kill-shaped:
 ///
 ///   first_blood    kill / Greyling        → ARMED, and it targets the creature standing under
 ///                                            the combat monument the gallery just raised. No
 ///                                            filters, so any kill fires it on the first try;
 ///                                            the requirements text names adding weapon_skill as
 ///                                            the next edit to make.
-///   punchwood      hit / tree_or_bush     → NOT ARMED, on purpose. The quest loader accepts
-///                                            "hit" without complaint and QuestTriggerEvaluator
-///                                            matches "kill" only, so a bush quest produces no
-///                                            error and no event. That trap is what the mod's
-///                                            README opens with, and reading about it teaches
-///                                            far less than opening the file it happened in.
+///   punchwood      hit / tree_or_bush     → ARMED through the schema-1 compatibility alias,
+///                                            accepting canonical resource_damaged events while
+///                                            keeping the old quest file unchanged.
 ///
-/// So a creator's first launch shows one quest that works, one that silently cannot, and the
-/// panel explaining the difference — against real files they can edit rather than prose.
+/// So a creator's first launch shows two working event shapes against real files they can edit.
 ///
 /// <b>The armed quest must target something the gallery supplies.</b> It first targeted a Neck,
 /// lifted from the test fixture because that was provably schema-valid — and the note here even
@@ -62,7 +58,7 @@ public static class LabQuestSeed {
         "quest_id": "punchwood",
         "name": "Punchwood",
         "category": "Starter",
-        "requirements": "Punch a tree with your bare hands. This one is NOT armed, deliberately. Nothing binds a 'hit' trigger to a quest today, so it will never fire - and nothing errors to tell you. That is the trap this lab exists to make visible. Change event to 'kill' and target to 'Greyling', then run lab_reload.",
+        "requirements": "Punch a tree with your bare hands. This schema-1 'hit' quest is ARMED: the shared contract keeps hit as an alias for resource_damaged, so your existing quest file did not need a rewrite. Type lab_target harvest for a fresh tree, then try changing target to 'bush' and run lab_reload.",
         "_note": "Every station in the gallery is one lab_target away from being replaced, so nothing here needs you to go looking for it.",
         "bot_command": "/comfy test summons_type:Punchwood image:",
         "auto_checked": false,

@@ -14,6 +14,7 @@ import re
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 ATLAS = os.path.join(HERE, "samples", "valheim-event-atlas.json")
+CAPABILITIES = os.path.join(HERE, "samples", "quest-capability-manifest.json")
 PAGES = os.path.join(HERE, "journal-pages.json")
 PATCHES = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Patches")
 OUT = os.path.join(REPO, "Lumberjacks", "src", "Game.Gateway", "Community", "questlab.html")
@@ -61,27 +62,34 @@ COLORS = {
 }
 
 atlas = json.load(open(ATLAS, encoding="utf-8"))
+capabilities = json.load(open(CAPABILITIES, encoding="utf-8"))
 _doc = json.load(open(PAGES, encoding="utf-8"))
 pages = _doc["pages"]
 incantations = _doc["incantations"]
 
 hooked = set()
-call = re.compile(r'LabPatching\.TryPatch\(\s*harmony,\s*typeof\(([A-Za-z0-9_.]+)\)\s*,\s*"([A-Za-z0-9_]+)"')
+call = re.compile(r'(?:LabPatching\.TryPatch|TryAtlasPatch)\(\s*harmony,\s*typeof\(([A-Za-z0-9_.]+)\)\s*,\s*"([A-Za-z0-9_]+)"')
 for name in os.listdir(PATCHES):
     if name.endswith(".cs"):
         for m in call.finditer(open(os.path.join(PATCHES, name), encoding="utf-8").read()):
             hooked.add(f"{m.group(1)}.{m.group(2)}")
 
+capabilities_by_method = {}
+for capability in capabilities["Signatures"]:
+    capabilities_by_method.setdefault(capability["MethodId"], []).append(capability)
+
 seams_by_cat = {}
 for s in atlas["Seams"]:
-    seams_by_cat.setdefault(s["Category"], {})[s["Id"]] = s["QuestUsable"]
+    seams_by_cat.setdefault(s["Category"], {})[s["Id"]] = capabilities_by_method[s["Id"]]
 
-VERDICT_SHORT = {
-    "today": "a quest can be bound to this",
-    "produces-event-no-trigger": "the world speaks, but no quest is listening",
-    "lab-candidate": "no quest can be bound to this yet",
-    "not-patchable": "beyond reach",
-}
+
+def capability_verdict(rows):
+    safe_events = sorted({row["CanonicalEvent"] for row in rows if row["CreatorSafe"]})
+    if safe_events:
+        return "bindable: " + ", ".join(safe_events), True
+    if any(row["Profile"] != "disabled" for row in rows):
+        return "diagnostic only — never bindable", False
+    return "intentionally disabled", False
 
 def render_svg(category):
     lines = []
@@ -152,7 +160,7 @@ html = [
     '</nav></div></div>',
     '<div class="wrap">',
     '<h1>The Quest Lab Tome</h1>',
-    '<p class="intro">This is the web-facing version of the in-game spellbook. It lists every spell the world genuinely answers to, categorized by rune school. Spells marked with a badge are ones this build can witness in-game today.</p>',
+    '<p class="intro">This is the web-facing version of the in-game spellbook. It lists every spell the world genuinely answers to, categorized by rune school. An Integrated badge means the exact runtime patch exists; the verdict names stable creator vocabulary or an explicit diagnostic-only boundary.</p>',
 
     # Onboarding. The tome taught eight schools and 78 spells and never once said how to
     # get the mod -- a reader who wanted to try it had nowhere to go from here.
@@ -176,7 +184,7 @@ html = [
     '<li><strong>Edit <code>BepInEx/config/comfy-quest-lab/quests/starter.json</code>, then '
     'run <code>lab_reload</code>.</strong>',
     '<p>No restart. The <em>Quests</em> tab names what changed, what will fire, and what '
-    'cannot &mdash; and shows the last kill the matcher was actually handed, which is how you '
+    'cannot &mdash; and shows the last event the matcher was actually handed, which is how you '
     'find out why something did not fire.</p></li>',
     '<li><strong>Need another target? <code>lab_target</code>.</strong>',
     '<p>Puts a fresh practice target in front of you &mdash; <code>lab_target harvest</code> for '
@@ -184,14 +192,13 @@ html = [
     'for the thing your quest is about; that is what the gallery is for.</p></li>',
     '</ol>',
 
-    '<p class="note"><strong>The starter file holds two quests that disagree on purpose.</strong> '
+    '<p class="note"><strong>The starter file holds two backward-compatible quests.</strong> '
     '<code>first_blood</code> is armed: kill the Greyling standing under the combat monument and it '
-    'fires &mdash; and <code>lab_target</code> puts a fresh one in front of you whenever you need another, so testing twice never means going to look for a second one. <code>punchwood</code> is not, '
-    'and nothing errors to tell you &mdash; a <code>hit</code> trigger parses perfectly and can '
-    'never fire, because only a creature kill can complete a quest today. All eight schools below '
-    'are <em>hooked</em>, meaning the lab can show you every one of them. Exactly one can have a '
-    'quest <em>bound</em> to it. Knowing which is which is the entire reason this tool exists, and '
-    'the verdict on every row below is the honest answer.</p>',
+    'fires &mdash; and <code>lab_target</code> puts a fresh one in front of you whenever you need another, so testing twice never means going to look for a second one. <code>punchwood</code> is also armed: '
+    '<code>hit</code> remains a compatibility alias for creature and resource damage. All eight '
+    'schools feed the same shared evaluator. Low-level mutations can still be inspected under '
+    '<code>questlab_profile diagnostic</code>, but those witnesses are structurally barred from '
+    'completing quests.</p>',
 
     '<p class="note"><strong>Each school&rsquo;s rune is also its filter.</strong> The mark beside '
     'each heading is the same mark you click in the lab&rsquo;s console to show or hide that '
@@ -205,8 +212,9 @@ for cat in ORDER:
     seams = seams_by_cat.get(cat, {})
     rows = []
     for seam_id in sorted(seams, key=lambda s: (s not in hooked, incantations.get(s, s))):
+        verdict, bindable = capability_verdict(seams[seam_id])
         rows.append((incantations.get(seam_id, seam_id), seam_id,
-                     VERDICT_SHORT[seams[seam_id]], seam_id in hooked, seams[seam_id] == "today"))
+                     verdict, seam_id in hooked, bindable))
 
     html.append(f'<div class="school">')
     html.append(f'<div class="school-header">{render_svg(cat)}<h2>{page["title"]}</h2></div>')
@@ -231,7 +239,7 @@ for cat in ORDER:
     html.append('<ul class="spell-list">')
     for name, true_name, verdict, bound, is_today in rows:
         verdict_class = "verdict-today" if is_today else ""
-        bound_html = '<span class="bound-badge">Witnessed</span>' if bound else ''
+        bound_html = '<span class="bound-badge">Integrated</span>' if bound else ''
         html.append(f'<li class="spell">')
         html.append(f'<div><span class="spell-name">{name}</span>{bound_html}<br><span class="spell-true-name">{true_name}</span></div>')
         html.append(f'<div class="spell-verdict {verdict_class}">{verdict}</div>')

@@ -10,8 +10,9 @@ using UnityEngine;
 /// rest. It is the closest thing the game has to a server-wide progression event, which
 /// makes it the natural seam for a guild-scale quest, and nothing has ever hooked it.
 ///
-/// Three overloads exist and only the string one is patched: the enum overloads route
-/// into it, so hooking all three would report every key change up to three times.</summary>
+/// Three overloads and the RPC witness are patched. The action correlator coalesces an
+/// overload cascade into one creator event while retaining exact provenance in verbose
+/// diagnostics.</summary>
 public static class WorldPatches {
   public static void Apply(Harmony harmony) {
     LabPatching.TryPatch(harmony, typeof(Player), "TeleportTo",
@@ -19,22 +20,65 @@ public static class WorldPatches {
         nameof(TeleportToPostfix), "Player.TeleportTo");
     LabPatching.TryPatch(harmony, typeof(ZoneSystem), "SetGlobalKey", new[] { typeof(string) },
         nameof(SetGlobalKeyPostfix), "ZoneSystem.SetGlobalKey");
+    LabPatching.TryPatch(harmony, typeof(ZoneSystem), "SetGlobalKey",
+        new[] { typeof(GlobalKeys) },
+        nameof(SetGlobalKeyEnumPostfix), "ZoneSystem.SetGlobalKey");
+    LabPatching.TryPatch(harmony, typeof(ZoneSystem), "SetGlobalKey",
+        new[] { typeof(GlobalKeys), typeof(float) },
+        nameof(SetGlobalKeyEnumTimedPostfix), "ZoneSystem.SetGlobalKey");
+    LabPatching.TryPatch(harmony, typeof(ZoneSystem), "RPC_SetGlobalKey",
+        new[] { typeof(long), typeof(string) },
+        nameof(RpcSetGlobalKeyPostfix), "ZoneSystem.RPC_SetGlobalKey");
+    LabPatching.TryPatch(harmony, typeof(ZoneSystem), "RemoveGlobalKey",
+        new[] { typeof(string) },
+        nameof(RemoveGlobalKeyPostfix), "ZoneSystem.RemoveGlobalKey");
+    LabPatching.TryPatch(harmony, typeof(ZoneSystem), "RemoveGlobalKey",
+        new[] { typeof(GlobalKeys) },
+        nameof(RemoveGlobalKeyEnumPostfix), "ZoneSystem.RemoveGlobalKey");
   }
 
   static void TeleportToPostfix(Player __instance, bool __result) {
     if (!__result) {
       return;   // refused, e.g. carrying something a portal will not take
     }
-    LabObserve.LocalPlayer("Player.TeleportTo", __instance, "portal", "teleported");
+    LabObserve.LocalPlayer(
+        "Player.TeleportTo(Vector3, Quaternion, bool)", __instance, "portal", "teleported");
   }
 
   /// <summary>Not player-filtered: a global key is world state, and it is interesting
   /// precisely because someone else may have caused it.</summary>
   static void SetGlobalKeyPostfix(string __0) {
-    if (string.IsNullOrEmpty(__0)) {
+    GlobalKey("ZoneSystem.SetGlobalKey(string)", __0, "world flag set");
+  }
+
+  static void SetGlobalKeyEnumPostfix(GlobalKeys __0) {
+    GlobalKey("ZoneSystem.SetGlobalKey(GlobalKeys)", __0.ToString(), "world flag set");
+  }
+
+  static void SetGlobalKeyEnumTimedPostfix(GlobalKeys __0, float __1) {
+    GlobalKey(
+        "ZoneSystem.SetGlobalKey(GlobalKeys, float)", __0.ToString(),
+        "world flag set for " + __1.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture));
+  }
+
+  static void RpcSetGlobalKeyPostfix(long __0, string __1) {
+    GlobalKey("ZoneSystem.RPC_SetGlobalKey(long, string)", __1, "world flag RPC set");
+  }
+
+  static void RemoveGlobalKeyPostfix(string __0) {
+    GlobalKey("ZoneSystem.RemoveGlobalKey(string)", __0, "world flag removed");
+  }
+
+  static void RemoveGlobalKeyEnumPostfix(GlobalKeys __0) {
+    GlobalKey(
+        "ZoneSystem.RemoveGlobalKey(GlobalKeys)", __0.ToString(), "world flag removed");
+  }
+
+  static void GlobalKey(string signatureId, string key, string detail) {
+    if (string.IsNullOrWhiteSpace(key)) {
       return;
     }
-    LabObserve.Seam("ZoneSystem.SetGlobalKey", __0, "world flag set");
+    LabObserve.Seam(signatureId, key, detail, fingerprint: key);
   }
 }
 
@@ -61,12 +105,16 @@ public static class SocialPatches {
     if (string.IsNullOrEmpty(__1)) {
       return;
     }
-    LabObserve.Seam("Chat.SendText", __0.ToString(), Truncate(__1));
+    LabObserve.Seam(
+        "Chat.SendText(Type, string)", __0.ToString(), "message text redacted");
   }
 
   static void SetTextPostfix(Sign __instance, string __0) {
-    LabObserve.Seam("Sign.SetText",
-        LabObserve.Clean(__instance == null ? null : __instance.name), Truncate(__0));
+    LabObserve.Seam(
+        "Sign.SetText(string)",
+        LabObserve.Clean(__instance == null ? null : __instance.name),
+        "sign text redacted",
+        __instance);
   }
 
   /// <summary>A console row is not a chat log. Long messages are cut so one paragraph

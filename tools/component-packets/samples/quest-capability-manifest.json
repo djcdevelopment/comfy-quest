@@ -213,8 +213,8 @@
       "Profile": "core",
       "CreatorSafe": true,
       "DedupeGroup": "character-healed",
-      "ActorScope": "local-player-caused",
-      "Reason": "Intentional heal route with a stable amount payload."
+      "ActorScope": "local-player",
+      "Reason": "Local-player heal witness with a stable amount payload."
     },
     {
       "SignatureId": "Character.OnDeath()",
@@ -295,8 +295,8 @@
       "Profile": "core",
       "CreatorSafe": true,
       "DedupeGroup": "character-healed",
-      "ActorScope": "local-player-caused",
-      "Reason": "RPC witness for the same heal action."
+      "ActorScope": "local-player",
+      "Reason": "RPC witness for the same local-player heal action."
     },
     {
       "SignatureId": "Character.RPC_Stagger(long, Vector3)",

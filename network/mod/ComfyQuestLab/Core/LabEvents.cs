@@ -36,17 +36,18 @@ public static class LabCategory {
 /// five event types from three hooks; EventType.cs names 34; and nothing in the game
 /// tells a builder which is which. See tools/component-packets/EVENT-ATLAS.md.</summary>
 public static class LabUsability {
-  /// <summary>The shipping mod hooks it and a quest trigger matches what it produces.
-  /// Exactly one seam qualifies today: Character.OnDeath.</summary>
+  /// <summary>The row is safe creator vocabulary and entered the shared evaluator.</summary>
   public const string Today = "today";
 
-  /// <summary>The shipping mod hooks it and emits an event, but no trigger matches that
-  /// event. Character.Damage emits first_hit; QuestTriggerEvaluator matches kill only.
-  /// Visible and unusable, which is the trap this label exists to name.</summary>
+  /// <summary>Legacy extraction-era verdict retained for atlas compatibility.</summary>
   public const string ProducesEventNoTrigger = "produces-event-no-trigger";
 
   /// <summary>Patchable, and nothing in a shipping mod hooks it. Most of the atlas.</summary>
   public const string LabCandidate = "lab-candidate";
+
+  /// <summary>The lab can show this low-level witness, but policy intentionally keeps it
+  /// outside the creator trigger vocabulary.</summary>
+  public const string DiagnosticOnly = "diagnostic-only";
 }
 
 /// <summary>One thing the game did, as the lab saw it.
@@ -65,6 +66,10 @@ public struct LabEvent {
   /// so a builder can look it up.</summary>
   public string Seam;
 
+  /// <summary>The stable creator-facing event name. This is what belongs in trigger.event;
+  /// <see cref="Seam"/> is retained as opt-in diagnostic provenance.</summary>
+  public string EventName;
+
   /// <summary>What it happened to, in the vocabulary a quest would use: a creature name,
   /// a prefab name, "tree", "bush".</summary>
   public string Target;
@@ -81,6 +86,23 @@ public struct LabEvent {
     At = DateTime.Now.ToString("HH:mm:ss");
     Category = category;
     Seam = seam;
+    EventName = seam;
+    Target = target ?? string.Empty;
+    Detail = detail ?? string.Empty;
+    Usability = usability;
+  }
+
+  public LabEvent(
+      string category,
+      string seam,
+      string eventName,
+      string target,
+      string detail,
+      string usability) {
+    At = DateTime.Now.ToString("HH:mm:ss");
+    Category = category;
+    Seam = seam;
+    EventName = eventName;
     Target = target ?? string.Empty;
     Detail = detail ?? string.Empty;
     Usability = usability;
@@ -146,6 +168,7 @@ public sealed class LabEventRing {
   static bool Matches(LabEvent row, string needle) {
     needle = needle.ToLowerInvariant();
     return (row.Seam ?? string.Empty).ToLowerInvariant().Contains(needle)
+        || (row.EventName ?? string.Empty).ToLowerInvariant().Contains(needle)
         || (row.Target ?? string.Empty).ToLowerInvariant().Contains(needle)
         || (row.Detail ?? string.Empty).ToLowerInvariant().Contains(needle);
   }

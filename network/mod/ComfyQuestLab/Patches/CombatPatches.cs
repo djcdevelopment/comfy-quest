@@ -1,20 +1,15 @@
 namespace ComfyQuestLab;
 
+using System.Collections.Generic;
+using System.Globalization;
+
 using HarmonyLib;
 
-/// <summary>Combat seams — the only category with any quest-usable ground today.
+/// <summary>Combat witnesses normalized into stable creator events.
 ///
-/// Worth understanding before anything else, because the three verdicts a builder will
-/// see here are all different and the difference is the whole lesson:
-///
-///   Character.OnDeath     a quest can fire on this today. The one seam that can.
-///   Character.Damage      emits first_hit, and no trigger matches first_hit. Visible,
-///   Character.RPC_Damage  unusable. This is the trap.
-///   everything else       lab only.
-///
-/// Damage and RPC_Damage are both patched because they are different ownership paths,
-/// not alternatives: client-owned melee goes through one and server-routed damage the
-/// other. Hooking only one silently loses half your hits.
+/// Damage and RPC_Damage are both patched because they are different ownership paths.
+/// The central action correlator gives both witnesses one dedupe key when they represent
+/// the same hit, while a repeated witness correctly starts a new action.
 ///
 /// OnDeath rather than deciding the kill inside a Damage postfix: IsDead() is still
 /// false there. The retired mod got this wrong and the shipping mod's comment records
@@ -30,15 +25,29 @@ public static class CombatPatches {
         nameof(OnDeathPostfix), "Character.OnDeath");
     LabPatching.TryPatch(harmony, typeof(Character), "Stagger", new[] { typeof(UnityEngine.Vector3) },
         nameof(StaggerPostfix), "Character.Stagger");
+    LabPatching.TryPatch(harmony, typeof(Character), "RPC_Stagger",
+        new[] { typeof(long), typeof(UnityEngine.Vector3) },
+        nameof(RpcStaggerPostfix), "Character.RPC_Stagger");
+    LabPatching.TryPatch(harmony, typeof(Character), "Heal",
+        new[] { typeof(float), typeof(bool) },
+        nameof(HealPostfix), "Character.Heal");
+    LabPatching.TryPatch(harmony, typeof(Character), "RPC_Heal",
+        new[] { typeof(long), typeof(float), typeof(bool) },
+        nameof(RpcHealPostfix), "Character.RPC_Heal");
+    LabPatching.TryPatch(harmony, typeof(Humanoid), "BlockAttack",
+        new[] { typeof(HitData), typeof(Character) },
+        nameof(BlockAttackPostfix), "Humanoid.BlockAttack");
   }
 
   static void DamagePostfix(Character __instance, HitData __0) {
-    LabObserve.PlayerHit("Character.Damage", __0, Describe(__instance), null);
+    LabObserve.PlayerHit(
+        "Character.Damage(HitData)", __0, __instance, Describe(__instance), null);
     LabKillWatch.RecordPlayerHit(__instance, __0, UnityEngine.Time.realtimeSinceStartup);
   }
 
   static void RpcDamagePostfix(Character __instance, HitData __1) {
-    LabObserve.PlayerHit("Character.RPC_Damage", __1, Describe(__instance), null);
+    LabObserve.PlayerHit(
+        "Character.RPC_Damage(long, HitData)", __1, __instance, Describe(__instance), null);
     LabKillWatch.RecordPlayerHit(__instance, __1, UnityEngine.Time.realtimeSinceStartup);
   }
 
@@ -54,7 +63,8 @@ public static class CombatPatches {
     if (__instance == null || __instance.IsPlayer()) {
       return;   // the player dying is progression, not a kill
     }
-    LabObserve.Seam("Character.OnDeath", Describe(__instance), "died");
+    LabObserve.Seam(
+        "Character.OnDeath()", Describe(__instance), "died", __instance, evaluate: false);
 
     // After the seam row on purpose, so a quest firing reads as a consequence of the
     // kill immediately above it rather than as an unrelated event.
@@ -65,7 +75,68 @@ public static class CombatPatches {
     if (__instance == null || __instance.IsPlayer()) {
       return;
     }
-    LabObserve.Seam("Character.Stagger", Describe(__instance), "staggered");
+    ObserveAttributedStagger("Character.Stagger(Vector3)", __instance);
+  }
+
+  static void RpcStaggerPostfix(Character __instance) {
+    if (__instance == null || __instance.IsPlayer()) {
+      return;
+    }
+    ObserveAttributedStagger("Character.RPC_Stagger(long, Vector3)", __instance);
+  }
+
+  static void ObserveAttributedStagger(string signatureId, Character victim) {
+    double now = UnityEngine.Time.realtimeSinceStartup;
+    bool attributed = LabKillWatch.TryPeekPlayerHit(
+        victim, now, 1.5, out string skill, out bool ranged);
+    LabEventRouter.Emit(
+        signatureId,
+        Describe(victim),
+        attributed ? "staggered by you" : "staggered",
+        LabEventRouter.Identity(victim),
+        skill,
+        skill,
+        ranged,
+        evaluate: attributed);
+  }
+
+  static void HealPostfix(Character __instance, float __0) {
+    ObserveLocalHeal("Character.Heal(float, bool)", __instance, __0);
+  }
+
+  static void RpcHealPostfix(Character __instance, float __1) {
+    ObserveLocalHeal("Character.RPC_Heal(long, float, bool)", __instance, __1);
+  }
+
+  static void ObserveLocalHeal(string signatureId, Character character, float amount) {
+    if (character == null || character != Player.m_localPlayer || amount <= 0f) {
+      return;
+    }
+    string value = amount.ToString("R", CultureInfo.InvariantCulture);
+    LabEventRouter.Emit(
+        signatureId,
+        "you",
+        "+" + amount.ToString("0.##", CultureInfo.InvariantCulture) + " health",
+        LabEventRouter.Identity(character),
+        value,
+        fields: new Dictionary<string, string> { ["amount"] = value });
+  }
+
+  static void BlockAttackPostfix(
+      Humanoid __instance, HitData __0, Character __1, bool __result) {
+    if (!__result || __instance == null || __instance != Player.m_localPlayer) {
+      return;
+    }
+    string target = __1 == null ? "attacker" : Describe(__1);
+    string skill = __0 == null ? null : __0.m_skill.ToString();
+    LabEventRouter.Emit(
+        "Humanoid.BlockAttack(HitData, Character)",
+        target,
+        "blocked",
+        LabEventRouter.Identity(__instance),
+        target + "|" + (skill ?? string.Empty),
+        skill,
+        __0 != null && __0.m_ranged);
   }
 
   /// <summary>The name a quest would actually match on — which is NOT the prefab name.

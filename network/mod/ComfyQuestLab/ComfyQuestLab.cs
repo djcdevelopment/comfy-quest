@@ -21,14 +21,13 @@ using UnityEngine;
 /// server, and it can be uninstalled the moment somebody is done learning.
 ///
 /// What it shares with the shipping mod is the quest contract itself — TrackedQuest,
-/// QuestViewLoader, QuestTriggerEvaluator are compiled from the same files (see the
+/// QuestEvent, QuestViewLoader, QuestEventCatalog, and QuestTriggerEvaluator are compiled from the same files (see the
 /// csproj), so a quest that behaves one way here behaves the same way there. That is
 /// the only promise the lab makes, and it is the one that matters.
 ///
-/// Status: all eight atlas categories are hooked — 28 seams. What differs between them is
-/// not whether the lab sees them but whether a quest can be BOUND to them: QuestTriggerEvaluator
-/// matches kill triggers only, so combat is the one school that can fire a quest today. The
-/// lab's job is to make that distinction visible rather than to hide it.</summary>
+/// Status: all eight atlas categories have a canonical event route. Creator rows show stable
+/// event names; exact method signatures remain diagnostic provenance. The generated catalog and
+/// runtime profile decide what is bindable rather than a hard-coded kill branch.</summary>
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 public sealed class ComfyQuestLab : BaseUnityPlugin {
   public const string PluginGuid = "djcdevelopment.valheim.comfyquestlab";
@@ -77,6 +76,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     ProgressionPatches.Apply(_harmony);
     WorldPatches.Apply(_harmony);
     SocialPatches.Apply(_harmony);
+    DiagnosticPatches.Apply(_harmony);
     LabPanelInputPatches.Apply(_harmony);
 
     // Not a seam — it holds the gallery up rather than watching anything. See the file.
@@ -249,6 +249,16 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
           "which seams this build hooked, and which it could not: questlab_seams",
           delegate { Report(SeamRoster()); });
 
+      new Terminal.ConsoleCommand("questlab_profile",
+          "show or set integration noise: questlab_profile [core|extended|diagnostic]",
+          delegate (Terminal.ConsoleEventArgs args) {
+            if (args.Length >= 2 && IsRuntimeProfile(args[1])) {
+              LabConfig.EventProfile.Value = args[1].ToLowerInvariant();
+            }
+            Report("quest lab event profile: " + LabConfig.EventProfile.Value
+                + " (core | extended | diagnostic)");
+          });
+
       // The gallery is the one thing here that changes the world, so it only ever moves
       // when somebody types one of these. check first, always.
       new Terminal.ConsoleCommand("questlab_gallery",
@@ -326,11 +336,12 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  lab_target [school]   put a fresh practice target in front of you");
     sb.AppendLine("  questlab_panel   open the live event console (" + LabConfig.PanelShortcut.Value + ")");
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
+    sb.AppendLine("  questlab_profile [core|extended|diagnostic]   choose integration noise");
     sb.AppendLine("  questlab_clear   empty the live view");
     sb.AppendLine("  questlab_gallery check | build | clear   raise the practice ground");
     sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");
     sb.AppendLine("  questlab_prefabs <name>   search what this game build has; dump writes the catalog");
-    sb.AppendLine("Hit a tree or a bush with the panel open — harvest is the wired category.");
+    sb.AppendLine("Try one action at a monument with the panel open; every school has bindable events.");
     return sb.ToString().TrimEnd();
   }
 
@@ -341,9 +352,15 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     foreach (LabPatching.Outcome o in outcomes) {
       sb.AppendLine("  " + (o.Applied ? "[x] " : "[ ] ") + o.Label + (o.Applied ? string.Empty : " — " + o.Detail));
     }
-    sb.AppendLine("All eight atlas categories are hooked. Being hooked is not the same as being "
-        + "bindable: only a kill can fire a quest today, which is what the Quests tab explains.");
+    sb.AppendLine("Creator rows use stable canonical events; exact method signatures are diagnostic. "
+        + "Active profile: " + LabConfig.EventProfile.Value + ".");
     return sb.ToString().TrimEnd();
+  }
+
+  static bool IsRuntimeProfile(string value) {
+    return string.Equals(value, LabRuntimeProfile.Core, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(value, LabRuntimeProfile.Extended, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(value, LabRuntimeProfile.Diagnostic, StringComparison.OrdinalIgnoreCase);
   }
 
   /// <summary>Say something to the player and the log at once. The shipping mod uses
@@ -370,6 +387,7 @@ public static class LabConfig {
   public static ConfigEntry<KeyboardShortcut> PanelShortcut { get; private set; }
   public static ConfigEntry<int> ConsoleRows { get; private set; }
   public static ConfigEntry<bool> VerboseLogging { get; private set; }
+  public static ConfigEntry<string> EventProfile { get; private set; }
   public static ConfigEntry<bool> ObserveStamina { get; private set; }
   public static ConfigEntry<int> BlueprintPiecesPerFrame { get; private set; }
   public static ConfigEntry<bool> QuestsEnabled { get; private set; }
@@ -409,6 +427,21 @@ public static class LabConfig {
             false,
             "Default OFF. ON = every observed event is also written to the BepInEx log. "
             + "Useful when you want a transcript to paste into a thread; noisy in combat.");
+
+    EventProfile =
+        config.Bind(
+            "Lab",
+            "eventProfile",
+            LabRuntimeProfile.Extended,
+            new ConfigDescription(
+                "Runtime integration profile. core = intentional low-noise actions; extended "
+                + "also enables stable high-frequency actions such as damage; diagnostic also "
+                + "shows corroborating and low-level mutation seams but never makes them quest "
+                + "triggers. Hot-reloadable. Stamina keeps its separate observeStamina gate.",
+                new AcceptableValueList<string>(
+                    LabRuntimeProfile.Core,
+                    LabRuntimeProfile.Extended,
+                    LabRuntimeProfile.Diagnostic)));
 
     ObserveStamina =
         config.Bind(

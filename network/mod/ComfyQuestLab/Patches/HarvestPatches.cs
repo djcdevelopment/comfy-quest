@@ -31,15 +31,34 @@ public static class HarvestPatches {
     LabPatching.TryPatch(harmony, typeof(Pickable), "Interact",
         new[] { typeof(Humanoid), typeof(bool), typeof(bool) },
         nameof(PickableInteractPostfix), "Pickable.Interact");
+    LabPatching.TryPatch(harmony, typeof(TreeBase), "RPC_Damage",
+        new[] { typeof(long), typeof(HitData) },
+        nameof(TreeBaseRpcDamagePostfix), "TreeBase.RPC_Damage");
+    LabPatching.TryPatch(harmony, typeof(TreeLog), "RPC_Damage",
+        new[] { typeof(long), typeof(HitData) },
+        nameof(TreeLogRpcDamagePostfix), "TreeLog.RPC_Damage");
+    LabPatching.TryPatch(harmony, typeof(Destructible), "RPC_Damage",
+        new[] { typeof(long), typeof(HitData) },
+        nameof(DestructibleRpcDamagePostfix), "Destructible.RPC_Damage");
+    LabPatching.TryPatch(harmony, typeof(MineRock), "Damage", new[] { typeof(HitData) },
+        nameof(MineRockDamagePostfix), "MineRock.Damage");
+    LabPatching.TryPatch(harmony, typeof(MineRock5), "Damage", new[] { typeof(HitData) },
+        nameof(MineRock5DamagePostfix), "MineRock5.Damage");
+    LabPatching.TryPatch(harmony, typeof(MineRock5), "RPC_Damage",
+        new[] { typeof(long), typeof(HitData), typeof(int) },
+        nameof(MineRock5RpcDamagePostfix), "MineRock5.RPC_Damage");
+    LabPatching.TryPatch(harmony, typeof(Pickable), "RPC_Pick",
+        new[] { typeof(long), typeof(int) },
+        nameof(PickableRpcPickPostfix), "Pickable.RPC_Pick");
   }
 
   static void TreeBaseDamagePostfix(TreeBase __instance, HitData __0) {
-    LabObserve.PlayerHit("TreeBase.Damage", __0,
+    LabObserve.PlayerHit("TreeBase.Damage(HitData)", __0, __instance,
         LabObserve.Clean(__instance == null ? null : __instance.name) + " (tree)", null);
   }
 
   static void TreeLogDamagePostfix(TreeLog __instance, HitData __0) {
-    LabObserve.PlayerHit("TreeLog.Damage", __0,
+    LabObserve.PlayerHit("TreeLog.Damage(HitData)", __0, __instance,
         LabObserve.Clean(__instance == null ? null : __instance.name) + " (log)", null);
   }
 
@@ -49,7 +68,8 @@ public static class HarvestPatches {
     // a Destructible is a "bush" when its prefab name says so. Everything else stays
     // "destructible", which is honest — the type covers a lot of scenery.
     string kind = IsBush(prefab) ? "bush" : "destructible";
-    LabObserve.PlayerHit("Destructible.Damage", __0, prefab + " (" + kind + ")", null);
+    LabObserve.PlayerHit(
+        "Destructible.Damage(HitData)", __0, __instance, prefab + " (" + kind + ")", null);
   }
 
   /// <summary>Berry picking, which is an interact rather than a damage event — the kind
@@ -58,9 +78,61 @@ public static class HarvestPatches {
     if (!__result) {
       return;   // the interact was refused; nothing happened worth teaching
     }
-    LabObserve.LocalPlayer("Pickable.Interact", __0 as Character,
-        LabObserve.Clean(__instance == null ? null : __instance.name) + " (pickable)",
-        "picked");
+    string target = LabObserve.Clean(__instance == null ? null : __instance.name)
+        + " (pickable)";
+    LabObserve.LocalPlayer(
+        "Pickable.Interact(Humanoid, bool, bool)", __0 as Character,
+        target, "picked", __instance, target);
+  }
+
+  static void TreeBaseRpcDamagePostfix(TreeBase __instance, HitData __1) {
+    LabObserve.PlayerHit("TreeBase.RPC_Damage(long, HitData)", __1, __instance,
+        LabObserve.Clean(__instance == null ? null : __instance.name) + " (tree)", null);
+  }
+
+  static void TreeLogRpcDamagePostfix(TreeLog __instance, HitData __1) {
+    LabObserve.PlayerHit("TreeLog.RPC_Damage(long, HitData)", __1, __instance,
+        LabObserve.Clean(__instance == null ? null : __instance.name) + " (log)", null);
+  }
+
+  static void DestructibleRpcDamagePostfix(Destructible __instance, HitData __1) {
+    string prefab = LabObserve.Clean(__instance == null ? null : __instance.name);
+    string kind = IsBush(prefab) ? "bush" : "destructible";
+    LabObserve.PlayerHit(
+        "Destructible.RPC_Damage(long, HitData)",
+        __1,
+        __instance,
+        prefab + " (" + kind + ")",
+        null);
+  }
+
+  static void MineRockDamagePostfix(MineRock __instance, HitData __0) {
+    LabObserve.PlayerHit("MineRock.Damage(HitData)", __0, __instance,
+        LabObserve.Clean(__instance == null ? null : __instance.name) + " (rock)", null);
+  }
+
+  static void MineRock5DamagePostfix(MineRock5 __instance, HitData __0) {
+    LabObserve.PlayerHit("MineRock5.Damage(HitData)", __0, __instance,
+        LabObserve.Clean(__instance == null ? null : __instance.name) + " (rock)", null);
+  }
+
+  static void MineRock5RpcDamagePostfix(MineRock5 __instance, HitData __1) {
+    LabObserve.PlayerHit("MineRock5.RPC_Damage(long, HitData, int)", __1, __instance,
+        LabObserve.Clean(__instance == null ? null : __instance.name) + " (rock)", null);
+  }
+
+  static void PickableRpcPickPostfix(Pickable __instance, long __0) {
+    if (!LabEventRouter.IsLocalSender(__0)) {
+      return;
+    }
+    string target = LabObserve.Clean(__instance == null ? null : __instance.name)
+        + " (pickable)";
+    LabEventRouter.Emit(
+        "Pickable.RPC_Pick(long, int)",
+        target,
+        "picked",
+        LabEventRouter.Identity(__instance),
+        target);
   }
 
   static bool IsBush(string prefabName) {

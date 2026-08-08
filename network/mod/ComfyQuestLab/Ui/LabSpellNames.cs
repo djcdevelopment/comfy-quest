@@ -32,6 +32,11 @@ public static class LabSpellNames {
         }
       }
     }
+    // Canonical creator events are intentionally readable snake_case and should stay
+    // visible exactly as authored. Raw method names contain a dot and still fall through.
+    if (!string.IsNullOrEmpty(trueName) && trueName.IndexOf('.') < 0) {
+      return trueName;
+    }
     return trueName;
   }
 }

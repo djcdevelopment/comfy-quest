@@ -1,6 +1,9 @@
 namespace ComfyQuestLab;
 
 using System;
+using System.Collections.Generic;
+
+using UnityEngine;
 
 /// <summary>The one call every patch makes.
 ///
@@ -14,14 +17,23 @@ using System;
 /// tool that can break someone's game is worse than no teaching tool.</summary>
 public static class LabObserve {
   /// <summary>Record something the local player caused.</summary>
-  public static void Seam(string seamId, string target, string detail) {
+  public static void Seam(
+      string signatureId,
+      string target,
+      string detail,
+      UnityEngine.Object subject = null,
+      string fingerprint = null,
+      IReadOnlyDictionary<string, string> fields = null,
+      bool evaluate = true) {
     try {
-      ComfyQuestLab.Observe(new LabEvent(
-          LabSeamCatalog.Category(seamId),
-          seamId,
+      LabEventRouter.Emit(
+          signatureId,
           target,
           detail,
-          LabSeamCatalog.Usability(seamId)));
+          LabEventRouter.Identity(subject),
+          fingerprint,
+          fields: fields,
+          evaluate: evaluate);
     } catch (Exception) {
     }
   }
@@ -30,7 +42,12 @@ public static class LabObserve {
   ///
   /// A world of creatures fighting each other buries the console within seconds of a
   /// fight starting, and a quest can only ever be about what the player did.</summary>
-  public static void PlayerHit(string seamId, HitData hit, string target, string extra) {
+  public static void PlayerHit(
+      string signatureId,
+      HitData hit,
+      UnityEngine.Object subject,
+      string target,
+      string extra) {
     try {
       if (hit == null || !ComfyQuestLab.IsLocalPlayerAttacker(hit)) {
         return;
@@ -39,7 +56,14 @@ public static class LabObserve {
       if (!string.IsNullOrEmpty(extra)) {
         detail += " · " + extra;
       }
-      Seam(seamId, target, detail);
+      LabEventRouter.Emit(
+          signatureId,
+          target,
+          detail,
+          LabEventRouter.Identity(subject),
+          hit.m_skill.ToString(),
+          hit.m_skill.ToString(),
+          hit.m_ranged);
     } catch (Exception) {
     }
   }
@@ -49,12 +73,25 @@ public static class LabObserve {
   /// Used by seams that are about the player rather than about a target: stamina,
   /// skills, teleports. On a multiplayer world the same method fires for every peer's
   /// character, and a builder learning what THEY just did does not want that.</summary>
-  public static void LocalPlayer(string seamId, Character who, string target, string detail) {
+  public static void LocalPlayer(
+      string signatureId,
+      Character who,
+      string target,
+      string detail,
+      UnityEngine.Object subject = null,
+      string fingerprint = null,
+      IReadOnlyDictionary<string, string> fields = null) {
     try {
       if (who == null || Player.m_localPlayer == null || who != Player.m_localPlayer) {
         return;
       }
-      Seam(seamId, target, detail);
+      LabEventRouter.Emit(
+          signatureId,
+          target,
+          detail,
+          LabEventRouter.Identity(subject == null ? who : subject),
+          fingerprint,
+          fields: fields);
     } catch (Exception) {
     }
   }

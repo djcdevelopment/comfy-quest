@@ -1,5 +1,8 @@
 namespace ComfyQuestLab;
 
+using System.Collections.Generic;
+using System.Globalization;
+
 using HarmonyLib;
 
 /// <summary>Progression seams: skills and stamina.
@@ -29,6 +32,16 @@ public static class ProgressionPatches {
         nameof(RaiseSkillPostfix), "Skills.RaiseSkill");
     LabPatching.TryPatch(harmony, typeof(Player), "OnDeath", System.Type.EmptyTypes,
         nameof(PlayerOnDeathPostfix), "Player.OnDeath");
+    LabPatching.TryPatch(harmony, typeof(Player), "RaiseSkill",
+        new[] { typeof(Skills.SkillType), typeof(float) },
+        nameof(PlayerRaiseSkillPostfix), "Player.RaiseSkill");
+    LabPatching.TryPatch(harmony, typeof(Player), "AddStamina", new[] { typeof(float) },
+        nameof(AddStaminaPostfix), "Player.AddStamina");
+    LabPatching.TryPatch(harmony, typeof(Player), "SetMaxHealth",
+        new[] { typeof(float), typeof(bool) },
+        nameof(SetMaxHealthPostfix), "Player.SetMaxHealth");
+    LabPatching.TryPatch(harmony, typeof(Skills), "LowerAllSkills", new[] { typeof(float) },
+        nameof(LowerAllSkillsPostfix), "Skills.LowerAllSkills");
 
     if (LabConfig.ObserveStamina.Value) {
       LabPatching.TryPatch(harmony, typeof(Player), "UseStamina", new[] { typeof(float) },
@@ -38,17 +51,77 @@ public static class ProgressionPatches {
 
   static void RaiseSkillPostfix(Skills.SkillType __0, float __1) {
     // Skills hangs off the local player, so anything raising one is the player's own.
-    LabObserve.Seam("Skills.RaiseSkill", __0.ToString(), "+" + __1.ToString("0.##"));
+    LabObserve.Seam(
+        "Skills.RaiseSkill(SkillType, float)",
+        __0.ToString(), "+" + __1.ToString("0.##"));
   }
 
   static void PlayerOnDeathPostfix(Player __instance) {
-    LabObserve.LocalPlayer("Player.OnDeath", __instance, "you", "died");
+    LabObserve.LocalPlayer("Player.OnDeath()", __instance, "you", "died");
+  }
+
+  static void PlayerRaiseSkillPostfix(Player __instance, Skills.SkillType __0, float __1) {
+    string amount = __1.ToString("R", CultureInfo.InvariantCulture);
+    LabObserve.LocalPlayer(
+        "Player.RaiseSkill(SkillType, float)", __instance, __0.ToString(),
+        "raised by " + __1.ToString("0.##", CultureInfo.InvariantCulture),
+        fingerprint: __0 + "|" + amount,
+        fields: ProgressFields(__0.ToString(), amount));
+  }
+
+  static void AddStaminaPostfix(Player __instance, float __0) {
+    if (__0 <= 0f) {
+      return;
+    }
+    string amount = __0.ToString("R", CultureInfo.InvariantCulture);
+    LabObserve.LocalPlayer(
+        "Player.AddStamina(float)", __instance, "stamina",
+        "+" + __0.ToString("0.#", CultureInfo.InvariantCulture),
+        fingerprint: amount, fields: ProgressFields("stamina", amount));
+  }
+
+  static void SetMaxHealthPostfix(Player __instance, float __0) {
+    if (__0 <= 0f) {
+      return;
+    }
+    string amount = __0.ToString("R", CultureInfo.InvariantCulture);
+    LabObserve.LocalPlayer(
+        "Player.SetMaxHealth(float, bool)", __instance, "health",
+        "maximum " + __0.ToString("0.#", CultureInfo.InvariantCulture),
+        fingerprint: amount, fields: ProgressFields("health", amount));
+  }
+
+  static void LowerAllSkillsPostfix(Skills __instance, float __0) {
+    try {
+      if (Player.m_localPlayer == null || __instance != Player.m_localPlayer.GetSkills()) {
+        return;
+      }
+      string amount = __0.ToString("R", CultureInfo.InvariantCulture);
+      LabEventRouter.Emit(
+          "Skills.LowerAllSkills(float)", "all skills",
+          "lowered by " + __0.ToString("0.##", CultureInfo.InvariantCulture),
+          LabEventRouter.Identity(Player.m_localPlayer), amount,
+          fields: ProgressFields("all", amount));
+    } catch (System.Exception) {
+    }
   }
 
   static void UseStaminaPostfix(Player __instance, float __0) {
     if (__0 <= 0f) {
       return;
     }
-    LabObserve.LocalPlayer("Player.UseStamina", __instance, "stamina", "-" + __0.ToString("0.#"));
+    LabObserve.LocalPlayer(
+        "Player.UseStamina(float)", __instance, "stamina",
+        "-" + __0.ToString("0.#", CultureInfo.InvariantCulture),
+        fingerprint: __0.ToString("R", CultureInfo.InvariantCulture),
+        fields: ProgressFields(
+            "stamina", __0.ToString("R", CultureInfo.InvariantCulture)));
+  }
+
+  static IReadOnlyDictionary<string, string> ProgressFields(string subject, string amount) {
+    return new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase) {
+      ["subject"] = subject,
+      ["amount"] = amount,
+    };
   }
 }

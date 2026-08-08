@@ -19,9 +19,14 @@ three tools that keep them honest. Nothing is published and there is no download
   Schema 1 gains optional scalar `trigger.where` filters without invalidating an existing
   file. The published `hit` verb remains a broad alias for creature or resource damage.
   Caller-supplied action identity dedupes local/RPC witnesses independently of quest
-  cooldown, including at the lab's zero-cooldown authoring setting. This is contract
-  capability; runtime integrations still require their own patch and witness receipts.
-- **All eight categories wired**, 26 atlas integrations plus two panel/input support hooks:
+  cooldown, including at the lab's zero-cooldown authoring setting.
+- **Atlas expansion complete in code.** All 86 practical exact signatures now have explicit
+  runtime patches, including all 57 creator-safe signatures. A central canonical router applies
+  core/extended/diagnostic profiles, emits stable event names, and coalesces local/RPC or overload
+  witnesses before quest evaluation. Diagnostic-only witnesses are structurally non-bindable;
+  four query/cheat signatures remain deliberately disabled. Headless and assembly-build receipts
+  are complete; the six schools beyond combat and harvest still need bounded i5 live receipts.
+- **The initial eight-category scaffold wired** 26 atlas integrations plus two panel/input support hooks:
   - **harvest** — `TreeBase.Damage`, `TreeLog.Damage`, `Destructible.Damage`,
     `Pickable.Interact`. The first three are what the retired ComfyControlSurface hooked,
     and the reason punching a bush used to fire a quest and no longer does. `TreeLog` is
@@ -63,10 +68,10 @@ three tools that keep them honest. Nothing is published and there is no download
   on a missing or stale classification.
 - **`check_lab_patches.py` — the guard that matters.** Harmony resolves
   `AccessTools.Method` at runtime, so a wrong argument list does not fail the build; it
-  returns null and the patch silently never applies. The checker verifies 26 atlas
-  integrations against the 90 exact signatures and reports the two lab support hooks
-  separately. It rejects wrong arg lists, missing parameters, typo'd names, and overloads
-  that do not exist.
+  returns null and the patch silently never applies. The checker verifies 57/57 safe and
+  86/86 practical exact-signature integrations against the 90-signature atlas, reports
+  the four intentionally disabled signatures, and keeps the two lab support hooks separate.
+  Mutation coverage proves a missing safe patch turns the guard red.
 - **Runes, one per category, doing double duty.** The same mark is the spellbook tab and
   the console's filter toggle, so learning the book teaches the console for free. Drawn
   procedurally from line segments — runes ARE line segments — so there are no PNGs to

@@ -5,23 +5,23 @@
 Install it on your own world, hit something, and watch the game tell you what it just
 did — and whether a quest could actually fire on it.
 
-> **Scaffold.** The live view, the spellbook and the quest lane all work, and all eight
-> schools are wired — 26 atlas integrations plus two panel/input support hooks; 25 atlas
-> integrations apply by default (`Player.UseStamina` is config-gated). `lab_setup` raises
-> the practice gallery and writes a starter quest file; it is the one command a newcomer
-> needs.
+> **Expansion build.** The live view, spellbook, and shared quest lane cover all eight
+> schools. The runtime explicitly patches all 86 practical atlas signatures plus two
+> panel/input support hooks. All 57 creator-safe signatures normalize to 34 stable events;
+> the remaining practical witnesses are diagnostic-only, and four query/cheat signatures
+> are deliberately disabled. `Player.UseStamina` remains separately config-gated.
 >
 > **Verified in game** (2026-08-07, one session). A seam fires and the live view reports
 > it, which is the whole claim:
 >
 > ```
-> 03:50:03  striking a standing tree
+> 03:50:03  resource_damaged
 >   Beech1 (tree)   skill Unarmed
->   -> nothing binds a quest to this yet
+>   -> a quest can be bound to this today
 > ```
 >
-> Plain name, resolved target, skill, and the verdict — a builder learns in one glance
-> that the game sees the hit *and* that no quest can be bound to it. The gallery also
+> Stable event name, resolved target, skill, and verdict — a builder learns in one glance
+> that the game sees the hit and which quest vocabulary binds to it. The gallery also
 > builds (620 pieces), the ground-to-plaza portal pair connects, and the structure stands
 > rather than decaying. The monuments read as their glyphs, each lit in its school's
 > colour.
@@ -33,8 +33,10 @@ did — and whether a quest could actually fire on it.
 > `$enemy_greyling` with no prefab name beside it, because that token already contains
 > `Greyling` — the "stay quiet when they agree" case.
 >
-> **Still unwitnessed:** inventory, building, crafting, progression, world, social. Patched
-> and reported hooked, but no event from them has been seen. Item stands stay bare
+> **Live receipt boundary:** combat, harvest, gallery construction, and the original kill
+> quest have in-game receipts. The 2026-08-08 expansion has headless coverage and a clean
+> game-assembly build; inventory, building, crafting, progression, world, and social still
+> require the bounded i5 live suite before they become witnessed claims. Item stands stay bare
 > (`SetVisualItem` is a registered RPC, not a callable method; the gear is dropped beside
 > them instead). This README describes what is here, not what is planned.
 
@@ -60,6 +62,7 @@ this?*
 | `lab_target [school]` | put a fresh practice target in front of you (default: combat) |
 | `questlab_help` | what this build can do |
 | `questlab_seams` | which seams hooked on your game version, and which didn't |
+| `questlab_profile [core\|extended\|diagnostic]` | select stable-event breadth or inspect raw witnesses |
 | `questlab_clear` | empty the console |
 
 `lab_setup` is typed into **Valheim's** console, which is **F5**. **F6** opens the lab's own
@@ -78,9 +81,9 @@ tree.
 Open the live view and punch a tree. You should see:
 
 ```
-[rune]  14:22:07  striking a standing tree
+[rune]  14:22:07  resource_damaged
         Beech1 (tree)   skill Unarmed
-        -> nothing binds a quest to this yet
+        -> a quest can be bound to this today
 ```
 
 That third line is the point of the whole tool.
@@ -92,20 +95,19 @@ command a thing, which here means writing code against it.
 
 ## Reading a row
 
-Every event ends in one of three verdicts:
+Every event ends in one of two creator-relevant verdicts:
 
 | Verdict | Means |
 | --- | --- |
-| **a quest can be bound to this today** | Exactly one thing qualifies right now: a creature dying. |
-| **the world speaks, but no quest is listening yet** | It really happens and you can watch it — striking a living thing does — but nothing will carry it into a quest. |
-| **nothing binds a quest to this yet** | Most of the game. |
+| **a quest can be bound to this today** | The witness normalized to one of the 34 safe canonical events and entered the shared evaluator. |
+| **diagnostic only** | Useful raw evidence under the diagnostic profile, but structurally barred from quest evaluation. |
 
 The full picture—91 atlas rows, 90 exact signatures, and 77 method IDs:
 [`tools/component-packets/EVENT-ATLAS.md`](../../../tools/component-packets/EVENT-ATLAS.md).
 Its generated capability manifest classifies every exact signature and names 34 stable
-creator-event candidates. Those are classifications, not runtime promises: the shared
-evaluator accepts all 34 (plus the schema-1 `hit` alias), while this scaffold's quest
-engine still forwards only `kill` until normalized, witnessed integrations land.
+creator events. The shared evaluator accepts all 34 (plus the schema-1 `hit` alias), and
+the lab routes every creator-safe signature through that same evaluator. The patch guard
+fails if any of the 57 safe or 86 practical signatures loses runtime coverage.
 
 ## Writing a quest
 
@@ -123,20 +125,19 @@ The starter file holds two quests that disagree with each other on purpose:
 | | |
 | --- | --- |
 | `first_blood` — `kill` / `Greyling` | **armed.** Kill the Greyling under the combat monument. |
-| `punchwood` — `hit` / `tree_or_bush` | **not armed**, and nothing errors. |
+| `punchwood` — `hit` / `tree_or_bush` | **armed.** Punch the harvest target; `hit` remains a broad compatibility alias. |
 
 **You never have to go hunting.** `lab_target` puts a fresh practice target in front of you —
 `lab_target harvest` for a tree, `lab_target crafting` for a smelter, and so on for all eight
 schools. The gallery's stations are placed once; this is how you get another one after you've
 killed, chopped or otherwise consumed the first.
 
-That second one is the current runtime lesson. The shared evaluator understands every safe
-catalog event and retains `hit` as a compatibility alias, but the lab engine still forwards
-only witnessed kills. A `hit` quest therefore parses cleanly and is contract-bindable without
-yet firing in game. All eight schools are *hooked*; exactly one currently reaches the quest
-engine. The Quests tab names which, and why.
+The shared evaluator understands every safe catalog event and retains `hit` as a compatibility
+alias for `damage_dealt` and `resource_damaged`. All eight schools reach the quest engine through
+the same canonical router. Alternative local/RPC and overload witnesses share a bounded action
+key, so even a zero-cooldown quest cannot complete twice for one action.
 
-The tab also shows **the last kill the matcher was given** — creature, skill, melee or ranged
+The tab also shows **the last event the matcher was given** — canonical name, target, and context
 — which is what turns "why didn't it fire" from a guess into a read.
 
 ### The name a quest matches on is not the prefab name
@@ -188,6 +189,7 @@ and pausing drops nothing — the ring keeps collecting behind it.
 | `panelShortcut` | `F6` | F7 is taken by the retired control surface. `None` = console commands only. |
 | `consoleRows` | `18` | Rows on screen; the ring holds 8× that so you can scroll back. |
 | `verboseLogging` | `false` | Also write every event to the BepInEx log. Noisy in combat, good for pasting into a thread. |
+| `eventProfile` | `extended` | `core` is low-noise; `extended` adds safe high-frequency events; `diagnostic` also shows raw non-bindable witnesses. Hot-reloadable. |
 | `observeStamina` | `false` | `Player.UseStamina` fires on nearly every action including running. Turn it on to see the shape, then off again. **Needs a restart** — it decides whether the patch applies at all. |
 
 Hot-reloadable except `observeStamina` — every other read is live, so `Config.Reload()`

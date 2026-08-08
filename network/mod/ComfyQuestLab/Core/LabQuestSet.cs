@@ -6,7 +6,7 @@ using ComfyNetworkSense;
 
 /// <summary>Why a quest cannot fire in the lab, in the vocabulary the panel already speaks.</summary>
 public static class LabArmed {
-  /// <summary>The real evaluator matched it. A kill can fire this today.</summary>
+  /// <summary>The real evaluator matched a catalog event against it.</summary>
   public const string Yes = "yes";
 
   /// <summary>No trigger block at all — a quest somebody checks by hand.</summary>
@@ -18,8 +18,11 @@ public static class LabArmed {
   /// <summary>venue "irl": the game will never see it.</summary>
   public const string Irl = "irl";
 
-  /// <summary>A real in-game trigger the evaluator has no lane for. The whole lesson.</summary>
-  public const string VerbNotKill = "verb-not-kill";
+  /// <summary>A real in-game trigger outside the safe creator catalog.</summary>
+  public const string UnsupportedEvent = "unsupported-event";
+
+  // Source compatibility for tests/tools compiled against the scaffold name.
+  public const string VerbNotKill = UnsupportedEvent;
 
   /// <summary>Matched nothing and none of the above explains it. Should not happen; if it
   /// does, the contract moved and the lab should say so rather than invent a reason.</summary>
@@ -60,9 +63,9 @@ public sealed class LabQuest {
         return "marked auto_checked, so something outside the game checks it";
       case LabArmed.Irl:
         return "an IRL quest; the game will never fire it";
-      case LabArmed.VerbNotKill:
+      case LabArmed.UnsupportedEvent:
         return "parsed fine — but nothing binds a '" + (Quest == null ? "?" : Quest.TriggerEvent)
-             + "' trigger to a quest today; only a creature kill can fire one";
+             + "' trigger; use a name from the creator event catalog";
       default:
         return "the evaluator matched nothing here, and the usual reasons do not explain it";
     }
@@ -216,13 +219,12 @@ public sealed class LabQuestSet {
     }
   }
 
-  /// <summary>Ask the real matcher whether any kill could ever satisfy this quest, by echoing the
+  /// <summary>Ask the real matcher whether any catalog event could satisfy this quest, by echoing the
   /// quest's own filters back at a throwaway zero-cooldown evaluator.
   ///
-  /// <c>CreatureMatches(filter, filter)</c> is a substring of itself; a skill equals itself; and
-  /// <c>ranged: true</c> satisfies both states of <c>TriggerProjectile</c> (the evaluator only
-  /// rejects a projectile quest on a melee kill, never the reverse). So an empty result means no
-  /// kill can EVER fire this quest — not that this particular probe missed.
+  /// Target and scalar filters are reflected into a synthetic event, and compatibility aliases
+  /// are tried against each canonical event they accept. An empty result therefore means the
+  /// shared evaluator cannot bind this shape, not that one arbitrary probe missed.
   ///
   /// The point of doing it this way: zero duplicated matching logic. If the evaluator's rules
   /// change, this answer changes with them instead of drifting into a comfortable lie.</summary>
@@ -235,8 +237,6 @@ public sealed class LabQuestSet {
       return LabArmed.Yes;
     }
 
-    // Order matters: forcing the verb below would make a trigger-less quest look like a verb
-    // problem, so the shapes that have nothing to do with the verb are ruled out first.
     if (!quest.HasTrigger) {
       return LabArmed.NoTrigger;
     }
@@ -249,46 +249,69 @@ public sealed class LabQuestSet {
       return LabArmed.Irl;
     }
 
-    // One ablation, and it is the interesting one: same quest, verb forced to "kill". If it fires
-    // now, the verb was the only thing standing in the way — which is the lab's central lesson,
-    // and worth stating by name rather than as "no".
-    if (Fires(WithKillVerb(quest))) {
-      return LabArmed.VerbNotKill;
+    if (!QuestEventCatalog.IsBindable(quest.TriggerEvent)) {
+      return LabArmed.UnsupportedEvent;
     }
 
     return LabArmed.Unknown;
   }
 
   static bool Fires(TrackedQuest quest) {
-    var probe = new QuestTriggerEvaluator(0.0);
-    IReadOnlyList<QuestCompletion> hits = probe.OnCreatureKilled(
-        new[] { quest },
-        string.IsNullOrWhiteSpace(quest.TriggerTarget) ? "any" : quest.TriggerTarget,
-        quest.TriggerWeaponSkill,
-        true,
-        0.0);
-    return hits.Count > 0;
-  }
+    if (quest == null || !quest.HasTrigger) {
+      return false;
+    }
 
-  /// <summary>A shallow copy with the trigger verb forced to "kill". Only ever fed to
-  /// <see cref="Fires"/> — it must never escape into the loaded set.</summary>
-  static TrackedQuest WithKillVerb(TrackedQuest quest) {
-    return new TrackedQuest {
-      QuestId = quest.QuestId,
-      Name = quest.Name,
-      Guild = quest.Guild,
-      Era = quest.Era,
-      Category = quest.Category,
-      BotCommand = quest.BotCommand,
-      AutoChecked = quest.AutoChecked,
-      Venue = quest.Venue,
-      TriggerEvent = "kill",
-      TriggerTarget = quest.TriggerTarget,
-      TriggerWeaponSkill = quest.TriggerWeaponSkill,
-      TriggerProjectile = quest.TriggerProjectile,
-      TriggerShots = quest.TriggerShots,
-      TriggerWhere = quest.TriggerWhere,
-    };
+    var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    if (quest.TriggerWhere != null) {
+      foreach (KeyValuePair<string, string> field in quest.TriggerWhere) {
+        if (string.Equals(field.Key, "event", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(field.Key, "target", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(field.Key, "weapon_skill", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(field.Key, "projectile", StringComparison.OrdinalIgnoreCase)) {
+          continue;
+        }
+        fields[field.Key] = string.Equals(field.Value, "any", StringComparison.OrdinalIgnoreCase)
+            ? "sample"
+            : field.Value;
+      }
+    }
+
+    bool projectile = quest.TriggerProjectile;
+    if (quest.TriggerWhere != null
+        && quest.TriggerWhere.TryGetValue("projectile", out string expectedProjectile)
+        && string.Equals(expectedProjectile, "true", StringComparison.OrdinalIgnoreCase)) {
+      projectile = true;
+    }
+
+    string target = string.IsNullOrWhiteSpace(quest.TriggerTarget) ? "any" : quest.TriggerTarget;
+    if (quest.TriggerWhere != null
+        && quest.TriggerWhere.TryGetValue("target", out string expectedTarget)
+        && !string.Equals(expectedTarget, "any", StringComparison.OrdinalIgnoreCase)) {
+      target = expectedTarget;
+    }
+    string weaponSkill = quest.TriggerWeaponSkill;
+    if (quest.TriggerWhere != null
+        && quest.TriggerWhere.TryGetValue("weapon_skill", out string expectedSkill)
+        && !string.Equals(expectedSkill, "any", StringComparison.OrdinalIgnoreCase)) {
+      weaponSkill = expectedSkill;
+    }
+
+    foreach (string canonicalEvent in QuestEventCatalog.AllEventNames) {
+      if (!QuestEventCatalog.TriggerMatches(quest.TriggerEvent, canonicalEvent)) {
+        continue;
+      }
+      var gameplayEvent = new QuestEvent(
+          canonicalEvent,
+          target,
+          weaponSkill,
+          projectile,
+          fields: fields);
+      var probe = new QuestTriggerEvaluator(0.0);
+      if (probe.OnEvent(new[] { quest }, gameplayEvent, 0.0).Count > 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static int CountOccurrences(string haystack, string needle) {

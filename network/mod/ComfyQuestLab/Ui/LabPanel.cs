@@ -160,7 +160,8 @@ public sealed class LabPanel {
         GUILayout.BeginHorizontal();
         GUILayout.Label(new GUIContent(LabRunes.For(row.Category)),
             GUILayout.Width(18f), GUILayout.Height(18f));
-        GUILayout.Label(row.At + "  " + LabSpellNames.For(row.Seam));
+        string creatorName = string.IsNullOrWhiteSpace(row.EventName) ? row.Seam : row.EventName;
+        GUILayout.Label(row.At + "  " + LabSpellNames.For(creatorName));
         GUILayout.EndHorizontal();
         GUILayout.Label("        " + row.Target + "   " + row.Detail);
         GUILayout.Label("        " + UsabilityLine(row.Usability));
@@ -192,6 +193,8 @@ public sealed class LabPanel {
         return "-> a quest can be bound to this today";
       case LabUsability.ProducesEventNoTrigger:
         return "-> the world speaks, but no quest is listening yet";
+      case LabUsability.DiagnosticOnly:
+        return "-> diagnostic witness; intentionally not a quest trigger";
       default:
         return "-> nothing binds a quest to this yet";
     }
@@ -204,9 +207,9 @@ public sealed class LabPanel {
   /// filtered by category — one fight would scroll a roster away and a filter toggle would
   /// hide it. Only the moments (a reload, a firing) go in the console.
   ///
-  /// The line that earns its place here is "last kill" below: it shows the three strings the
-  /// matcher was actually handed, which turns "why didn't my quest fire" from a guess into
-  /// a read.</summary>
+  /// The line that earns its place here is "last event" below: it shows the canonical name and
+  /// target the matcher was actually handed, which turns "why didn't my quest fire" from a
+  /// guess into a read.</summary>
   void DrawQuests() {
     LabQuestSet set = LabQuestEngine.Set;
 
@@ -220,9 +223,9 @@ public sealed class LabPanel {
 
     GUILayout.Label("from " + LabQuestEngine.QuestDir);
 
-    string lastKill = LabQuestEngine.LastKillLine;
-    GUILayout.Label("last kill the matcher was given: "
-        + (string.IsNullOrEmpty(lastKill) ? "none yet" : lastKill));
+    string lastEvent = LabQuestEngine.LastEventLine;
+    GUILayout.Label("last event the matcher was given: "
+        + (string.IsNullOrEmpty(lastEvent) ? "none yet" : lastEvent));
 
     if (!LabConfig.QuestsEnabled.Value) {
       GUILayout.Label("questsEnabled is OFF — files are loaded, but nothing will fire.");
@@ -349,7 +352,7 @@ public sealed class LabPanel {
       }
       GUILayout.Label("  " + (spell.Bound ? "*" : "-") + "  " + spell.Name);
       GUILayout.Label("        " + spell.Verdict
-          + (spell.Bound ? string.Empty : "  ·  this tome cannot witness it yet"));
+          + (spell.Bound ? string.Empty : "  ·  intentionally not integrated"));
       if (_showTrueNames) {
         GUILayout.Label("        true name: " + spell.TrueName);
       }
@@ -357,7 +360,7 @@ public sealed class LabPanel {
     }
 
     GUILayout.Space(8f);
-    GUILayout.Label("Bound " + LabPatching.AppliedCount + " of "
+    GUILayout.Label("Integrated " + LabPatching.AppliedCount + " of "
         + LabPatching.Outcomes.Count + " seams this build reached for.");
     foreach (LabPatching.Outcome outcome in LabPatching.Outcomes) {
       if (!outcome.Applied) {

@@ -105,6 +105,27 @@ public static class LabKillWatch {
     }
   }
 
+  /// <summary>Read, but do not consume, a recent local-player hit for adjacent actions such as
+  /// stagger. The short age keeps an unrelated later stagger from inheriting an old attacker.</summary>
+  public static bool TryPeekPlayerHit(
+      Character victim, double now, double maxAge, out string weaponSkill, out bool ranged) {
+    weaponSkill = null;
+    ranged = false;
+    try {
+      if (victim == null
+          || !_hits.TryGetValue(victim.GetInstanceID(), out LastHit hit)
+          || now < hit.At
+          || now - hit.At > maxAge) {
+        return false;
+      }
+      weaponSkill = hit.WeaponSkill;
+      ranged = hit.Ranged;
+      return true;
+    } catch (Exception) {
+      return false;
+    }
+  }
+
   public static void Clear() {
     _hits.Clear();
   }

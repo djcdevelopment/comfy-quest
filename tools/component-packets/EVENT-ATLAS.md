@@ -21,7 +21,9 @@ running, no Docker, and no BepInEx — it reads the DLL.
 91 atlas rows across 8 categories. They normalize to **90 exact signatures** and **77
 method IDs**: `Player.OnDeath()` is intentionally listed in both combat and progression,
 and overloads share a method ID without sharing a signature. All 90 signatures are
-patchable. **One is usable by a quest today.**
+patchable. In the extraction-era shipping-mod view below, **one is directly usable by a
+quest**; Quest Lab's additive runtime now covers all 86 practical signatures and routes
+57 creator-safe signatures into the shared evaluator.
 
 | Category | Seams | Hooked | Quest-usable |
 | --- | ---: | ---: | ---: |
@@ -39,9 +41,10 @@ classification lives in
 [`quest-capability-rules.json`](quest-capability-rules.json), and the generated,
 signature-exact result lives in
 [`samples/quest-capability-manifest.json`](samples/quest-capability-manifest.json). The
-current policy normalizes 43 event meanings and marks 34 stable events as safe candidates
-for creator quests. A candidate does not become `today` until the shared evaluator,
-runtime patch, dedupe guard, and witness receipt all exist.
+current policy normalizes 43 event meanings and marks 34 stable events as safe for creator
+quests. The shared evaluator supports all 34, every safe signature has an explicit runtime
+patch, and alternative local/RPC and overload routes share a tested action-dedupe contract.
+In-game witness receipts remain a separate evidence tier from that built coverage.
 
 The distinction is deliberate:
 
@@ -54,7 +57,9 @@ The distinction is deliberate:
 Run `python tools/component-packets/generate_seam_catalog.py --check` to prove all three
 cardinalities and every classification are current. Generation fails when an atlas method
 is missing a rule, a removed method leaves a stale rule, or a creator-safe event lacks a
-primary route.
+primary route. Run `python tools/component-packets/check_lab_patches.py` to prove 57/57
+creator-safe and 86/86 practical signatures retain exact runtime patches; the other four
+are query/cheat surfaces intentionally classified `disabled`.
 
 ## Reading a verdict
 

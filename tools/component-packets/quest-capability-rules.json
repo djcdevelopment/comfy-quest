@@ -78,8 +78,8 @@
       "Profile": "core",
       "CreatorSafe": true,
       "Dedupe": "character-healed",
-      "Actor": "local-player-caused",
-      "Reason": "Intentional heal route with a stable amount payload."
+      "Actor": "local-player",
+      "Reason": "Local-player heal witness with a stable amount payload."
     },
     {
       "Methods": ["Character.RPC_Heal"],
@@ -89,8 +89,8 @@
       "Profile": "core",
       "CreatorSafe": true,
       "Dedupe": "character-healed",
-      "Actor": "local-player-caused",
-      "Reason": "RPC witness for the same heal action."
+      "Actor": "local-player",
+      "Reason": "RPC witness for the same local-player heal action."
     },
     {
       "Methods": ["Character.OnDeath"],

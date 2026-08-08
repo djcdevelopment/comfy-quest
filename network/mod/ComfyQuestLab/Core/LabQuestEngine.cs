@@ -9,8 +9,8 @@ using ComfyNetworkSense;
 
 using UnityEngine;
 
-/// <summary>The lab's quest lane: read the quest directory, hold the loaded set, and let a kill
-/// ask the real evaluator whether anything fires.
+/// <summary>The lab's quest lane: read the quest directory, hold the loaded set, and let every
+/// safe canonical event ask the real evaluator whether anything fires.
 ///
 /// Deliberately thin. Everything worth testing lives in <see cref="LabQuestSet"/> and
 /// <see cref="LabQuestAdvisor"/>, which are Unity-free and covered; what is left here is disk IO,
@@ -24,6 +24,7 @@ public static class LabQuestEngine {
   static LabQuestSet _set = new LabQuestSet();
   static QuestTriggerEvaluator _evaluator = new QuestTriggerEvaluator(60.0);
   static string _lastKillLine;
+  static string _lastEventLine;
   static List<string> _lastReport = new List<string>();
 
   /// <summary>The loaded set. Never null, even before the first load.</summary>
@@ -34,6 +35,9 @@ public static class LabQuestEngine {
   /// The single most useful line in the panel: it turns "why didn't my quest fire" from a guess
   /// into a read, because the three strings the matcher compared are right there.</summary>
   public static string LastKillLine { get { return _lastKillLine; } }
+
+  /// <summary>The last canonical event handed to the shared matcher.</summary>
+  public static string LastEventLine { get { return _lastEventLine; } }
 
   /// <summary>Diff, failures and advisories from the last reload, for the Quests tab.</summary>
   public static List<string> LastReport { get { return _lastReport; } }
@@ -91,6 +95,7 @@ public static class LabQuestEngine {
     // lab_reload exists to protect. Reloading is an authoring act, not a gameplay one.
     _evaluator = new QuestTriggerEvaluator(CooldownSeconds());
     LabKillWatch.Clear();
+    LabEventRouter.Reset();
 
     foreach (string line in _set.DiffFrom(previous)) {
       report.Add(line);
@@ -157,7 +162,60 @@ public static class LabQuestEngine {
     return files;
   }
 
-  // ---- the kill lane ---------------------------------------------------------------------
+  // ---- canonical event lane ---------------------------------------------------------------
+
+  public static void OnEvent(
+      QuestEvent gameplayEvent, string category, string detail, double now) {
+    try {
+      if (!LabConfig.QuestsEnabled.Value || gameplayEvent == null) {
+        return;
+      }
+
+      IReadOnlyList<QuestCompletion> completions = _evaluator.OnEvent(
+          _set.Quests.Count == 0 ? EmptyQuests : TrackedQuests(), gameplayEvent, now);
+      _lastEventLine = DateTime.Now.ToString("HH:mm:ss") + " · " + gameplayEvent.Name
+          + " · " + (gameplayEvent.Target ?? "any") + " → "
+          + GenericOutcome(completions, gameplayEvent, now);
+
+      foreach (QuestCompletion completion in completions) {
+        Credit(completion, category, gameplayEvent, detail);
+      }
+    } catch (Exception) {
+      // A postfix that throws takes the game path down with it.
+    }
+  }
+
+  static string GenericOutcome(
+      IReadOnlyList<QuestCompletion> completions, QuestEvent gameplayEvent, double now) {
+    if (completions.Count > 0) {
+      return "fired " + completions.Count;
+    }
+
+    var cooling = new List<string>();
+    foreach (LabQuest quest in _set.Quests) {
+      double remaining = _evaluator.CooldownRemaining(quest.QuestId, now);
+      if (remaining > 0.0 && WouldMatch(quest.Quest, gameplayEvent)) {
+        cooling.Add(quest.Quest.Name + " re-arms in "
+            + Mathf.CeilToInt((float) remaining) + "s");
+      }
+    }
+    return cooling.Count == 0
+        ? "matched nothing"
+        : "matched, but still cooling down — " + string.Join(", ", cooling);
+  }
+
+  static bool WouldMatch(TrackedQuest quest, QuestEvent gameplayEvent) {
+    var probe = new QuestTriggerEvaluator(0.0);
+    var withoutDedupe = new QuestEvent(
+        gameplayEvent.Name,
+        gameplayEvent.Target,
+        gameplayEvent.WeaponSkill,
+        gameplayEvent.Projectile,
+        fields: gameplayEvent.Fields);
+    return probe.OnEvent(new[] { quest }, withoutDedupe, 0.0).Count > 0;
+  }
+
+  // ---- attributed kill lane ---------------------------------------------------------------
 
   /// <summary>A creature died. If the local player landed the fatal blow, ask the real evaluator
   /// what completes, and record what it was asked either way.
@@ -182,6 +240,7 @@ public static class LabQuestEngine {
       _lastKillLine = DateTime.Now.ToString("HH:mm:ss") + " · " + kill.Display + " · "
           + kill.WeaponSkill + " · " + (kill.Ranged ? "ranged" : "melee") + " → "
           + Outcome(completions, kill, now);
+      _lastEventLine = _lastKillLine;
 
       foreach (QuestCompletion completion in completions) {
         Credit(completion, kill);
@@ -241,20 +300,28 @@ public static class LabQuestEngine {
 
   /// <summary>Count the fire and put one row in the console beside the death that caused it.</summary>
   static void Credit(QuestCompletion completion, LabKill kill) {
+    Credit(
+        completion,
+        LabCategory.Combat,
+        QuestEvent.CreatureKilled(kill.Creature, kill.WeaponSkill, kill.Ranged),
+        kill.WeaponSkill);
+  }
+
+  static void Credit(
+      QuestCompletion completion, string category, QuestEvent gameplayEvent, string detail) {
     foreach (LabQuest quest in _set.Quests) {
       if (string.Equals(quest.QuestId, completion.QuestId, StringComparison.OrdinalIgnoreCase)) {
         quest.Fires++;
       }
     }
 
-    // Category is chosen here rather than looked up: LabSeamCatalog.Category() answers Combat for
-    // any id it does not know, so routing "quest.fired" through it would be right by accident.
-    // A quest firing on a kill IS combat — but it should say so on purpose.
     ComfyQuestLab.Observe(new LabEvent(
-        LabCategory.Combat,
+        category,
+        "quest.fired",
         "quest.fired",
         completion.Name,
-        "kill " + kill.Display + " · " + kill.WeaponSkill,
+        gameplayEvent.Name + " " + (gameplayEvent.Target ?? "any")
+            + (string.IsNullOrWhiteSpace(detail) ? string.Empty : " · " + detail),
         LabUsability.Today));
 
     ComfyQuestLab.Report("quest fired: " + completion.Name);

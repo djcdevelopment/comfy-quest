@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import importlib.util
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,8 @@ MANIFEST = (
 )
 GENERATOR = REPO / "tools" / "component-packets" / "generate_seam_catalog.py"
 RULES = REPO / "tools" / "component-packets" / "quest-capability-rules.json"
+PATCH_CHECKER = REPO / "tools" / "component-packets" / "check_lab_patches.py"
+PATCHES = REPO / "network" / "mod" / "ComfyQuestLab" / "Patches"
 
 SPEC = importlib.util.spec_from_file_location("quest_capability_generator", GENERATOR)
 CAPABILITY_GENERATOR = importlib.util.module_from_spec(SPEC)
@@ -136,6 +139,43 @@ class QuestCapabilityManifestTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_every_creator_safe_signature_has_a_runtime_patch(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(PATCH_CHECKER)],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("creator-safe runtime coverage 57/57", result.stdout)
+        self.assertIn("practical atlas runtime coverage 86/86", result.stdout)
+
+    def test_missing_creator_patch_turns_the_guard_red(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            copied = Path(temporary) / "Patches"
+            shutil.copytree(PATCHES, copied)
+            combat = copied / "CombatPatches.cs"
+            source = combat.read_text(encoding="utf-8")
+            source = source.replace(
+                'LabPatching.TryPatch(harmony, typeof(Character), "Damage"',
+                'LabPatching.SkipPatch(harmony, typeof(Character), "Damage"',
+                1,
+            )
+            combat.write_text(source, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(PATCH_CHECKER), "--patches", str(copied)],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "creator-safe signature has no runtime patch: Character.Damage(HitData)",
+                result.stdout,
+            )
 
     def test_missing_policy_turns_the_guard_red(self) -> None:
         rules = json.loads(RULES.read_text(encoding="utf-8"))

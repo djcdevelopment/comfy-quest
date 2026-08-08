@@ -24,6 +24,7 @@ public static class LabPatching {
   }
 
   static readonly List<Outcome> _outcomes = new();
+  static readonly Dictionary<MethodBase, string> _signatureIds = new();
 
   public static IReadOnlyList<Outcome> Outcomes { get { return _outcomes; } }
 
@@ -37,6 +38,15 @@ public static class LabPatching {
       }
       return n;
     }
+  }
+
+  public static string SignatureFor(MethodBase method) {
+    if (method != null && _signatureIds.TryGetValue(method, out string signatureId)) {
+      return signatureId;
+    }
+    return method == null
+        ? "unknown"
+        : method.DeclaringType.Name + "." + method.Name;
   }
 
   /// <summary>Patch <paramref name="declaringType"/>.<paramref name="methodName"/> with a
@@ -74,6 +84,7 @@ public static class LabPatching {
       }
 
       harmony.Patch(target, postfix: new HarmonyMethod(postfix));
+      _signatureIds[target] = label;
       Record(label, true, "ok");
     } catch (Exception ex) {
       Record(label, false, ex.Message);
