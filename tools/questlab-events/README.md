@@ -120,8 +120,12 @@ for canonical names and safe action identity. The parser only:
 3. keeps rows without an action identity as distinct actions;
 4. fails if one stable identity carries conflicting canonical payloads.
 
-Every action retains `raw_witnesses`, `coalesced_witnesses`, and `source_records`, so a
-clean chart never erases transport or overload evidence.
+When an input actually carries multiple witnesses for one action, the report retains
+`raw_witnesses`, `coalesced_witnesses`, and `source_records` instead of hiding that evidence.
+The stock runtime archive is intentionally downstream of Quest Lab's local/RPC and overload
+dedupe and normally records only the first creator-facing witness; it cannot reconstruct seams
+that were suppressed before persistence. Use the exact live-suite receipt—not an event archive—
+for transport-witness/coalescing proof.
 
 By default, source paths, raw session IDs, raw action identities, detail, diagnostic
 seams, and private-looking field names are absent. `--include-diagnostics` and
