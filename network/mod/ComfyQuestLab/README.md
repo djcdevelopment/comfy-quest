@@ -95,6 +95,10 @@ update.
 | `questlab_batch prepare all-schools` | write eight ordinary example quests, safely reset the marked site, and raise one fresh compact course with targets and supplies at point of use |
 | `questlab_batch run [all-schools\|creator-events]` | start live witnessing or run the explicitly synthetic 34-event contract probe |
 | `questlab_batch reset\|report\|export` | reset safely, show progress, or write a machine-readable receipt |
+| `questlab_blueprint capture <name> <radius> [mine\|lab] [replace]` | copy your pieces or Quest Lab-marked pieces inside a 1–40 m sphere into a deterministic PlanBuild file plus metadata sidecar |
+| `questlab_blueprint inspect <name>` | validate the sidecar hash and prove its PlanBuild projection still agrees |
+| `questlab_blueprint diff <name> [radius] [mine\|lab]` | compare a live selection with the capture, independent of world translation |
+| `questlab_blueprint check\|build\|count\|clear <name>` | preflight, replay, inspect, or remove only that marked blueprint build |
 
 `lab_setup` is typed into **Valheim's** console, which is **F5**. **F6** opens the lab's own
 panel. Two different keys, and mixing them up is the most common first stumble.
@@ -238,6 +242,37 @@ Generated counts
 and previews live in
 [`gallery-profiles.json`](../../../tools/component-packets/samples/gallery-profiles.json)
 and `gallery-plan-comparison.png`; `generate_gallery.py --check` guards plan drift.
+
+## Capture a build by example
+
+Quest Lab can turn a bounded live build into a portable pair without changing the source
+objects. Stand near the build and run, for example:
+
+```text
+questlab_blueprint capture my-hall 24 mine
+questlab_blueprint inspect my-hall
+```
+
+`mine` selects only pieces whose durable Valheim creator id is the local player. `lab`
+selects only pieces already owned by the Gallery or blueprint lanes. Both are additionally
+limited to a sphere around the player, capped at 40 m and 2,048 pieces; there is deliberately
+no unbounded or arbitrary-world selection. Capture refuses to overwrite either output unless
+the final argument is the explicit word `replace`.
+
+The `.blueprint` is the community-standard PlanBuild projection. Its adjacent
+`.capture.json` sidecar preserves sign text, item-stand item/variant/quality/orientation, and
+Quest Lab's durable rune-light/text-glow marks. Piece coordinates are translated to a zero
+minimum, quaternions are canonicalized, the complete records are sorted, and a SHA-256 covers
+them. Capturing the same structure at a different world position therefore produces identical
+content. `inspect` verifies the hash and refuses a mixed sidecar/blueprint pair; a build does
+the same check before placing its first object. `diff` captures another bounded selection in
+memory and reports missing and extra structural or metadata records.
+
+Only metadata with a reviewed persistence path is portable. Arbitrary ZDO keys, container
+contents, door state, portal links, generic runtime `Light` component edits, terrain operations,
+and non-unit scale are intentionally excluded. Replayed objects use the existing blueprint
+mark, count, and selective-clear lifecycle, so a captured experiment remains removable without
+touching unrelated world pieces.
 
 ## Bounded suites and receipts
 

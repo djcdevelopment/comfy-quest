@@ -345,9 +345,9 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       // The other world-changing lane. Same rule as the gallery: it only ever moves
       // when somebody types one of these, and check comes before build, always.
       new Terminal.ConsoleCommand("questlab_blueprint",
-          "build a PlanBuild .blueprint file: questlab_blueprint <list|check|build|clear> "
-          + "[name] — build <name> sky raises it overhead with a portal pair bound to "
-          + "the blueprint's name, ground door at your crosshair",
+          "capture or build PlanBuild files: capture <name> <radius 1-40> [mine|lab] "
+          + "[replace]; inspect|diff|check|build|count|clear <name>; build <name> sky "
+          + "raises it overhead with a named portal pair",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "list";
             string name = args.Length >= 3 ? args[2] : null;
@@ -355,6 +355,16 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
                 && string.Equals(args[3], "sky", StringComparison.OrdinalIgnoreCase);
             if (verb == "build") {
               StartCoroutine(_blueprints.Build(this, name, sky));
+            } else if (verb == "capture") {
+              bool replace = args.Length >= 6
+                  && string.Equals(args[5], "replace", StringComparison.OrdinalIgnoreCase);
+              Report(_blueprints.Capture(name, args.Length >= 4 ? args[3] : null,
+                  args.Length >= 5 ? args[4] : "mine", replace));
+            } else if (verb == "inspect") {
+              Report(_blueprints.Inspect(name));
+            } else if (verb == "diff") {
+              Report(_blueprints.Diff(name, args.Length >= 4 ? args[3] : null,
+                  args.Length >= 5 ? args[4] : null));
             } else if (verb == "clear") {
               Report(_blueprints.Clear(name));
             } else if (verb == "count") {
@@ -416,7 +426,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_gallery evidence [profile-or-build-id]   export read-only truth and named views");
     sb.AppendLine("  questlab_gallery trees|restore-trees [profile-or-build-id]   inspect or recover pruned trees");
     sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   bounded evidence runs");
-    sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");
+    sb.AppendLine("  questlab_blueprint capture <n> <1-40m> [mine|lab] [replace]   copy a bounded live build");
+    sb.AppendLine("  questlab_blueprint inspect|diff <n> | check|build|count|clear <n>   verify or replay it");
     sb.AppendLine("  questlab_prefabs <name> | inspect <exact-name> | dump   search or inspect rendered state");
     sb.AppendLine("Try one action at a monument with the panel open; every school has bindable events.");
     return sb.ToString().TrimEnd();

@@ -1,6 +1,6 @@
 # Changelog
 
-**r22 Creator Foundry and Gallery Truth foundation.** Every safe canonical event now carries generated,
+**r22 Creator Foundry, Gallery Truth, and build-by-example foundation.** Every safe canonical event now carries generated,
 shared creator metadata: target kind and meaning, an honest example target, meaningful
 weapon/projectile support, and the exact event-specific scalar fields a `trigger.where` may use.
 The 34-event metadata source is guarded against capability drift and expands into both the public
@@ -17,6 +17,15 @@ camera view plans. The existing OMEN/i5 mailbox gains only the explicit allowlis
 `gallery_evidence` operation and retrieves the fixed-directory artifact after validating its
 path and schema. Evidence never moves the camera or world and never overrules the rendered
 frame or human visual acceptance.
+
+`questlab_blueprint capture` now exports either the
+local player's pieces or Quest Lab-marked pieces inside an explicit 1–40 m radius as a
+deterministic PlanBuild file plus a hashed metadata sidecar. Sign text, item-stand display
+state, and Quest Lab light/glow marks survive replay. `inspect` detects tampering or a mixed
+file pair before placement; translation-independent `diff` reports structural and metadata
+drift. Capture is read-only, refuses silent overwrite, caps selections at 2,048 pieces, and
+reuses the existing marked build/count/clear lifecycle. The Unity-free contract has executable
+round-trip, determinism, tamper, oversize, projection, metadata, and diff tests.
 
 **r21 executable ledger serializer correction.** A one-record r20 live probe proved that
 Unity's `JsonUtility` discarded every custom record array regardless of whether its DTO was

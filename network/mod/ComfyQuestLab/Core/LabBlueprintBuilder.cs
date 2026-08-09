@@ -3,7 +3,9 @@ namespace ComfyQuestLab;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 using HarmonyLib;
@@ -18,7 +20,7 @@ using UnityEngine;
 /// blueprint — or an offline generator's Fallingwater — reach the world without anyone
 /// rebuilding a DLL.
 ///
-/// Four commands, in the order you should use them:
+/// Import commands, in the order you should use them:
 ///
 ///   list    what is in the blueprints directory.
 ///   check   parse one file, resolve every prefab it names, place nothing. A blueprint
@@ -29,12 +31,17 @@ using UnityEngine;
 ///           own ZDO, and clear sweeps the loaded ZDO table for that mark. Ids are
 ///           session-scoped; the mark is not — this survives any number of restarts.
 ///
+/// Build-by-example adds a read-only front half: capture a bounded creator/mark-scoped
+/// selection, inspect its hash and PlanBuild projection, then diff it against another
+/// bounded live selection. Capture never broadens the build/clear mutation boundary.
+///
 /// Placement is origin-relative at the player's position with one ground sample: a house
 /// keeps its own internal levels, so the blueprint's lowest piece is set just above the
 /// ground under your feet and everything else rides at its authored offset. On a slope
 /// that means buried or floating edges — pick flat ground.</summary>
 public sealed class LabBlueprintBuilder {
   const float GroundClearance = 0.3f;
+  const string CaptureSuffix = ".capture.json";
 
   /// <summary>Sky mode, the gallery's own move generalized: the build rides this far
   /// above the ground and a portal pair connects it to where the operator was aiming.
@@ -56,6 +63,10 @@ public sealed class LabBlueprintBuilder {
       return Path.Combine(BepInEx.Paths.ConfigPath,
           Path.Combine("comfy-quest-lab", "blueprints"));
     }
+  }
+
+  static string CapturePath(string canonicalName) {
+    return Path.Combine(BlueprintsDir, canonicalName + CaptureSuffix);
   }
 
   // ---- list ------------------------------------------------------------------------
@@ -85,6 +96,133 @@ public sealed class LabBlueprintBuilder {
     }
   }
 
+  // ---- capture / inspect / diff ----------------------------------------------------
+
+  /// <summary>Export a deliberately narrow live selection as both a community-standard
+  /// PlanBuild projection and a deterministic Quest Lab metadata sidecar. Capture never
+  /// marks, claims, moves, or destroys a world object.</summary>
+  public string Capture(string name, string radiusArg, string selectionArg,
+                        bool replace = false) {
+    Player player = Player.m_localPlayer;
+    if (player == null || ZNetScene.instance == null || ZDOMan.instance == null) {
+      return "not in a world yet.";
+    }
+    string canonical = LabCaptureContract.CanonicalName(name);
+    if (canonical.Length == 0) {
+      return "capture names use 1-64 lowercase letters, digits, '-' or '_'.";
+    }
+    float radius;
+    if (!float.TryParse(radiusArg, NumberStyles.Float, CultureInfo.InvariantCulture,
+                        out radius)
+        || radius < LabCaptureContract.MinRadius || radius > LabCaptureContract.MaxRadius) {
+      return "capture radius must be 1-40 metres.";
+    }
+    radius = (float)Math.Round(radius, 3, MidpointRounding.AwayFromZero);
+    string selection = (selectionArg ?? "mine").Trim().ToLowerInvariant();
+    if (selection != "mine" && selection != "lab") {
+      return "capture selection must be mine (your player-built pieces) or lab "
+          + "(Quest Lab-marked pieces).";
+    }
+
+    Directory.CreateDirectory(BlueprintsDir);
+    string blueprintPath = Path.Combine(BlueprintsDir, canonical + ".blueprint");
+    string capturePath = CapturePath(canonical);
+    if (!replace && (File.Exists(blueprintPath) || File.Exists(capturePath))) {
+      return "refusing to overwrite " + canonical + ". Use an unused name, or append replace "
+          + "after reviewing the existing artifact.";
+    }
+
+    List<LabCapturePiece> records;
+    string selectionError;
+    if (!TrySelect(player, radius, selection, out records, out selectionError)) {
+      return selectionError;
+    }
+    LabCaptureArtifact artifact;
+    try {
+      artifact = LabCaptureContract.Create(canonical, selection, radius, records);
+    } catch (Exception ex) {
+      return "capture refused: " + ex.Message;
+    }
+
+    string json = LabCaptureContract.Serialize(artifact) + "\n";
+    string blueprint = LabCaptureContract.ToBlueprintText(artifact);
+    string error;
+    if (!WritePairAtomically(capturePath, json, blueprintPath, blueprint, out error)) {
+      return "capture write failed; neither artifact was replaced: " + error;
+    }
+    int signs = 0, stands = 0, lights = 0;
+    foreach (LabCapturePiece piece in artifact.Pieces) {
+      if (piece.HasSignText) signs++;
+      if (piece.HasItemStand) stands++;
+      if (!string.IsNullOrEmpty(piece.RuneSchool)
+          || !string.IsNullOrEmpty(piece.TextGlowSchool)) lights++;
+    }
+    return "captured " + artifact.PieceCount + " " + selection + " piece(s) inside "
+        + radius.ToString("0.###", CultureInfo.InvariantCulture) + " m as " + canonical
+        + "\n  " + blueprintPath + "\n  " + capturePath
+        + "\n  metadata: " + signs + " sign(s), " + stands + " item stand(s), "
+        + lights + " Quest Lab light/glow carrier(s)\n  sha256 "
+        + artifact.PiecesSha256 + "\nRun questlab_blueprint inspect " + canonical
+        + " before clearing the source.";
+  }
+
+  public string Inspect(string name) {
+    string canonical = LabCaptureContract.CanonicalName(name);
+    if (canonical.Length == 0) return "which capture? questlab_blueprint list shows the names.";
+    LabCaptureArtifact artifact;
+    string error = LoadCapture(canonical, out artifact);
+    if (error != null) return error;
+    BlueprintFile bp;
+    List<string> problems;
+    string load = Load(canonical, out bp, out problems);
+    if (load != null) return "capture sidecar is valid, but its PlanBuild projection is not: " + load;
+    if (!LabCaptureContract.BlueprintMatches(artifact, bp, out error)) {
+      return "capture refused: " + error + ". Regenerate the pair; do not build mixed files.";
+    }
+    int signs = artifact.Pieces.Count(p => p.HasSignText);
+    int stands = artifact.Pieces.Count(p => p.HasItemStand);
+    int lights = artifact.Pieces.Count(p => !string.IsNullOrEmpty(p.RuneSchool)
+        || !string.IsNullOrEmpty(p.TextGlowSchool));
+    return "capture " + canonical + " is internally consistent\n  " + artifact.PieceCount
+        + " piece(s), " + signs + " sign(s), " + stands + " item stand(s), " + lights
+        + " light/glow carrier(s)\n  source selection " + artifact.Selection + " within "
+        + artifact.RadiusMetres.ToString("0.###", CultureInfo.InvariantCulture)
+        + " m\n  pieces sha256 " + artifact.PiecesSha256
+        + "\n  PlanBuild projection and metadata sidecar agree.";
+  }
+
+  public string Diff(string name, string radiusArg, string selectionArg) {
+    Player player = Player.m_localPlayer;
+    if (player == null || ZNetScene.instance == null || ZDOMan.instance == null) {
+      return "not in a world yet.";
+    }
+    string canonical = LabCaptureContract.CanonicalName(name);
+    LabCaptureArtifact artifact;
+    string error = LoadCapture(canonical, out artifact);
+    if (error != null) return error;
+    float radius = artifact.RadiusMetres;
+    if (!string.IsNullOrEmpty(radiusArg)
+        && (!float.TryParse(radiusArg, NumberStyles.Float, CultureInfo.InvariantCulture,
+                           out radius)
+            || radius < LabCaptureContract.MinRadius || radius > LabCaptureContract.MaxRadius)) {
+      return "diff radius must be 1-40 metres.";
+    }
+    string selection = string.IsNullOrEmpty(selectionArg)
+        ? artifact.Selection : selectionArg.Trim().ToLowerInvariant();
+    if (selection != "mine" && selection != "lab") return "diff selection must be mine or lab.";
+    List<LabCapturePiece> actual;
+    if (!TrySelect(player, radius, selection, out actual, out error)) return error;
+    LabCaptureDiff diff = LabCaptureContract.Diff(artifact.Pieces, actual);
+    var sb = new StringBuilder();
+    sb.Append("capture diff ").Append(canonical).Append(": ")
+      .Append(diff.Equal ? "MATCH" : "DIFFERENT").Append(" — expected ")
+      .Append(diff.ExpectedCount).Append(", selected ").Append(diff.ActualCount)
+      .Append(", missing ").Append(diff.MissingCount).Append(", extra ").Append(diff.ExtraCount);
+    foreach (string example in diff.Examples) sb.Append("\n  ").Append(example);
+    if (!diff.Equal) sb.Append("\nSelection is translation-independent, but rotation and metadata must match.");
+    return sb.ToString();
+  }
+
   // ---- check -----------------------------------------------------------------------
 
   public string Check(string name) {
@@ -100,6 +238,19 @@ public sealed class LabBlueprintBuilder {
 
     List<string> missing;
     Dictionary<string, GameObject> prefabs = ResolvePrefabs(bp, out missing);
+    string canonical = CanonicalName(name);
+    LabCaptureArtifact capture = null;
+    string captureProblem = null;
+    if (File.Exists(CapturePath(canonical))) {
+      captureProblem = LoadCapture(canonical, out capture);
+      if (captureProblem == null
+          && !LabCaptureContract.BlueprintMatches(capture, bp, out captureProblem)) {
+        capture = null;
+      }
+      if (captureProblem == null) {
+        captureProblem = ValidateCaptureItems(capture);
+      }
+    }
 
     var sb = new StringBuilder();
     sb.AppendLine("blueprint check — " + CanonicalName(name)
@@ -120,6 +271,11 @@ public sealed class LabBlueprintBuilder {
     foreach (string p in problems) {
       sb.AppendLine("  parse: " + p);
     }
+    if (capture != null) {
+      sb.AppendLine("  deterministic capture sidecar agrees: " + capture.PiecesSha256);
+    } else if (captureProblem != null) {
+      sb.AppendLine("CAPTURE SIDECAR INVALID: " + captureProblem);
+    }
     if (missing.Count > 0) {
       sb.AppendLine("MISSING (this game build has no prefab by these names):");
       foreach (string m in missing) {
@@ -127,6 +283,8 @@ public sealed class LabBlueprintBuilder {
       }
       sb.AppendLine("Find the right name with: questlab_prefabs <part of the name>");
       sb.Append("Not ready — build will refuse until the names resolve.");
+    } else if (captureProblem != null) {
+      sb.Append("Not ready — build refuses a mixed or invalid capture pair.");
     } else {
       sb.Append("Ready. questlab_blueprint build " + CanonicalName(name));
     }
@@ -156,6 +314,22 @@ public sealed class LabBlueprintBuilder {
 
     List<string> missing;
     Dictionary<string, GameObject> prefabs = ResolvePrefabs(bp, out missing);
+    string canonical = CanonicalName(name);
+    LabCaptureArtifact capture = null;
+    string captureProblem = null;
+    if (File.Exists(CapturePath(canonical))) {
+      captureProblem = LoadCapture(canonical, out capture);
+      if (captureProblem == null
+          && !LabCaptureContract.BlueprintMatches(capture, bp, out captureProblem)) {
+        capture = null;
+      }
+      if (captureProblem == null) captureProblem = ValidateCaptureItems(capture);
+      if (captureProblem != null) {
+        Report("refusing to build capture pair: " + captureProblem
+            + ". Run questlab_blueprint inspect " + canonical + ".");
+        yield break;
+      }
+    }
     if (sky) {
       // Sky mode adds its own hardware: the portal pair and the arrival pad.
       foreach (string extra in new[] { PortalPrefab, PadPrefab }) {
@@ -175,7 +349,7 @@ public sealed class LabBlueprintBuilder {
     }
 
     _running = true;
-    string mark = CanonicalName(name);
+    string mark = canonical;
 
     // Ground mode builds at the player's feet. Sky mode anchors on whatever the
     // crosshair is aimed at — sampled NOW, before anything exists to hit — and rides
@@ -228,6 +402,7 @@ public sealed class LabBlueprintBuilder {
     int reportStep = Mathf.Max(1, total / 10);
     int perFrame = Mathf.Clamp(LabConfig.BlueprintPiecesPerFrame.Value, 1, 200);
 
+    int captureIndex = 0;
     foreach (BpPiece piece in bp.Pieces) {
       if (piece.ScaleRejected) {
         continue;
@@ -241,11 +416,14 @@ public sealed class LabBlueprintBuilder {
         rot = Quaternion.identity;
       }
 
-      if (Place(prefabs[piece.Prefab], piece.Prefab, at, rot, mark) != null) {
+      GameObject built = Place(prefabs[piece.Prefab], piece.Prefab, at, rot, mark);
+      if (built != null) {
+        if (capture != null) ApplyCapturedMetadata(built, capture.Pieces[captureIndex]);
         placed++;
       } else {
         failed++;
       }
+      captureIndex++;
 
       attempted++;
       if (attempted % reportStep == 0 && attempted < total) {
@@ -305,7 +483,7 @@ public sealed class LabBlueprintBuilder {
   /// placement time: it runs from Awake, during Instantiate, before the ZDO below has
   /// been marked as ours.</summary>
   GameObject Place(GameObject prefab, string prefabName, Vector3 position,
-                   Quaternion rotation, string mark) {
+                    Quaternion rotation, string mark) {
     try {
       GameObject go = UnityEngine.Object.Instantiate(prefab, position, rotation);
       if (go == null) {
@@ -333,6 +511,58 @@ public sealed class LabBlueprintBuilder {
     } catch (Exception ex) {
       LogOnce("could not place " + prefabName + ": " + ex.Message);
       return null;
+    }
+  }
+
+  static string ValidateCaptureItems(LabCaptureArtifact capture) {
+    if (capture == null) return null;
+    foreach (LabCapturePiece piece in capture.Pieces) {
+      if (!piece.HasItemStand || string.IsNullOrEmpty(piece.ItemPrefab)) continue;
+      if (ObjectDB.instance == null) return "ObjectDB is not ready to validate item stands";
+      GameObject item = ObjectDB.instance.GetItemPrefab(piece.ItemPrefab);
+      if (item == null || item.GetComponent<ItemDrop>() == null
+          || ItemStand.GetAttachPrefab(item) == null) {
+        return "item-stand attachment '" + piece.ItemPrefab
+            + "' is unavailable in this game build";
+      }
+    }
+    return null;
+  }
+
+  /// <summary>Restore only metadata with a verified vanilla or Quest Lab persistence
+  /// path. Arbitrary ZDO fields and arbitrary Unity component state are intentionally
+  /// absent from the capture contract.</summary>
+  static void ApplyCapturedMetadata(GameObject built, LabCapturePiece record) {
+    if (built == null || record == null) return;
+    try {
+      ZNetView view = built.GetComponent<ZNetView>();
+      ZDO zdo = view == null ? null : view.GetZDO();
+      if (zdo == null) return;
+      if (record.HasSignText && built.GetComponent<Sign>() != null) {
+        zdo.Set("text", record.SignText ?? string.Empty);
+        built.SendMessage("UpdateText", SendMessageOptions.DontRequireReceiver);
+      }
+      if (record.HasItemStand && built.GetComponent<ItemStand>() != null) {
+        zdo.Set("type", record.ItemType);
+        if (!string.IsNullOrEmpty(record.ItemPrefab)) {
+          zdo.Set("item", record.ItemPrefab);
+          zdo.Set("variant", record.ItemVariant);
+          zdo.Set("quality", Math.Max(1, record.ItemQuality));
+          view.InvokeRPC(ZNetView.Everybody, "SetVisualItem", record.ItemPrefab,
+              record.ItemVariant, Math.Max(1, record.ItemQuality), record.ItemType);
+        }
+      }
+      if (!string.IsNullOrEmpty(record.TextGlowSchool)) {
+        LabRuneLight.MarkTextGlow(zdo, record.TextGlowSchool);
+        LabRuneLight.ApplyTextGlow(built, record.TextGlowSchool);
+      }
+      if (!string.IsNullOrEmpty(record.RuneSchool)) {
+        LabRuneLight.Mark(zdo, record.RuneSchool, record.RuneStyle);
+        LabRuneLight.Apply(built, record.RuneSchool, record.RuneStyle);
+      }
+    } catch (Exception ex) {
+      ComfyQuestLab.LogInfo("[blueprint] captured metadata restore failed for "
+          + (record.Prefab ?? "piece") + ": " + ex.Message);
     }
   }
 
@@ -457,6 +687,137 @@ public sealed class LabBlueprintBuilder {
     sb.Append(". Only loaded zones are swept — if part of the build sits beyond view "
         + "distance, walk there and clear again.");
     return sb.ToString();
+  }
+
+  bool TrySelect(Player player, float radius, string selection,
+                 out List<LabCapturePiece> records, out string error) {
+    records = new List<LabCapturePiece>();
+    error = null;
+    Vector3 center = player.transform.position;
+    float radiusSquared = radius * radius;
+    long playerId = player.GetPlayerID();
+    try {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        Vector3 at = zdo.GetPosition();
+        if ((at - center).sqrMagnitude > radiusSquared) continue;
+        bool selected = selection == "lab"
+            ? LabMarks.IsLabBuilt(zdo)
+            : zdo.GetLong("creator", 0L) == playerId && !LabMarks.IsLabBuilt(zdo);
+        if (!selected) continue;
+        GameObject prefab = ZNetScene.instance.GetPrefab(zdo.GetPrefab());
+        Piece piece = prefab == null ? null : prefab.GetComponent<Piece>();
+        if (piece == null) continue;
+        if (records.Count >= LabCaptureContract.MaxPieces) {
+          error = "capture refused: more than " + LabCaptureContract.MaxPieces
+              + " matching pieces are inside the radius. Reduce the radius.";
+          records.Clear();
+          return false;
+        }
+        Quaternion q = zdo.GetRotation();
+        var record = new LabCapturePiece {
+          Prefab = prefab.name,
+          Category = piece.m_category.ToString(),
+          X = at.x, Y = at.y, Z = at.z,
+          Qx = q.x, Qy = q.y, Qz = q.z, Qw = q.w,
+          RuneSchool = LabRuneLight.SchoolOf(zdo),
+          RuneStyle = LabRuneLight.StyleOf(zdo),
+          TextGlowSchool = LabRuneLight.TextGlowSchoolOf(zdo),
+        };
+        GameObject live = null;
+        ZNetView view = ZNetScene.instance.FindInstance(zdo);
+        if (view != null) live = view.gameObject;
+        bool sign = (live != null && live.GetComponent<Sign>() != null)
+            || prefab.GetComponent<Sign>() != null;
+        if (sign) {
+          record.HasSignText = true;
+          record.SignText = zdo.GetString("text", string.Empty);
+        }
+        bool itemStand = (live != null && live.GetComponent<ItemStand>() != null)
+            || prefab.GetComponent<ItemStand>() != null;
+        if (itemStand) {
+          record.HasItemStand = true;
+          record.ItemPrefab = zdo.GetString("item", string.Empty);
+          record.ItemVariant = zdo.GetInt("variant", 0);
+          record.ItemQuality = zdo.GetInt("quality", 1);
+          record.ItemType = zdo.GetInt("type", 0);
+        }
+        records.Add(record);
+      }
+    } catch (Exception ex) {
+      records.Clear();
+      error = "capture could not read the loaded ZDO table on this game build: " + ex.Message;
+      return false;
+    }
+    if (records.Count == 0) {
+      error = "capture found no " + selection + " pieces inside "
+          + radius.ToString("0.###", CultureInfo.InvariantCulture)
+          + " m. Only loaded pieces count; stand near the build.";
+      return false;
+    }
+    return true;
+  }
+
+  static string LoadCapture(string canonical, out LabCaptureArtifact artifact) {
+    artifact = null;
+    if (string.IsNullOrEmpty(canonical)) return "capture name is required.";
+    string path = CapturePath(canonical);
+    if (!File.Exists(path)) return "no capture sidecar named \"" + canonical + "\" in "
+        + BlueprintsDir + ".";
+    try {
+      artifact = LabCaptureContract.Deserialize(File.ReadAllText(path, Encoding.UTF8));
+      string error;
+      if (!LabCaptureContract.TryValidate(artifact, out error)) {
+        artifact = null;
+        return "invalid capture sidecar: " + error;
+      }
+      if (!string.Equals(artifact.Name, canonical, StringComparison.Ordinal)) {
+        artifact = null;
+        return "capture sidecar name does not match its file name.";
+      }
+      return null;
+    } catch (Exception ex) {
+      artifact = null;
+      return "could not read capture sidecar: " + ex.Message;
+    }
+  }
+
+  static bool WritePairAtomically(string firstPath, string firstContent,
+                                  string secondPath, string secondContent,
+                                  out string error) {
+    error = null;
+    string token = Guid.NewGuid().ToString("N");
+    string firstTemp = firstPath + "." + token + ".tmp";
+    string secondTemp = secondPath + "." + token + ".tmp";
+    string firstBackup = firstPath + "." + token + ".bak";
+    string secondBackup = secondPath + "." + token + ".bak";
+    bool firstMoved = false, secondMoved = false;
+    try {
+      File.WriteAllText(firstTemp, firstContent, new UTF8Encoding(false));
+      File.WriteAllText(secondTemp, secondContent, new UTF8Encoding(false));
+      if (File.Exists(firstPath)) File.Move(firstPath, firstBackup);
+      if (File.Exists(secondPath)) File.Move(secondPath, secondBackup);
+      File.Move(firstTemp, firstPath); firstMoved = true;
+      File.Move(secondTemp, secondPath); secondMoved = true;
+      // The pair is committed once both renames land. Backup cleanup is not allowed to
+      // turn a successful commit into a rollback after one backup was already removed.
+      try { if (File.Exists(firstBackup)) File.Delete(firstBackup); } catch (Exception) { }
+      try { if (File.Exists(secondBackup)) File.Delete(secondBackup); } catch (Exception) { }
+      return true;
+    } catch (Exception ex) {
+      error = ex.Message;
+      try {
+        if (firstMoved && File.Exists(firstPath)) File.Delete(firstPath);
+        if (secondMoved && File.Exists(secondPath)) File.Delete(secondPath);
+        if (File.Exists(firstBackup)) File.Move(firstBackup, firstPath);
+        if (File.Exists(secondBackup)) File.Move(secondBackup, secondPath);
+      } catch (Exception rollback) {
+        error += "; rollback also failed: " + rollback.Message;
+      }
+      return false;
+    } finally {
+      try { if (File.Exists(firstTemp)) File.Delete(firstTemp); } catch (Exception) { }
+      try { if (File.Exists(secondTemp)) File.Delete(secondTemp); } catch (Exception) { }
+    }
   }
 
   // ---- plumbing --------------------------------------------------------------------
