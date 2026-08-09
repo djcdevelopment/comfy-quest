@@ -38,6 +38,15 @@ drift. Capture is read-only, refuses silent overwrite, caps selections at 2,048 
 reuses the existing marked build/count/clear lifecycle. The Unity-free contract has executable
 round-trip, determinism, tamper, oversize, projection, metadata, and diff tests.
 
+Creator packs now have an exact certification and publishing lane. A Unity-free console host
+links the shipping schema-1 loader, generated 34-event catalog, evaluator, and Quest Lab armed
+probe; `publish` must pass that host before writing a reproducible `.questpack` and public-safe
+sidecar. Exact synthetic/live receipts can earn scoped, hash-backed badges only after full schema,
+coverage, coalescing, and zero-double-completion checks. Compatibility Doctor and Pacing Clinic
+reports are summarized without promoting advice to proof. Every published pack carries a generic
+getting-started guide plus read-only inspect/diagnose and no-side-effect install-preview commands;
+install/uninstall retain their no-overwrite and refuse-on-modification guarantees.
+
 **r21 executable ledger serializer correction.** A one-record r20 live probe proved that
 Unity's `JsonUtility` discarded every custom record array regardless of whether its DTO was
 nested or top-level. Recovery persistence now uses the data-contract JSON serializer already

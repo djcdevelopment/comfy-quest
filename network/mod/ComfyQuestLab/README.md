@@ -366,6 +366,24 @@ chat/sign text is redacted and cannot be filtered, while `item_crafted` currentl
 crafting subject rather than the crafted item. r22 does not yet add a panel editor or write files;
 it supplies the drift-guarded contract those surfaces can safely consume next.
 
+### Certified creator packs
+
+[`tools/quest-packs`](../../../tools/quest-packs/README.md) turns a local course into a
+deterministic, data-only `.questpack`. The `publish` command does not mirror the matcher in a
+script: its Unity-free contract host links this release's `QuestViewLoader`, generated event
+catalog, `QuestTriggerEvaluator`, and armed-state probe, then embeds that exact verdict in a
+public-safe certification report. Included suite receipts are independently checked against the
+complete 34-event or eight-school schemas before they can earn a badge. Partial JSON with a
+plausible `verdict: pass` earns nothing.
+
+Every published pack includes a generated generic getting-started guide. `inspect` verifies the
+archive and claim hashes, `diagnose` explains catalog/contract drift without installing, and
+`install --dry-run` names every destination without touching it. Installation never overwrites;
+uninstall refuses before deleting anything if a creator changed an installed quest or asset.
+No Derek-specific service, path, account, or remote console is required. The generated guide and
+public certification sidecar contain no raw gameplay receipt; creators deliberately including raw
+receipts in the pack should review those source files before public distribution.
+
 The tab also shows **the last event the matcher was given** — canonical name, target, and context
 — which is what turns "why didn't it fire" from a guess into a read.
 
