@@ -3,6 +3,7 @@
 Quest Lab keeps its normalized event history local and useful before Google enters the
 picture. This companion validates a session's authoritative JSONL, produces a safe CSV,
 and—after a one-time opt-in—turns one selected session into a polished Google workbook.
+The bundled tools require Python 3.10 or newer.
 
 ## The two-click setup, then one-click exports
 
@@ -49,14 +50,19 @@ batch, saves a local receipt, and takes the browser directly to the new Sheet.
 
 - **Events** — exact normalized archive columns, frozen header, filter, and practical widths.
 - **Summary** — total/bindable rows plus school and canonical-event counts.
-- **Metadata** — schema, release, UTC boundaries, privacy-field switches, source filenames
+- **Metadata** — schema, release, UTC boundaries, startup-default routing profile,
+  privacy-field switches, source filenames
   and SHA-256, per-file OAuth scope, and RAW write mode.
 
 The exporter uses the Sheets API's `RAW` input option, so sign text, player-created names,
 and other cells cannot become formulas. CSV adds a leading apostrophe to formula-shaped
 text because desktop spreadsheet programs may otherwise interpret it on open. Google
 requests stay below 1.5 MB, inside Google's current recommendation to keep payloads under
-2 MB. There is never one network request per event row.
+2 MB. A transient `429` or `5xx` retries the same idempotent range/format request with six
+bounded delays (1, 2, 4, 8, 16, then 30 seconds); workbook creation itself is never retried,
+because an ambiguous create response must not produce a second workbook. Large sessions can
+therefore take several minutes while Google replenishes write quota. There is never one network
+request per event row.
 
 ## Local parser
 
@@ -80,16 +86,39 @@ the final `sessionEnd` are validated as integrity metadata, never mistaken for g
 A clean end, clean end with drops, still-active/unclean tail, and retention-partial session
 remain distinct states in both the dashboard and workbook. Missing retained segments may be
 exported with a prominent warning; an unexplained sequence gap or malformed row is refused.
+Sequence continuity is still enforced inside every retained segment and across adjacent retained
+segments. A cumulative drop notice may establish a new monotonic baseline after a missing segment;
+its unverifiable `droppedSinceLastNotice` delta is labeled partial, while later deltas are checked
+from that retained baseline.
 One broken session gets its own disabled card rather than hiding healthy sessions. Limits are
-128 parts, 64 MiB per part, 250,000 events, and 256 KiB per JSONL row.
+128 parts, 64 MiB per part, 512 MiB total, 250,000 events, and 256 KiB per JSONL row. The stock
+writer's 16 MiB segment size fits the direct exporter's per-file and total-byte envelope, but its
+24 retained segments do **not** guarantee that one session stays below the independent 250,000-
+event limit. Route any session over a direct bound to the packaged offline parser and filter it
+before workbook creation. That parser accepts at most 128 MiB per selected file, 512 MiB total,
+and 1,000,000 unique rows for streaming JSON/CSV; its XLSX/ZIP outputs have smaller documented
+expanded-size and row ceilings. A 65–128 MiB segment is offline-only, and a 129–256 MiB segment
+is deliberately refused by both bundled exporters.
 
-These archives contain the stable, post-deduplication creator events that quests actually
-consume; they are intentionally not a raw Harmony/RPC/overload trace. Diagnostic seam and
-action identity fields remain an explicit privacy opt-in. Use the bounded live-suite receipts
-when transport-witness evidence is required. An interrupted writer may leave one incomplete,
+These archives contain stable, post-deduplication catalog-routed events, not a raw
+Harmony/RPC/overload trace. Rows with `usability=today` are the creator events quests consume;
+`diagnostic-only` rows remain evidence rather than bindable triggers. Diagnostic seam and action
+identity fields remain an explicit privacy opt-in. Use the bounded live-suite receipts when
+transport-witness evidence is required. An interrupted writer may leave one incomplete,
 unterminated final JSONL line: the parser hashes but does not export that crash tail, labels the
 session active/unclean, and still rejects malformed newline-terminated rows or damage in an
 earlier segment.
+
+`runtimeProfile` is the configured default captured when Valheim started; the writer marks it
+`startup-default`, and descriptive filenames say `startup-<profile>`. A live profile change or
+bounded suite override does not pretend to rewrite earlier rows. Canonical event/usability
+columns remain the event-level record.
+
+The packaged `questlab-events` tool is the richer offline path for multi-session filters,
+normalized JSON/CSV, a five-tab XLSX, or an evidence ZIP. Its JSON/CSV outputs support larger
+archives without constructing a workbook in memory; see
+[`../questlab-events/README.md`](../questlab-events/README.md). The loopback dashboard stays the
+short one-session path: direct CSV or a three-tab Google workbook with no intermediate file.
 
 ## Credential and network boundary
 
@@ -106,9 +135,13 @@ earlier segment.
 - No Google request occurs on startup, session discovery, `inspect`, `to-csv`, `doctor`, or
   CSV download. If dependencies, OAuth configuration, consent, network access, or a
   Workspace policy blocks Google, the local archive and CSV path remain fully functional.
-- A write failure after workbook creation can leave a partial workbook. The error names its
-  fixed Google Sheets link so the owner can inspect or delete it; the tool never retries into
-  duplicate workbooks by itself.
+- The setup card prints the absolute packaged or repository `requirements-google.txt` path, so
+  its install command works regardless of the directory from which the launcher was invoked.
+- A Google write failure after workbook creation can leave a partial workbook. The error names
+  its fixed Sheets link. If only the local receipt write fails after a complete upload, the
+  dashboard says the Sheet already exists and presents that same link with an explicit
+  do-not-retry warning. `429`/`5xx` recovery retries only idempotent writes and formatting against
+  that same validated sheet ID; the tool never retries creation into duplicate workbooks.
 
 ## Enterprise deployment reality
 

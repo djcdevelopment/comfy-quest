@@ -5,9 +5,14 @@ enters a bounded background writer; quest matching and the live ring remain unch
 wait for disk. Each session gets a descriptive UTC/release/profile JSONL name, a self-describing
 `comfy-questlab-events/v1` header in every rotated segment, UTC event timestamps, and a clean
 end summary when Valheim shuts down normally. JSONL flushes every second and is the append-only
-source of truth; a crash may leave only its final line partial, which consumers are expected to
-ignore. A fixed 4,096-row queue drops instead of growing or delaying gameplay, and emits both a
+source of truth; a crash may leave only its final line partial. The loopback companion labels
+that exact tail automatically, while the offline parser requires an explicit recovery flag. A
+fixed 4,096-row queue drops instead of growing or delaying gameplay, and emits both a
 machine-readable overflow notice and a dropped-row count in status/end records.
+Quest reload/completion notices remain live-panel diagnostics rather than masquerading as
+creator events in the strict archive; durable rows enter only through the atlas/catalog router.
+Filename/header profile provenance is labelled `startup-default`; hot profile changes and
+bounded-suite overrides therefore cannot be mistaken for a per-row profile claim.
 
 The default privacy surface is creator event, school, target, and usability. Bounded detail and
 exact diagnostic seam/action identity are separate startup opt-ins; chat and sign text remain
@@ -28,7 +33,10 @@ active/unclean, and retention-partial archives, detects unexplained gaps/tamperi
 formula-neutralized RFC 4180 CSV. After an explicit Desktop OAuth setup, one **Create Google
 Sheet** click creates a three-tab Events/Summary/Metadata workbook, writes only RAW values in
 sub-1.5 MB batches, applies its filter/frozen headers/widths in one formatting batch, saves a
-local source-hash receipt, and opens the created file. Authorization uses the system browser,
+local source-hash receipt, and opens the created file. Transient 429/5xx failures retry only the
+same idempotent ranges and formatting request with bounded backoff; workbook creation itself is
+never retried. The package also carries a strict dependency-free offline parser for filtered
+JSON/CSV, five-tab XLSX, and evidence ZIP output. Authorization uses the system browser,
 random loopback callback, PKCE/state, and only Google's non-sensitive per-file `drive.file`
 scope. Windows refresh tokens are DPAPI-protected under Local App Data; Disconnect attempts
 revocation and always removes the local token. Missing libraries, tenant denial, or offline

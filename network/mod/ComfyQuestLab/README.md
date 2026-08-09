@@ -171,7 +171,7 @@ clearing the retained log are separate, explicitly labelled actions.
 The in-memory console is backed by a local, bounded creator-event archive under
 `BepInEx/config/comfy-quest-lab/event-archive/`. JSONL is enabled by default and names each
 session for a human, for example
-`questlab-events-20260809T123456789Z-r24-extended.jsonl`; rotations add `-part002` and repeat
+`questlab-events-20260809T123456789Z-r24-startup-extended.jsonl`; rotations add `-part002` and repeat
 the same session header so every part is independently parseable. Each accepted canonical row
 has an ISO-8601 UTC timestamp, sequence, school, creator event, target, and usability. A clean
 shutdown adds an end/count summary; after a crash a consumer should ignore only an incomplete
@@ -184,6 +184,13 @@ source regardless. An unknown future runtime signature is archived as the stable
 `unclassified_runtime_event`; its raw identifier stays in the live ring and enters the file only
 with diagnostic identity enabled. Nothing archives arbitrary quest files, player names, world
 contents, or the event's internal field dictionary.
+Lab-owned administrative rows such as quest reload/completion notices remain visible in the
+live panel but stay out of creator archives; only atlas/catalog-routed runtime events cross the
+durable boundary.
+
+The filename/header profile is explicitly the configured default captured at Valheim startup,
+not per-row provenance. `questlab_profile` can change routing live and bounded suites can
+temporarily widen it; the canonical event and usability on each row are the event-level truth.
 
 JSONL flushes once per second. A 4,096-row memory queue and 16 MiB segments prevent an event
 storm from blocking gameplay or growing forever; overflow becomes an explicit archive notice
@@ -199,8 +206,10 @@ schema,session_id,sequence,timestamp_utc,school,creator_event,target,detail,usab
 ```
 
 Use `questlab_archive` for the current path and accepted/written/dropped counts, or
-`questlab_archive flush` before opening the files in another tool. Archive policy is captured in
-the session header and therefore takes effect on the next Valheim launch after a config change.
+`questlab_archive flush` before opening the files in another tool. Archive settings take effect
+on the next Valheim launch after a config change. The session header records release, startup
+profile, privacy flags, and segment identity; it does not claim every queue/flush/retention knob
+as per-file provenance.
 
 ### Export dashboard and Google Sheets
 
@@ -214,6 +223,10 @@ selected session into Events, Summary, and Metadata tabs and opens the new workb
 per-file `drive.file` scope cannot browse the rest of Drive; tokens stay outside BepInEx and
 the repo, protected by current-user DPAPI on Windows. See the
 [companion security/setup guide](../../../tools/questlab-sheets/README.md).
+
+The creator package also includes the dependency-free `questlab-events` parser for filtered
+JSON/CSV, a richer five-tab XLSX, or a portable evidence bundle. The dashboard is the fast
+single-session route; the offline parser is the analysis and large-archive route.
 
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Its world-action grid gives each integration one row with a colored

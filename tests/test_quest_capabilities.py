@@ -202,6 +202,30 @@ class QuestCapabilityManifestTests(unittest.TestCase):
         self.assertIn("creator-safe runtime coverage 57/57", result.stdout)
         self.assertIn("practical atlas runtime coverage 86/86", result.stdout)
 
+    def test_durable_archive_is_owned_only_by_the_catalog_router(self) -> None:
+        mod = REPO / "network" / "mod" / "ComfyQuestLab"
+        runtime_callers = []
+        for path in mod.rglob("*.cs"):
+            source = path.read_text(encoding="utf-8")
+            if "ComfyQuestLab.ObserveRuntimeEvent(" in source:
+                runtime_callers.append(path.relative_to(mod).as_posix())
+        self.assertEqual(runtime_callers, ["Core/LabEventRouter.cs"])
+
+        plugin = (mod / "ComfyQuestLab.cs").read_text(encoding="utf-8")
+        self.assertIn("public static void ObserveRuntimeEvent", plugin)
+        self.assertIn("if (archive && self._eventArchive != null)", plugin)
+        self.assertEqual(plugin.count("_eventArchive.TryRecord(row, actionIdentity)"), 1)
+
+        router = (mod / "Core" / "LabEventRouter.cs").read_text(encoding="utf-8")
+        self.assertEqual(router.count("ComfyQuestLab.ObserveRuntimeEvent("), 2)
+        self.assertNotIn("quest.reloaded", router)
+        self.assertNotIn("quest.fired", router)
+
+        archive = (mod / "Core" / "LabEventArchive.cs").read_text(encoding="utf-8")
+        csv_retry = archive.index("if (!TryDelete(csv)) continue;")
+        json_delete = archive.index("TryDelete(candidate);", csv_retry)
+        self.assertLess(csv_retry, json_delete)
+
     def test_missing_creator_patch_turns_the_guard_red(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             copied = Path(temporary) / "Patches"

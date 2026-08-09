@@ -75,6 +75,12 @@ class QuestLabPackageTests(unittest.TestCase):
         self.assertIn("explicit file allowlist", source)
         self.assertNotIn("Copy-Item $sheetsSource -Recurse", source)
 
+        self.assertIn("$eventsSource = Join-Path $root 'tools\\questlab-events'", source)
+        for filename in ("questlab_events.py", "README.md"):
+            with self.subTest(parser_filename=filename):
+                self.assertIn(filename, source)
+        self.assertNotIn("Copy-Item $eventsSource -Recurse", source)
+
     def test_release_dll_does_not_change_with_the_containing_git_commit(self) -> None:
         # SourceLink puts the repository revision into the PDB and its checksum into the
         # PE debug directory. That makes a docs-only landing change the DLL hash even when
@@ -104,6 +110,18 @@ class QuestLabPackageTests(unittest.TestCase):
         readme = (MOD / "README.md").read_text(encoding="utf-8")
         self.assertIn("Valheim/BepInEx/plugins/", readme)
         self.assertIn("Valheim/BepInEx/config/", readme)
+
+    def test_packager_rewrites_repository_links_for_extracted_readme(self) -> None:
+        source = PACKAGER.read_text(encoding="utf-8")
+        self.assertIn("$readmeLinks = [ordered]@{", source)
+        self.assertIn("questlab-sheets/Start-QuestLabSheets.ps1", source)
+        self.assertIn("questlab-sheets/README.md", source)
+        self.assertIn("https://github.com/djcdevelopment/baseline/blob/main/", source)
+        self.assertIn("package README retains a repository-relative link", source)
+        self.assertIn("Quest Lab package README target is missing", source)
+        self.assertIn("Quest Lab package README has a broken local link", source)
+        self.assertIn("network/mod/ComfyQuestLab/Patches/HarvestPatches.cs", source)
+        self.assertNotIn("Copy-Item $readme -Destination $staging", source)
 
 
 if __name__ == "__main__":

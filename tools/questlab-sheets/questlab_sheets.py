@@ -21,6 +21,7 @@ import secrets
 import sys
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -32,7 +33,7 @@ from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Sequence
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 
 SCHEMA = "comfy-questlab-events/v1"
@@ -41,9 +42,12 @@ SHEETS_PORT = 47631
 SHEETS_HOME = f"http://127.0.0.1:{SHEETS_PORT}/"
 MAX_PARTS = 128
 MAX_PART_BYTES = 64 * 1024 * 1024
+MAX_TOTAL_BYTES = 512 * 1024 * 1024
 MAX_EVENTS = 250_000
 MAX_LINE_BYTES = 256 * 1024
 MAX_GOOGLE_REQUEST_BYTES = 1_500_000
+SAME_SHEET_RETRY_DELAYS = (1.0, 2.0, 4.0, 8.0, 16.0, 30.0)
+GOOGLE_REQUIREMENTS_PATH = Path(__file__).resolve().with_name("requirements-google.txt")
 CSV_COLUMNS = (
     "schema",
     "session_id",
@@ -72,6 +76,17 @@ GOOGLE_REVOKE_URI = "https://oauth2.googleapis.com/revoke"
 
 class QuestLabSheetsError(RuntimeError):
     """A user-actionable, token-safe failure."""
+
+
+class SheetCreatedWithoutReceipt(QuestLabSheetsError):
+    """Google succeeded but the local evidence receipt could not be persisted."""
+
+    def __init__(self, spreadsheet_url: str):
+        self.spreadsheet_url = spreadsheet_url
+        super().__init__(
+            "Google created and populated the Sheet, but Quest Lab could not save its local "
+            "receipt. Open the existing Sheet below; do not click export again."
+        )
 
 
 class _RecordDecodeError(QuestLabSheetsError):
@@ -114,6 +129,7 @@ class EventSession:
     started_utc: str
     release_id: str
     runtime_profile: str
+    runtime_profile_semantics: str
     include_details: bool
     include_diagnostic_identity: bool
     events: tuple[EventRow, ...]
@@ -160,6 +176,11 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def google_install_command() -> str:
+    """A launch-directory-independent command for the local dashboard."""
+    return f'python -m pip install -r "{GOOGLE_REQUIREMENTS_PATH}"'
+
+
 def default_state_dir() -> Path:
     if os.name == "nt":
         root = os.environ.get("LOCALAPPDATA")
@@ -191,6 +212,19 @@ def _required_text(record: Mapping[str, Any], key: str, context: str) -> str:
     return value.strip()
 
 
+def _required_utc(record: Mapping[str, Any], key: str, context: str) -> str:
+    value = _required_text(record, key, context)
+    if not value.endswith("Z"):
+        raise QuestLabSheetsError(f"{context}: {key} must be ISO-8601 UTC ending in Z")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        raise QuestLabSheetsError(f"{context}: {key} must be valid ISO-8601 UTC") from None
+    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        raise QuestLabSheetsError(f"{context}: {key} must be ISO-8601 UTC ending in Z")
+    return value
+
+
 def _present_text(record: Mapping[str, Any], key: str, context: str) -> str:
     if key not in record or not isinstance(record[key], str):
         raise QuestLabSheetsError(f"{context}: {key} must be a string")
@@ -220,15 +254,20 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
     header: Mapping[str, Any] | None = None
     events: list[EventRow] = []
     seen_sequences: set[int] = set()
+    segment_sequences: dict[int, list[int]] = {}
     session_id = ""
     runtime_profile = ""
+    runtime_profile_semantics = ""
     observed_segments: list[int] = []
     archive_notice_count = 0
     notice_dropped_total = 0
+    last_notice_segment: int | None = None
+    notice_delta_unverifiable = False
     session_end: Mapping[str, Any] | None = None
     crash_tail = False
     warnings: list[str] = []
     source_digest = hashlib.sha256()
+    total_source_bytes = 0
 
     for path_index, path in enumerate(paths):
         if not path.is_file():
@@ -239,8 +278,20 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
         source_digest.update(b"\0")
         part_had_header = False
         part_had_event = False
+        part_segment: int | None = None
+        part_source_bytes = 0
         with path.open("rb") as source:
             for line_number, line in enumerate(source, start=1):
+                part_source_bytes += len(line)
+                if part_source_bytes > MAX_PART_BYTES:
+                    raise QuestLabSheetsError(
+                        f"{path.name}: exceeds the {MAX_PART_BYTES // (1024 * 1024)} MiB safety limit"
+                    )
+                total_source_bytes += len(line)
+                if total_source_bytes > MAX_TOTAL_BYTES:
+                    raise QuestLabSheetsError(
+                        f"session exceeds the {MAX_TOTAL_BYTES // (1024 * 1024)} MiB total safety limit"
+                    )
                 source_digest.update(line)
                 if not line.strip():
                     continue
@@ -279,6 +330,7 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
                         raise QuestLabSheetsError(f"{context}: segment must be a positive integer")
                     if segment in observed_segments:
                         raise QuestLabSheetsError(f"{context}: duplicate segment {segment}")
+                    part_segment = segment
                     filename_match = SESSION_FILE.fullmatch(path.name)
                     if filename_match:
                         filename_segment = int(filename_match.group("part") or "1")
@@ -290,11 +342,22 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
                     if header is None:
                         header = record
                         session_id = candidate_id
+                        _required_utc(record, "startedUtc", context)
                         runtime_profile = _required_text(record, "runtimeProfile", context)
+                        runtime_profile_semantics = _required_text(
+                            record, "runtimeProfileSemantics", context
+                        )
+                        if runtime_profile_semantics != "startup-default":
+                            raise QuestLabSheetsError(
+                                f"{context}: runtimeProfileSemantics must be startup-default"
+                            )
                     else:
                         if candidate_id != session_id:
                             raise QuestLabSheetsError(f"{context}: sessionId changed between parts")
-                        for key in ("startedUtc", "releaseId", "runtimeProfile", "fields"):
+                        for key in (
+                            "startedUtc", "releaseId", "runtimeProfile",
+                            "runtimeProfileSemantics", "fields",
+                        ):
                             if record.get(key) != header.get(key):
                                 raise QuestLabSheetsError(f"{context}: {key} changed between parts")
                     continue
@@ -303,17 +366,32 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
                         raise QuestLabSheetsError(f"{context}: archiveNotice appeared before the session header")
                     if record.get("sessionId") != session_id:
                         raise QuestLabSheetsError(f"{context}: archiveNotice sessionId does not match the header")
-                    _required_text(record, "timestampUtc", context)
+                    _required_utc(record, "timestampUtc", context)
                     if record.get("reason") != "queue-capacity":
                         raise QuestLabSheetsError(f"{context}: unknown archiveNotice reason")
                     since_last = record.get("droppedSinceLastNotice")
                     total_dropped = record.get("totalDroppedEventCount")
                     if (isinstance(since_last, bool) or not isinstance(since_last, int) or since_last < 1
                             or isinstance(total_dropped, bool) or not isinstance(total_dropped, int)
-                            or total_dropped < since_last or total_dropped < notice_dropped_total
-                            or total_dropped - notice_dropped_total != since_last):
+                            or total_dropped < since_last or total_dropped <= notice_dropped_total):
                         raise QuestLabSheetsError(f"{context}: invalid or decreasing archive drop counts")
+                    if part_segment is None:
+                        raise QuestLabSheetsError(f"{context}: archiveNotice has no segment header")
+                    baseline_segment = 1 if last_notice_segment is None else last_notice_segment
+                    delta_is_verifiable = all(
+                        segment in observed_segments
+                        for segment in range(baseline_segment, part_segment + 1)
+                    )
+                    if delta_is_verifiable:
+                        if total_dropped - notice_dropped_total != since_last:
+                            raise QuestLabSheetsError(f"{context}: invalid archive drop delta")
+                    else:
+                        # A purged segment may contain the notice that established the missing
+                        # cumulative baseline. Preserve monotonic totals, but do not invent an
+                        # equality assertion across evidence that is no longer retained.
+                        notice_delta_unverifiable = True
                     notice_dropped_total = total_dropped
+                    last_notice_segment = part_segment
                     archive_notice_count += 1
                     part_had_event = True
                     continue
@@ -324,10 +402,17 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
                         raise QuestLabSheetsError(f"{context}: sessionEnd must be in the final selected segment")
                     if record.get("sessionId") != session_id:
                         raise QuestLabSheetsError(f"{context}: sessionEnd sessionId does not match the header")
-                    for key in ("startedUtc", "releaseId", "runtimeProfile"):
+                    for key in (
+                        "startedUtc", "releaseId", "runtimeProfile", "runtimeProfileSemantics",
+                    ):
                         if record.get(key) != header.get(key):
                             raise QuestLabSheetsError(f"{context}: sessionEnd {key} does not match the header")
-                    _required_text(record, "endedUtc", context)
+                    ended_utc_value = _required_utc(record, "endedUtc", context)
+                    started_utc_value = _required_utc(header, "startedUtc", "session header")
+                    if datetime.fromisoformat(ended_utc_value[:-1] + "+00:00") < datetime.fromisoformat(
+                        started_utc_value[:-1] + "+00:00"
+                    ):
+                        raise QuestLabSheetsError(f"{context}: endedUtc is before startedUtc")
                     if record.get("reason") != "clean-shutdown":
                         raise QuestLabSheetsError(f"{context}: unknown sessionEnd reason")
                     for key in ("eventCount", "droppedEventCount", "segments"):
@@ -336,6 +421,10 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
                             raise QuestLabSheetsError(f"{context}: {key} must be a non-negative integer")
                     if record["segments"] < 1:
                         raise QuestLabSheetsError(f"{context}: segments must be positive")
+                    if record["segments"] != part_segment:
+                        raise QuestLabSheetsError(
+                            f"{context}: sessionEnd segments must equal its end-bearing segment"
+                        )
                     if record["droppedEventCount"] < notice_dropped_total:
                         raise QuestLabSheetsError(f"{context}: sessionEnd droppedEventCount is below its notices")
                     session_end = record
@@ -354,6 +443,9 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
                 if sequence in seen_sequences:
                     raise QuestLabSheetsError(f"{context}: duplicate sequence {sequence}")
                 seen_sequences.add(sequence)
+                if part_segment is None:
+                    raise QuestLabSheetsError(f"{context}: event has no segment header")
+                segment_sequences.setdefault(part_segment, []).append(sequence)
                 part_had_event = True
                 fields = header["fields"]
                 include_details = fields["details"] is True
@@ -369,7 +461,7 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
                     schema=SCHEMA,
                     session_id=session_id,
                     sequence=sequence,
-                    timestamp_utc=_required_text(record, "timestampUtc", context),
+                    timestamp_utc=_required_utc(record, "timestampUtc", context),
                     school=_required_text(record, "school", context),
                     creator_event=_required_text(record, "creatorEvent", context),
                     target=_present_text(record, "target", context),
@@ -385,7 +477,6 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
 
     if header is None:
         raise QuestLabSheetsError("session header is missing")
-    events.sort(key=lambda row: row.sequence)
     sorted_segments = sorted(observed_segments)
     if observed_segments != sorted_segments:
         raise QuestLabSheetsError("archive parts were not supplied in segment order")
@@ -393,14 +484,48 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
     missing_segment = sorted_segments != expected_observed or sorted_segments[0] != 1
     if missing_segment:
         warnings.append("one or more retained archive segments are missing")
+    if notice_delta_unverifiable:
+        warnings.append(
+            "archive drop deltas cross missing segments; retained cumulative totals remain partial"
+        )
+
+    observed_set = set(sorted_segments)
+    previous_event_segment: int | None = None
+    previous_sequence: int | None = None
+    for segment in sorted_segments:
+        retained_sequences = segment_sequences.get(segment, [])
+        if not retained_sequences:
+            continue
+        expected_within = list(range(retained_sequences[0], retained_sequences[-1] + 1))
+        if retained_sequences != expected_within:
+            raise QuestLabSheetsError(
+                f"event sequence has a gap or reordering within retained segment {segment}"
+            )
+        if previous_sequence is None:
+            complete_prefix = all(value in observed_set for value in range(1, segment + 1))
+            if complete_prefix and retained_sequences[0] != 1:
+                raise QuestLabSheetsError(
+                    "event sequence has a gap before the first retained event; expected sequence 1"
+                )
+        else:
+            assert previous_event_segment is not None
+            contiguous_evidence = all(
+                value in observed_set
+                for value in range(previous_event_segment + 1, segment + 1)
+            )
+            if contiguous_evidence and retained_sequences[0] != previous_sequence + 1:
+                raise QuestLabSheetsError(
+                    "event sequence has a gap between contiguous retained segments"
+                )
+        previous_event_segment = segment
+        previous_sequence = retained_sequences[-1]
+
+    events.sort(key=lambda row: row.sequence)
     sequences = [row.sequence for row in events]
-    if sequences:
+    if missing_segment and sequences:
         expected_sequences = list(range(sequences[0], sequences[-1] + 1))
-        if sequences != expected_sequences or sequences[0] != 1:
-            if missing_segment:
-                warnings.append("event sequence is partial because retained archive segments are missing")
-            else:
-                raise QuestLabSheetsError("event sequence has a gap; refusing silently corrupted evidence")
+        if sequences[0] != 1 or sequences != expected_sequences:
+            warnings.append("event sequence is partial because retained archive segments are missing")
 
     declared_event_count: int | None = None
     declared_segments: int | None = None
@@ -428,6 +553,10 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
             missing_segment = True
         if all_segments_present and declared_event_count != len(events):
             raise QuestLabSheetsError("sessionEnd eventCount does not match the selected archive")
+        if all_segments_present and dropped_event_count != notice_dropped_total:
+            raise QuestLabSheetsError(
+                "sessionEnd droppedEventCount does not match the complete archive notices"
+            )
         if dropped_event_count > 0:
             warnings.append(f"archive queue dropped {dropped_event_count} event(s)")
         archive_state = (
@@ -438,9 +567,10 @@ def parse_session(paths: Sequence[Path]) -> EventSession:
     fields = header["fields"]
     return EventSession(
         session_id=session_id,
-        started_utc=_required_text(header, "startedUtc", "session header"),
+        started_utc=_required_utc(header, "startedUtc", "session header"),
         release_id=_required_text(header, "releaseId", "session header"),
         runtime_profile=runtime_profile,
+        runtime_profile_semantics=runtime_profile_semantics,
         include_details=fields.get("details") is True,
         include_diagnostic_identity=fields.get("diagnosticIdentity") is True,
         events=tuple(events),
@@ -569,7 +699,8 @@ def workbook_values(session: EventSession, exported_utc: str) -> dict[str, list[
         ["Schema", SCHEMA],
         ["Session ID", session.session_id],
         ["Quest Lab release", session.release_id],
-        ["Runtime profile", session.runtime_profile],
+        ["Startup default profile", session.runtime_profile],
+        ["Profile semantics", session.runtime_profile_semantics],
         ["Archive state", session.archive_state],
         ["Started (UTC)", session.started_utc],
         ["Ended (UTC)", session.ended_utc or "not recorded"],
@@ -598,26 +729,76 @@ def chunk_value_ranges(sheet: str, rows: Sequence[Sequence[Any]]) -> Iterator[di
         return
     chunk: list[Sequence[Any]] = []
     start = 1
+    def envelope_bytes(row_start: int) -> int:
+        body = {
+            "valueInputOption": "RAW",
+            "data": [{"range": f"'{sheet}'!A{row_start}", "values": []}],
+        }
+        return len(json.dumps(body, ensure_ascii=True).encode("utf-8"))
+
+    chunk_bytes = envelope_bytes(start)
     for row in rows:
-        candidate = chunk + [row]
-        body = {"values": candidate}
-        size = len(json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
-        if chunk and size > MAX_GOOGLE_REQUEST_BYTES:
+        # googleapiclient serializes a JSON request body; ensure_ascii=True is the safe
+        # upper-bound for Unicode-heavy rows. Size the exact batchUpdate body, not only
+        # its nested values object.
+        row_bytes = len(json.dumps(row, ensure_ascii=True).encode("utf-8"))
+        candidate_bytes = chunk_bytes + row_bytes + (2 if chunk else 0)
+        if candidate_bytes > MAX_GOOGLE_REQUEST_BYTES:
+            if not chunk:
+                raise QuestLabSheetsError("one workbook row exceeds the Google request safety limit")
             yield {"range": f"'{sheet}'!A{start}", "values": list(chunk)}
             start += len(chunk)
-            chunk = [row]
-        else:
-            chunk = candidate
+            chunk = []
+            chunk_bytes = envelope_bytes(start)
+            candidate_bytes = chunk_bytes + row_bytes
+            if candidate_bytes > MAX_GOOGLE_REQUEST_BYTES:
+                raise QuestLabSheetsError("one workbook row exceeds the Google request safety limit")
+        chunk.append(row)
+        chunk_bytes = candidate_bytes
     if chunk:
         yield {"range": f"'{sheet}'!A{start}", "values": list(chunk)}
+
+
+def _retryable_google_status(exc: Exception) -> bool:
+    response = getattr(exc, "resp", None)
+    candidates = (
+        getattr(response, "status", None),
+        getattr(exc, "status_code", None),
+        getattr(exc, "code", None),
+    )
+    for candidate in candidates:
+        try:
+            status = int(candidate)
+        except (TypeError, ValueError):
+            continue
+        return status == 429 or 500 <= status <= 599
+    return False
+
+
+def _execute_same_sheet(request: Any, sleep: Callable[[float], None]) -> tuple[Any, int]:
+    """Retry only an idempotent request against an already-created spreadsheet."""
+    retries = 0
+    while True:
+        try:
+            return request.execute(), retries
+        except Exception as exc:
+            if not _retryable_google_status(exc) or retries >= len(SAME_SHEET_RETRY_DELAYS):
+                raise
+            sleep(SAME_SHEET_RETRY_DELAYS[retries])
+            retries += 1
 
 
 class GoogleSheetsExporter:
     """Creates only new spreadsheets and populates them with RAW values."""
 
-    def __init__(self, service: Any, receipt_dir: Path):
+    def __init__(
+            self,
+            service: Any,
+            receipt_dir: Path,
+            sleep: Callable[[float], None] = time.sleep):
         self._service = service
         self._receipt_dir = receipt_dir
+        self._sleep = sleep
 
     def export(self, session: EventSession) -> ExportResult:
         exported_utc = utc_now()
@@ -633,6 +814,8 @@ class GoogleSheetsExporter:
                     "rowCount": max(100, len(values["Metadata"]) + 10), "columnCount": 2}}},
             ],
         }
+        # Creating a workbook is not idempotent. Deliberately make this one attempt: a
+        # retry after an ambiguous response could create a duplicate workbook.
         created = self._service.spreadsheets().create(
             body=create_body, fields="spreadsheetId"
         ).execute()
@@ -641,18 +824,23 @@ class GoogleSheetsExporter:
             raise QuestLabSheetsError("Google created a spreadsheet but returned an invalid identifier")
 
         request_count = 0
+        same_sheet_retry_count = 0
         try:
             for sheet, rows in values.items():
                 for data in chunk_value_ranges(sheet, rows):
-                    self._service.spreadsheets().values().batchUpdate(
+                    request = self._service.spreadsheets().values().batchUpdate(
                         spreadsheetId=spreadsheet_id,
                         body={"valueInputOption": "RAW", "data": [data]},
-                    ).execute()
+                    )
+                    _, retries = _execute_same_sheet(request, self._sleep)
+                    same_sheet_retry_count += retries
                     request_count += 1
-            self._service.spreadsheets().batchUpdate(
+            formatting = self._service.spreadsheets().batchUpdate(
                 spreadsheetId=spreadsheet_id,
                 body={"requests": _formatting_requests(len(values["Events"]))},
-            ).execute()
+            )
+            _, retries = _execute_same_sheet(formatting, self._sleep)
+            same_sheet_retry_count += retries
         except Exception as exc:
             url = google_sheet_url(spreadsheet_id)
             raise QuestLabSheetsError(
@@ -672,17 +860,27 @@ class GoogleSheetsExporter:
             "archiveState": session.archive_state,
             "droppedEventCount": session.dropped_event_count,
             "valuesRequests": request_count,
+            "sameSheetRetryCount": same_sheet_retry_count,
+            "sameSheetRetryLimitPerRequest": len(SAME_SHEET_RETRY_DELAYS),
             "valueInputOption": "RAW",
             "oauthScope": DRIVE_FILE_SCOPE,
         }
-        receipt_path = self._write_receipt(session, receipt)
+        try:
+            receipt_path = self._write_receipt(session, receipt)
+        except Exception:
+            # The network mutation already succeeded. Preserve that outcome and its fixed,
+            # validated URL rather than returning a generic failure that invites a duplicate.
+            raise SheetCreatedWithoutReceipt(url) from None
         return ExportResult(spreadsheet_id, url, len(session.events), request_count, str(receipt_path))
 
     def _write_receipt(self, session: EventSession, receipt: Mapping[str, Any]) -> Path:
         self._receipt_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         safe_session = re.sub(r"[^A-Za-z0-9._-]", "_", session.session_id)[:48]
-        target = self._receipt_dir / f"sheets-export-{stamp}-{safe_session}.json"
+        safe_sheet = re.sub(
+            r"[^A-Za-z0-9_-]", "_", str(receipt.get("spreadsheetId", "unknown"))
+        )[:24]
+        target = self._receipt_dir / f"sheets-export-{stamp}-{safe_session}-{safe_sheet}.json"
         _write_private_text(target, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
         return target
 
@@ -897,7 +1095,7 @@ class GoogleAuth:
     def connect(self) -> None:
         missing = self.dependency_error()
         if missing:
-            raise QuestLabSheetsError(missing + "; install requirements-google.txt")
+            raise QuestLabSheetsError(missing + "; run " + google_install_command())
         self.store.validate_client()
         from google_auth_oauthlib.flow import InstalledAppFlow
 
@@ -920,7 +1118,7 @@ class GoogleAuth:
     def service(self) -> Any:
         missing = self.dependency_error()
         if missing:
-            raise QuestLabSheetsError(missing + "; install requirements-google.txt")
+            raise QuestLabSheetsError(missing + "; run " + google_install_command())
         if not self.store.has_token():
             raise QuestLabSheetsError("Google is not connected; use Connect Google once first")
         from google.auth.transport.requests import Request
@@ -1121,6 +1319,17 @@ def make_handler(dashboard: Dashboard) -> type[BaseHTTPRequestHandler]:
                     self.end_headers()
                     return
                 raise QuestLabSheetsError("unknown local dashboard action")
+            except SheetCreatedWithoutReceipt as exc:
+                link = html.escape(exc.spreadsheet_url, quote=True)
+                self._html(
+                    HTTPStatus.OK,
+                    page(
+                        "Google Sheet created - receipt warning",
+                        "<div class='alert'><strong>Sheet created; local receipt not saved.</strong>"
+                        f"<p>{html.escape(str(exc))}</p></div>"
+                        f"<p><a class='button primary' href='{link}'>Open the existing Sheet</a></p>",
+                    ),
+                )
             except QuestLabSheetsError as exc:
                 self._error(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc))
             except Exception as exc:
@@ -1184,10 +1393,11 @@ def dashboard_page(dashboard: Dashboard) -> str:
 
     setup = ""
     if missing:
+        install_command = html.escape(google_install_command())
         setup = (
             "<section class='card setup'><h2>Optional Google setup</h2>"
             "<p>Local parsing and CSV already work. To enable Sheets, install the optional libraries:</p>"
-            "<p><code>python -m pip install -r requirements-google.txt</code></p></section>"
+            f"<p><code>{install_command}</code></p></section>"
         )
     elif not configured:
         setup = (
@@ -1246,6 +1456,7 @@ def inspect_payload(session: EventSession) -> dict[str, Any]:
         "startedUtc": session.started_utc,
         "releaseId": session.release_id,
         "runtimeProfile": session.runtime_profile,
+        "runtimeProfileSemantics": session.runtime_profile_semantics,
         "archiveState": session.archive_state,
         "endedUtc": session.ended_utc or None,
         "endReason": session.end_reason or None,

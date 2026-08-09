@@ -187,8 +187,17 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // ---- what the patches call -------------------------------------------------------
 
-  /// <summary>Record one thing the game did. Safe to call from any postfix.</summary>
+  /// <summary>Record a Lab-owned status/diagnostic row in the live ring only.</summary>
   public static void Observe(LabEvent row, string actionIdentity = null) {
+    Record(row, actionIdentity, false);
+  }
+
+  /// <summary>Record one catalog-routed runtime event in the live ring and durable archive.</summary>
+  public static void ObserveRuntimeEvent(LabEvent row, string actionIdentity = null) {
+    Record(row, actionIdentity, true);
+  }
+
+  static void Record(LabEvent row, string actionIdentity, bool archive) {
     ComfyQuestLab self = Instance;
     if (self == null || self._ring == null || !LabConfig.Enabled.Value) {
       return;
@@ -196,7 +205,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     self._ring.Add(row);
     // The archive owns its own bounded queue and worker. This call never waits for disk,
     // and any archive failure leaves the ring and quest evaluator untouched.
-    if (self._eventArchive != null) {
+    if (archive && self._eventArchive != null) {
       self._eventArchive.TryRecord(row, actionIdentity);
     }
     if (LabConfig.VerboseLogging.Value) {

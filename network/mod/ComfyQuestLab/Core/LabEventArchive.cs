@@ -344,17 +344,26 @@ public sealed class LabEventArchive : IDisposable {
       for (int i = 0; i < excess; i++) {
         string candidate = jsonl[i];
         if (string.Equals(candidate, _currentJsonlPath, StringComparison.OrdinalIgnoreCase)) continue;
+        string csv = Path.ChangeExtension(candidate, ".csv");
+        TryDelete(csv + ".tmp");
+        // A spreadsheet can hold the derived CSV open. Keep the authoritative JSONL so
+        // this pair remains discoverable and a future purge retries it; deleting JSONL
+        // first would orphan a locked CSV forever because retention enumerates JSONL.
+        if (!TryDelete(csv)) continue;
         TryDelete(candidate);
-        TryDelete(Path.ChangeExtension(candidate, ".csv"));
-        TryDelete(Path.ChangeExtension(candidate, ".csv") + ".tmp");
       }
     } catch (Exception) {
       // Retention cleanup is opportunistic. A locked old export must not disable new capture.
     }
   }
 
-  static void TryDelete(string path) {
-    try { if (File.Exists(path)) File.Delete(path); } catch (Exception) { }
+  static bool TryDelete(string path) {
+    try {
+      if (File.Exists(path)) File.Delete(path);
+      return !File.Exists(path);
+    } catch (Exception) {
+      return false;
+    }
   }
 
   void WriteSessionEnd(DateTime endedUtc) {
@@ -365,6 +374,7 @@ public sealed class LabEventArchive : IDisposable {
     JsonField(sb, "sessionId", _sessionId, true);
     JsonField(sb, "releaseId", _options.ReleaseId, true);
     JsonField(sb, "runtimeProfile", _options.RuntimeProfile, true);
+    JsonField(sb, "runtimeProfileSemantics", "startup-default", true);
     JsonField(sb, "startedUtc", _startedUtcText, true);
     JsonField(sb, "endedUtc", Iso(endedUtc), true);
     JsonNumber(sb, "eventCount", WrittenCount, true);
@@ -415,6 +425,7 @@ public sealed class LabEventArchive : IDisposable {
     JsonField(sb, "startedUtc", _startedUtcText, true);
     JsonField(sb, "releaseId", _options.ReleaseId, true);
     JsonField(sb, "runtimeProfile", _options.RuntimeProfile, true);
+    JsonField(sb, "runtimeProfileSemantics", "startup-default", true);
     JsonNumber(sb, "segment", _segment, true);
     sb.Append(",\"fields\":{\"details\":")
         .Append(_options.IncludeDetails ? "true" : "false")
@@ -531,7 +542,7 @@ public sealed class LabEventArchive : IDisposable {
   string UniqueSessionId(DateTime started, string releaseId, string profile) {
     string release = ReleaseShort(releaseId);
     string root = started.ToString("yyyyMMdd'T'HHmmssfff'Z'", CultureInfo.InvariantCulture)
-        + "-" + release + "-" + SafeToken(profile, 24, "unknown");
+        + "-" + release + "-startup-" + SafeToken(profile, 24, "unknown");
     for (int collision = 1; collision <= 999; collision++) {
       string candidate = root + (collision == 1
           ? string.Empty

@@ -30,7 +30,7 @@ public static class LabEventRouter {
       bool evaluate = true) {
     try {
       if (!LabSeamCatalog.TryGet(signatureId, out LabSeamCatalog.Entry capability)) {
-        ComfyQuestLab.Observe(new LabEvent(
+        ComfyQuestLab.ObserveRuntimeEvent(new LabEvent(
             LabCategory.Combat,
             signatureId,
             signatureId,
@@ -67,7 +67,7 @@ public static class LabEventRouter {
         string usability = capability.CreatorSafe
             ? LabUsability.Today
             : LabUsability.DiagnosticOnly;
-        ComfyQuestLab.Observe(new LabEvent(
+        ComfyQuestLab.ObserveRuntimeEvent(new LabEvent(
             capability.Category,
             capability.SignatureId,
             capability.CanonicalEvent,

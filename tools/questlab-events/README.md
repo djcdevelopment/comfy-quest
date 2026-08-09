@@ -2,12 +2,23 @@
 
 Quest Lab's archive is the durable event ledger; this tool turns one session, a rotated
 session, or a directory of sessions into a creator-readable report. It is local-only and
-does not need Valheim, Google credentials, Python packages, or network access.
+does not need Valheim, Google credentials, Python packages, or network access. It requires
+Python 3.10 or newer.
 
 ## Fast path
 
 ```powershell
 python tools\questlab-events\questlab_events.py `
+  "C:\Program Files (x86)\Steam\steamapps\common\Valheim\BepInEx\config\comfy-quest-lab\event-archive" `
+  --strict `
+  --sheets captures\questlab-events.xlsx `
+  --bundle captures\questlab-events-sheets.zip
+```
+
+From the packaged Quest Lab zip, use the packaged path:
+
+```powershell
+python questlab-events\questlab_events.py `
   "C:\Program Files (x86)\Steam\steamapps\common\Valheim\BepInEx\config\comfy-quest-lab\event-archive" `
   --strict `
   --sheets captures\questlab-events.xlsx `
@@ -51,19 +62,29 @@ schema,session_id,sequence,timestamp_utc,school,creator_event,target,detail,usab
 
 JSONL remains authoritative. If both JSONL and CSV are passed, equal `(sessionId,
 sequence)` witnesses are recognized as mirrors and counted once. Conflicting mirror rows
-fail with a hashed identity instead of silently choosing one.
+fail with a hashed identity instead of silently choosing one. When a directory is passed,
+the parser automatically ignores a paired CSV whose same-named JSONL authority is present;
+this avoids charging the stock mirror twice against the total input bound. Pass both files
+explicitly when you want the stricter mirror-equality check.
 
 A crash can leave one partial final JSONL line. The default is to fail and name its file,
 line, and JSON column. `--allow-truncated-tail` explicitly skips only that incomplete last
-line and marks the export as data-loss-affected. It never skips malformed complete rows.
+line in the highest selected segment of each filename session group and marks the export as
+data-loss-affected. It never skips malformed complete rows or an earlier segment's tail.
 
 Without `--strict`, the parser also understands older names such as `category`,
 `eventName`, `at`, and `dedupeKey`. An ISO-8601 date and timezone are still required; a
 wall-clock value such as `14:03:22` is not enough to merge or filter sessions safely.
+Strict JSONL additionally requires the writer's real JSON types, UTC strings ending in `Z`,
+continuous accepted-event sequences, unique segment numbers, and monotonic drop notices.
+A valid header-only or clean zero-event session remains reportable.
 
 ## Filtering and output
 
 Filters apply before action coalescing and are inclusive:
+
+The examples below use the repository path. In the packaged zip, replace
+`tools\questlab-events\questlab_events.py` with `questlab-events\questlab_events.py`.
 
 ```powershell
 # Combat and harvest actions involving a grey target in one UTC window.
@@ -84,10 +105,12 @@ python tools\questlab-events\questlab_events.py .\event-archive `
 case-insensitive substring match. CSV views are `actions`, `witnesses`, `summary`,
 `metadata`, `event-summary`, and `school-summary`.
 
-## Sheets companion column contract
+## Offline workbook column contract
 
-The first three workbook tabs and their CSV counterparts are the stable companion
-surface. Column order is intentional.
+The first three tabs of this tool's five-tab offline workbook and their CSV counterparts are
+its stable surface. Column order is intentional. The fixed-loopback dashboard intentionally
+uses the archive's direct 11-column projection in a smaller three-tab Google workbook; the two
+surfaces serve different workflows and are not interchangeable column contracts.
 
 `Events` / `tables/events.csv`:
 
@@ -131,15 +154,21 @@ that were suppressed before persistence. Use the exact live-suite receipt—not 
 for transport-witness/coalescing proof.
 
 By default, source paths, raw session IDs, raw action identities, detail, diagnostic
-seams, and private-looking field names are absent. `--include-diagnostics` and
+seams, and private-looking field names are absent. Tolerant imports recursively scrub those
+keys from nested objects and arrays as well as the top level. `--include-diagnostics` and
 `--include-private-fields` are explicit opt-ins. CSV cells that could begin a Sheets or
 Excel formula (`=`, `+`, `-`, `@`, or control whitespace) are forced to literal text; XLSX
 cells are emitted as strings and receive the same defense.
 
-Inputs are bounded to 256 files, 512 MiB total, 128 MiB per file, and 1,000,000 unique
-event records. Files are streamed line-by-line before bounded normalization; explicit
-local paths are allowed because this is a CLI, not a file-serving endpoint. JSON and
-single-table CSV may use that full parser bound. In-memory workbook generation has a
+Inputs are bounded to 256 files, 512 MiB total, 128 MiB per file, 4 MiB per physical
+JSONL/CSV line, and 1,000,000 unique event records. File and aggregate byte counts are
+enforced again while streaming, so a growing or replaced input cannot bypass the initial
+size preflight. Explicit local paths are allowed because this is a CLI, not a file-serving
+endpoint. JSON and single-table CSV may use that full parser bound. In-memory workbook generation has a
 separate 25,000-row-per-tab / 64 MiB expanded estimate ceiling; the multi-format zip uses
 a 96 MiB expanded estimate ceiling. If either would be exceeded, the command fails before
 building XML and tells the creator to filter or use normalized JSON/CSV instead.
+
+The header's `runtimeProfile` is the configured startup default, explicitly paired with
+`runtimeProfileSemantics: startup-default`; live profile changes and bounded-suite overrides
+do not turn it into per-row provenance.

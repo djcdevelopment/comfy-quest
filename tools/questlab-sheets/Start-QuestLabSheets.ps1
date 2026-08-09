@@ -10,7 +10,12 @@ $toolRoot = $PSScriptRoot
 $entrypoint = Join-Path $toolRoot 'questlab_sheets.py'
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
-    throw 'Python 3 is required for the Quest Lab export companion. Install Python, then run this script again.'
+    throw 'Python 3.10 or newer is required for the Quest Lab export companion. Install Python, then run this script again.'
+}
+
+& python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 42)"
+if ($LASTEXITCODE -ne 0) {
+    throw 'Python 3.10 or newer is required for the Quest Lab export companion. Upgrade Python, then run this script again.'
 }
 
 $arguments = @($entrypoint, 'serve')

@@ -35,6 +35,7 @@ def header(session: str = "20260809T120000Z-demo", segment: int = 1) -> dict:
         "startedUtc": "2026-08-09T12:00:00Z",
         "releaseId": "questlab-v0.2.0-test",
         "runtimeProfile": "extended",
+        "runtimeProfileSemantics": "startup-default",
         "segment": segment,
         "fields": {"details": True, "diagnosticIdentity": False},
     }
@@ -64,6 +65,7 @@ def session_end(*, event_count: int, segments: int, dropped: int = 0) -> dict:
         "sessionId": "20260809T120000Z-demo",
         "releaseId": "questlab-v0.2.0-test",
         "runtimeProfile": "extended",
+        "runtimeProfileSemantics": "startup-default",
         "startedUtc": "2026-08-09T12:00:00Z",
         "endedUtc": "2026-08-09T12:10:00Z",
         "eventCount": event_count,
@@ -90,30 +92,59 @@ def write_jsonl(path: Path, records: list[dict]) -> None:
 
 
 class FakeRequest:
-    def __init__(self, response: object = None, failure: Exception | None = None):
+    def __init__(
+            self,
+            response: object = None,
+            failure: Exception | None = None,
+            failures: list[Exception] | None = None):
         self.response = response if response is not None else {}
-        self.failure = failure
+        self.failures = list(failures or ())
+        if failure is not None:
+            self.failures.append(failure)
+        self.execute_count = 0
 
     def execute(self) -> object:
-        if self.failure:
-            raise self.failure
+        self.execute_count += 1
+        if self.failures:
+            raise self.failures.pop(0)
         return self.response
 
 
+class FakeHttpError(Exception):
+    def __init__(self, status: int):
+        super().__init__(f"HTTP {status}")
+        self.resp = type("FakeHttpResponse", (), {"status": status})()
+
+
 class FakeValues:
-    def __init__(self, calls: list[tuple]):
+    def __init__(self, calls: list[tuple], first_request_failures: list[Exception] | None = None):
         self.calls = calls
+        self.first_request_failures = list(first_request_failures or ())
+        self.requests: list[FakeRequest] = []
 
     def batchUpdate(self, **kwargs: object) -> FakeRequest:  # noqa: N802
         self.calls.append(("values.batchUpdate", kwargs))
-        return FakeRequest({"totalUpdatedRows": 1})
+        request = FakeRequest(
+            {"totalUpdatedRows": 1},
+            failures=self.first_request_failures,
+        )
+        self.first_request_failures = []
+        self.requests.append(request)
+        return request
 
 
 class FakeSpreadsheets:
-    def __init__(self, calls: list[tuple], spreadsheet_id: str = "safe_sheet_id_12345"):
+    def __init__(
+            self,
+            calls: list[tuple],
+            spreadsheet_id: str = "safe_sheet_id_12345",
+            value_failures: list[Exception] | None = None,
+            formatting_failures: list[Exception] | None = None):
         self.calls = calls
         self.spreadsheet_id = spreadsheet_id
-        self._values = FakeValues(calls)
+        self._values = FakeValues(calls, value_failures)
+        self.formatting_failures = list(formatting_failures or ())
+        self.formatting_requests: list[FakeRequest] = []
 
     def create(self, **kwargs: object) -> FakeRequest:
         self.calls.append(("create", kwargs))
@@ -124,13 +155,25 @@ class FakeSpreadsheets:
 
     def batchUpdate(self, **kwargs: object) -> FakeRequest:  # noqa: N802
         self.calls.append(("format.batchUpdate", kwargs))
-        return FakeRequest({})
+        request = FakeRequest({}, failures=self.formatting_failures)
+        self.formatting_failures = []
+        self.formatting_requests.append(request)
+        return request
 
 
 class FakeService:
-    def __init__(self, spreadsheet_id: str = "safe_sheet_id_12345"):
+    def __init__(
+            self,
+            spreadsheet_id: str = "safe_sheet_id_12345",
+            value_failures: list[Exception] | None = None,
+            formatting_failures: list[Exception] | None = None):
         self.calls: list[tuple] = []
-        self._spreadsheets = FakeSpreadsheets(self.calls, spreadsheet_id)
+        self._spreadsheets = FakeSpreadsheets(
+            self.calls,
+            spreadsheet_id,
+            value_failures,
+            formatting_failures,
+        )
 
     def spreadsheets(self) -> FakeSpreadsheets:
         return self._spreadsheets
@@ -165,6 +208,7 @@ class QuestLabSheetsTests(unittest.TestCase):
             ))
             self.assertEqual(session.archive_state, "complete")
             self.assertEqual(session.runtime_profile, "extended")
+            self.assertEqual(session.runtime_profile_semantics, "startup-default")
             payload = SHEETS.inspect_payload(session)
             self.assertEqual(payload["eventRows"], 3)
             self.assertEqual(payload["schoolCounts"], {"combat": 1, "harvest": 2})
@@ -184,6 +228,33 @@ class QuestLabSheetsTests(unittest.TestCase):
                 with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, expected):
                     SHEETS.parse_session([path])
 
+    def test_parser_requires_valid_utc_timestamps_and_ordered_session_bounds(self) -> None:
+        bad_header = header()
+        bad_header["startedUtc"] = "2026-08-09 12:00:00"
+        bad_event = event(1, timestampUtc="2026-99-09T12:00:01Z")
+        backwards_end = session_end(event_count=1, segments=1)
+        backwards_end["endedUtc"] = "2026-08-09T11:59:59Z"
+        cases = (
+            ([bad_header, event(1)], "startedUtc must be ISO-8601 UTC ending in Z"),
+            ([header(), bad_event], "timestampUtc must be valid ISO-8601 UTC"),
+            ([header(), event(1), backwards_end], "endedUtc is before startedUtc"),
+        )
+        for records, expected in cases:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "questlab-events-session.jsonl"
+                write_jsonl(path, records)
+                with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, expected):
+                    SHEETS.parse_session([path])
+
+    def test_parser_enforces_a_total_session_byte_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "questlab-events-session.jsonl"
+            write_jsonl(path, [header(), event(1)])
+            with mock.patch.object(SHEETS, "MAX_TOTAL_BYTES", 100), self.assertRaisesRegex(
+                SHEETS.QuestLabSheetsError, "total safety limit"
+            ):
+                SHEETS.parse_session([path])
+
     def test_archive_notice_and_clean_end_are_metadata_not_event_rows(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "questlab-events-session.jsonl"
@@ -197,6 +268,45 @@ class QuestLabSheetsTests(unittest.TestCase):
             self.assertEqual(session.archive_notice_count, 1)
             self.assertEqual(session.dropped_event_count, 2)
             self.assertIn("archive queue dropped 2 event(s)", session.warnings)
+
+    def test_drop_notice_delta_is_partial_only_across_missing_segments(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            retained = root / "questlab-events-20260809T120000Z-demo-part002.jsonl"
+            write_jsonl(retained, [
+                header(segment=2),
+                event(3),
+                archive_notice(5, since_last=2),
+                session_end(event_count=3, segments=2, dropped=5),
+            ])
+            session = SHEETS.parse_session([retained])
+            self.assertEqual(session.archive_state, "partial")
+            self.assertEqual(session.dropped_event_count, 5)
+            self.assertTrue(any("drop deltas cross missing segments" in row for row in session.warnings))
+
+            complete = root / "questlab-events-complete.jsonl"
+            write_jsonl(complete, [header(), event(1), archive_notice(5, since_last=2)])
+            with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, "invalid archive drop delta"):
+                SHEETS.parse_session([complete])
+
+            first = root / "questlab-events-20260809T120000Z-demo.jsonl"
+            third = root / "questlab-events-20260809T120000Z-demo-part003.jsonl"
+            write_jsonl(first, [header(), event(1), archive_notice(100, since_last=100)])
+            write_jsonl(third, [header(segment=3), event(3), archive_notice(100, since_last=5)])
+            with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, "invalid or decreasing"):
+                SHEETS.parse_session([first, third])
+
+    def test_drop_notice_reestablishes_a_verifiable_baseline_after_a_gap(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "questlab-events-20260809T120000Z-demo-part002.jsonl"
+            write_jsonl(path, [
+                header(segment=2),
+                event(3),
+                archive_notice(5, since_last=2),
+                archive_notice(7, since_last=1),
+            ])
+            with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, "invalid archive drop delta"):
+                SHEETS.parse_session([path])
 
     def test_missing_session_end_remains_exportable_but_explicitly_incomplete(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -255,12 +365,32 @@ class QuestLabSheetsTests(unittest.TestCase):
     def test_session_end_cannot_undercount_retained_rows_or_observed_segments(self) -> None:
         cases = (
             ([header(), event(1), event(2), session_end(event_count=1, segments=1)], "below the retained"),
-            ([header(segment=2), event(1), session_end(event_count=1, segments=1)], "below an observed"),
+            ([header(segment=2), event(1), session_end(event_count=1, segments=1)], "end-bearing segment"),
         )
         for records, expected in cases:
             with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temporary:
                 suffix = "-part002" if records[0]["segment"] == 2 else ""
                 path = Path(temporary) / f"questlab-events-20260809T120000Z-demo{suffix}.jsonl"
+                write_jsonl(path, records)
+                with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, expected):
+                    SHEETS.parse_session([path])
+
+    def test_clean_end_must_match_drop_notices_and_its_end_bearing_segment(self) -> None:
+        cases = (
+            (
+                [header(), event(1), archive_notice(1), session_end(
+                    event_count=1, segments=1, dropped=2
+                )],
+                "droppedEventCount does not match",
+            ),
+            (
+                [header(), event(1), session_end(event_count=1, segments=3)],
+                "segments must equal its end-bearing segment",
+            ),
+        )
+        for records, expected in cases:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "questlab-events-20260809T120000Z-demo.jsonl"
                 write_jsonl(path, records)
                 with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, expected):
                     SHEETS.parse_session([path])
@@ -273,6 +403,33 @@ class QuestLabSheetsTests(unittest.TestCase):
             self.assertEqual(session.archive_state, "partial")
             self.assertEqual(session.observed_segments, (2,))
             self.assertTrue(any("segments" in warning for warning in session.warnings))
+
+    def test_sequence_continuity_is_checked_inside_every_retained_segment(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "questlab-events-20260809T120000Z-demo-part002.jsonl"
+            write_jsonl(path, [
+                header(segment=2),
+                event(100, timestampUtc="2026-08-09T12:00:01Z"),
+                event(102, timestampUtc="2026-08-09T12:00:02Z"),
+            ])
+            with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, "within retained segment 2"):
+                SHEETS.parse_session([path])
+
+    def test_sequence_continuity_distinguishes_retained_and_missing_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = root / "questlab-events-20260809T120000Z-demo.jsonl"
+            second = root / "questlab-events-20260809T120000Z-demo-part002.jsonl"
+            write_jsonl(first, [header(), event(1)])
+            write_jsonl(second, [header(segment=2), event(3)])
+            with self.assertRaisesRegex(SHEETS.QuestLabSheetsError, "between contiguous retained"):
+                SHEETS.parse_session([first, second])
+
+            third = root / "questlab-events-20260809T120000Z-demo-part003.jsonl"
+            write_jsonl(third, [header(segment=3), event(3)])
+            partial = SHEETS.parse_session([first, third])
+            self.assertEqual(partial.archive_state, "partial")
+            self.assertEqual([row.sequence for row in partial.events], [1, 3])
 
     def test_filename_and_header_segment_must_agree(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -392,6 +549,8 @@ class QuestLabSheetsTests(unittest.TestCase):
             self.assertIn(["combat", 1], workbook["Summary"])
             self.assertIn(["Write mode", "RAW (formula interpretation disabled)"], workbook["Metadata"])
             self.assertIn(["OAuth scope", SHEETS.DRIVE_FILE_SCOPE], workbook["Metadata"])
+            self.assertIn(["Startup default profile", "extended"], workbook["Metadata"])
+            self.assertIn(["Profile semantics", "startup-default"], workbook["Metadata"])
 
     def test_google_export_is_create_only_raw_batched_formatted_and_receipted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -416,6 +575,66 @@ class QuestLabSheetsTests(unittest.TestCase):
             self.assertEqual(receipt["oauthScope"], SHEETS.DRIVE_FILE_SCOPE)
             self.assertNotIn("token", json.dumps(receipt).lower())
 
+            second = SHEETS.GoogleSheetsExporter(
+                FakeService("second_safe_sheet_id_67890"), root / "receipts"
+            ).export(session)
+            self.assertNotEqual(result.receipt_path, second.receipt_path)
+            self.assertEqual(len(list((root / "receipts").glob("*.json"))), 2)
+
+            failing = SHEETS.GoogleSheetsExporter(
+                FakeService("third_safe_sheet_id_24680"), root / "receipts"
+            )
+            with mock.patch.object(
+                failing, "_write_receipt", side_effect=OSError("simulated receipt failure")
+            ), self.assertRaises(SHEETS.SheetCreatedWithoutReceipt) as caught:
+                failing.export(session)
+            self.assertEqual(
+                caught.exception.spreadsheet_url,
+                "https://docs.google.com/spreadsheets/d/third_safe_sheet_id_24680/edit",
+            )
+            self.assertIn("do not click export again", str(caught.exception))
+
+    def test_google_export_retries_only_same_sheet_writes_with_bounded_backoff(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            session = self.make_session(root)
+            service = FakeService(
+                value_failures=[FakeHttpError(429), FakeHttpError(503)],
+                formatting_failures=[FakeHttpError(500)],
+            )
+            sleeps: list[float] = []
+            result = SHEETS.GoogleSheetsExporter(
+                service,
+                root / "receipts",
+                sleep=sleeps.append,
+            ).export(session)
+            self.assertEqual([name for name, _ in service.calls].count("create"), 1)
+            self.assertEqual(sleeps, [1.0, 2.0, 1.0])
+            self.assertEqual(service._spreadsheets._values.requests[0].execute_count, 3)
+            self.assertEqual(service._spreadsheets.formatting_requests[0].execute_count, 2)
+            receipt = json.loads(Path(result.receipt_path).read_text(encoding="utf-8"))
+            self.assertEqual(receipt["sameSheetRetryCount"], 3)
+            self.assertEqual(
+                receipt["sameSheetRetryLimitPerRequest"],
+                len(SHEETS.SAME_SHEET_RETRY_DELAYS),
+            )
+
+    def test_same_sheet_retry_refuses_nontransient_and_stops_at_the_bound(self) -> None:
+        sleeps: list[float] = []
+        nontransient = FakeRequest(failures=[FakeHttpError(400)])
+        with self.assertRaises(FakeHttpError):
+            SHEETS._execute_same_sheet(nontransient, sleeps.append)
+        self.assertEqual(nontransient.execute_count, 1)
+        self.assertEqual(sleeps, [])
+
+        persistent = FakeRequest(
+            failures=[FakeHttpError(503)] * (len(SHEETS.SAME_SHEET_RETRY_DELAYS) + 1)
+        )
+        with self.assertRaises(FakeHttpError):
+            SHEETS._execute_same_sheet(persistent, sleeps.append)
+        self.assertEqual(persistent.execute_count, len(SHEETS.SAME_SHEET_RETRY_DELAYS) + 1)
+        self.assertEqual(sleeps, list(SHEETS.SAME_SHEET_RETRY_DELAYS))
+
     def test_google_sheet_identifier_and_url_are_not_an_arbitrary_redirect(self) -> None:
         self.assertEqual(
             SHEETS.google_sheet_url("safe_sheet_id_12345"),
@@ -426,13 +645,19 @@ class QuestLabSheetsTests(unittest.TestCase):
                 SHEETS.google_sheet_url(invalid)
 
     def test_value_batches_stay_under_internal_payload_limit(self) -> None:
-        rows = [[str(index), "x" * 2000] for index in range(2000)]
+        rows = [[str(index), "x\U0001f332" * 1000] for index in range(2000)]
         chunks = list(SHEETS.chunk_value_ranges("Events", rows))
         self.assertGreater(len(chunks), 1)
         self.assertEqual(sum(len(chunk["values"]) for chunk in chunks), len(rows))
         for chunk in chunks:
-            encoded = json.dumps({"values": chunk["values"]}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            body = {"valueInputOption": "RAW", "data": [chunk]}
+            encoded = json.dumps(body, ensure_ascii=True).encode("utf-8")
             self.assertLessEqual(len(encoded), SHEETS.MAX_GOOGLE_REQUEST_BYTES)
+
+        with mock.patch.object(SHEETS, "MAX_GOOGLE_REQUEST_BYTES", 32), self.assertRaisesRegex(
+            SHEETS.QuestLabSheetsError, "one workbook row exceeds"
+        ):
+            list(SHEETS.chunk_value_ranges("Events", [["x" * 100]]))
 
     def test_desktop_client_validation_pins_google_endpoints(self) -> None:
         good = {
@@ -523,7 +748,21 @@ class QuestLabSheetsTests(unittest.TestCase):
             self.assertIn(marker, panel)
         self.assertIn("$PSScriptRoot", start)
         self.assertIn("http://127.0.0.1:47631/", start)
+        self.assertIn("sys.version_info >= (3, 10)", start)
         self.assertNotIn("Invoke-Expression", start)
+
+    def test_dashboard_google_install_command_is_independent_of_launch_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            dashboard = SHEETS.Dashboard(root, root / "state")
+            with mock.patch.object(SHEETS.GoogleAuth, "dependency_error", return_value="missing"):
+                rendered = SHEETS.dashboard_page(dashboard)
+            self.assertEqual(
+                SHEETS.GOOGLE_REQUIREMENTS_PATH,
+                TOOL.resolve().with_name("requirements-google.txt"),
+            )
+            self.assertIn(str(SHEETS.GOOGLE_REQUIREMENTS_PATH), rendered)
+            self.assertNotIn("-r requirements-google.txt", rendered)
 
     def test_documentation_uses_only_official_google_design_sources(self) -> None:
         readme = README.read_text(encoding="utf-8")
@@ -531,6 +770,10 @@ class QuestLabSheetsTests(unittest.TestCase):
         self.assertIn("developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/create", readme)
         self.assertIn("developers.google.com/workspace/sheets/api/limits", readme)
         self.assertIn("support.google.com/a/answer/7281227", readme)
+        self.assertIn("transient `429` or `5xx` retries the same idempotent", readme)
+        self.assertIn("workbook creation itself is never retried", readme)
+        self.assertIn("65–128 MiB segment is offline-only", readme)
+        self.assertNotIn("24-by-16-MiB retention fits", readme)
         self.assertNotIn("stackoverflow.com", readme.lower())
 
 
