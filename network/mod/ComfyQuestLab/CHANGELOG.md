@@ -1,6 +1,6 @@
 # Changelog
 
-**r23 accessible demo cockpit.** The panel now exposes its `INTERACTIVE` input ownership
+**r23 self-guided scenario and accessible demo cockpits.** The panel now exposes its `INTERACTIVE` input ownership
 instead of making cursor behavior implicit, and every important verdict carries an ASCII
 `[OK]`, `[INFO]`, `[CHECK]`, or `[PROVED]` cue in addition to color. A new **Ready?** tab
 derives its summary from this process's actual Harmony outcomes, shared/generated creator-event
@@ -10,6 +10,20 @@ appearance. Ctrl+1-4, Ctrl+Tab, Ctrl+F, Ctrl+0, and F1 add discoverable keyboard
 without changing Escape/F6 close semantics. Panel geometry is now a Unity-free tested policy:
 desktop-sized persisted bounds shrink into low-resolution/high-zoom viewports, resize and zoom
 save immediately, and Reset layout always returns to a visible 100% window.
+
+The new Scenarios tab makes all 34 safe canonical
+events browsable by colored school, with their shared target meaning, honest example, runtime
+profile, `trigger.where` fields, safety class, compact-course availability, and a concrete live
+action. Each `scenario-<event>` uses the existing bounded prepare/run/reset/report/export
+lifecycle. Prepare writes an ordinary editable schema-1 quest produced by `QuestAuthoring` plus
+a deterministic, hashed `comfy-questlab-scenario/v1` manifest into one fixed Lab-owned folder;
+it never loads or edits creator quests, reuses identical output, and refuses to overwrite a
+changed generated file. The panel can copy the draft JSON or exact file path and open its folder.
+Run feeds that draft and the catalog example through the exact source-shared loader/evaluator and
+exports the normal receipt with explicit `synthetic-scenario` provenance, never a false gameplay
+witness claim. The OMEN/i5 helper retains its eleven fixed operations and adds the 34 exact
+scenario IDs to its suite allowlist; no console text, keystroke, arbitrary path, or prefab surface
+was added. The compact `all-schools` lane remains the live witness proof.
 
 **r22 Creator Foundry, Gallery Truth, and build-by-example foundation.** Every safe canonical event now carries generated,
 shared creator metadata: target kind and meaning, an honest example target, meaningful

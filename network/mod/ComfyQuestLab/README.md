@@ -37,8 +37,9 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r23 adds the accessible demo cockpit after r22 added the shared
-> Creator Foundry and Gallery Truth contracts, so those same suites must be re-witnessed
+> 34/34 creator events. r23 adds the accessible Ready? and Scenarios cockpits with editable
+> draft handoff after r22 added the shared Creator Foundry and Gallery Truth contracts, so
+> those same suites must be re-witnessed
 > against the exact r23 DLL before
 > the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
@@ -91,9 +92,10 @@ update.
 | `questlab_gallery trees` | report pending/restored natural-tree recovery ledgers |
 | `questlab_gallery restore-trees [profile-or-build-id]` | restore a pending ledger only after matching gallery pieces are gone |
 | `questlab_prefabs inspect <exact-name>` | compare startup prefab, current prefab, and loaded-instance renderer state; export material, emission, property-block, GI, and light evidence as JSON |
-| `questlab_batch suites` | list the two bounded evidence classes |
+| `questlab_batch suites` | list the two release suites and the 34 `scenario-<event>` rehearsals |
 | `questlab_batch prepare all-schools` | write eight ordinary example quests, safely reset the marked site, and raise one fresh compact course with targets and supplies at point of use |
-| `questlab_batch run [all-schools\|creator-events]` | start live witnessing or run the explicitly synthetic 34-event contract probe |
+| `questlab_batch prepare scenario-<event>` | export one deterministic, editable schema-1 draft plus its scenario manifest without loading it or changing the world |
+| `questlab_batch run [all-schools\|creator-events\|scenario-<event>]` | start live witnessing, run the 34-event contract probe, or rehearse one event through the exact evaluator |
 | `questlab_batch reset\|report\|export` | reset safely, show progress, or write a machine-readable receipt |
 | `questlab_blueprint capture <name> <radius> [mine\|lab] [replace]` | copy your pieces or Quest Lab-marked pieces inside a 1–40 m sphere into a deterministic PlanBuild file plus metadata sidecar |
 | `questlab_blueprint inspect <name>` | validate the sidecar hash and prove its PlanBuild projection still agrees |
@@ -136,6 +138,23 @@ The **Quests** tab is a compact dashboard rather than a prose dump. Its fixed co
 the colored school rune, quest name, creator event and target, armed state, and fire count.
 Use the row's **down chevron** only when you need its source file, evaluator explanation,
 cooldown, or advisories; the up chevron collapses it and load errors are grouped separately.
+
+The **Scenarios** tab is the self-guided creator cockpit. Pick a colored school, select any of
+the 34 canonical events, and read its real target meaning, example, runtime profile,
+`trigger.where` fields, safety class, and a plain-language live action. **Copy draft JSON** puts
+an ordinary editable schema-1 quest on the clipboard immediately. **Prepare draft** writes that
+same QuestAuthoring-generated file beside a deterministic `comfy-questlab-scenario/v1` manifest
+under `BepInEx/config/comfy-quest-lab/scenarios/scenario-<event>/`; neither file is loaded into the
+quest lane. The panel exposes the exact draft path and opens only that bounded folder. Preparing
+again reuses byte-identical output and refuses to overwrite a changed file, so experimenting in
+place cannot silently lose work.
+
+**Run evaluator** passes the generated quest and catalog example through the exact shared loader
+and evaluator, then auto-exports the normal suite receipt. Reset, Report, and Export are the same
+bounded lifecycle used by the live course and the allowlisted OMEN/i5 mailbox. Scenario receipts
+say `synthetic-scenario`: they prove the draft matches, never that a person performed the action
+in Valheim. Events staged by the compact course are labelled as such; risky world-key, death, and
+skill-loss actions remain clearly separated from their safe evaluator rehearsal.
 
 Hovering any clipped grid cell writes its full meaning into the help bar at the bottom of the
 window. Blue bindable-event cells are buttons: click one to copy the exact `trigger.event` ID
@@ -310,10 +329,17 @@ the exact source-shared evaluator and labels its receipt `synthetic-contract`. I
 bindability, not that a Valheim player performed those actions. Receipts are ordinary JSON
 under `BepInEx/config/comfy-quest-lab/receipts/`.
 
+Each `scenario-<event>` suite narrows that contract proof to one discoverable event. `prepare`
+writes the editable quest and hashed manifest into its fixed Lab-owned scenario folder; `run`
+uses the manifest's catalog example and generated quest with the shared evaluator, and emits a
+one-event `synthetic-scenario` receipt. Existing files under `quests/` are never enumerated,
+edited, loaded, or removed by this workflow.
+
 For an unattended i5 lane, [`Invoke-I5QuestLabBatch.ps1`](../../../tools/i5/Invoke-I5QuestLabBatch.ps1)
 deploys one expiring request through the SHA-verified config lane and collects its request,
-suite, Gallery Truth, and relevant-log receipts. Its eleven operations, two suites, and three gallery profiles
-are fixed allowlists. The request schema has no console text, key, path, or prefab field.
+suite, Gallery Truth, and relevant-log receipts. Its eleven operations, two release suites,
+34 exact scenario IDs, and three gallery profiles are fixed allowlists. The request schema has
+no console text, key, path, or prefab field.
 
 ## Writing a quest
 
@@ -352,19 +378,21 @@ and each event-specific scalar field accepted by `trigger.where`. The human-owne
 generator refuses a missing or invented event and publishes the same rows into the capability
 manifest and both mod assemblies.
 
-`QuestAuthoring.FromEvent` is the Unity-free foundation for a future panel action. It turns one
+`QuestAuthoring.FromEvent` is the Unity-free foundation behind the Scenarios panel. It turns one
 witnessed `QuestEvent` into a complete schema-1 view, feeds that JSON through the exact shipping
 `QuestViewLoader`, and requires the exact `QuestTriggerEvaluator` to match the original witness
 before returning it. Stable identity fields such as station/item are retained; volatile amount
-and quantity values stay discoverable but are not copied into a draft by default. Existing quest
-files are unchanged.
+and quantity values stay discoverable but are not copied into a draft by default. The panel can
+copy that result directly or prepare it in the bounded scenario folder; existing quest files are
+unchanged.
 
 `QuestAuthoring.ValidateDraft` and `Diagnose` return structured parse/match diagnostics. A miss is
 explained by asking the evaluator counterfactual questions with one constraint at a time; there is
 no second parser or matcher. The metadata is deliberately honest about current producer limits:
 chat/sign text is redacted and cannot be filtered, while `item_crafted` currently identifies the
-crafting subject rather than the crafted item. r22 does not yet add a panel editor or write files;
-it supplies the drift-guarded contract those surfaces can safely consume next.
+crafting subject rather than the crafted item. The cockpit is deliberately a safe draft/export
+surface, not a free-form in-game editor: creators edit the ordinary file with their chosen tool,
+then place it under `quests/` and reload when they want it armed.
 
 ### Certified creator packs
 

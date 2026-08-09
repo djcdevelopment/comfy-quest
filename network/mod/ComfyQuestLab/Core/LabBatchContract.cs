@@ -82,10 +82,18 @@ public static class LabBatchContract {
 
   public static LabBatchSuite FindSuite(string id) {
     string wanted = string.IsNullOrWhiteSpace(id) ? AllSchoolsSuite.Id : id.Trim();
+    LabBatchSuite builtin = FindBuiltinSuite(wanted);
+    if (builtin != null) return builtin;
+    LabScenarioDefinition scenario = LabScenarioCatalog.Find(wanted);
+    return scenario == null ? null : scenario.Suite;
+  }
+
+  /// <summary>The two release-verification suites, excluding one-event creator rehearsals.
+  /// Kept separate so the scenario catalog can classify course-backed events without a static
+  /// initialization loop.</summary>
+  internal static LabBatchSuite FindBuiltinSuite(string id) {
     foreach (LabBatchSuite suite in Suites) {
-      if (string.Equals(suite.Id, wanted, StringComparison.OrdinalIgnoreCase)) {
-        return suite;
-      }
+      if (string.Equals(suite.Id, id, StringComparison.OrdinalIgnoreCase)) return suite;
     }
     return null;
   }
@@ -98,7 +106,9 @@ public static class LabBatchContract {
         .Append(" required event(s), ").Append(suite.EvidenceKind).AppendLine();
       sb.AppendLine("    " + suite.Description);
     }
-    sb.Append("Use questlab_batch prepare all-schools before its live run.");
+    sb.Append("34 one-event rehearsals are also allowlisted as scenario-<event>. ")
+      .Append("Browse them in the Scenarios tab, then use the same prepare/run/reset/report/export ")
+      .Append("verbs. Use questlab_batch prepare all-schools before its live run.");
     return sb.ToString();
   }
 

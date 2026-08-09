@@ -175,6 +175,28 @@ class QuestLabPanelTests(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.panel)
 
+    def test_scenario_cockpit_exposes_the_bounded_creator_handoff(self) -> None:
+        controller = (MOD / "Core" / "LabBatchController.cs").read_text(encoding="utf-8")
+        scenario = (MOD / "Core" / "LabScenarioContract.cs").read_text(encoding="utf-8")
+        for marker in (
+            'new GUIContent("Scenarios",',
+            "LabScenarioCatalog.All.Count",
+            'new GUIContent("1  Prepare draft",',
+            'new GUIContent("2  Run evaluator",',
+            'new GUIContent("Copy draft JSON",',
+            'new GUIContent("Copy draft path",',
+            'new GUIContent("Open artifacts",',
+            "scenario.BuildQuestView()",
+            "batch.Prepare(instance, scenario.Id)",
+            "batch.Run(scenario.Id)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+        self.assertIn("QuestAuthoring.FromEvent", scenario)
+        self.assertIn("QuestTriggerEvaluator", scenario)
+        self.assertIn("ExistingContentConflict(questPath, questView)", controller)
+        self.assertIn("refused to overwrite a changed generated file", controller)
+
     def test_window_position_and_size_persist_on_close(self) -> None:
         for key in ("panelX", "panelY", "panelWidth", "panelHeight"):
             with self.subTest(key=key):
@@ -198,12 +220,13 @@ class QuestLabPanelTests(unittest.TestCase):
             "HandleKeyboardNavigation();",
             "KeyCode.Alpha1",
             "KeyCode.Alpha4",
+            "KeyCode.Alpha5",
             "KeyCode.Tab",
             "KeyCode.F",
             "KeyCode.Alpha0",
             "KeyCode.F1",
             'new GUIContent("Keys", "show keyboard shortcuts and state legend")',
-            '"KEYBOARD  /  Ctrl+1..4 tabs',
+            '"KEYBOARD  /  Ctrl+1..5 tabs',
             "ResetPanelLayout()",
         ):
             with self.subTest(marker=marker):
@@ -226,7 +249,7 @@ class QuestLabPanelTests(unittest.TestCase):
 
     def test_readiness_tab_uses_runtime_state_and_disclaims_visual_proof(self) -> None:
         for marker in (
-            'new GUIContent("Ready?", "runtime-backed demo readiness; Ctrl+4")',
+            'new GUIContent("Ready?", "runtime-backed demo readiness; Ctrl+5")',
             "HooksApplied = LabPatching.AppliedCount",
             "CatalogEventCount = QuestEventCatalog.Count",
             "ManifestEventCount = LabSeamCatalog.CreatorSafeEventCount",

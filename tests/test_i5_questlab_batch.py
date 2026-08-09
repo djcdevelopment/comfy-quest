@@ -12,6 +12,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "tools" / "i5" / "Invoke-I5QuestLabBatch.ps1"
+CAPABILITIES = (
+    REPO / "tools" / "component-packets" / "samples" / "quest-capability-manifest.json"
+)
 EXPECTED_OPERATIONS = {
     "prepare",
     "run",
@@ -59,6 +62,20 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
             self.source,
         )
 
+    def test_suite_allowlist_contains_exactly_the_two_suites_and_all_scenarios(self) -> None:
+        match = re.search(
+            r"\[ValidateSet\(([^)]*)\)\]\s*\[string\]\$Suite",
+            self.source,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        values = set(re.findall(r"'([a-z0-9_-]+)'", match.group(1)))
+        capabilities = json.loads(CAPABILITIES.read_text(encoding="utf-8"))
+        expected = {"all-schools", "creator-events"} | {
+            "scenario-" + event for event in capabilities["CreatorSafeEvents"]
+        }
+        self.assertEqual(values, expected)
+
     def test_dry_run_stops_before_any_i5_process(self) -> None:
         dry_run_branch = self.source.index("if ($DryRun)")
         self.assertLess(dry_run_branch, self.source.index("& powershell.exe"))
@@ -94,6 +111,37 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
             self.assertEqual(envelope["schema"], "comfy-questlab-batch-request/v1")
             self.assertEqual(envelope["operation"], "run")
             self.assertEqual(envelope["suite"], "creator-events")
+
+    def test_one_event_scenario_uses_the_same_bounded_run_envelope(self) -> None:
+        with tempfile.TemporaryDirectory() as output_directory:
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(SCRIPT),
+                    "run",
+                    "-Suite",
+                    "scenario-sign_written",
+                    "-OutputDirectory",
+                    output_directory,
+                    "-DryRun",
+                    "-Lane",
+                    "omen",
+                ],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            envelope = json.loads(next(Path(output_directory).glob("*-request.json")).read_text())
+            self.assertEqual(envelope["operation"], "run")
+            self.assertEqual(envelope["suite"], "scenario-sign_written")
+            self.assertNotIn("path", envelope)
+            self.assertNotIn("command", envelope)
 
     def test_gallery_defaults_select_grand_but_compare_retains_wide_baseline(self) -> None:
         cases = (

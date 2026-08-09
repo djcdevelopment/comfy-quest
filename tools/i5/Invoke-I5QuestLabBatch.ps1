@@ -21,7 +21,23 @@ param(
     )]
     [string]$Operation,
 
-    [ValidateSet('all-schools', 'creator-events')]
+    [ValidateSet(
+        'all-schools', 'creator-events',
+        'scenario-attack_blocked', 'scenario-character_healed',
+        'scenario-character_staggered', 'scenario-chat_sent',
+        'scenario-container_emptied', 'scenario-damage_dealt',
+        'scenario-global_key_removed', 'scenario-global_key_set',
+        'scenario-item_consumed', 'scenario-item_crafted', 'scenario-item_dropped',
+        'scenario-item_equipped', 'scenario-item_picked_up', 'scenario-item_unequipped',
+        'scenario-kill', 'scenario-max_health_changed', 'scenario-piece_damaged',
+        'scenario-piece_destroyed', 'scenario-piece_placed', 'scenario-piece_removed',
+        'scenario-piece_repaired', 'scenario-player_died', 'scenario-player_teleported',
+        'scenario-resource_damaged', 'scenario-resource_picked', 'scenario-sign_written',
+        'scenario-skill_raised', 'scenario-skills_lowered', 'scenario-stamina_gained',
+        'scenario-stamina_spent', 'scenario-station_fuel_added',
+        'scenario-station_input_added', 'scenario-station_output_collected',
+        'scenario-station_output_produced'
+    )]
     [string]$Suite = 'all-schools',
 
     [ValidateSet('classic', 'marble-wide', 'marble-grand')]
@@ -284,9 +300,10 @@ if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
         Write-Error 'Quest Lab suite receipt records a same-action double completion.'
         exit 1
     }
-    if ($Operation -eq 'run' -and $Suite -eq 'creator-events' -and
+    if ($Operation -eq 'run' -and
+        ($Suite -eq 'creator-events' -or $Suite.StartsWith('scenario-')) -and
         $suiteObject.verdict -ne 'pass') {
-        Write-Error "creator-events contract suite did not pass: $($suiteObject.verdict)"
+        Write-Error "synthetic evaluator suite did not pass: $($suiteObject.verdict)"
         exit 1
     }
 }

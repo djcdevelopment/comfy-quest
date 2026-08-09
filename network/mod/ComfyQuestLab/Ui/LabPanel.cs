@@ -41,6 +41,9 @@ public sealed class LabPanel {
   const float SpellTrueNameColumn = 220f;
   const float MinPanelScale = LabPanelLayout.MinimumScale;
   const float MaxPanelScale = LabPanelLayout.MaximumScale;
+  const float ScenarioEventColumn = 210f;
+  const float ScenarioProfileColumn = 82f;
+  const float ScenarioSelectColumn = 70f;
   const float PanelScaleStep = 0.1f;
 
   readonly LabEventRing _ring;
@@ -52,7 +55,10 @@ public sealed class LabPanel {
   Vector2 _journalScroll;
   Vector2 _questScroll;
   Vector2 _readinessScroll;
+  Vector2 _scenarioScroll;
   string _journalCategory = LabCategory.Harvest;   // where a new builder starts
+  string _scenarioCategory = LabCategory.Harvest;
+  string _selectedScenarioId = "scenario-resource_damaged";
   string _filterText = string.Empty;
   string _notice = string.Empty;
   float _noticeUntil;
@@ -86,7 +92,7 @@ public sealed class LabPanel {
   GUIStyle _resizeStyle;
   Tab _tab = Tab.Console;
 
-  enum Tab { Console, Spellbook, Quests, Readiness }
+  enum Tab { Console, Spellbook, Scenarios, Quests, Readiness }
 
   /// <summary>One rune, used as a toggle. The same call renders a spellbook tab and a
   /// console filter, which is the whole reason the runes exist: learning the book
@@ -193,6 +199,8 @@ public sealed class LabPanel {
       DrawConsole();
     } else if (_tab == Tab.Spellbook) {
       DrawSpellbook();
+    } else if (_tab == Tab.Scenarios) {
+      DrawScenarioCockpit();
     } else if (_tab == Tab.Quests) {
       DrawQuestDashboard();
     } else {
@@ -217,13 +225,18 @@ public sealed class LabPanel {
         GUI.skin.button)) {
       _tab = Tab.Spellbook;
     }
+    if (GUILayout.Toggle(_tab == Tab.Scenarios,
+        new GUIContent("Scenarios", "prepare and rehearse one canonical event; Ctrl+3"),
+        GUI.skin.button)) {
+      _tab = Tab.Scenarios;
+    }
     if (GUILayout.Toggle(_tab == Tab.Quests,
-        new GUIContent("Quests", "loaded quest files and evaluator state; Ctrl+3"),
+        new GUIContent("Quests", "loaded quest files and evaluator state; Ctrl+4"),
         GUI.skin.button)) {
       _tab = Tab.Quests;
     }
     if (GUILayout.Toggle(_tab == Tab.Readiness,
-        new GUIContent("Ready?", "runtime-backed demo readiness; Ctrl+4"), GUI.skin.button)) {
+        new GUIContent("Ready?", "runtime-backed demo readiness; Ctrl+5"), GUI.skin.button)) {
       _tab = Tab.Readiness;
     }
     GUILayout.FlexibleSpace();
@@ -274,8 +287,10 @@ public sealed class LabPanel {
     } else if (current.keyCode == KeyCode.Alpha2) {
       SelectTab(Tab.Spellbook);
     } else if (current.keyCode == KeyCode.Alpha3) {
-      SelectTab(Tab.Quests);
+      SelectTab(Tab.Scenarios);
     } else if (current.keyCode == KeyCode.Alpha4) {
+      SelectTab(Tab.Quests);
+    } else if (current.keyCode == KeyCode.Alpha5) {
       SelectTab(Tab.Readiness);
     } else if (current.keyCode == KeyCode.Tab) {
       int count = Enum.GetValues(typeof(Tab)).Length;
@@ -302,7 +317,7 @@ public sealed class LabPanel {
   void DrawKeyboardHelp() {
     GUILayout.BeginVertical(_questDetailStyle);
     GUILayout.BeginHorizontal();
-    GUILayout.Label("KEYBOARD  /  Ctrl+1..4 tabs  /  Ctrl+Tab cycle  /  Ctrl+F find  /  "
+    GUILayout.Label("KEYBOARD  /  Ctrl+1..5 tabs  /  Ctrl+Tab cycle  /  Ctrl+F find  /  "
         + "Ctrl+0 zoom  /  F1 help  /  F6 or Esc close");
     if (GUILayout.Button(new GUIContent("Reset layout",
         "restore 100% zoom and a visible default window"), GUILayout.Width(96f))) {
@@ -864,6 +879,198 @@ public sealed class LabPanel {
     }
   }
 
+  /// <summary>A bounded rehearsal cockpit over the shared 34-event authoring catalog.
+  /// Preparing writes only Lab-owned artifacts; running feeds one generated ordinary quest and
+  /// one catalog example to the exact shared evaluator. The UI calls the existing batch
+  /// lifecycle, so local clicks and allowlisted OMEN/i5 requests produce the same receipts.</summary>
+  void DrawScenarioCockpit() {
+    for (int row = 0; row < 2; row++) {
+      GUILayout.BeginHorizontal();
+      for (int i = row * 4; i < (row + 1) * 4 && i < LabCategory.All.Length; i++) {
+        string category = LabCategory.All[i];
+        bool selected = string.Equals(
+            _scenarioCategory, category, StringComparison.OrdinalIgnoreCase);
+        if (RuneToggle(selected, category, LabJournal.For(category).Title, 138f) && !selected) {
+          _scenarioCategory = category;
+          LabScenarioDefinition first = LabScenarioCatalog.FirstForSchool(category);
+          _selectedScenarioId = first == null ? null : first.Id;
+          _scenarioScroll = Vector2.zero;
+        }
+      }
+      GUILayout.EndHorizontal();
+    }
+    GUILayout.Space(5f);
+
+    GUILayout.BeginHorizontal();
+    GUILayout.Label("Pick one creator event. Preview runs are exact evaluator evidence, not a "
+        + "claim that gameplay happened.");
+    GUILayout.FlexibleSpace();
+    GUILayout.Label(LabScenarioCatalog.All.Count + " events");
+    GUILayout.EndHorizontal();
+
+    DrawScenarioGridHeader();
+    _scenarioScroll = GUILayout.BeginScrollView(
+        _scenarioScroll, GUILayout.Height(Mathf.Min(218f, _window.height * 0.34f)));
+    int visibleIndex = 0;
+    foreach (LabScenarioDefinition scenario in LabScenarioCatalog.All) {
+      if (!string.Equals(
+          scenario.School, _scenarioCategory, StringComparison.OrdinalIgnoreCase)) {
+        continue;
+      }
+      DrawScenarioGridRow(scenario, visibleIndex++);
+    }
+    GUILayout.EndScrollView();
+
+    LabScenarioDefinition current = LabScenarioCatalog.Find(_selectedScenarioId)
+        ?? LabScenarioCatalog.FirstForSchool(_scenarioCategory);
+    if (current == null) return;
+
+    Color schoolColor = LabRunes.ColorFor(current.School);
+    DrawSectionHeading(current.EventName.ToUpperInvariant(), schoolColor,
+        LabRunes.For(current.School));
+    GUILayout.BeginVertical(_questDetailStyle);
+    GUILayout.Label("target  /  " + current.TargetKind + "  /  " + current.TargetDescription);
+    GUILayout.Label("example  /  " + current.ExampleTarget
+        + "    profile  /  " + current.Profile.ToUpperInvariant()
+        + "    safety  /  " + current.Safety);
+    GUILayout.Label("try live  /  " + current.LiveAction);
+    if (current.Fields.Count > 0) {
+      var fields = new List<string>();
+      foreach (QuestEventCatalog.FieldDefinition field in current.Fields) {
+        fields.Add(field.Name + "=" + field.Example
+            + (field.DraftByDefault ? " (drafted)" : " (optional)"));
+      }
+      GUILayout.Label("where fields  /  " + string.Join("  Â·  ", fields.ToArray()));
+    }
+    GUILayout.Label(current.CourseWitnessAvailable
+        ? "live lane  /  staged in the all-schools compact course"
+        : "live lane  /  follow the action above; this one is not staged by the compact course");
+    GUILayout.EndVertical();
+
+    DrawScenarioControls(current);
+  }
+
+  void DrawScenarioGridHeader() {
+    GUILayout.BeginHorizontal();
+    GridCell(new GUIContent("EVENT"), _gridHeaderStyle, ScenarioEventColumn);
+    GridCell(new GUIContent("TARGET / EXAMPLE"), _gridHeaderStyle, -1f);
+    GridCell(new GUIContent("PROFILE"), _gridHeaderStyle, ScenarioProfileColumn);
+    GridCell(new GUIContent("OPEN"), _gridHeaderStyle, ScenarioSelectColumn);
+    GUILayout.EndHorizontal();
+  }
+
+  void DrawScenarioGridRow(LabScenarioDefinition scenario, int index) {
+    GUIStyle style = index % 2 == 0 ? _gridEvenStyle : _gridOddStyle;
+    bool selected = string.Equals(
+        _selectedScenarioId, scenario.Id, StringComparison.OrdinalIgnoreCase);
+    Color prior = style.normal.textColor;
+    Color priorHover = style.hover.textColor;
+    if (selected) {
+      style.normal.textColor = LabRunes.ColorFor(scenario.School);
+      style.hover.textColor = Color.white;
+    }
+    GUILayout.BeginHorizontal();
+    if (GridButton(new GUIContent((selected ? "â–¶  " : string.Empty) + scenario.EventName,
+        "click to select; canonical trigger.event is " + scenario.EventName),
+        style, ScenarioEventColumn)) {
+      _selectedScenarioId = scenario.Id;
+    }
+    GridCell(new GUIContent(scenario.TargetKind + " / " + scenario.ExampleTarget,
+        scenario.TargetDescription), style, -1f);
+    GridCell(new GUIContent(scenario.Profile.ToUpperInvariant(),
+        scenario.Profile + " runtime profile"), style, ScenarioProfileColumn);
+    if (GridButton(new GUIContent("Select", "open this rehearsal"),
+        style, ScenarioSelectColumn)) {
+      _selectedScenarioId = scenario.Id;
+    }
+    GUILayout.EndHorizontal();
+    style.normal.textColor = prior;
+    style.hover.textColor = priorHover;
+  }
+
+  void DrawScenarioControls(LabScenarioDefinition scenario) {
+    LabBatchController batch = ComfyQuestLab.Batch;
+    if (batch == null) {
+      GUILayout.Label("Scenario runner is unavailable in this game state.");
+      return;
+    }
+
+    GUILayout.BeginHorizontal();
+    bool controlsEnabled = GUI.enabled;
+    GUI.enabled = controlsEnabled && !batch.IsPreparing && !batch.IsLiveCaptureRunning;
+    if (GUILayout.Button(new GUIContent("1  Prepare draft",
+        "write an owned scenario manifest and ordinary schema-1 quest; do not load it"))) {
+      ComfyQuestLab instance = ComfyQuestLab.Instance;
+      if (instance != null) instance.StartCoroutine(batch.Prepare(instance, scenario.Id));
+    }
+    if (GUILayout.Button(new GUIContent("2  Run evaluator",
+        "run this one example through the exact shared loader and evaluator"))) {
+      ComfyQuestLab.Report(batch.Run(scenario.Id));
+    }
+    GUI.enabled = controlsEnabled;
+    if (GUILayout.Button(new GUIContent("Reset", "clear volatile evidence and restore cooldown"),
+        GUILayout.Width(70f))) {
+      ComfyQuestLab.Report(batch.Reset());
+    }
+    if (GUILayout.Button(new GUIContent("Report", "show current scenario progress"),
+        GUILayout.Width(70f))) {
+      ComfyQuestLab.Report(batch.Report());
+    }
+    GUI.enabled = controlsEnabled && batch.Session != null;
+    if (GUILayout.Button(new GUIContent("Export", "write a machine-readable suite receipt"),
+        GUILayout.Width(70f))) {
+      ComfyQuestLab.Report(batch.Export());
+    }
+    GUI.enabled = controlsEnabled;
+    GUILayout.EndHorizontal();
+
+    bool prepared = string.Equals(
+        batch.PreparedSuiteId, scenario.Id, StringComparison.OrdinalIgnoreCase);
+    LabBatchSession session = batch.Session;
+    bool currentRun = session != null && string.Equals(
+        session.Suite.Id, scenario.Id, StringComparison.OrdinalIgnoreCase);
+    Color prior = GUI.contentColor;
+    GUI.contentColor = currentRun && session.Verdict == "pass"
+        ? new Color(0.55f, 1f, 0.64f, 1f)
+        : (prepared
+            ? new Color(0.72f, 0.88f, 1f, 1f)
+            : new Color(0.72f, 0.76f, 0.82f, 1f));
+    GUILayout.Label(currentRun
+        ? "STATUS  /  " + session.Summary()
+        : (prepared
+            ? "STATUS  /  PREPARED  /  " + batch.PreparedArtifactPath
+            : "STATUS  /  choose Prepare, then Run evaluator"));
+    GUI.contentColor = prior;
+
+    GUILayout.BeginHorizontal();
+    if (GUILayout.Button(new GUIContent("Copy draft JSON",
+        "copy the exact editable schema-1 quest generated by QuestAuthoring"),
+        GUILayout.Width(128f))) {
+      CopyScenarioDraft(scenario);
+    }
+    if (prepared && !string.IsNullOrWhiteSpace(batch.PreparedArtifactPath)) {
+      if (GUILayout.Button(new GUIContent("Copy draft path",
+          "copy the generated quest-view.json path"), GUILayout.Width(128f))) {
+        CopyToClipboard("scenario draft", batch.PreparedQuestPath);
+      }
+      if (GUILayout.Button(new GUIContent("Open artifacts",
+          "open the generated scenario folder"), GUILayout.Width(118f))) {
+        OpenDirectory("scenario artifacts", Path.GetDirectoryName(batch.PreparedArtifactPath));
+      }
+    }
+    GUILayout.FlexibleSpace();
+    GUILayout.EndHorizontal();
+  }
+
+  void CopyScenarioDraft(LabScenarioDefinition scenario) {
+    try {
+      GUIUtility.systemCopyBuffer = scenario.BuildQuestView();
+      ShowNotice("COPIED EDITABLE SCHEMA-1 DRAFT  /  " + scenario.EventName);
+    } catch (Exception ex) {
+      ShowNotice("COPY FAILED  /  " + ex.Message);
+    }
+  }
+
   /// <summary>The spellbook. Eight runes, each a school of things the world will answer
   /// to — what it covers, something to go and try, and the trap.
   ///
@@ -1253,6 +1460,17 @@ public sealed class LabPanel {
       Directory.CreateDirectory(LabQuestEngine.QuestDir);
       Application.OpenURL(new Uri(LabQuestEngine.QuestDir).AbsoluteUri);
       ShowNotice("OPENED QUEST FOLDER");
+    } catch (Exception ex) {
+      ShowNotice("OPEN FAILED  /  " + ex.Message);
+    }
+  }
+
+  void OpenDirectory(string label, string path) {
+    try {
+      if (string.IsNullOrWhiteSpace(path)) return;
+      Directory.CreateDirectory(path);
+      Application.OpenURL(new Uri(path).AbsoluteUri);
+      ShowNotice("OPENED " + (label ?? "folder").ToUpperInvariant());
     } catch (Exception ex) {
       ShowNotice("OPEN FAILED  /  " + ex.Message);
     }

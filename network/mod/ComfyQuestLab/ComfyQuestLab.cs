@@ -323,7 +323,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
       new Terminal.ConsoleCommand("questlab_batch",
           "bounded integration suites: questlab_batch "
-          + "<suites|prepare|run|reset|report|export> [all-schools|creator-events]",
+          + "<suites|prepare|run|reset|report|export> "
+          + "[all-schools|creator-events|scenario-<event>]",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "suites";
             string suite = args.Length >= 3 ? args[2] : "all-schools";
@@ -425,7 +426,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_gallery identify|clear [profile-or-build-id]   inspect or remove marks safely");
     sb.AppendLine("  questlab_gallery evidence [profile-or-build-id]   export read-only truth and named views");
     sb.AppendLine("  questlab_gallery trees|restore-trees [profile-or-build-id]   inspect or recover pruned trees");
-    sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   bounded evidence runs");
+    sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   "
+        + "bounded live, contract, or scenario evidence runs");
     sb.AppendLine("  questlab_blueprint capture <n> <1-40m> [mine|lab] [replace]   copy a bounded live build");
     sb.AppendLine("  questlab_blueprint inspect|diff <n> | check|build|count|clear <n>   verify or replay it");
     sb.AppendLine("  questlab_prefabs <name> | inspect <exact-name> | dump   search or inspect rendered state");
