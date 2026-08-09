@@ -301,6 +301,18 @@ public static class LabRuneLight {
         return;
       }
 
+      bool signFace = string.Equals(style, SignFaceStyle, StringComparison.Ordinal);
+      if (signFace) {
+        // This branch must precede lamp allocation. Lamp children are client-local and
+        // therefore absent after every process restart; allocating first would create a
+        // brand-new floor light and then only try to remove a nonexistent old one.
+        ApplyTextGlow(host, school);
+        if (existing != null) {
+          UnityEngine.Object.Destroy(existing.gameObject);
+        }
+        return;
+      }
+
       GameObject lamp;
       if (existing != null) {
         lamp = existing.gameObject;
@@ -308,19 +320,6 @@ public static class LabRuneLight {
         lamp = new GameObject(LampChildName);
         lamp.transform.SetParent(host.transform, false);
         lamp.AddComponent<Light>();
-      }
-
-      bool signFace = string.Equals(style, SignFaceStyle, StringComparison.Ordinal);
-      if (signFace) {
-        // Even a 1.6 m point light blooms across polished marble in Valheim's bright
-        // environments. Make the editable prompt itself emissive and remove any lamp an
-        // older build hung here; the lettering identifies the interaction without
-        // changing exposure across the hub floor.
-        ApplyTextGlow(host, school);
-        if (existing != null) {
-          UnityEngine.Object.Destroy(existing.gameObject);
-        }
-        return;
       }
 
       bool bannerFace = string.Equals(style, BannerFaceStyle, StringComparison.Ordinal);

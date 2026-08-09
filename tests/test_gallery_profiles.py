@@ -186,6 +186,10 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("if (signFace)", light)
         self.assertIn("ApplyTextGlow(host, school)", light)
         self.assertIn("UnityEngine.Object.Destroy(existing.gameObject)", light)
+        self.assertLess(
+            light.index("bool signFace"),
+            light.index("lamp = new GameObject(LampChildName)"),
+        )
         self.assertNotIn("Mathf.Min(configuredRange, 1.6f)", light)
         self.assertIn("Mathf.Min(configuredRange, 5.5f)", light)
 

@@ -1,5 +1,10 @@
 # Changelog
 
+**r16 fresh-process correction.** The Social sign's text-only branch now runs before any
+lamp allocation. r15 removed a lamp only when one already existed in memory, but
+client-local lamp children never survive a restart; r16 makes the no-floor-light rule
+true on the first load as well as a live retune.
+
 **r15 marble-exposure correction.** The editable `sign here` prompt no longer owns a
 point light. Its school-coloured glyphs emit directly, and loading r15 removes the lamp
 from an already-standing r14 sign. This keeps the interaction obvious without blooming
