@@ -158,6 +158,24 @@ class QuestLabEventExportTests(unittest.TestCase):
         self.assertEqual(read.duplicate_input_records, 1)
         self.assertEqual(report["totals"]["raw_witnesses"], 1)
 
+    def test_formula_neutralized_csv_is_the_same_authoritative_jsonl_witness(self) -> None:
+        item = event(1, target="=IMPORTXML(\"https://bad.invalid\")", action="@action-1")
+        item["detail"] = "+detail"
+        item["diagnosticSeam"] = "-diagnostic"
+        source = self.jsonl("questlab-events-formula-mirror.jsonl", [header(), item])
+        projected = dict(item)
+        for key in ("target", "detail", "diagnosticSeam", "actionIdentity"):
+            projected[key] = "'" + projected[key]
+        projection = self.csv_archive("questlab-events-formula-mirror.csv", [projected])
+
+        read = EVENTS.read_inputs([source, projection], strict=True)
+
+        self.assertEqual(len(read.records), 1)
+        self.assertEqual(read.duplicate_input_records, 1)
+        self.assertEqual(read.records[0].source_format, "jsonl")
+        self.assertEqual(read.records[0].target, item["target"])
+        self.assertEqual(read.records[0].action_identity, item["actionIdentity"])
+
     def test_malformed_json_names_file_line_and_column(self) -> None:
         path = self.root / "questlab-events-bad.jsonl"
         path.write_text(json.dumps(header()) + "\n" + '{"schema": nope}\n', encoding="utf-8")

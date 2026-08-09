@@ -90,6 +90,7 @@ class EventRecord:
     diagnostic_seam: str
     fields: dict[str, str]
     release_id: str
+    source_format: str
     source_ordinal: int
     line_number: int
     raw_witness_count: int = 1
@@ -238,6 +239,7 @@ def normalize_event(
     strict: bool,
     session_header: dict[str, Any] | None,
     include_private: bool,
+    source_format: str,
 ) -> EventRecord:
     if strict:
         csv_shape = "creator_event" in row or "timestamp_utc" in row
@@ -345,6 +347,7 @@ def normalize_event(
         diagnostic_seam=diagnostic_seam,
         fields=fields,
         release_id=release_id,
+        source_format=source_format,
         source_ordinal=source_ordinal,
         line_number=line_number,
         raw_witness_count=raw_witness_count,
@@ -552,6 +555,7 @@ def read_jsonl(
                     strict=strict,
                     session_header=active_header,
                     include_private=include_private,
+                    source_format="jsonl",
                 )
                 if active_header and event.session_id != active_header["sessionId"]:
                     raise EventExportError("event sessionId disagrees with its session header")
@@ -598,6 +602,7 @@ def read_csv_file(
                         strict=strict,
                         session_header=None,
                         include_private=include_private,
+                        source_format="csv",
                     )
                 )
             except EventExportError as exc:
@@ -640,29 +645,64 @@ def _mirror_signature(row: EventRecord) -> tuple[Any, ...]:
         row.timestamp_utc,
         row.school,
         row.creator_event,
-        row.target,
         row.usability,
-        row.action_identity,
         row.raw_witness_count,
     )
+
+
+def _archive_csv_projection(value: str) -> str:
+    """Mirror the runtime writer's formula-neutralizing CSV projection exactly."""
+    index = 0
+    while index < len(value) and (value[index].isspace() or ord(value[index]) < 32 or ord(value[index]) == 127):
+        index += 1
+    if index < len(value) and value[index] in "=+-@":
+        return "'" + value
+    return value
+
+
+def _projected_text_compatible(
+    left: EventRecord, left_value: str, right: EventRecord, right_value: str
+) -> bool:
+    if left_value == right_value:
+        return True
+    if left.source_format == "jsonl" and right.source_format == "csv":
+        return _archive_csv_projection(left_value) == right_value
+    if left.source_format == "csv" and right.source_format == "jsonl":
+        return left_value == _archive_csv_projection(right_value)
+    return False
 
 
 def _mirrors_compatible(left: EventRecord, right: EventRecord) -> bool:
     if _mirror_signature(left) != _mirror_signature(right):
         return False
     for left_value, right_value in (
-        (left.fields, right.fields),
+        (left.target, right.target),
+        (left.action_identity, right.action_identity),
+    ):
+        if not _projected_text_compatible(left, left_value, right, right_value):
+            return False
+    for left_value, right_value in (
         (left.detail, right.detail),
         (left.diagnostic_seam, right.diagnostic_seam),
     ):
-        if left_value and right_value and left_value != right_value:
+        if left_value and right_value and not _projected_text_compatible(
+            left, left_value, right, right_value
+        ):
             return False
+    if left.fields and right.fields and left.fields != right.fields:
+        return False
     return True
 
 
 def _prefer_richer(left: EventRecord, right: EventRecord) -> EventRecord:
-    left_score = bool(left.detail) + bool(left.diagnostic_seam) + len(left.fields) + bool(left.release_id)
-    right_score = bool(right.detail) + bool(right.diagnostic_seam) + len(right.fields) + bool(right.release_id)
+    left_score = (
+        bool(left.detail) + bool(left.diagnostic_seam) + len(left.fields)
+        + bool(left.release_id) + (left.source_format == "jsonl")
+    )
+    right_score = (
+        bool(right.detail) + bool(right.diagnostic_seam) + len(right.fields)
+        + bool(right.release_id) + (right.source_format == "jsonl")
+    )
     chosen, other = (right, left) if right_score > left_score else (left, right)
     chosen.mirror_count = left.mirror_count + right.mirror_count
     chosen.redacted_fields = max(left.redacted_fields, right.redacted_fields)
