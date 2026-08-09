@@ -44,6 +44,20 @@ did — and whether a quest could actually fire on it.
 > the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
+## R24 acceptance update (2026-08-09)
+
+This update supersedes the earlier historical receipt boundary above.
+
+The exact r24 OMEN DLL passed the source-shared creator contract at 34/34 events and quests
+with zero double completions. Its clean session archive contains 309 strict-parseable canonical
+rows and a matching CSV projection with zero drops. The offline parser produced a five-tab
+workbook and import bundle; the local Sheets doctor found one readable session and made zero
+network requests. Gallery v2 was rebuilt as `marble-grand-20260809T204409Z-01`; all nine
+braziers measured below the roof and Derek visually accepted the rebuilt court. Truth Lens
+retains weather-coverage and fresh-prefab warnings as honest follow-up evidence. A later
+non-mutating compare request was delivered after acceptance but OMEN exited before its receipt
+returned; automated compare coverage is green.
+
 ## Why this exists
 
 Authoring a quest today means guessing, and guessing fails *silently*.

@@ -42,6 +42,16 @@ scope. Windows refresh tokens are DPAPI-protected under Local App Data; Disconne
 revocation and always removes the local token. Missing libraries, tenant denial, or offline
 Google never disables local JSONL/CSV.
 
+**r24 final acceptance.** The exact r24 OMEN DLL passed the source-shared creator contract at
+34/34 events and quests with zero double completions. A clean OMEN session produced 309 strict-
+parseable canonical rows, a matching CSV projection, and zero dropped rows. The offline parser
+produced a five-tab workbook and import bundle; the local Sheets doctor found one readable session
+and made zero network requests. Gallery v2 was rebuilt as `marble-grand-20260809T204409Z-01`;
+all nine braziers measured below the roof and human visual review accepted the rebuilt court.
+Truth Lens warnings for weather coverage and fresh-prefab differences remain intentionally honest
+follow-up evidence. A non-mutating compare request was delivered after acceptance but OMEN exited
+before its receipt returned; automated compare coverage remains green.
+
 **r23 self-guided scenario and accessible demo cockpits.** The panel now exposes its `INTERACTIVE` input ownership
 instead of making cursor behavior implicit, and every important verdict carries an ASCII
 `[OK]`, `[INFO]`, `[CHECK]`, or `[PROVED]` cue in addition to color. A new **Ready?** tab
