@@ -107,6 +107,7 @@ class ReadResult:
     input_files: int = 0
     duplicate_input_records: int = 0
     truncated_tail_records_ignored: int = 0
+    partial_session_ids: set[str] = field(default_factory=set)
 
 
 def _normalized_key(value: Any) -> str:
@@ -357,7 +358,10 @@ def normalize_event(
 
 def validate_session(row: dict[str, Any], strict: bool) -> dict[str, Any]:
     if strict:
-        required = ("schema", "recordType", "sessionId", "startedUtc", "releaseId", "segment", "fields")
+        required = (
+            "schema", "recordType", "sessionId", "startedUtc", "releaseId",
+            "runtimeProfile", "segment", "fields",
+        )
         missing = [name for name in required if name not in row]
         if missing:
             raise EventExportError("strict session record is missing " + ", ".join(missing))
@@ -370,6 +374,12 @@ def validate_session(row: dict[str, Any], strict: bool) -> dict[str, Any]:
     started_value = _lookup(row, "startedUtc", "started_utc")
     _, started_utc = parse_timestamp(started_value, "startedUtc")
     release_id = _text(_lookup(row, "releaseId", "release_id"), "releaseId", 256, required=strict).strip()
+    runtime_profile = _text(
+        _lookup(row, "runtimeProfile", "runtime_profile"),
+        "runtimeProfile",
+        128,
+        required=strict,
+    ).strip()
     segment_value = _lookup(row, "segment")
     segment = _positive_count(segment_value, "segment") if segment_value not in (None, "") else None
     if strict and segment is None:
@@ -388,6 +398,7 @@ def validate_session(row: dict[str, Any], strict: bool) -> dict[str, Any]:
         "sessionId": session_id,
         "startedUtc": started_utc,
         "releaseId": release_id,
+        "runtimeProfile": runtime_profile,
         "segment": segment,
         "fields": privacy,
     }
@@ -395,7 +406,10 @@ def validate_session(row: dict[str, Any], strict: bool) -> dict[str, Any]:
 
 def validate_session_end(row: dict[str, Any], strict: bool) -> dict[str, Any]:
     if strict:
-        required = ("schema", "recordType", "sessionId", "endedUtc", "eventCount", "segments", "reason")
+        required = (
+            "schema", "recordType", "sessionId", "releaseId", "runtimeProfile",
+            "startedUtc", "endedUtc", "eventCount", "droppedEventCount", "segments", "reason",
+        )
         missing = [name for name in required if name not in row]
         if missing:
             raise EventExportError("strict sessionEnd record is missing " + ", ".join(missing))
@@ -405,16 +419,35 @@ def validate_session_end(row: dict[str, Any], strict: bool) -> dict[str, Any]:
     if schema and schema != ARCHIVE_SCHEMA:
         raise EventExportError(f"unsupported sessionEnd schema {schema!r}")
     session_id = _text(_lookup(row, "sessionId", "session_id"), "sessionId", 256, required=True).strip()
+    release_id = _text(
+        _lookup(row, "releaseId", "release_id"), "releaseId", 256, required=strict
+    ).strip()
+    runtime_profile = _text(
+        _lookup(row, "runtimeProfile", "runtime_profile"),
+        "runtimeProfile",
+        128,
+        required=strict,
+    ).strip()
+    _, started_utc = parse_timestamp(_lookup(row, "startedUtc", "started_utc"), "startedUtc")
     _, ended_utc = parse_timestamp(_lookup(row, "endedUtc", "ended_utc"), "endedUtc")
+    if ended_utc < started_utc:
+        raise EventExportError("sessionEnd endedUtc cannot precede startedUtc")
     event_count = _nonnegative_count(_lookup(row, "eventCount", "event_count"), "eventCount")
+    dropped_event_count = _nonnegative_count(
+        _lookup(row, "droppedEventCount", "dropped_event_count"), "droppedEventCount"
+    )
     segments = _positive_count(_lookup(row, "segments"), "segments")
     reason = _text(_lookup(row, "reason"), "reason", 128, required=True).strip()
     if strict and reason != "clean-shutdown":
         raise EventExportError("sessionEnd reason must be 'clean-shutdown'")
     return {
         "sessionId": session_id,
+        "releaseId": release_id,
+        "runtimeProfile": runtime_profile,
+        "startedUtc": started_utc,
         "endedUtc": ended_utc,
         "eventCount": event_count,
+        "droppedEventCount": dropped_event_count,
         "segments": segments,
         "reason": reason,
     }
@@ -464,7 +497,7 @@ def validate_archive_notice(row: dict[str, Any], strict: bool) -> dict[str, Any]
 
 
 def _headers_compatible(left: dict[str, Any], right: dict[str, Any]) -> bool:
-    keys = ("sessionId", "startedUtc", "releaseId", "fields")
+    keys = ("sessionId", "startedUtc", "releaseId", "runtimeProfile", "fields")
     return all(left.get(key) == right.get(key) for key in keys)
 
 
@@ -498,6 +531,7 @@ def read_jsonl(
     active_header: dict[str, Any] | None = None
     saw_record = False
     truncated_tail_records = 0
+    session_ended = False
     try:
         stream = path.open("r", encoding="utf-8-sig", newline="")
     except OSError as exc:
@@ -518,6 +552,8 @@ def read_jsonl(
             if not isinstance(row, dict):
                 raise EventExportError(f"{path.name}:{line_number}: record must be an object")
             record_type = _text(_lookup(row, "recordType", "record_type"), "recordType", 32).strip().lower()
+            if session_ended:
+                raise EventExportError(f"{path.name}:{line_number}: record appeared after sessionEnd")
             if not saw_record and strict and record_type != "session":
                 raise EventExportError(f"{path.name}:{line_number}: first record must be a session header")
             saw_record = True
@@ -536,7 +572,9 @@ def read_jsonl(
                     previous = endings.get(ending["sessionId"])
                     if previous and previous != ending:
                         raise EventExportError("sessionEnd disagrees with another segment")
+                    ending["sourceSegment"] = active_header.get("segment") if active_header else None
                     endings[ending["sessionId"]] = ending
+                    session_ended = True
                     continue
                 if record_type == "archivenotice":
                     notice = validate_archive_notice(row, strict)
@@ -673,6 +711,11 @@ def _projected_text_compatible(
 
 
 def _mirrors_compatible(left: EventRecord, right: EventRecord) -> bool:
+    # A mirror is specifically the writer's JSONL authority plus its paired CSV
+    # projection. Repeated JSONL (or repeated CSV) sequence identities are corruption,
+    # even when their payload happens to be byte-for-byte equal.
+    if left.source_format == right.source_format:
+        return False
     if _mirror_signature(left) != _mirror_signature(right):
         return False
     for left_value, right_value in (
@@ -767,6 +810,11 @@ def read_inputs(
             if previous is None:
                 by_witness[key] = row
                 continue
+            if previous.source_format == row.source_format:
+                safe = identity_hash(row.session_id, str(row.sequence), row.creator_event)
+                raise EventExportError(
+                    f"duplicate {row.source_format} witness identity {safe}"
+                )
             if not _mirrors_compatible(previous, row):
                 safe = identity_hash(row.session_id, str(row.sequence), row.creator_event)
                 raise EventExportError(
@@ -786,7 +834,58 @@ def read_inputs(
     )
     if not result.records:
         raise EventExportError("archives contain no event records")
+    _reconcile_session_contract(result, strict)
     return result
+
+
+def _reconcile_session_contract(result: ReadResult, strict: bool) -> None:
+    """Make an end record evidence only after it agrees with its complete session."""
+    events_by_session: dict[str, int] = defaultdict(int)
+    for row in result.records:
+        if row.session_id and row.source_format == "jsonl":
+            events_by_session[row.session_id] += 1
+
+    notice_totals: dict[str, int] = defaultdict(int)
+    for notice in result.archive_notices:
+        session_id = notice["sessionId"]
+        notice_totals[session_id] = max(
+            notice_totals[session_id], notice["totalDroppedEventCount"]
+        )
+
+    for session_id, ending in result.session_ends.items():
+        header = result.session_headers.get(session_id)
+        if header is None:
+            if strict:
+                raise EventExportError("sessionEnd has no matching session header")
+            continue
+        for key in ("releaseId", "runtimeProfile", "startedUtc"):
+            if ending.get(key) and ending.get(key) != header.get(key):
+                raise EventExportError(f"sessionEnd {key} disagrees with its session header")
+
+        seen = set(header.get("seenSegments", []))
+        if header.get("segment") is not None:
+            seen.add(header["segment"])
+        declared_segments = ending["segments"]
+        if not seen or max(seen) != declared_segments:
+            raise EventExportError("sessionEnd segments disagree with observed archive segments")
+        if ending.get("sourceSegment") != declared_segments:
+            raise EventExportError("sessionEnd did not appear in its declared final segment")
+        complete_segments = seen == set(range(1, declared_segments + 1))
+
+        observed_events = events_by_session.get(session_id, 0)
+        if ending["eventCount"] < observed_events:
+            raise EventExportError("sessionEnd eventCount is smaller than observed event rows")
+        if complete_segments and ending["eventCount"] != observed_events:
+            raise EventExportError("sessionEnd eventCount disagrees with observed event rows")
+
+        noticed_drops = notice_totals.get(session_id, 0)
+        if ending["droppedEventCount"] < noticed_drops:
+            raise EventExportError("sessionEnd droppedEventCount is smaller than archive notices")
+        if complete_segments and ending["droppedEventCount"] != noticed_drops:
+            raise EventExportError("sessionEnd droppedEventCount disagrees with archive notices")
+
+        if not complete_segments or ending["eventCount"] != observed_events:
+            result.partial_session_ids.add(session_id)
 
 
 def identity_hash(*parts: str) -> str:
@@ -991,6 +1090,7 @@ def metadata_rows(report: dict[str, Any]) -> list[dict[str, str]]:
         ("coalesced_witnesses", totals["coalesced_witnesses"]),
         ("sessions", totals["sessions"]),
         ("clean_shutdown_sessions", totals["clean_shutdown_sessions"]),
+        ("partial_sessions", totals["partial_sessions"]),
         ("sessions_without_end_record_in_inputs", totals["sessions_without_end_record_in_inputs"]),
         ("release_ids", ",".join(report["release_ids"])),
         ("filters_json", json.dumps(report["filters"], sort_keys=True, ensure_ascii=False, separators=(",", ":"))),
@@ -1030,6 +1130,11 @@ def build_report(
         dropped_by_session[alias] = max(
             dropped_by_session.get(alias, 0), notice["totalDroppedEventCount"]
         )
+    for session_id, ending in read.session_ends.items():
+        alias = _session_hash(session_id)
+        dropped_by_session[alias] = max(
+            dropped_by_session.get(alias, 0), ending.get("droppedEventCount", 0)
+        )
     totals = {
         "input_files": read.input_files,
         "input_event_records": len(read.records),
@@ -1037,7 +1142,11 @@ def build_report(
         "truncated_tail_records_ignored": read.truncated_tail_records_ignored,
         "archive_notices": len(read.archive_notices),
         "dropped_event_count": sum(dropped_by_session.values()),
-        "data_loss_detected": bool(read.archive_notices or read.truncated_tail_records_ignored),
+        "data_loss_detected": bool(
+            sum(dropped_by_session.values())
+            or read.truncated_tail_records_ignored
+            or read.partial_session_ids
+        ),
         "filtered_event_records": len(records),
         "raw_witnesses": raw_witnesses,
         "canonical_actions": len(actions),
@@ -1046,6 +1155,7 @@ def build_report(
         "distinct_schools": len({item["school"] for item in actions}),
         "sessions": len(sessions),
         "clean_shutdown_sessions": len(completed_sessions),
+        "partial_sessions": len(read.partial_session_ids),
         "sessions_without_end_record_in_inputs": max(0, len(sessions) - len(completed_sessions)),
         "first_seen_utc": min((item["timestamp_utc"] for item in actions), default=None),
         "last_seen_utc": max((item["last_timestamp_utc"] for item in actions), default=None),
@@ -1303,7 +1413,7 @@ def make_xlsx(report: dict[str, Any]) -> bytes:
     validate_spreadsheet_bounds(report)
     readme_rows = [
         {"topic": "Quest Lab Event Workbook", "value": "Upload or open this .xlsx in Google Sheets; no add-on, macro, or credential is required."},
-        {"topic": "Events", "value": "One row per stable creator action. raw_witnesses preserves local/RPC or overload witness volume."},
+        {"topic": "Events", "value": "One row per stable creator action. raw_witnesses counts only witnesses present in the input; the stock runtime archive is already downstream of local/RPC dedupe."},
         {"topic": "Raw Witnesses", "value": "One row per unique archived sequence; paired JSONL/CSV mirrors are counted once."},
         {"topic": "Privacy", "value": "Action/session identities are SHA-256 aliases; paths are omitted; diagnostic text is opt-in."},
         {"topic": "Formula safety", "value": "User-controlled cells that could begin a spreadsheet formula are forced to literal text."},

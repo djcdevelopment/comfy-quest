@@ -32,6 +32,7 @@ def header(segment: int = 1) -> dict:
         "sessionId": SESSION,
         "startedUtc": "2026-08-09T16:00:00.123Z",
         "releaseId": "questlab-r24",
+        "runtimeProfile": "extended",
         "segment": segment,
         "fields": {"details": True, "diagnosticIdentity": True},
     }
@@ -62,13 +63,17 @@ def event(
     }
 
 
-def session_end(event_count: int, segments: int = 1) -> dict:
+def session_end(event_count: int, segments: int = 1, dropped: int = 0) -> dict:
     return {
         "schema": EVENTS.ARCHIVE_SCHEMA,
         "recordType": "sessionEnd",
         "sessionId": SESSION,
+        "releaseId": "questlab-r24",
+        "runtimeProfile": "extended",
+        "startedUtc": "2026-08-09T16:00:00.123Z",
         "endedUtc": "2026-08-09T16:01:00.000Z",
         "eventCount": event_count,
+        "droppedEventCount": dropped,
         "segments": segments,
         "reason": "clean-shutdown",
     }
@@ -148,6 +153,17 @@ class QuestLabEventExportTests(unittest.TestCase):
         self.assertEqual(read.session_headers[SESSION]["seenSegments"], [1, 2])
         self.assertIn(SESSION, read.session_ends)
 
+    def test_retained_final_segment_is_explicitly_partial_and_end_drops_are_loss(self) -> None:
+        retained = self.jsonl(
+            "questlab-events-session-part002.jsonl",
+            [header(2), event(2), session_end(2, 2, dropped=3)],
+        )
+        read = EVENTS.read_inputs([retained], strict=True)
+        report = EVENTS.build_report(read, read.records, filters={})
+        self.assertEqual(report["totals"]["partial_sessions"], 1)
+        self.assertEqual(report["totals"]["dropped_event_count"], 3)
+        self.assertTrue(report["totals"]["data_loss_detected"])
+
     def test_jsonl_and_csv_mirrors_do_not_double_count(self) -> None:
         item = event(1)
         source = self.jsonl("questlab-events-session.jsonl", [header(), item])
@@ -157,6 +173,14 @@ class QuestLabEventExportTests(unittest.TestCase):
         self.assertEqual(len(read.records), 1)
         self.assertEqual(read.duplicate_input_records, 1)
         self.assertEqual(report["totals"]["raw_witnesses"], 1)
+
+    def test_repeated_sequence_in_the_same_authoritative_format_is_corruption(self) -> None:
+        path = self.jsonl(
+            "questlab-events-duplicate-sequence.jsonl",
+            [header(), event(1), event(1)],
+        )
+        with self.assertRaisesRegex(EVENTS.EventExportError, "duplicate jsonl witness identity"):
+            EVENTS.read_inputs([path], strict=True)
 
     def test_formula_neutralized_csv_is_the_same_authoritative_jsonl_witness(self) -> None:
         item = event(1, target="=IMPORTXML(\"https://bad.invalid\")", action="@action-1")
@@ -198,7 +222,7 @@ class QuestLabEventExportTests(unittest.TestCase):
     def test_archive_notice_preserves_bounded_queue_loss_in_summary(self) -> None:
         path = self.jsonl(
             "questlab-events-overflow.jsonl",
-            [header(), event(1), archive_notice(7, 7), archive_notice(2, 9), session_end(1)],
+            [header(), event(1), archive_notice(7, 7), archive_notice(2, 9), session_end(1, dropped=9)],
         )
         report = self.report([path])
         self.assertEqual(report["totals"]["archive_notices"], 2)
@@ -206,6 +230,24 @@ class QuestLabEventExportTests(unittest.TestCase):
         self.assertTrue(report["totals"]["data_loss_detected"])
         metadata = {row["key"]: row["value"] for row in report["metadata"]}
         self.assertEqual(metadata["dropped_event_count"], "9")
+
+    def test_strict_session_end_must_match_identity_counts_drops_and_be_final(self) -> None:
+        corruptions = []
+        wrong_identity = session_end(1)
+        wrong_identity["runtimeProfile"] = "diagnostic"
+        corruptions.append(([header(), event(1), wrong_identity], "runtimeProfile disagrees"))
+        corruptions.append(([header(), event(1), session_end(999)], "eventCount disagrees"))
+        corruptions.append((
+            [header(), event(1), archive_notice(2, 2), session_end(1, dropped=0)],
+            "droppedEventCount is smaller",
+        ))
+        corruptions.append(([header(), event(1), session_end(1), event(2)], "after sessionEnd"))
+
+        for index, (rows, expected) in enumerate(corruptions):
+            with self.subTest(expected=expected):
+                path = self.jsonl(f"questlab-events-corrupt-end-{index}.jsonl", rows)
+                with self.assertRaisesRegex(EVENTS.EventExportError, expected):
+                    EVENTS.read_inputs([path], strict=True)
 
     def test_strict_contract_rejects_legacy_but_tolerant_mode_imports_it(self) -> None:
         legacy = self.jsonl(

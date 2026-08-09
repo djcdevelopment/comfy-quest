@@ -37,7 +37,10 @@ Strict mode accepts schema `comfy-questlab-events/v1`:
 - event rows carry `sessionId`, positive `sequence`, UTC `timestampUtc`, `school`,
   `creatorEvent`, `target`, and `usability`; `detail`, `diagnosticSeam`, and
   `actionIdentity` are optional;
-- clean shutdown may append `recordType: "sessionEnd"` to the final segment;
+- clean shutdown may append `recordType: "sessionEnd"` to the final segment. Strict mode
+  reconciles its release/profile/start identity, segment and event counts, dropped count, and
+  final-record position before reporting the shutdown as clean. Missing retained segments are
+  explicit partial/data-loss state rather than a false corruption verdict;
 - bounded queue loss is explicit as `recordType: "archiveNotice"`, and the parser turns
   its cumulative dropped count into a visible `data_loss_detected` result;
 - the paired CSV projection must use this exact RFC 4180 header:
