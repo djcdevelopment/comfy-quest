@@ -37,10 +37,10 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r23 adds the accessible Ready? and Scenarios cockpits with editable
+> 34/34 creator events. r24 adds a privacy-safe durable event archive; r23 added the accessible Ready? and Scenarios cockpits with editable
 > draft handoff after r22 added the shared Creator Foundry and Gallery Truth contracts, so
 > those same suites must be re-witnessed
-> against the exact r23 DLL before
+> against the exact r24 DLL before
 > the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
@@ -81,6 +81,7 @@ update.
 | `questlab_seams` | which seams hooked on your game version, and which didn't |
 | `questlab_profile [core\|extended\|diagnostic]` | select stable-event breadth or inspect raw witnesses |
 | `questlab_clear` | empty the console |
+| `questlab_archive [flush]` | show the current timestamped archive, counts/faults, or request a nonblocking flush |
 | `questlab_gallery profiles` | list the generated Gallery v2 geometry choices and counts |
 | `questlab_gallery check [profile]` | resolve every prefab without placing anything |
 | `questlab_gallery build [profile]` | raise one marked profile; default is `marble-grand` |
@@ -163,6 +164,42 @@ path can also be clicked to copy it. **Pause** freezes the retained moment while
 and school filters live over that snapshot; **Resume** returns to the live stream. **All** and
 **Default** recover the eight-school or quiet two-school filter presets. Clearing the search and
 clearing the retained log are separate, explicitly labelled actions.
+
+### Durable event files
+
+The in-memory console is backed by a local, bounded creator-event archive under
+`BepInEx/config/comfy-quest-lab/event-archive/`. JSONL is enabled by default and names each
+session for a human, for example
+`questlab-events-20260809T123456789Z-r24-extended.jsonl`; rotations add `-part002` and repeat
+the same session header so every part is independently parseable. Each accepted canonical row
+has an ISO-8601 UTC timestamp, sequence, school, creator event, target, and usability. A clean
+shutdown adds an end/count summary; after a crash a consumer should ignore only an incomplete
+final line.
+
+Privacy is conservative: `[Archive] includeDetails=false` and
+`includeDiagnosticIdentity=false` by default. Turning them on adds bounded detail plus the exact
+atlas seam and deduplicated action identity. Chat and sign contents remain redacted at their
+source regardless. An unknown future runtime signature is archived as the stable
+`unclassified_runtime_event`; its raw identifier stays in the live ring and enters the file only
+with diagnostic identity enabled. Nothing archives arbitrary quest files, player names, world
+contents, or the event's internal field dictionary.
+
+JSONL flushes once per second. A 4,096-row memory queue and 16 MiB segments prevent an event
+storm from blocking gameplay or growing forever; overflow becomes an explicit archive notice
+and dropped-row count. The default retention is 24 segment pairs, oldest first. The optional CSV
+projection is on by default at `[Archive] csvSnapshotSeconds=5` (set it to `0` to disable) and
+uses the stable header below. It is replaced atomically, so spreadsheet readers never observe a
+half-written snapshot. Every text cell beginning with `=`, `+`, `-`, or `@` (including after
+leading whitespace/control characters) is prefixed with an apostrophe in CSV to prevent formula
+execution in Excel or Google Sheets; authoritative JSONL retains the sanitized literal value.
+
+```text
+schema,session_id,sequence,timestamp_utc,school,creator_event,target,detail,usability,diagnostic_seam,action_identity
+```
+
+Use `questlab_archive` for the current path and accepted/written/dropped counts, or
+`questlab_archive flush` before opening the files in another tool. Archive policy is captured in
+the session header and therefore takes effect on the next Valheim launch after a config change.
 
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Its world-action grid gives each integration one row with a colored

@@ -329,7 +329,7 @@ public static class LabQuestEngine {
         completion.Name,
         gameplayEvent.Name + " " + (gameplayEvent.Target ?? "any")
             + (string.IsNullOrWhiteSpace(detail) ? string.Empty : " · " + detail),
-        LabUsability.Today));
+        LabUsability.Today), gameplayEvent == null ? null : gameplayEvent.DedupeKey);
 
     ComfyQuestLab.Report("quest fired: " + completion.Name);
   }

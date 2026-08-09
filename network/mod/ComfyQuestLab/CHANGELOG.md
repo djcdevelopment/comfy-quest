@@ -1,5 +1,25 @@
 # Changelog
 
+**r24 durable creator-event archive.** Every accepted, deduplicated canonical row now also
+enters a bounded background writer; quest matching and the live ring remain unchanged and never
+wait for disk. Each session gets a descriptive UTC/release/profile JSONL name, a self-describing
+`comfy-questlab-events/v1` header in every rotated segment, UTC event timestamps, and a clean
+end summary when Valheim shuts down normally. JSONL flushes every second and is the append-only
+source of truth; a crash may leave only its final line partial, which consumers are expected to
+ignore. A fixed 4,096-row queue drops instead of growing or delaying gameplay, and emits both a
+machine-readable overflow notice and a dropped-row count in status/end records.
+
+The default privacy surface is creator event, school, target, and usability. Bounded detail and
+exact diagnostic seam/action identity are separate startup opt-ins; chat and sign text remain
+redacted before they ever reach the archive. Unknown runtime signatures map to the stable
+`unclassified_runtime_event`; their raw identity remains diagnostic opt-in. Segments rotate at 16 MiB and retain 24 JSONL/CSV
+pairs by default. The optional spreadsheet projection is enabled at a five-second interval and
+publishes each current-segment RFC 4180 CSV atomically, so a reader sees an old complete table or
+a new complete table rather than half a rewrite. Spreadsheet formula prefixes are neutralized in
+every CSV text cell (including after leading whitespace/control characters) while JSONL retains
+the sanitized literal. `questlab_archive [flush]` exposes the session,
+path, accepted/written/dropped counts, faults, and an on-demand nonblocking flush.
+
 **r23 self-guided scenario and accessible demo cockpits.** The panel now exposes its `INTERACTIVE` input ownership
 instead of making cursor behavior implicit, and every important verdict carries an ASCII
 `[OK]`, `[INFO]`, `[CHECK]`, or `[PROVED]` cue in addition to color. A new **Ready?** tab
@@ -341,7 +361,8 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
 tome, so a newcomer needs no other instruction. It is a front door onto
 `questlab_gallery build` rather than a separate mechanism.
 
-**Not here yet:** the journal (a stub that shows the seam roster); and JSONL persistence.
+**Not here yet at that historical cut:** the journal (a stub that showed the seam roster), and
+JSONL persistence (added in r24).
 `GameplayEventTypes` is not linked — it shares a file with a 353-line Unity-dependent
 class and needs extracting first.
 

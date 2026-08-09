@@ -36,7 +36,7 @@ public static class LabEventRouter {
             signatureId,
             target,
             detail,
-            LabUsability.LabCandidate));
+            LabUsability.LabCandidate), null);
         return null;
       }
 
@@ -73,7 +73,7 @@ public static class LabEventRouter {
             capability.CanonicalEvent,
             target,
             detail,
-            usability));
+            usability), actionKey);
       } else if (LabConfig.VerboseLogging != null && LabConfig.VerboseLogging.Value) {
         ComfyQuestLab.LogInfo(
             "[lab] coalesced " + capability.SignatureId + " into " + actionKey);

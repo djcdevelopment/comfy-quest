@@ -2,6 +2,7 @@ namespace ComfyQuestLab;
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 using BepInEx;
@@ -36,7 +37,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260809-r23";
+  public const string ReleaseId = "questlab-v0.2.0-20260809-r24";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -47,6 +48,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   LabGalleryBuilder _gallery;
   LabBatchController _batch;
   LabBlueprintBuilder _blueprints;
+  LabEventArchive _eventArchive;
 
   public static LabEventRing Ring { get { return Instance == null ? null : Instance._ring; } }
   public static LabBatchController Batch { get { return Instance == null ? null : Instance._batch; } }
@@ -68,6 +70,27 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     if (IsDedicatedServer()) {
       LogInfo("dedicated server detected — quest lab is client-only, doing nothing.");
       return;
+    }
+
+    if (LabConfig.ArchiveEnabled.Value) {
+      try {
+        _eventArchive = new LabEventArchive(new LabEventArchiveOptions {
+          DirectoryPath = Path.Combine(Paths.ConfigPath, "comfy-quest-lab", "event-archive"),
+          ReleaseId = ReleaseId,
+          RuntimeProfile = LabConfig.EventProfile.Value,
+          IncludeDetails = LabConfig.ArchiveIncludeDetails.Value,
+          IncludeDiagnosticIdentity = LabConfig.ArchiveIncludeDiagnosticIdentity.Value,
+          JsonlFlushSeconds = LabConfig.ArchiveFlushSeconds.Value,
+          CsvFlushSeconds = LabConfig.ArchiveCsvSeconds.Value,
+          MaxSegmentBytes = LabConfig.ArchiveMaxSegmentMiB.Value * 1024 * 1024,
+          MaxSegments = LabConfig.ArchiveMaxSegments.Value,
+        });
+        LogInfo(_eventArchive.Status());
+      } catch (Exception exception) {
+        // Persistence is an observer of the lab, never a precondition for the lab.
+        LogInfo("event archive unavailable; live events and quests continue: "
+            + exception.GetType().Name + ": " + exception.Message);
+      }
     }
 
     _harmony = new Harmony(PluginGuid);
@@ -154,18 +177,28 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       _harmony.UnpatchSelf();
       _harmony = null;
     }
+    if (_eventArchive != null) {
+      _eventArchive.Dispose();
+      LogInfo(_eventArchive.Status());
+      _eventArchive = null;
+    }
     Instance = null;
   }
 
   // ---- what the patches call -------------------------------------------------------
 
   /// <summary>Record one thing the game did. Safe to call from any postfix.</summary>
-  public static void Observe(LabEvent row) {
+  public static void Observe(LabEvent row, string actionIdentity = null) {
     ComfyQuestLab self = Instance;
     if (self == null || self._ring == null || !LabConfig.Enabled.Value) {
       return;
     }
     self._ring.Add(row);
+    // The archive owns its own bounded queue and worker. This call never waits for disk,
+    // and any archive failure leaves the ring and quest evaluator untouched.
+    if (self._eventArchive != null) {
+      self._eventArchive.TryRecord(row, actionIdentity);
+    }
     if (LabConfig.VerboseLogging.Value) {
       LogInfo("[lab] " + row.Category + " " + row.Seam + " " + row.Target + " " + row.Detail);
     }
@@ -405,6 +438,23 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       new Terminal.ConsoleCommand("questlab_clear",
           "empty the event console: questlab_clear",
           delegate { _ring.Clear(); Report("console cleared"); });
+
+      new Terminal.ConsoleCommand("questlab_archive",
+          "show or flush the durable canonical event archive: questlab_archive [flush]",
+          delegate (Terminal.ConsoleEventArgs args) {
+            if (_eventArchive == null) {
+              Report("event archive is disabled or unavailable; set [Archive] archiveEnabled=true "
+                  + "and restart Valheim");
+              return;
+            }
+            if (args.Length >= 2
+                && string.Equals(args[1], "flush", StringComparison.OrdinalIgnoreCase)) {
+              _eventArchive.RequestFlush();
+              Report("event archive flush requested · " + _eventArchive.Status());
+              return;
+            }
+            Report(_eventArchive.Status());
+          });
     } catch (Exception ex) {
       LogInfo("could not register console commands: " + ex);
     }
@@ -419,6 +469,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_panel   open the live event console (" + LabConfig.PanelShortcut.Value + ")");
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
     sb.AppendLine("  questlab_profile [core|extended|diagnostic]   choose integration noise");
+    sb.AppendLine("  questlab_archive [flush]   show or flush the timestamped event archive");
     sb.AppendLine("  questlab_clear   empty the live view");
     sb.AppendLine("  questlab_gallery profiles   list Gallery v2 geometry choices");
     sb.AppendLine("  questlab_gallery check|build|rebuild [profile]   inspect or raise one profile");
@@ -488,6 +539,13 @@ public static class LabConfig {
   public static ConfigEntry<int> BlueprintPiecesPerFrame { get; private set; }
   public static ConfigEntry<bool> QuestsEnabled { get; private set; }
   public static ConfigEntry<float> QuestCooldownSeconds { get; private set; }
+  public static ConfigEntry<bool> ArchiveEnabled { get; private set; }
+  public static ConfigEntry<bool> ArchiveIncludeDetails { get; private set; }
+  public static ConfigEntry<bool> ArchiveIncludeDiagnosticIdentity { get; private set; }
+  public static ConfigEntry<float> ArchiveFlushSeconds { get; private set; }
+  public static ConfigEntry<float> ArchiveCsvSeconds { get; private set; }
+  public static ConfigEntry<int> ArchiveMaxSegmentMiB { get; private set; }
+  public static ConfigEntry<int> ArchiveMaxSegments { get; private set; }
 
   public static void Bind(ConfigFile config) {
     Enabled =
@@ -582,6 +640,72 @@ public static class LabConfig {
             + "Turn it on to see the shape of a stamina event, then turn it off again. "
             + "Changing this needs a game restart, because it decides whether the patch "
             + "is applied at all.");
+
+    ArchiveEnabled =
+        config.Bind(
+            "Archive",
+            "archiveEnabled",
+            true,
+            "Write accepted canonical Quest Lab events to a timestamped JSONL session under "
+            + "BepInEx/config/comfy-quest-lab/event-archive. Captured once at startup; restart "
+            + "after changing this setting.");
+
+    ArchiveIncludeDetails =
+        config.Bind(
+            "Archive",
+            "includeDetails",
+            false,
+            "Default OFF for privacy. Include the bounded human-readable detail column. Chat "
+            + "and sign text remains redacted at its source even when this is ON. Restart required.");
+
+    ArchiveIncludeDiagnosticIdentity =
+        config.Bind(
+            "Archive",
+            "includeDiagnosticIdentity",
+            false,
+            "Default OFF for privacy and readability. Include exact atlas signature/seam and "
+            + "deduplicated action identity beside creator vocabulary. Restart required.");
+
+    ArchiveFlushSeconds =
+        config.Bind(
+            "Archive",
+            "jsonlFlushSeconds",
+            1f,
+            new ConfigDescription(
+                "How often queued JSONL lines are flushed for live readers. Writing happens on a "
+                + "bounded background worker and never on a gameplay hook. Restart required.",
+                new AcceptableValueRange<float>(0.1f, 60f)));
+
+    ArchiveCsvSeconds =
+        config.Bind(
+            "Archive",
+            "csvSnapshotSeconds",
+            5f,
+            new ConfigDescription(
+                "Write the spreadsheet-ready CSV projection and flush it this often. Default 5 "
+                + "seconds; set 0 to disable CSV while retaining authoritative JSONL. Restart required.",
+                new AcceptableValueRange<float>(0f, 3600f)));
+
+    ArchiveMaxSegmentMiB =
+        config.Bind(
+            "Archive",
+            "maxSegmentMiB",
+            16,
+            new ConfigDescription(
+                "Maximum size of each JSONL/CSV segment before a new self-describing part is opened. "
+                + "Restart required.",
+                new AcceptableValueRange<int>(1, 256)));
+
+    ArchiveMaxSegments =
+        config.Bind(
+            "Archive",
+            "maxSegments",
+            24,
+            new ConfigDescription(
+                "Maximum timestamped archive segments retained across sessions. Old Quest Lab "
+                + "JSONL/CSV pairs are removed oldest-first; each file is also size-bounded. "
+                + "Restart required.",
+                new AcceptableValueRange<int>(2, 200)));
 
     GalleryPiecesPerFrame =
         config.Bind(
