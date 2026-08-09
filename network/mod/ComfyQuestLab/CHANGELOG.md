@@ -1,5 +1,16 @@
 # Changelog
 
+**r23 accessible demo cockpit.** The panel now exposes its `INTERACTIVE` input ownership
+instead of making cursor behavior implicit, and every important verdict carries an ASCII
+`[OK]`, `[INFO]`, `[CHECK]`, or `[PROVED]` cue in addition to color. A new **Ready?** tab
+derives its summary from this process's actual Harmony outcomes, shared/generated creator-event
+counts, loaded and armed quests, eight-school coverage, and the bounded live suite. It only says
+`PROVED` after the real all-schools suite passes and explicitly refuses to certify rendered
+appearance. Ctrl+1-4, Ctrl+Tab, Ctrl+F, Ctrl+0, and F1 add discoverable keyboard navigation
+without changing Escape/F6 close semantics. Panel geometry is now a Unity-free tested policy:
+desktop-sized persisted bounds shrink into low-resolution/high-zoom viewports, resize and zoom
+save immediately, and Reset layout always returns to a visible 100% window.
+
 **r22 Creator Foundry, Gallery Truth, and build-by-example foundation.** Every safe canonical event now carries generated,
 shared creator metadata: target kind and meaning, an honest example target, meaningful
 weapon/projectile support, and the exact event-specific scalar fields a `trigger.where` may use.

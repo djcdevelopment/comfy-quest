@@ -37,9 +37,9 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r22 adds the shared Creator Foundry contract after r21 changed the
-> selected court's roof and tree-ledger serializer, so those same suites must be re-witnessed
-> against the exact r22 DLL before
+> 34/34 creator events. r23 adds the accessible demo cockpit after r22 added the shared
+> Creator Foundry and Gallery Truth contracts, so those same suites must be re-witnessed
+> against the exact r23 DLL before
 > the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
@@ -110,6 +110,27 @@ the lower-right handle resizes it within the current screen. Position and size a
 the panel closes. The visible **− / +** controls zoom the whole panel from 65–200% in 10%
 steps; click the percentage to return to 100%. A windowed/1080p creator and a 4K creator can
 tune the same grid independently.
+
+Saved desktop bounds are clamped into the current logical viewport, including high zoom at
+low resolution, so a monitor or window-mode change cannot strand the controls off screen.
+Resize and zoom changes save immediately, and **Reset layout** restores a visible default
+window at 100%.
+
+The header says **[INTERACTIVE]** while the panel owns the pointer and blocks player actions;
+closing returns ownership to gameplay. State never depends on hue alone: rows also say
+**[OK]**, **[INFO]**, **[CHECK]**, or **[PROVED]**. Press **F1** or click **Keys** for the
+compact legend. Keyboard users can use **Ctrl+1-4** for the four tabs, **Ctrl+Tab** /
+**Ctrl+Shift+Tab** to cycle, **Ctrl+F** to focus event search, and **Ctrl+0** to return to
+100% zoom. F6 and Escape retain their single job: close the panel and release input even
+when search has focus.
+
+The **Ready?** tab is a pre-demo cockpit built from live state, not a checklist somebody can
+forget to update. It reports the loaded release/profile, real hook successes, agreement between
+the shared evaluator and generated creator-event manifest, quest parse/armed counts, bindable
+school coverage, and the current all-schools batch result. **[PROVED]** appears only after all
+eight live witnesses and all eight example quests pass in the bounded suite. Its summary is
+copyable for support or a demo handoff. Runtime readiness does not claim the Gallery looks good;
+scale, lighting, readability, and composition remain explicit human visual acceptance.
 
 The **Quests** tab is a compact dashboard rather than a prose dump. Its fixed columns show
 the colored school rune, quest name, creator event and target, armed state, and fire count.
@@ -399,7 +420,7 @@ and pausing drops nothing — the ring keeps collecting behind it.
 | `panelShortcut` | `F6` | F7 is taken by the retired control surface. `None` = console commands only. |
 | `panelScale` | `1` | Whole-panel zoom, 0.65–2.00. The in-panel − / + buttons change and persist it in 10% steps. |
 | `panelX`, `panelY` | `80`, `90` | Saved logical screen position. Updated on close and clamped after resolution/zoom changes. |
-| `panelWidth`, `panelHeight` | `900`, `620` | Saved logical window size. Updated on close; the drag handle remains bounded to the current screen. |
+| `panelWidth`, `panelHeight` | `900`, `620` | Saved logical window size. Resize saves immediately; current-screen bounds win after a resolution/zoom change. |
 | `consoleRows` | `18` | Rows on screen; the ring holds 8× that so you can scroll back. |
 | `galleryPiecesPerFrame` | `24` | Gallery objects placed per frame, clamped to 1–200. Lower it on a slower client. |
 | `blueprintPiecesPerFrame` | `12` | Blueprint objects placed per frame, clamped to 1–200. |

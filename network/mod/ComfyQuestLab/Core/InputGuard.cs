@@ -19,6 +19,9 @@ using UnityEngine;
 /// types, and a missing type must degrade to "not typing" rather than throw on every
 /// frame of Update().</summary>
 public static class InputGuard {
+  public const string GameplayMode = "gameplay";
+  public const string InteractiveMode = "interactive";
+
   static bool _panelOwnsInput;
   static CursorLockMode _previousCursorLock;
   static bool _previousCursorVisible;
@@ -28,6 +31,13 @@ public static class InputGuard {
   /// an acquire/release lifecycle, so opening and closing cannot leave Valheim in a
   /// half-GUI, half-camera state.</summary>
   public static bool PanelOwnsInput { get { return _panelOwnsInput; } }
+
+  /// <summary>Human-readable ownership state for the panel and support screenshots.
+  /// Quest Lab has no misleading half-interactive/passive mode: the closed panel leaves
+  /// input with gameplay; the open, clickable panel owns it explicitly.</summary>
+  public static string OwnershipMode {
+    get { return _panelOwnsInput ? InteractiveMode : GameplayMode; }
+  }
 
   public static void AcquirePanelInput() {
     if (!_panelOwnsInput) {

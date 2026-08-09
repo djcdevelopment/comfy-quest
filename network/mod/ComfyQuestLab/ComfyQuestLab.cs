@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260809-r22";
+  public const string ReleaseId = "questlab-v0.2.0-20260809-r23";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -528,14 +528,16 @@ public static class LabConfig {
         "Lab", "panelWidth", 900f,
         new ConfigDescription(
             "Saved Quest Lab window width. Drag the lower-right handle; the value is saved "
-            + "when the panel closes.",
-            new AcceptableValueRange<float>(700f, 2400f)));
+            + "when resizing finishes or the panel closes. Small values remain recoverable "
+            + "on a low-resolution or high-zoom viewport.",
+            new AcceptableValueRange<float>(240f, 2400f)));
     PanelHeight = config.Bind(
         "Lab", "panelHeight", 620f,
         new ConfigDescription(
             "Saved Quest Lab window height. Drag the lower-right handle; the value is saved "
-            + "when the panel closes.",
-            new AcceptableValueRange<float>(440f, 1800f)));
+            + "when resizing finishes or the panel closes. Small values remain recoverable "
+            + "on a low-resolution or high-zoom viewport.",
+            new AcceptableValueRange<float>(180f, 1800f)));
 
     ConsoleRows =
         config.Bind(
