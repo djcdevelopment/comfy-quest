@@ -183,8 +183,10 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("material.EnableKeyword(ShaderUtilities.Keyword_Glow)", light)
         self.assertIn("colour.r * 2.2f", light)
         self.assertIn("? new Vector3(0f, 0f, -0.32f)", light)
-        self.assertIn("Mathf.Min(configuredIntensity, 1.5f)", light)
-        self.assertIn("Mathf.Min(configuredRange, 1.6f)", light)
+        self.assertIn("if (signFace)", light)
+        self.assertIn("ApplyTextGlow(host, school)", light)
+        self.assertIn("UnityEngine.Object.Destroy(existing.gameObject)", light)
+        self.assertNotIn("Mathf.Min(configuredRange, 1.6f)", light)
         self.assertIn("Mathf.Min(configuredRange, 5.5f)", light)
 
     def test_mounted_welcome_food_is_real_and_does_not_litter_on_clear(self) -> None:

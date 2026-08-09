@@ -1,5 +1,10 @@
 # Changelog
 
+**r15 marble-exposure correction.** The editable `sign here` prompt no longer owns a
+point light. Its school-coloured glyphs emit directly, and loading r15 removes the lamp
+from an already-standing r14 sign. This keeps the interaction obvious without blooming
+across the polished hub floor.
+
 **r14 presentation follow-up.** Every long-form school-banner letter now has a
 school-coloured TextMeshPro emissive halo while each word retains only one realtime point
 light. The glow persists on the sign ZDO and returns after zone reloads, improving rain and

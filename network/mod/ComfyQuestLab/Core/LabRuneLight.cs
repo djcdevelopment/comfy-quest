@@ -311,15 +311,22 @@ public static class LabRuneLight {
       }
 
       bool signFace = string.Equals(style, SignFaceStyle, StringComparison.Ordinal);
+      if (signFace) {
+        // Even a 1.6 m point light blooms across polished marble in Valheim's bright
+        // environments. Make the editable prompt itself emissive and remove any lamp an
+        // older build hung here; the lettering identifies the interaction without
+        // changing exposure across the hub floor.
+        ApplyTextGlow(host, school);
+        if (existing != null) {
+          UnityEngine.Object.Destroy(existing.gameObject);
+        }
+        return;
+      }
+
       bool bannerFace = string.Equals(style, BannerFaceStyle, StringComparison.Ordinal);
-      bool faceLamp = signFace || bannerFace;
-      // The Social prompt is only two metres above a reflective marble floor. The ordinary
-      // 11 m rune wash turned that floor into a white bloom and left the sign itself dark.
-      // Put a tight lamp just off the sign face; at 1.6 m it cannot reach the floor, while
-      // the sign and top of its post remain visibly pink. Bridge banners use the same face
-      // offset with a 5.5 m word wash that still stops above the floor; rune hosts keep the
-      // ordinary wide setting.
-      lamp.transform.localPosition = faceLamp
+      // Bridge banners keep one restrained point wash at the word centre; the other
+      // letters use their own glyph glow and add no realtime lights.
+      lamp.transform.localPosition = bannerFace
           ? new Vector3(0f, 0f, -0.32f)
           : Vector3.zero;
 
@@ -331,12 +338,8 @@ public static class LabRuneLight {
       light.color = ColourFor(school);
       float configuredIntensity = Intensity != null ? Intensity.Value : 6f;
       float configuredRange = Range != null ? Range.Value : 22f;
-      light.intensity = signFace
-          ? Mathf.Min(configuredIntensity, 1.5f)
-          : (bannerFace ? Mathf.Min(configuredIntensity, 2.5f) : configuredIntensity);
-      light.range = signFace
-          ? Mathf.Min(configuredRange, 1.6f)
-          : (bannerFace ? Mathf.Min(configuredRange, 5.5f) : configuredRange);
+      light.intensity = bannerFace ? Mathf.Min(configuredIntensity, 2.5f) : configuredIntensity;
+      light.range = bannerFace ? Mathf.Min(configuredRange, 5.5f) : configuredRange;
       // No shadows on purpose: eight shadow-casting point lights across a 76 m gallery is
       // a real frame cost, and a rune reads by its own glow rather than by what it casts.
       light.shadows = LightShadows.None;
