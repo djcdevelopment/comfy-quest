@@ -9,40 +9,6 @@ using System.Text;
 
 using UnityEngine;
 
-// Unity's field serializer is the persistence contract here, not System.Text.Json. Keep
-// both DTOs top-level and the record collection a plain array: the r19 live reader proved
-// that a syntactically valid JSON array targeting List<T> of a nested DTO could deserialize
-// as an empty collection without throwing. These conservative shapes are also what
-// JsonUtility itself emits and reads most reliably across Valheim's Unity versions.
-[Serializable]
-public sealed class LabTreeRecoveryRecord {
-  public string Prefab;
-  public int PrefabHash;
-  public float X, Y, Z;
-  public float Qx, Qy, Qz, Qw;
-  public bool HasEuler;
-  public float Rx, Ry, Rz;
-  public float Sx, Sy, Sz;
-  public bool HasHealth;
-  public float Health;
-}
-
-[Serializable]
-public sealed class LabTreeRecoveryLedger {
-  public string Schema;
-  public string PluginRelease;
-  public string ProfileId;
-  public string BuildId;
-  public string CreatedUtc;
-  public string RestoredUtc;
-  public bool Restored;
-  public int RecordCount;
-  public string RecordsSha256;
-  public int RemovedCount;
-  public int RestoredCount;
-  public LabTreeRecoveryRecord[] Trees = new LabTreeRecoveryRecord[0];
-}
-
 /// <summary>Recoverably clears natural trees from the generated Gallery footprint.
 ///
 /// The grand court deliberately stays below Valheim's witnessed snow line now. Mature
@@ -438,7 +404,7 @@ public static class LabTreeRecovery {
   }
 
   static LabTreeRecoveryLedger ReadLedger(string path) {
-    return JsonUtility.FromJson<LabTreeRecoveryLedger>(File.ReadAllText(path));
+    return LabTreeRecoveryContract.Deserialize(File.ReadAllText(path));
   }
 
   /// <summary>Never let a syntactically valid but record-empty JSON file authorize a
@@ -499,7 +465,8 @@ public static class LabTreeRecovery {
   static void WriteLedger(string path, LabTreeRecoveryLedger ledger) {
     string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
     try {
-      File.WriteAllText(temporary, JsonUtility.ToJson(ledger, true) + Environment.NewLine);
+      File.WriteAllText(temporary,
+          LabTreeRecoveryContract.Serialize(ledger) + Environment.NewLine);
       if (File.Exists(path)) {
         File.Replace(temporary, path, null);
       } else {

@@ -1,5 +1,12 @@
 # Changelog
 
+**r21 executable ledger serializer correction.** A one-record r20 live probe proved that
+Unity's `JsonUtility` discarded every custom record array regardless of whether its DTO was
+nested or top-level. Recovery persistence now uses the data-contract JSON serializer already
+used by the shipping network mod, with explicit v1 field names. The serializer and DTOs live in
+a Unity-free shared source file; executable tests round-trip all 43 records and parse the exact
+forensic v1 field shape. The real ledger was restored unchanged after the probe.
+
 **r20 Unity-ledger shape correction.** The first r19 OMEN identify receipt proved two things
 before any destructive request ran: all nine r18 braziers were above the old roof underside,
 and Unity still read zero records from the manually repaired 43-tree ledger. Tree record and
