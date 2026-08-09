@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260808-r16";
+  public const string ReleaseId = "questlab-v0.2.0-20260808-r17";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -86,6 +86,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     GalleryStructurePatches.Apply(_harmony);
     // Also not a seam: hangs a coloured lamp on each monument. Client-side and cosmetic.
     RuneLightPatches.Apply(_harmony);
+    // Read-only observability: snapshot prefab renderer state before world pieces stream in.
+    LabRenderInspectorPatches.Apply(_harmony);
 
     RegisterConsoleCommands();
 
@@ -352,11 +354,14 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
       new Terminal.ConsoleCommand("questlab_prefabs",
           "search what this game build actually has: questlab_prefabs <part of a name>, "
-          + "or questlab_prefabs dump to write the whole catalog to a JSON file",
+          + "questlab_prefabs inspect <exact-name> reads materials/lights, or dump writes "
+          + "the whole catalog to JSON",
           delegate (Terminal.ConsoleEventArgs args) {
             string arg = args.Length >= 2 ? args[1] : null;
             if (string.Equals(arg, "dump", StringComparison.OrdinalIgnoreCase)) {
               Report(LabPrefabDump.Write());
+            } else if (string.Equals(arg, "inspect", StringComparison.OrdinalIgnoreCase)) {
+              Report(LabRenderInspector.Inspect(args.Length >= 3 ? args[2] : null));
             } else {
               Report(LabGalleryBuilder.SearchPrefabs(arg));
             }
@@ -396,7 +401,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_gallery identify|clear [profile-or-build-id]   inspect or remove marks safely");
     sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   bounded evidence runs");
     sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");
-    sb.AppendLine("  questlab_prefabs <name>   search what this game build has; dump writes the catalog");
+    sb.AppendLine("  questlab_prefabs <name> | inspect <exact-name> | dump   search or inspect rendered state");
     sb.AppendLine("Try one action at a monument with the panel open; every school has bindable events.");
     return sb.ToString().TrimEnd();
   }

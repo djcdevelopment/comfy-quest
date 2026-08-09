@@ -1,5 +1,12 @@
 # Changelog
 
+**r17 rendered-state observability.** `questlab_prefabs inspect <exact-name>` now
+records the renderer state Valheim is actually using rather than inferring appearance
+from placement code. It snapshots candidate surface materials when `ZNetScene` starts,
+then compares the current prefab with loaded instances and writes every shader property,
+enabled keyword, GI flag, renderer property-block override, and child light to JSON. The
+read path uses only shared materials, so inspecting a piece cannot clone or alter it.
+
 **r16 fresh-process correction.** The Social sign's text-only branch now runs before any
 lamp allocation. r15 removed a lamp only when one already existed in memory, but
 client-local lamp children never survive a restart; r16 makes the no-floor-light rule

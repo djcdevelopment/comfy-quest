@@ -85,6 +85,7 @@ update.
 | `questlab_gallery identify` | report loaded profile and build marks before changing the world |
 | `questlab_gallery clear [profile-or-build-id]` | return safely to the terrain below, then remove only matching marked gallery objects |
 | `questlab_gallery rebuild [profile]` | safely clear and rebuild one profile at the same reusable site |
+| `questlab_prefabs inspect <exact-name>` | compare startup prefab, current prefab, and loaded-instance renderer state; export material, emission, property-block, GI, and light evidence as JSON |
 | `questlab_batch suites` | list the two bounded evidence classes |
 | `questlab_batch prepare all-schools` | write eight ordinary example quests, safely reset the marked site, and raise one fresh compact course with targets and supplies at point of use |
 | `questlab_batch run [all-schools\|creator-events]` | start live witnessing or run the explicitly synthetic 34-event contract probe |
