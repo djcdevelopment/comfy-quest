@@ -10,7 +10,7 @@ using System;
 
 /// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>
 public static class LabGalleryPlan {
-  public const int PlanVersion = 7;
+  public const int PlanVersion = 8;
   public const string DefaultProfileId = "marble-grand";
 
   public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }
@@ -3907,12 +3907,12 @@ public static class LabGalleryPlan {
     },
     new Profile {
       Id = "marble-grand", Name = "Marble grand",
-      Description = "Selected compact court: a ground welcome camp, 10 m quarter-length halls, and a sheltered marble canopy with hanging braziers.",
+      Description = "Selected compact court: a ground welcome camp, 10 m quarter-length halls, and a high sheltered marble canopy with visible hanging braziers.",
       RingRadius = 27f, RuneHeight = 17f,
       BeamLength = 2f, HallWidth = 10f,
       SpokeLength = 9f,
       PlatformClearance = 6f,
-      RoofClearance = 8f,
+      RoofClearance = 16f,
       GroundPortalX = 8f, GroundPortalZ = 0f,
       WelcomeAnchorX = -3f, WelcomeAnchorZ = 0f,
       FootprintRadius = 48f,
@@ -5502,15 +5502,15 @@ public static class LabGalleryPlan {
         new Tile { X = 28f, Z = 8f, Prefab = "blackmarble_floor" },
       },
       CeilingFixtures = new CeilingFixture[] {
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 0f, Y = 8f, Z = 0f, Yaw = 0f, InfiniteFuel = true },
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 0f, Y = 8f, Z = 21.38f, Yaw = 0f, InfiniteFuel = true },
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 15.118f, Y = 8f, Z = 15.118f, Yaw = 45f, InfiniteFuel = true },
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 21.38f, Y = 8f, Z = 0f, Yaw = 90f, InfiniteFuel = true },
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 15.118f, Y = 8f, Z = -15.118f, Yaw = 135f, InfiniteFuel = true },
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 0f, Y = 8f, Z = -21.38f, Yaw = 180f, InfiniteFuel = true },
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = -15.118f, Y = 8f, Z = -15.118f, Yaw = 225f, InfiniteFuel = true },
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = -21.38f, Y = 8f, Z = 0f, Yaw = 270f, InfiniteFuel = true },
-        new CeilingFixture { Prefab = "piece_brazierceiling01", X = -15.118f, Y = 8f, Z = 15.118f, Yaw = 315f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 0f, Y = 16f, Z = 0f, Yaw = 0f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 0f, Y = 16f, Z = 21.38f, Yaw = 0f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 15.118f, Y = 16f, Z = 15.118f, Yaw = 45f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 21.38f, Y = 16f, Z = 0f, Yaw = 90f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 15.118f, Y = 16f, Z = -15.118f, Yaw = 135f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = 0f, Y = 16f, Z = -21.38f, Yaw = 180f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = -15.118f, Y = 16f, Z = -15.118f, Yaw = 225f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = -21.38f, Y = 16f, Z = 0f, Yaw = 270f, InfiniteFuel = true },
+        new CeilingFixture { Prefab = "piece_brazierceiling01", X = -15.118f, Y = 16f, Z = 15.118f, Yaw = 315f, InfiniteFuel = true },
       },
       Fixtures = new[] {
         new Fixture { Prefab = "blackmarble_2x2x1", X = -5.5f, Y = 0f, Z = 14f, Yaw = 90f, Orient = "", Text = "" },

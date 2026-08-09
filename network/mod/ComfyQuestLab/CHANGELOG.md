@@ -1,5 +1,18 @@
 # Changelog
 
+**r19 high-canopy and recovery-ledger correction.** The selected roof moves from 8 m to
+16 m above the walking surface following the live sheltered-court review. All nine ceiling
+braziers now attach their measured topmost mesh point just below the marble underside, so the
+roughly 1.945 m body hangs visibly below it regardless of the vanilla prefab's pivot location.
+Gallery identify now reports loaded fixture mesh bounds against the roof underside, making an
+occluded or inverted placement a machine-visible failure rather than a count of hidden objects.
+The r18 live build also exposed that Unity omitted a private nested tree-record list while
+still writing `RemovedCount = 43`. Tree and ledger DTOs are now public serializable types;
+every write-ahead ledger carries a record count and digest and must deserialize with the same
+records before the first tree is touched. Restore/status reject incomplete ledgers. Additive
+native Euler fields support exact reconstruction from a saved Valheim ZDO snapshot. Plan v8,
+profile JSON, previews, tests, documentation, and release identity move together.
+
 **r18 sheltered-court correction.** The r17 renderer receipt proved the shared
 `blackmarble_floor` material was non-emissive; the live white floor and matching white
 smelter were Valheim's altitude snow treatment on the 32 m deck. `marble-grand` now sits

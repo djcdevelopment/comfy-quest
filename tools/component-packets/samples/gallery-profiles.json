@@ -13,6 +13,7 @@
       "pruneNaturalTrees": false,
       "roofClearance": 0.0,
       "roofMaterials": [],
+      "ceilingFixtureHeights": [],
       "groundPortalX": 2.0,
       "groundPortalZ": 0.0,
       "welcomeAnchorX": 0.0,
@@ -49,6 +50,7 @@
       "pruneNaturalTrees": false,
       "roofClearance": 0.0,
       "roofMaterials": [],
+      "ceilingFixtureHeights": [],
       "groundPortalX": 2.0,
       "groundPortalZ": 0.0,
       "welcomeAnchorX": 0.0,
@@ -77,14 +79,17 @@
     {
       "id": "marble-grand",
       "name": "Marble grand",
-      "description": "Selected compact court: a ground welcome camp, 10 m quarter-length halls, and a sheltered marble canopy with hanging braziers.",
+      "description": "Selected compact court: a ground welcome camp, 10 m quarter-length halls, and a high sheltered marble canopy with visible hanging braziers.",
       "ringRadius": 27.0,
       "runeHeight": 17.0,
       "platformClearance": 6.0,
       "pruneNaturalTrees": true,
-      "roofClearance": 8.0,
+      "roofClearance": 16.0,
       "roofMaterials": [
         "blackmarble_floor"
+      ],
+      "ceilingFixtureHeights": [
+        16.0
       ],
       "groundPortalX": 8.0,
       "groundPortalZ": 0.0,
