@@ -37,8 +37,9 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r21 changes the selected court's roof and tree-ledger serializer,
-> so those same suites must be re-witnessed against the exact r21 DLL before
+> 34/34 creator events. r22 adds the shared Creator Foundry contract after r21 changed the
+> selected court's roof and tree-ledger serializer, so those same suites must be re-witnessed
+> against the exact r22 DLL before
 > the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
@@ -270,6 +271,29 @@ alias for `damage_dealt` and `resource_damaged`. All eight schools reach the que
 the same canonical router. Alternative local/RPC and overload witnesses share a bounded action
 key, so even a zero-cooldown quest cannot complete twice for one action.
 
+### Creator Foundry contract
+
+Every canonical event now carries shared creator metadata in `QuestEventCatalog`: what its target
+actually means, one honest example target, whether weapon skill/projectile context is meaningful,
+and each event-specific scalar field accepted by `trigger.where`. The human-owned source is
+[`quest-event-authoring.json`](../../../tools/component-packets/quest-event-authoring.json); the
+generator refuses a missing or invented event and publishes the same rows into the capability
+manifest and both mod assemblies.
+
+`QuestAuthoring.FromEvent` is the Unity-free foundation for a future panel action. It turns one
+witnessed `QuestEvent` into a complete schema-1 view, feeds that JSON through the exact shipping
+`QuestViewLoader`, and requires the exact `QuestTriggerEvaluator` to match the original witness
+before returning it. Stable identity fields such as station/item are retained; volatile amount
+and quantity values stay discoverable but are not copied into a draft by default. Existing quest
+files are unchanged.
+
+`QuestAuthoring.ValidateDraft` and `Diagnose` return structured parse/match diagnostics. A miss is
+explained by asking the evaluator counterfactual questions with one constraint at a time; there is
+no second parser or matcher. The metadata is deliberately honest about current producer limits:
+chat/sign text is redacted and cannot be filtered, while `item_crafted` currently identifies the
+crafting subject rather than the crafted item. r22 does not yet add a panel editor or write files;
+it supplies the drift-guarded contract those surfaces can safely consume next.
+
 The tab also shows **the last event the matcher was given** — canonical name, target, and context
 — which is what turns "why didn't it fire" from a guess into a read.
 
@@ -358,7 +382,7 @@ predicate restating the matcher's rules is the thing that drifts silently, and "
 means fires there" is the only promise the lab makes. If the evaluator gains a lane, this
 answer changes with it for free.
 
-**`LabQuestSet`, `LabQuestAdvisor`, `LabQuestSeed`, and `LabBatchContract` are Unity-free and linked into
+**`LabQuestSet`, `LabQuestAdvisor`, `LabQuestSeed`, `QuestAuthoring`, and `LabBatchContract` are Unity-free and linked into
 ComfyNetworkSense.Tests**, so the logic a creator depends on is provable in seconds without a
 game install. `LabQuestSet.Build` takes file *contents*, not paths, for exactly that reason —
 keep disk IO in `LabQuestEngine`. `LabQuestAdvisor` takes world facts as injected delegates

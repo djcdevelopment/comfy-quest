@@ -2,6 +2,7 @@
   "Schema": "comfy-quest-capabilities/v1",
   "SourceAtlas": "tools/component-packets/samples/valheim-event-atlas.json",
   "SourceRules": "tools/component-packets/quest-capability-rules.json",
+  "SourceAuthoring": "tools/component-packets/quest-event-authoring.json",
   "AssemblySource": "assembly_valheim.dll (Steam client install, extracted 2026-08-07)",
   "Counts": {
     "AtlasRows": 91,
@@ -46,6 +47,462 @@
     "station_input_added",
     "station_output_collected",
     "station_output_produced"
+  ],
+  "CreatorEvents": [
+    {
+      "Name": "attack_blocked",
+      "TargetKind": "creature",
+      "TargetDescription": "the attacker name seen by the matcher",
+      "ExampleTarget": "$enemy_greyling",
+      "SupportsWeaponSkill": true,
+      "SupportsProjectile": true,
+      "Fields": []
+    },
+    {
+      "Name": "character_healed",
+      "TargetKind": "character",
+      "TargetDescription": "the healed character; the current safe route emits the local player as you",
+      "ExampleTarget": "you",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "amount",
+          "Description": "health restored by this action",
+          "Example": "25",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "character_staggered",
+      "TargetKind": "creature",
+      "TargetDescription": "the staggered creature name seen by the matcher",
+      "ExampleTarget": "$enemy_greyling",
+      "SupportsWeaponSkill": true,
+      "SupportsProjectile": true,
+      "Fields": []
+    },
+    {
+      "Name": "chat_sent",
+      "TargetKind": "chat-mode",
+      "TargetDescription": "the Valheim chat mode, not the redacted message text",
+      "ExampleTarget": "Normal",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "container_emptied",
+      "TargetKind": "prefab",
+      "TargetDescription": "the emptied container prefab",
+      "ExampleTarget": "piece_chest_wood",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "damage_dealt",
+      "TargetKind": "creature",
+      "TargetDescription": "the damaged creature name seen by the matcher",
+      "ExampleTarget": "$enemy_greyling",
+      "SupportsWeaponSkill": true,
+      "SupportsProjectile": true,
+      "Fields": []
+    },
+    {
+      "Name": "global_key_removed",
+      "TargetKind": "global-key",
+      "TargetDescription": "the exact Valheim world flag removed",
+      "ExampleTarget": "defeated_eikthyr",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "global_key_set",
+      "TargetKind": "global-key",
+      "TargetDescription": "the exact Valheim world flag set",
+      "ExampleTarget": "defeated_eikthyr",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "item_consumed",
+      "TargetKind": "item-prefab",
+      "TargetDescription": "the consumed item's stable prefab name",
+      "ExampleTarget": "CookedMeat",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "item_crafted",
+      "TargetKind": "station",
+      "TargetDescription": "the current producer's crafting subject; it does not yet expose the crafted item",
+      "ExampleTarget": "crafting bench",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "item_dropped",
+      "TargetKind": "item-prefab",
+      "TargetDescription": "the dropped item's stable prefab name",
+      "ExampleTarget": "Wood",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "item_equipped",
+      "TargetKind": "item-prefab",
+      "TargetDescription": "the equipped item's stable prefab name",
+      "ExampleTarget": "AxeBronze",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "item_picked_up",
+      "TargetKind": "item-prefab",
+      "TargetDescription": "the picked-up object's stable prefab name",
+      "ExampleTarget": "Wood",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "item_unequipped",
+      "TargetKind": "item-prefab",
+      "TargetDescription": "the unequipped item's stable prefab name",
+      "ExampleTarget": "AxeBronze",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "kill",
+      "TargetKind": "creature",
+      "TargetDescription": "the killed creature name seen by the matcher",
+      "ExampleTarget": "$enemy_greyling",
+      "SupportsWeaponSkill": true,
+      "SupportsProjectile": true,
+      "Fields": []
+    },
+    {
+      "Name": "max_health_changed",
+      "TargetKind": "attribute",
+      "TargetDescription": "the changed player attribute",
+      "ExampleTarget": "health",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "subject",
+          "Description": "the changed attribute",
+          "Example": "health",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "amount",
+          "Description": "the resulting maximum health",
+          "Example": "100",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "piece_damaged",
+      "TargetKind": "piece-prefab",
+      "TargetDescription": "the damaged structure prefab",
+      "ExampleTarget": "wood_wall",
+      "SupportsWeaponSkill": true,
+      "SupportsProjectile": true,
+      "Fields": []
+    },
+    {
+      "Name": "piece_destroyed",
+      "TargetKind": "piece-prefab",
+      "TargetDescription": "the destroyed structure prefab",
+      "ExampleTarget": "wood_wall",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "piece_placed",
+      "TargetKind": "piece-prefab",
+      "TargetDescription": "the placed structure prefab",
+      "ExampleTarget": "wood_wall",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "piece_removed",
+      "TargetKind": "piece",
+      "TargetDescription": "the removed subject; the attributed player route currently emits the generic value piece",
+      "ExampleTarget": "piece",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "piece_repaired",
+      "TargetKind": "piece-prefab",
+      "TargetDescription": "the repaired structure prefab",
+      "ExampleTarget": "wood_wall",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "player_died",
+      "TargetKind": "player",
+      "TargetDescription": "the local player",
+      "ExampleTarget": "you",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "player_teleported",
+      "TargetKind": "travel",
+      "TargetDescription": "the teleport mechanism; the current route emits portal",
+      "ExampleTarget": "portal",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "resource_damaged",
+      "TargetKind": "resource-prefab",
+      "TargetDescription": "the damaged tree, log, rock, bush, or destructible prefab",
+      "ExampleTarget": "Beech1",
+      "SupportsWeaponSkill": true,
+      "SupportsProjectile": true,
+      "Fields": []
+    },
+    {
+      "Name": "resource_picked",
+      "TargetKind": "pickable-prefab",
+      "TargetDescription": "the picked resource prefab",
+      "ExampleTarget": "RaspberryBush",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "sign_written",
+      "TargetKind": "sign-prefab",
+      "TargetDescription": "the edited sign prefab; message text is deliberately redacted and is not a filter",
+      "ExampleTarget": "sign",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": []
+    },
+    {
+      "Name": "skill_raised",
+      "TargetKind": "skill",
+      "TargetDescription": "the exact Valheim skill name",
+      "ExampleTarget": "Axes",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "subject",
+          "Description": "the exact skill name",
+          "Example": "Axes",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "amount",
+          "Description": "skill progress added by this action",
+          "Example": "1",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "skills_lowered",
+      "TargetKind": "skill-set",
+      "TargetDescription": "the affected skill set",
+      "ExampleTarget": "all skills",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "subject",
+          "Description": "the affected skill set",
+          "Example": "all",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "amount",
+          "Description": "the applied loss fraction",
+          "Example": "0.05",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "stamina_gained",
+      "TargetKind": "attribute",
+      "TargetDescription": "the changed player attribute",
+      "ExampleTarget": "stamina",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "subject",
+          "Description": "the changed attribute",
+          "Example": "stamina",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "amount",
+          "Description": "stamina restored by this action",
+          "Example": "10",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "stamina_spent",
+      "TargetKind": "attribute",
+      "TargetDescription": "the changed player attribute",
+      "ExampleTarget": "stamina",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "subject",
+          "Description": "the changed attribute",
+          "Example": "stamina",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "amount",
+          "Description": "stamina spent by this action",
+          "Example": "10",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "station_fuel_added",
+      "TargetKind": "item-prefab",
+      "TargetDescription": "the fuel item or the stable value fuel",
+      "ExampleTarget": "Coal",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "station",
+          "Description": "the receiving station prefab",
+          "Example": "smelter",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "item",
+          "Description": "the inserted fuel item",
+          "Example": "Coal",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "quantity",
+          "Description": "items inserted by this action",
+          "Example": "1",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "station_input_added",
+      "TargetKind": "item-prefab",
+      "TargetDescription": "the ore, food, or fermentable item inserted",
+      "ExampleTarget": "CopperOre",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "station",
+          "Description": "the receiving station prefab",
+          "Example": "smelter",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "item",
+          "Description": "the inserted input item",
+          "Example": "CopperOre",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "quantity",
+          "Description": "items inserted by this action",
+          "Example": "1",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "station_output_collected",
+      "TargetKind": "station-output",
+      "TargetDescription": "the collected station output; cooking currently emits cooking output",
+      "ExampleTarget": "cooking output",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "station",
+          "Description": "the station prefab",
+          "Example": "piece_cookingstation",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "item",
+          "Description": "the collected output description",
+          "Example": "cooking output",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "quantity",
+          "Description": "the collected slot or quantity",
+          "Example": "1",
+          "DraftByDefault": false
+        }
+      ]
+    },
+    {
+      "Name": "station_output_produced",
+      "TargetKind": "item-prefab",
+      "TargetDescription": "the output item produced by the station",
+      "ExampleTarget": "Copper",
+      "SupportsWeaponSkill": false,
+      "SupportsProjectile": false,
+      "Fields": [
+        {
+          "Name": "station",
+          "Description": "the producing station prefab",
+          "Example": "smelter",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "item",
+          "Description": "the produced output item",
+          "Example": "Copper",
+          "DraftByDefault": true
+        },
+        {
+          "Name": "quantity",
+          "Description": "items produced by this action",
+          "Example": "1",
+          "DraftByDefault": false
+        }
+      ]
+    }
   ],
   "TriggerAliases": {
     "hit": [

@@ -1,5 +1,15 @@
 # Changelog
 
+**r22 Creator Foundry contract foundation.** Every safe canonical event now carries generated,
+shared creator metadata: target kind and meaning, an honest example target, meaningful
+weapon/projectile support, and the exact event-specific scalar fields a `trigger.where` may use.
+The 34-event metadata source is guarded against capability drift and expands into both the public
+manifest and the Unity-free `QuestEventCatalog`. New shared `QuestAuthoring` primitives turn one
+witnessed event into a complete backward-compatible schema-1 quest view, round-trip it through
+the shipping loader, and require the shipping evaluator to match it before returning. Structured
+miss diagnostics isolate constraints through counterfactual evaluator calls rather than copying
+matcher rules. No existing quest file or evaluator behavior changes.
+
 **r21 executable ledger serializer correction.** A one-record r20 live probe proved that
 Unity's `JsonUtility` discarded every custom record array regardless of whether its DTO was
 nested or top-level. Recovery persistence now uses the data-contract JSON serializer already

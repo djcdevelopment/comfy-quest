@@ -12,6 +12,7 @@ signature record, and duplicate atlas rows remain visible through AtlasRowCount.
 Reads:
   tools/component-packets/samples/valheim-event-atlas.json
   tools/component-packets/quest-capability-rules.json
+  tools/component-packets/quest-event-authoring.json
 Writes:
   tools/component-packets/samples/quest-capability-manifest.json
   network/mod/ComfyQuestLab/Core/LabSeamCatalog.g.cs
@@ -32,6 +33,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 ATLAS = HERE / "samples" / "valheim-event-atlas.json"
 RULES = HERE / "quest-capability-rules.json"
+AUTHORING = HERE / "quest-event-authoring.json"
 MANIFEST = HERE / "samples" / "quest-capability-manifest.json"
 CSHARP = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabSeamCatalog.g.cs"
 EVENT_CATALOG = (
@@ -79,6 +81,7 @@ USABILITY_RANK = {
 ROUTES = {"primary", "alternate", "corroborating", "diagnostic", "suppressed"}
 PROFILES = {"core", "extended", "diagnostic", "disabled"}
 EVENT_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+FIELD_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 RULE_FIELDS = {
     "Methods",
     "Category",
@@ -308,10 +311,12 @@ def build_manifest(atlas: dict, rules_document: dict, signatures: list[dict]) ->
                 {entry["CanonicalEvent"] for entry in in_category if entry["CreatorSafe"]}
             ),
         }
+    authoring = build_authoring(safe_events)
     return {
         "Schema": "comfy-quest-capabilities/v1",
         "SourceAtlas": "tools/component-packets/samples/valheim-event-atlas.json",
         "SourceRules": "tools/component-packets/quest-capability-rules.json",
+        "SourceAuthoring": "tools/component-packets/quest-event-authoring.json",
         "AssemblySource": atlas["Source"],
         "Counts": {
             "AtlasRows": sum(entry["AtlasRowCount"] for entry in signatures),
@@ -322,10 +327,88 @@ def build_manifest(atlas: dict, rules_document: dict, signatures: list[dict]) ->
             "CreatorSafeSignatures": sum(bool(entry["CreatorSafe"]) for entry in signatures),
         },
         "CreatorSafeEvents": safe_events,
+        "CreatorEvents": authoring,
         "TriggerAliases": rules_document.get("TriggerAliases", {}),
         "CategoryCounts": category_counts,
         "Signatures": signatures,
     }
+
+
+def build_authoring(safe_events: list[str]) -> list[dict]:
+    """Validate the human creator vocabulary against the generated safe catalog.
+
+    Patch policy decides whether an event is safe. This file only explains the stable
+    envelope creators receive, so it must cover that policy exactly and may not invent
+    an event the evaluator will reject.
+    """
+    document = read_json(AUTHORING)
+    if document.get("Schema") != "comfy-quest-event-authoring/v1":
+        raise CapabilityError("quest-event-authoring.json schema is not v1")
+    rows = document.get("Events")
+    if not isinstance(rows, list):
+        raise CapabilityError("quest-event-authoring.json Events must be an array")
+
+    by_name: dict[str, dict] = {}
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            raise CapabilityError(f"creator event {index} must be an object")
+        expected_fields = {
+            "Name", "TargetKind", "TargetDescription", "ExampleTarget",
+            "SupportsWeaponSkill", "SupportsProjectile", "Fields",
+        }
+        unknown = set(row) - expected_fields
+        missing = expected_fields - set(row)
+        if unknown or missing:
+            raise CapabilityError(
+                f"creator event {index} fields: missing={sorted(missing)}, "
+                f"unknown={sorted(unknown)}"
+            )
+        name = row["Name"]
+        if not isinstance(name, str) or not EVENT_NAME.fullmatch(name):
+            raise CapabilityError(f"creator event {index} has invalid Name {name!r}")
+        if name in by_name:
+            raise CapabilityError(f"duplicate creator metadata for {name}")
+        for field in ("TargetKind", "TargetDescription", "ExampleTarget"):
+            if not isinstance(row[field], str) or not row[field].strip():
+                raise CapabilityError(f"{name}: {field} must be a non-empty string")
+        for field in ("SupportsWeaponSkill", "SupportsProjectile"):
+            if not isinstance(row[field], bool):
+                raise CapabilityError(f"{name}: {field} must be boolean")
+        fields = row["Fields"]
+        if not isinstance(fields, list):
+            raise CapabilityError(f"{name}: Fields must be an array")
+        seen_fields: set[str] = set()
+        for field_index, field in enumerate(fields, start=1):
+            required = {"Name", "Description", "Example", "DraftByDefault"}
+            if not isinstance(field, dict) or set(field) != required:
+                raise CapabilityError(
+                    f"{name}: field {field_index} must contain exactly {sorted(required)}"
+                )
+            field_name = field["Name"]
+            if not isinstance(field_name, str) or not FIELD_NAME.fullmatch(field_name):
+                raise CapabilityError(f"{name}: invalid field name {field_name!r}")
+            if field_name in seen_fields:
+                raise CapabilityError(f"{name}: duplicate field {field_name}")
+            seen_fields.add(field_name)
+            if field_name in {"event", "target", "weapon_skill", "projectile"}:
+                raise CapabilityError(
+                    f"{name}: universal field {field_name} belongs in its typed metadata"
+                )
+            if not isinstance(field["Description"], str) or not field["Description"].strip():
+                raise CapabilityError(f"{name}.{field_name}: Description is empty")
+            if not isinstance(field["Example"], str) or not field["Example"].strip():
+                raise CapabilityError(f"{name}.{field_name}: Example is empty")
+            if not isinstance(field["DraftByDefault"], bool):
+                raise CapabilityError(f"{name}.{field_name}: DraftByDefault must be boolean")
+        by_name[name] = row
+
+    missing = set(safe_events) - set(by_name)
+    extra = set(by_name) - set(safe_events)
+    if missing or extra:
+        raise CapabilityError(
+            f"creator authoring drift: missing={sorted(missing)}, extra={sorted(extra)}"
+        )
+    return [by_name[name] for name in safe_events]
 
 
 def cs(value: str) -> str:
@@ -479,7 +562,9 @@ def render_csharp(atlas: dict, signatures: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def render_event_catalog(signatures: list[dict], aliases: dict[str, list[str]]) -> str:
+def render_event_catalog(
+    signatures: list[dict], aliases: dict[str, list[str]], authoring: list[dict]
+) -> str:
     """Render the Unity-free creator vocabulary shared by both mod assemblies."""
     events: dict[str, dict[str, str]] = {}
     for entry in signatures:
@@ -497,6 +582,7 @@ def render_event_catalog(signatures: list[dict], aliases: dict[str, list[str]]) 
             )
         events[name] = definition
 
+    authoring_by_name = {row["Name"]: row for row in authoring}
     lines = [
         "// <auto-generated>",
         "//   Generated by tools/component-packets/generate_seam_catalog.py from the",
@@ -512,15 +598,58 @@ def render_event_catalog(signatures: list[dict], aliases: dict[str, list[str]]) 
         "public static class QuestEventCatalog {",
         "  public const string Schema = \"comfy-quest-event/v1\";",
         "",
+        "  /// <summary>One event-specific scalar accepted by trigger.where.</summary>",
+        "  public readonly struct FieldDefinition {",
+        "    public string Name { get; }",
+        "    public string Description { get; }",
+        "    public string Example { get; }",
+        "    public bool DraftByDefault { get; }",
+        "",
+        "    public FieldDefinition(",
+        "        string name, string description, string example, bool draftByDefault) {",
+        "      Name = name;",
+        "      Description = description;",
+        "      Example = example;",
+        "      DraftByDefault = draftByDefault;",
+        "    }",
+        "  }",
+        "",
         "  public readonly struct Definition {",
         "    public string Name { get; }",
         "    public string Category { get; }",
         "    public string Profile { get; }",
+        "    public string TargetKind { get; }",
+        "    public string TargetDescription { get; }",
+        "    public string ExampleTarget { get; }",
+        "    public bool SupportsWeaponSkill { get; }",
+        "    public bool SupportsProjectile { get; }",
+        "    public IReadOnlyList<FieldDefinition> Fields { get; }",
         "",
         "    public Definition(string name, string category, string profile) {",
         "      Name = name;",
         "      Category = category;",
         "      Profile = profile;",
+        "      TargetKind = \"subject\";",
+        "      TargetDescription = \"the event subject\";",
+        "      ExampleTarget = \"any\";",
+        "      SupportsWeaponSkill = false;",
+        "      SupportsProjectile = false;",
+        "      Fields = new FieldDefinition[0];",
+        "    }",
+        "",
+        "    public Definition(",
+        "        string name, string category, string profile, string targetKind,",
+        "        string targetDescription, string exampleTarget, bool supportsWeaponSkill,",
+        "        bool supportsProjectile, FieldDefinition[] fields) {",
+        "      Name = name;",
+        "      Category = category;",
+        "      Profile = profile;",
+        "      TargetKind = targetKind;",
+        "      TargetDescription = targetDescription;",
+        "      ExampleTarget = exampleTarget;",
+        "      SupportsWeaponSkill = supportsWeaponSkill;",
+        "      SupportsProjectile = supportsProjectile;",
+        "      Fields = fields ?? new FieldDefinition[0];",
         "    }",
         "  }",
         "",
@@ -528,9 +657,29 @@ def render_event_catalog(signatures: list[dict], aliases: dict[str, list[str]]) 
         "      new Dictionary<string, Definition>(StringComparer.OrdinalIgnoreCase) {",
     ]
     for name, definition in sorted(events.items()):
+        creator = authoring_by_name[name]
+        fields = creator["Fields"]
+        rendered_fields = "new FieldDefinition[0]"
+        if fields:
+            rendered_fields = "new[] { " + ", ".join(
+                "new FieldDefinition("
+                + ", ".join(
+                    [
+                        cs(field["Name"]),
+                        cs(field["Description"]),
+                        cs(field["Example"]),
+                        str(field["DraftByDefault"]).lower(),
+                    ]
+                )
+                + ")"
+                for field in fields
+            ) + " }"
         lines.append(
             f"    {{ {cs(name)}, new Definition({cs(name)}, {cs(definition['Category'])}, "
-            f"{cs(definition['Profile'])}) }},"
+            f"{cs(definition['Profile'])}, {cs(creator['TargetKind'])}, "
+            f"{cs(creator['TargetDescription'])}, {cs(creator['ExampleTarget'])}, "
+            f"{str(creator['SupportsWeaponSkill']).lower()}, "
+            f"{str(creator['SupportsProjectile']).lower()}, {rendered_fields}) }},"
         )
     lines += [
         "  };",
@@ -602,7 +751,7 @@ def render_outputs() -> dict[Path, str]:
         MANIFEST: json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
         CSHARP: render_csharp(atlas, signatures),
         EVENT_CATALOG: render_event_catalog(
-            signatures, rules_document.get("TriggerAliases", {})
+            signatures, rules_document.get("TriggerAliases", {}), manifest["CreatorEvents"]
         ),
     }
 

@@ -21,7 +21,7 @@ using UnityEngine;
 /// server, and it can be uninstalled the moment somebody is done learning.
 ///
 /// What it shares with the shipping mod is the quest contract itself — TrackedQuest,
-/// QuestEvent, QuestViewLoader, QuestEventCatalog, and QuestTriggerEvaluator are compiled from the same files (see the
+/// QuestEvent, QuestViewLoader, QuestEventCatalog, QuestAuthoring, and QuestTriggerEvaluator are compiled from the same files (see the
 /// csproj), so a quest that behaves one way here behaves the same way there. That is
 /// the only promise the lab makes, and it is the one that matters.
 ///
@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260809-r21";
+  public const string ReleaseId = "questlab-v0.2.0-20260809-r22";
 
   public static ComfyQuestLab Instance { get; private set; }
 

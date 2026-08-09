@@ -49,13 +49,14 @@ Each entry in `quests`:
   bump, for example:
 
   ```json
-  { "event": "item_crafted", "target": "SwordIron",
-    "where": { "station": "forge", "quality": 2 } }
+  { "event": "station_input_added", "target": "CopperOre",
+    "where": { "station": "smelter", "item": "CopperOre" } }
   ```
 
   The shared evaluator accepts all 34 creator-safe canonical events; in-game support is
   claimed only after a normalized producer, dedupe guard, and witness receipt land. See
-  `quest-view-schema.md` for exact matching and rejection rules.
+  `quest-view-schema.md` for exact matching and rejection rules, and the generated
+  capability manifest for each event's creator-facing target and filter fields.
 
 That's the whole shape. If you need a field that isn't here, add it — then teach
 `validate.py` and the harvest adapters about it.

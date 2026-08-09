@@ -24,6 +24,7 @@ MANIFEST = (
 )
 GENERATOR = REPO / "tools" / "component-packets" / "generate_seam_catalog.py"
 RULES = REPO / "tools" / "component-packets" / "quest-capability-rules.json"
+AUTHORING = REPO / "tools" / "component-packets" / "quest-event-authoring.json"
 PATCH_CHECKER = REPO / "tools" / "component-packets" / "check_lab_patches.py"
 PATCHES = REPO / "network" / "mod" / "ComfyQuestLab" / "Patches"
 JOURNAL_GENERATOR = REPO / "tools" / "component-packets" / "generate_journal.py"
@@ -114,6 +115,27 @@ class QuestCapabilityManifestTests(unittest.TestCase):
             self.manifest["TriggerAliases"],
             {"hit": ["damage_dealt", "resource_damaged"]},
         )
+
+    def test_every_safe_event_has_creator_target_and_field_metadata(self) -> None:
+        creator_events = self.manifest["CreatorEvents"]
+        self.assertEqual(
+            [row["Name"] for row in creator_events],
+            self.manifest["CreatorSafeEvents"],
+        )
+        for row in creator_events:
+            with self.subTest(event=row["Name"]):
+                self.assertTrue(row["TargetKind"])
+                self.assertTrue(row["TargetDescription"])
+                self.assertTrue(row["ExampleTarget"])
+                names = [field["Name"] for field in row["Fields"]]
+                self.assertEqual(len(names), len(set(names)))
+                self.assertFalse(
+                    set(names) & {"event", "target", "weapon_skill", "projectile"}
+                )
+                for field in row["Fields"]:
+                    self.assertTrue(field["Description"])
+                    self.assertTrue(field["Example"])
+                    self.assertIsInstance(field["DraftByDefault"], bool)
 
     def test_known_local_rpc_routes_share_event_and_dedupe_group(self) -> None:
         pairs = (
@@ -226,6 +248,26 @@ class QuestCapabilityManifestTests(unittest.TestCase):
                     CAPABILITY_GENERATOR.build_model()
             finally:
                 CAPABILITY_GENERATOR.RULES = original_rules
+
+    def test_missing_creator_metadata_turns_the_guard_red(self) -> None:
+        authoring = json.loads(AUTHORING.read_text(encoding="utf-8"))
+        authoring["Events"] = [
+            row for row in authoring["Events"] if row["Name"] != "sign_written"
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            mutated = Path(temporary) / "quest-event-authoring.json"
+            mutated.write_text(json.dumps(authoring), encoding="utf-8")
+            original = CAPABILITY_GENERATOR.AUTHORING
+            try:
+                CAPABILITY_GENERATOR.AUTHORING = mutated
+                atlas, rules, _, signatures = CAPABILITY_GENERATOR.build_model()
+                with self.assertRaisesRegex(
+                    CAPABILITY_GENERATOR.CapabilityError,
+                    "creator authoring drift.*sign_written",
+                ):
+                    CAPABILITY_GENERATOR.build_manifest(atlas, rules, signatures)
+            finally:
+                CAPABILITY_GENERATOR.AUTHORING = original
 
 
 if __name__ == "__main__":
