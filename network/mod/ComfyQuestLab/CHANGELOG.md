@@ -1,5 +1,13 @@
 # Changelog
 
+**r20 Unity-ledger shape correction.** The first r19 OMEN identify receipt proved two things
+before any destructive request ran: all nine r18 braziers were above the old roof underside,
+and Unity still read zero records from the manually repaired 43-tree ledger. Tree record and
+ledger DTOs now live at namespace scope, and the persisted collection is a plain record array
+instead of `List<T>` of a nested type. Write-ahead pruning still builds and sorts in memory, but
+it converts to this conservative Unity field-serializer shape before the mandatory write/read,
+count, and digest round trip. The existing v1 JSON field names stay compatible.
+
 **r19 high-canopy and recovery-ledger correction.** The selected roof moves from 8 m to
 16 m above the walking surface following the live sheltered-court review. All nine ceiling
 braziers now attach their measured topmost mesh point just below the marble underside, so the

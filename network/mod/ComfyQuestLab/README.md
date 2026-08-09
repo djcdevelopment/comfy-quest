@@ -37,8 +37,8 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r19 changes the selected court's roof and tree-ledger guard,
-> so those same suites must be re-witnessed against the exact r19 DLL before
+> 34/34 creator events. r20 changes the selected court's roof and tree-ledger serializer,
+> so those same suites must be re-witnessed against the exact r20 DLL before
 > the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
