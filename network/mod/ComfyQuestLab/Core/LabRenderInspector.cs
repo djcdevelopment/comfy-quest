@@ -55,10 +55,13 @@ public static class LabRenderInspector {
   sealed class RootState {
     public string Name;
     public string Digest;
+    public string ConfigurationDigest;
     public int RendererCount;
     public int MaterialCount;
     public int EmissionSignals;
     public int PropertyBlockEmissionSignals;
+    public int SurfaceSignals;
+    public int PropertyBlockSurfaceSignals;
     public int LightCount;
     public int EnabledLights;
     public readonly List<RendererState> Renderers = new List<RendererState>();
@@ -69,6 +72,8 @@ public static class LabRenderInspector {
     public string Path;
     public string Type;
     public bool Enabled;
+    public bool ConfiguredEnabled;
+    public bool ActiveInHierarchy;
     public bool HasPropertyBlock;
     public int LightmapIndex;
     public int RealtimeLightmapIndex;
@@ -88,6 +93,7 @@ public static class LabRenderInspector {
     public readonly List<string> Keywords = new List<string>();
     public readonly List<PropertyState> Properties = new List<PropertyState>();
     public readonly List<string> EmissionEvidence = new List<string>();
+    public readonly List<string> SurfaceEvidence = new List<string>();
   }
 
   sealed class PropertyState {
@@ -97,6 +103,8 @@ public static class LabRenderInspector {
     public string Value;
     public bool IlluminationRelated;
     public bool ActiveSignal;
+    public bool SurfaceRelated;
+    public bool SurfaceSignal;
   }
 
   sealed class PropertyBlockState {
@@ -108,6 +116,8 @@ public static class LabRenderInspector {
     public string Path;
     public string Type;
     public bool Enabled;
+    public bool ConfiguredEnabled;
+    public bool ActiveInHierarchy;
     public float Intensity;
     public float Range;
     public Color Color;
@@ -119,6 +129,30 @@ public static class LabRenderInspector {
     public int Count;
     public int MarkedCount;
     public readonly List<Vector3> SamplePositions = new List<Vector3>();
+  }
+
+  /// <summary>Small comparison surface for the Gallery truth receipt. The full inspector
+  /// artifact remains the place for per-property diagnosis; this summary makes it cheap to
+  /// compare one loaded Gallery sample with the untouched prefab configuration.</summary>
+  internal sealed class RenderSummary {
+    public string ConfigurationDigest;
+    public int IlluminationSignals;
+    public int SurfaceSignals;
+    public int ConfiguredLights;
+  }
+
+  internal static RenderSummary SummarizeConfiguration(GameObject root) {
+    RootState state = CaptureRoot(root);
+    int configuredLights = 0;
+    foreach (LightState light in state.Lights) {
+      if (light.ConfiguredEnabled) configuredLights++;
+    }
+    return new RenderSummary {
+      ConfigurationDigest = state.ConfigurationDigest,
+      IlluminationSignals = state.EmissionSignals + state.PropertyBlockEmissionSignals,
+      SurfaceSignals = state.SurfaceSignals + state.PropertyBlockSurfaceSignals,
+      ConfiguredLights = configuredLights,
+    };
   }
 
   /// <summary>Capture immutable string summaries immediately after ZNetScene has built
@@ -192,10 +226,14 @@ public static class LabRenderInspector {
       bool startupChanged = hasStartup && !string.Equals(
           startup.Digest, prefabState.Digest, StringComparison.Ordinal);
       bool anyLiveDiffers = false;
+      bool anyLiveConfigurationDiffers = false;
       foreach (LiveGroup group in groups.Values) {
         if (!string.Equals(group.State.Digest, prefabState.Digest, StringComparison.Ordinal)) {
           anyLiveDiffers = true;
-          break;
+        }
+        if (!string.Equals(group.State.ConfigurationDigest, prefabState.ConfigurationDigest,
+            StringComparison.Ordinal)) {
+          anyLiveConfigurationDiffers = true;
         }
       }
 
@@ -215,6 +253,9 @@ public static class LabRenderInspector {
           + liveEmissionGroups + " state(s) with illumination signals, "
           + liveLightGroups + " with enabled lights; "
           + (anyLiveDiffers ? "LIVE STATE DIFFERS FROM PREFAB" : "same as current prefab"));
+      sb.AppendLine("loaded render configuration: " + (anyLiveConfigurationDiffers
+          ? "DIFFERS FROM FRESH PREFAB"
+          : "same as fresh prefab (activation-only differences ignored)"));
       AppendEmissionSummary(sb, prefabState);
       sb.Append("artifact: ").Append(path);
       return sb.ToString();
@@ -271,11 +312,15 @@ public static class LabRenderInspector {
       state.MaterialCount += rendererState.Materials.Count;
       foreach (MaterialState material in rendererState.Materials) {
         state.EmissionSignals += material.EmissionEvidence.Count;
+        state.SurfaceSignals += material.SurfaceEvidence.Count;
       }
       foreach (PropertyBlockState block in rendererState.PropertyBlocks) {
         foreach (PropertyState property in block.Properties) {
           if (property.ActiveSignal) {
             state.PropertyBlockEmissionSignals++;
+          }
+          if (property.SurfaceSignal) {
+            state.PropertyBlockSurfaceSignals++;
           }
         }
       }
@@ -293,6 +338,8 @@ public static class LabRenderInspector {
         Path = RelativePath(root.transform, light.transform),
         Type = light.type.ToString(),
         Enabled = light.enabled && light.gameObject.activeInHierarchy,
+        ConfiguredEnabled = light.enabled,
+        ActiveInHierarchy = light.gameObject.activeInHierarchy,
         Intensity = light.intensity,
         Range = light.range,
         Color = light.color,
@@ -300,7 +347,8 @@ public static class LabRenderInspector {
       });
     }
 
-    state.Digest = Digest(Signature(state));
+    state.Digest = Digest(Signature(state, true));
+    state.ConfigurationDigest = Digest(Signature(state, false));
     return state;
   }
 
@@ -309,6 +357,8 @@ public static class LabRenderInspector {
       Path = RelativePath(root, renderer.transform),
       Type = renderer.GetType().Name,
       Enabled = renderer.enabled && renderer.gameObject.activeInHierarchy,
+      ConfiguredEnabled = renderer.enabled,
+      ActiveInHierarchy = renderer.gameObject.activeInHierarchy,
       HasPropertyBlock = renderer.HasPropertyBlock(),
       LightmapIndex = renderer.lightmapIndex,
       RealtimeLightmapIndex = renderer.realtimeLightmapIndex,
@@ -375,6 +425,7 @@ public static class LabRenderInspector {
         Name = name,
         Type = type.ToString(),
         IlluminationRelated = IlluminationName(name),
+        SurfaceRelated = SurfaceName(name),
       };
       try {
         switch (type) {
@@ -382,27 +433,32 @@ public static class LabRenderInspector {
             Color color = material.GetColor(id);
             property.Value = ColorText(color);
             property.ActiveSignal = property.IlluminationRelated && ColorSignal(color);
+            property.SurfaceSignal = property.SurfaceRelated && ColorSignal(color);
             break;
           case ShaderPropertyType.Vector:
             Vector4 vector = material.GetVector(id);
             property.Value = VectorText(vector);
             property.ActiveSignal = property.IlluminationRelated && VectorSignal(vector);
+            property.SurfaceSignal = property.SurfaceRelated && VectorSignal(vector);
             break;
           case ShaderPropertyType.Float:
           case ShaderPropertyType.Range:
             float number = material.GetFloat(id);
             property.Value = Num(number);
             property.ActiveSignal = property.IlluminationRelated && Mathf.Abs(number) > 0.0001f;
+            property.SurfaceSignal = property.SurfaceRelated && Mathf.Abs(number) > 0.0001f;
             break;
           case ShaderPropertyType.Int:
             int integer = material.GetInteger(id);
             property.Value = integer.ToString(CultureInfo.InvariantCulture);
             property.ActiveSignal = property.IlluminationRelated && integer != 0;
+            property.SurfaceSignal = property.SurfaceRelated && integer != 0;
             break;
           case ShaderPropertyType.Texture:
             Texture texture = material.GetTexture(id);
             property.Value = texture == null ? "null" : texture.name;
             property.ActiveSignal = property.IlluminationRelated && texture != null;
+            property.SurfaceSignal = property.SurfaceRelated && texture != null;
             break;
           default:
             property.Value = "unsupported";
@@ -415,6 +471,9 @@ public static class LabRenderInspector {
       if (property.ActiveSignal) {
         state.EmissionEvidence.Add(property.Name + "=" + property.Value);
       }
+      if (property.SurfaceSignal) {
+        state.SurfaceEvidence.Add(property.Name + "=" + property.Value);
+      }
     }
     return state;
   }
@@ -425,7 +484,8 @@ public static class LabRenderInspector {
     var seen = new HashSet<int>();
     foreach (MaterialState material in materials) {
       foreach (PropertyState candidate in material.Properties) {
-        if (!candidate.IlluminationRelated || !seen.Add(candidate.Id)
+        if ((!candidate.IlluminationRelated && !candidate.SurfaceRelated)
+            || !seen.Add(candidate.Id)
             || !block.HasProperty(candidate.Id)) {
           continue;
         }
@@ -433,32 +493,38 @@ public static class LabRenderInspector {
           Id = candidate.Id,
           Name = candidate.Name,
           Type = candidate.Type,
-          IlluminationRelated = true,
+          IlluminationRelated = candidate.IlluminationRelated,
+          SurfaceRelated = candidate.SurfaceRelated,
         };
         try {
           if (block.HasColor(candidate.Id)) {
             Color color = block.GetColor(candidate.Id);
             property.Type = "Color";
             property.Value = ColorText(color);
-            property.ActiveSignal = ColorSignal(color);
+            property.ActiveSignal = property.IlluminationRelated && ColorSignal(color);
+            property.SurfaceSignal = property.SurfaceRelated && ColorSignal(color);
           } else if (block.HasTexture(candidate.Id)) {
             Texture texture = block.GetTexture(candidate.Id);
             property.Type = "Texture";
             property.Value = texture == null ? "null" : texture.name;
-            property.ActiveSignal = texture != null;
+            property.ActiveSignal = property.IlluminationRelated && texture != null;
+            property.SurfaceSignal = property.SurfaceRelated && texture != null;
           } else if (block.HasVector(candidate.Id)) {
             Vector4 vector = block.GetVector(candidate.Id);
             property.Type = "Vector";
             property.Value = VectorText(vector);
-            property.ActiveSignal = VectorSignal(vector);
+            property.ActiveSignal = property.IlluminationRelated && VectorSignal(vector);
+            property.SurfaceSignal = property.SurfaceRelated && VectorSignal(vector);
           } else if (block.HasFloat(candidate.Id)) {
             float number = block.GetFloat(candidate.Id);
             property.Type = "Float";
             property.Value = Num(number);
-            property.ActiveSignal = Mathf.Abs(number) > 0.0001f;
+            property.ActiveSignal = property.IlluminationRelated && Mathf.Abs(number) > 0.0001f;
+            property.SurfaceSignal = property.SurfaceRelated && Mathf.Abs(number) > 0.0001f;
           } else {
             property.Value = "present (type unavailable)";
-            property.ActiveSignal = true;
+            property.ActiveSignal = property.IlluminationRelated;
+            property.SurfaceSignal = property.SurfaceRelated;
           }
         } catch (Exception ex) {
           property.Value = "unreadable: " + ex.GetType().Name;
@@ -546,11 +612,15 @@ public static class LabRenderInspector {
   static void AppendRootJson(StringBuilder sb, RootState state, string indent) {
     sb.Append("{\"name\": ").Append(Quote(state.Name))
       .Append(", \"digest\": ").Append(Quote(state.Digest))
+      .Append(", \"configurationDigest\": ").Append(Quote(state.ConfigurationDigest))
       .Append(", \"rendererCount\": ").Append(state.RendererCount)
       .Append(", \"materialCount\": ").Append(state.MaterialCount)
       .Append(", \"materialIlluminationSignals\": ").Append(state.EmissionSignals)
       .Append(", \"propertyBlockIlluminationSignals\": ")
       .Append(state.PropertyBlockEmissionSignals)
+      .Append(", \"surfaceSignals\": ").Append(state.SurfaceSignals)
+      .Append(", \"propertyBlockSurfaceSignals\": ")
+      .Append(state.PropertyBlockSurfaceSignals)
       .Append(", \"lightCount\": ").Append(state.LightCount)
       .Append(", \"enabledLights\": ").Append(state.EnabledLights)
       .Append(", \"renderers\": [");
@@ -565,6 +635,8 @@ public static class LabRenderInspector {
       sb.Append("{\"path\": ").Append(Quote(light.Path))
         .Append(", \"type\": ").Append(Quote(light.Type))
         .Append(", \"enabled\": ").Append(Bool(light.Enabled))
+        .Append(", \"configuredEnabled\": ").Append(Bool(light.ConfiguredEnabled))
+        .Append(", \"activeInHierarchy\": ").Append(Bool(light.ActiveInHierarchy))
         .Append(", \"intensity\": ").Append(Num(light.Intensity))
         .Append(", \"range\": ").Append(Num(light.Range))
         .Append(", \"color\": ").Append(ColorJson(light.Color))
@@ -577,6 +649,8 @@ public static class LabRenderInspector {
     sb.Append("{\"path\": ").Append(Quote(renderer.Path))
       .Append(", \"type\": ").Append(Quote(renderer.Type))
       .Append(", \"enabled\": ").Append(Bool(renderer.Enabled))
+      .Append(", \"configuredEnabled\": ").Append(Bool(renderer.ConfiguredEnabled))
+      .Append(", \"activeInHierarchy\": ").Append(Bool(renderer.ActiveInHierarchy))
       .Append(", \"hasPropertyBlock\": ").Append(Bool(renderer.HasPropertyBlock))
       .Append(", \"lightmapIndex\": ").Append(renderer.LightmapIndex)
       .Append(", \"realtimeLightmapIndex\": ").Append(renderer.RealtimeLightmapIndex)
@@ -610,6 +684,7 @@ public static class LabRenderInspector {
       .Append(", \"renderQueue\": ").Append(material.RenderQueue)
       .Append(", \"keywords\": ").Append(StringArrayJson(material.Keywords))
       .Append(", \"illuminationEvidence\": ").Append(StringArrayJson(material.EmissionEvidence))
+      .Append(", \"surfaceEvidence\": ").Append(StringArrayJson(material.SurfaceEvidence))
       .Append(", \"properties\": [");
     for (int i = 0; i < material.Properties.Count; i++) {
       if (i > 0) sb.Append(',');
@@ -624,14 +699,17 @@ public static class LabRenderInspector {
       .Append(", \"type\": ").Append(Quote(property.Type))
       .Append(", \"value\": ").Append(Quote(property.Value))
       .Append(", \"illuminationRelated\": ").Append(Bool(property.IlluminationRelated))
-      .Append(", \"activeSignal\": ").Append(Bool(property.ActiveSignal)).Append('}');
+      .Append(", \"activeSignal\": ").Append(Bool(property.ActiveSignal))
+      .Append(", \"surfaceRelated\": ").Append(Bool(property.SurfaceRelated))
+      .Append(", \"surfaceSignal\": ").Append(Bool(property.SurfaceSignal)).Append('}');
   }
 
-  static string Signature(RootState state) {
+  static string Signature(RootState state, bool effectiveActivation) {
     var sb = new StringBuilder();
     foreach (RendererState renderer in state.Renderers) {
       sb.Append(renderer.Path).Append('|').Append(renderer.Type).Append('|')
-        .Append(renderer.Enabled).Append('|').Append(renderer.HasPropertyBlock).Append('|')
+        .Append(effectiveActivation ? renderer.Enabled : renderer.ConfiguredEnabled)
+        .Append('|').Append(renderer.HasPropertyBlock).Append('|')
         .Append(renderer.LightmapIndex).Append('|').Append(renderer.RealtimeLightmapIndex)
         .Append('|').Append(renderer.ShadowCastingMode).Append('|').Append(renderer.ReceiveShadows);
       foreach (MaterialState material in renderer.Materials) {
@@ -654,7 +732,8 @@ public static class LabRenderInspector {
     }
     foreach (LightState light in state.Lights) {
       sb.Append("|L:").Append(light.Path).Append('|').Append(light.Type).Append('|')
-        .Append(light.Enabled).Append('|').Append(Num(light.Intensity)).Append('|')
+        .Append(effectiveActivation ? light.Enabled : light.ConfiguredEnabled)
+        .Append('|').Append(Num(light.Intensity)).Append('|')
         .Append(Num(light.Range)).Append('|').Append(ColorText(light.Color)).Append('|')
         .Append(light.Shadows);
     }
@@ -668,6 +747,15 @@ public static class LabRenderInspector {
     value = value.ToLowerInvariant();
     return value.Contains("emiss") || value.Contains("emission")
         || value.Contains("glow") || value.Contains("illum") || value.Contains("bloom");
+  }
+
+  static bool SurfaceName(string value) {
+    if (string.IsNullOrEmpty(value)) {
+      return false;
+    }
+    value = value.ToLowerInvariant();
+    return value.Contains("snow") || value.Contains("wet") || value.Contains("rain")
+        || value.Contains("frost") || value.Contains("weather");
   }
 
   static bool ColorSignal(Color color) {

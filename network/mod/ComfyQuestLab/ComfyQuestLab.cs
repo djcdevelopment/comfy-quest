@@ -285,7 +285,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       // when somebody types one of these. check first, always.
       new Terminal.ConsoleCommand("questlab_gallery",
           "manage Gallery v2: questlab_gallery "
-          + "<profiles|check|build|compare|identify|clear|rebuild|trees|restore-trees> "
+          + "<profiles|check|build|compare|identify|evidence|clear|rebuild|trees|restore-trees> "
           + "[profile-or-build-id]",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "check";
@@ -301,6 +301,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
               StartCoroutine(_gallery.Rebuild(this, value));
             } else if (verb == "identify") {
               Report(_gallery.Identify());
+            } else if (verb == "evidence") {
+              Report(LabTruthLens.Capture(value).Summary);
             } else if (verb == "profiles") {
               Report(LabGalleryBuilder.Profiles());
             } else if (verb == "trees") {
@@ -411,6 +413,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_gallery check|build|rebuild [profile]   inspect or raise one profile");
     sb.AppendLine("  questlab_gallery compare [left] [right]   raise two profiles side by side");
     sb.AppendLine("  questlab_gallery identify|clear [profile-or-build-id]   inspect or remove marks safely");
+    sb.AppendLine("  questlab_gallery evidence [profile-or-build-id]   export read-only truth and named views");
     sb.AppendLine("  questlab_gallery trees|restore-trees [profile-or-build-id]   inspect or recover pruned trees");
     sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   bounded evidence runs");
     sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");

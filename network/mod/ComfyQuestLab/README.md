@@ -85,6 +85,7 @@ update.
 | `questlab_gallery build [profile]` | raise one marked profile; default is `marble-grand` |
 | `questlab_gallery compare [left] [right]` | raise two profiles side by side under one build id |
 | `questlab_gallery identify` | report profile/build/role marks, live roof coverage, and tree-ledger state before changing the world |
+| `questlab_gallery evidence [profile-or-build-id]` | export read-only Gallery Truth: bounds, weather exposure, fresh-prefab comparisons, fixture assertions, and named camera views |
 | `questlab_gallery clear [profile-or-build-id]` | return safely to terrain, remove only matching marked gallery objects, then restore matching ledgered trees |
 | `questlab_gallery rebuild [profile]` | safely clear and rebuild one profile at the same reusable site |
 | `questlab_gallery trees` | report pending/restored natural-tree recovery ledgers |
@@ -183,6 +184,21 @@ fireplaces stay fuelled across zone reloads, without changing any ordinary brazi
 reports whether every visible fixture body is actually below the slab; the role count alone is
 not treated as visual-placement evidence.
 
+`questlab_gallery evidence [profile-or-build-id]` is the repeatable Truth Lens pass. It writes
+`comfy-questlab-gallery-truth/v1` under
+`BepInEx/config/comfy-quest-lab/receipts/truth/` without moving the player, camera, clock,
+weather, or a single world object. Each standing profile/build records renderer-derived world
+bounds; live `RoofCheck` coverage; ceiling-brazier clearance from the overlapping roof
+underface; and up to two live-vs-fresh render-configuration samples per role/prefab group.
+Those comparisons include material illumination, snow/wet/rain surface signals, and configured
+light deltas.
+
+The same artifact plans deterministic `overview-north`, `overview-east`, `overhead`,
+`arrival-eye`, and—when a roof is loaded—`roof-underside` views for the camera proof lane. It
+can prove an intersection, exposure, or material/light delta. It cannot prove that a frame
+looks good: visible snow and final appearance remain human visual judgments. Verify a collected
+artifact with `python tools/component-packets/verify_questlab_truth.py <artifact.json>`.
+
 The default is a course rather than an empty monument. Before the ascent portal, a ground
 welcome camp puts a Birch beside its bronze axe and serves cooked meat, Queens Jam, and bread
 on real horizontal item stands atop a picnic table. Each display carries a generated, prefab-
@@ -198,7 +214,7 @@ intersect the generated platform cells plus a bounded 12 m crown margin (the com
 Meadows Beech survey is 21.5 m across). It records exact
 prefab, position, native Euler rotation, quaternion, scale, and any non-default health in a
 JSON write-ahead ledger. The ledger carries an expected record count and SHA-256 digest and is
-read back through Unity's own serializer before the first world mutation; an absent or partial
+read back through the source-shared data-contract serializer before the first world mutation; an absent or partial
 tree collection aborts the gallery build. It then retires those roots
 directly—no damage, drops, or player statistics. The welcome Birch is placed afterwards and
 remains a marked gallery object. An ordinary `clear` restores matching pending ledgers only
@@ -240,7 +256,7 @@ under `BepInEx/config/comfy-quest-lab/receipts/`.
 
 For an unattended i5 lane, [`Invoke-I5QuestLabBatch.ps1`](../../../tools/i5/Invoke-I5QuestLabBatch.ps1)
 deploys one expiring request through the SHA-verified config lane and collects its request,
-suite, and relevant-log receipts. Its ten operations, two suites, and three gallery profiles
+suite, Gallery Truth, and relevant-log receipts. Its eleven operations, two suites, and three gallery profiles
 are fixed allowlists. The request schema has no console text, key, path, or prefab field.
 
 ## Writing a quest

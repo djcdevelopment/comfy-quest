@@ -21,6 +21,7 @@ EXPECTED_OPERATIONS = {
     "gallery_build",
     "gallery_compare",
     "gallery_identify",
+    "gallery_evidence",
     "gallery_clear",
     "gallery_rebuild",
 }
@@ -133,6 +134,40 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
                 envelope = json.loads(receipts[0].read_text(encoding="utf-8"))
                 for field, value in expected.items():
                     self.assertEqual(envelope[field], value)
+
+    def test_gallery_evidence_is_read_only_and_selector_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as output_directory:
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(SCRIPT),
+                    "gallery_evidence",
+                    "-Selector",
+                    "marble-grand",
+                    "-OutputDirectory",
+                    output_directory,
+                    "-DryRun",
+                    "-Lane",
+                    "omen",
+                ],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            envelope = json.loads(next(Path(output_directory).glob("*-request.json")).read_text())
+            self.assertEqual(envelope["operation"], "gallery_evidence")
+            self.assertEqual(envelope["selector"], "marble-grand")
+            self.assertNotIn("profile", envelope)
+            self.assertNotIn("path", envelope)
+
+        self.assertIn("comfy-questlab-gallery-truth/v1", self.source)
+        self.assertIn("receipts/truth/", self.source)
 
     def test_no_generic_execution_or_keystroke_primitive_exists(self) -> None:
         for forbidden in (

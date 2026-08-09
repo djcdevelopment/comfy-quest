@@ -16,7 +16,8 @@ param(
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateSet(
         'prepare', 'run', 'reset', 'report', 'export',
-        'gallery_build', 'gallery_compare', 'gallery_identify', 'gallery_clear', 'gallery_rebuild'
+        'gallery_build', 'gallery_compare', 'gallery_identify', 'gallery_evidence',
+        'gallery_clear', 'gallery_rebuild'
     )]
     [string]$Operation,
 
@@ -87,6 +88,10 @@ switch ($Operation) {
         break
     }
     'gallery_clear' {
+        $request.selector = $Selector
+        break
+    }
+    'gallery_evidence' {
         $request.selector = $Selector
         break
     }
@@ -284,6 +289,54 @@ if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
         Write-Error "creator-events contract suite did not pass: $($suiteObject.verdict)"
         exit 1
     }
+}
+
+if (-not [string]::IsNullOrWhiteSpace([string]$receipt.evidence_path)) {
+    $evidencePathRaw = [string]$receipt.evidence_path
+    $evidencePathNormalized = $evidencePathRaw.Replace('\', '/')
+    $expectedEvidenceRoot = if ($Lane -eq 'i5') {
+        "$i5ValheimRoot/BepInEx/config/comfy-quest-lab/receipts/truth/"
+    } else {
+        ($omenValheimRoot.Replace('\', '/') + '/BepInEx/config/comfy-quest-lab/receipts/truth/')
+    }
+    if (-not $evidencePathNormalized.StartsWith(
+            $expectedEvidenceRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "truth evidence escaped the fixed receipt directory: $evidencePathRaw"
+    }
+    $evidenceLeaf = $evidencePathNormalized.Substring($expectedEvidenceRoot.Length)
+    if ($evidenceLeaf -notmatch '^[A-Za-z0-9._-]+\.json$') {
+        throw "truth evidence did not name one fixed-directory JSON file: $evidencePathRaw"
+    }
+    if ($Lane -eq 'i5') {
+        $escapedEvidencePath = $evidencePathRaw.Replace("'", "''")
+        $evidenceReadScript = @"
+`$path = '$escapedEvidencePath'
+if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding(`$false)
+[Console]::Write([System.IO.File]::ReadAllText(`$path))
+"@
+        $evidenceEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($evidenceReadScript))
+        $evidenceLines = & ssh -o BatchMode=yes -o ConnectTimeout=8 i5 `
+            "powershell.exe -NoProfile -EncodedCommand $evidenceEncoded" 2>$null
+        if ($LASTEXITCODE -ne 0) { throw 'truth evidence path was reported but could not be read' }
+        $evidenceJson = @($evidenceLines) -join [Environment]::NewLine
+    } else {
+        if (-not (Test-Path -LiteralPath $evidencePathRaw)) {
+            throw 'truth evidence path was reported but could not be read'
+        }
+        $evidenceJson = [System.IO.File]::ReadAllText($evidencePathRaw)
+    }
+    $evidenceObject = $evidenceJson | ConvertFrom-Json
+    if ($evidenceObject.schema -ne 'comfy-questlab-gallery-truth/v1') {
+        throw "unexpected truth evidence schema: $($evidenceObject.schema)"
+    }
+    $localEvidence = Join-Path $OutputDirectory "$requestId-truth.json"
+    [System.IO.File]::WriteAllText(
+        $localEvidence,
+        $evidenceJson + [Environment]::NewLine,
+        (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "truth evidence: $localEvidence"
+    Write-Host "truth verdict: $($evidenceObject.verdict)"
 }
 
 $logScript = @'

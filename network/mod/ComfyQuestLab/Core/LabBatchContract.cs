@@ -222,7 +222,8 @@ public static class LabBatchContract {
 public static class LabBatchRequestPolicy {
   public static readonly string[] Operations = {
     "prepare", "run", "reset", "report", "export",
-    "gallery_build", "gallery_compare", "gallery_identify", "gallery_clear", "gallery_rebuild",
+    "gallery_build", "gallery_compare", "gallery_identify", "gallery_evidence",
+    "gallery_clear", "gallery_rebuild",
   };
 
   public static bool Validate(
@@ -244,6 +245,16 @@ public static class LabBatchRequestPolicy {
     if (operation == "reset" || operation == "report" || operation == "export"
         || operation == "gallery_identify") {
       return NoExtras(suite, profile, compareProfile, selector, out error);
+    }
+    if (operation == "gallery_evidence") {
+      if (string.IsNullOrWhiteSpace(selector)
+          || (!string.Equals(selector, "all", StringComparison.OrdinalIgnoreCase)
+              && LabGalleryPlan.Find(selector) == null
+              && !SafeToken(selector, 80))) {
+        error = "gallery_selector_invalid";
+        return false;
+      }
+      return NoExtras(suite, profile, compareProfile, out error);
     }
     if (operation == "gallery_build" || operation == "gallery_rebuild") {
       if (string.IsNullOrWhiteSpace(profile) || LabGalleryPlan.Find(profile) == null) {

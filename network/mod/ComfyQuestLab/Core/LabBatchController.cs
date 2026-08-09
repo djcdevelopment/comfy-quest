@@ -440,6 +440,16 @@ public sealed class LabBatchController {
       WriteRequestReceipt(request, "completed", _gallery.Identify());
       return;
     }
+    if (operation == "gallery_evidence") {
+      LabTruthLens.CaptureResult result = LabTruthLens.Capture(
+          request.selector, request.request_id);
+      WriteRequestReceipt(
+          request,
+          result.Succeeded ? "completed" : "failed",
+          result.Summary,
+          result.Path);
+      return;
+    }
     if (operation == "gallery_clear") {
       if (_gallery.IsRunning || _preparing) {
         WriteRequestReceipt(request, "rejected", "gallery_or_prepare_busy");
@@ -592,7 +602,8 @@ public sealed class LabBatchController {
     }
   }
 
-  void WriteRequestReceipt(LabBatchRequest request, string state, string detail) {
+  void WriteRequestReceipt(
+      LabBatchRequest request, string state, string detail, string evidencePath = null) {
     try {
       Directory.CreateDirectory(RequestReceiptsDir);
       string path = Path.Combine(RequestReceiptsDir, request.request_id + ".json");
@@ -607,6 +618,8 @@ public sealed class LabBatchController {
       sb.AppendLine("  \"release_id\": \"" + ComfyQuestLab.ReleaseId + "\",");
       sb.AppendLine("  \"completed_utc\": \"" + NowUtc() + "\",");
       sb.AppendLine("  \"detail\": \"" + LabBatchContract.Json(detail) + "\",");
+      sb.AppendLine("  \"evidence_path\": \""
+          + LabBatchContract.Json(evidencePath ?? string.Empty) + "\",");
       string suiteReceiptPath = RequestExposesSuiteReceipt(request.operation)
           ? _lastExportPath
           : string.Empty;

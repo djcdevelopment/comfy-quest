@@ -1,6 +1,6 @@
 # Changelog
 
-**r22 Creator Foundry contract foundation.** Every safe canonical event now carries generated,
+**r22 Creator Foundry and Gallery Truth foundation.** Every safe canonical event now carries generated,
 shared creator metadata: target kind and meaning, an honest example target, meaningful
 weapon/projectile support, and the exact event-specific scalar fields a `trigger.where` may use.
 The 34-event metadata source is guarded against capability drift and expands into both the public
@@ -8,7 +8,15 @@ manifest and the Unity-free `QuestEventCatalog`. New shared `QuestAuthoring` pri
 witnessed event into a complete backward-compatible schema-1 quest view, round-trip it through
 the shipping loader, and require the shipping evaluator to match it before returning. Structured
 miss diagnostics isolate constraints through counterfactual evaluator calls rather than copying
-matcher rules. No existing quest file or evaluator behavior changes.
+matcher rules. No existing quest file or evaluator behavior changes. `questlab_gallery evidence
+[profile-or-build-id]`
+exports a read-only, machine-verifiable subject receipt: marked/loaded world bounds,
+Valheim roof protection and honest snow-risk classification, per-fixture roof-underface
+clearance, bounded fresh-prefab versus live render-configuration samples, and deterministic
+camera view plans. The existing OMEN/i5 mailbox gains only the explicit allowlisted
+`gallery_evidence` operation and retrieves the fixed-directory artifact after validating its
+path and schema. Evidence never moves the camera or world and never overrules the rendered
+frame or human visual acceptance.
 
 **r21 executable ledger serializer correction.** A one-record r20 live probe proved that
 Unity's `JsonUtility` discarded every custom record array regardless of whether its DTO was
