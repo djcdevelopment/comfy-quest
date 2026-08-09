@@ -20,6 +20,20 @@ every CSV text cell (including after leading whitespace/control characters) whil
 the sanitized literal. `questlab_archive [flush]` exposes the session,
 path, accepted/written/dropped counts, faults, and an on-demand nonblocking flush.
 
+**r24 local event portability and Google Sheets companion.** The live event view adds
+one fixed `127.0.0.1` **Exports** handoff—never a configured URL or command—and the Workbench
+package now carries the companion beside the DLL. Its dependency-free parser validates and
+combines authoritative `comfy-questlab-events/v1` JSONL parts, distinguishes clean, dropped,
+active/unclean, and retention-partial archives, detects unexplained gaps/tampering, and emits
+formula-neutralized RFC 4180 CSV. After an explicit Desktop OAuth setup, one **Create Google
+Sheet** click creates a three-tab Events/Summary/Metadata workbook, writes only RAW values in
+sub-1.5 MB batches, applies its filter/frozen headers/widths in one formatting batch, saves a
+local source-hash receipt, and opens the created file. Authorization uses the system browser,
+random loopback callback, PKCE/state, and only Google's non-sensitive per-file `drive.file`
+scope. Windows refresh tokens are DPAPI-protected under Local App Data; Disconnect attempts
+revocation and always removes the local token. Missing libraries, tenant denial, or offline
+Google never disables local JSONL/CSV.
+
 **r23 self-guided scenario and accessible demo cockpits.** The panel now exposes its `INTERACTIVE` input ownership
 instead of making cursor behavior implicit, and every important verdict carries an ASCII
 `[OK]`, `[INFO]`, `[CHECK]`, or `[PROVED]` cue in addition to color. A new **Ready?** tab

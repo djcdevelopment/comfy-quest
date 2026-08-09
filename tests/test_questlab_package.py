@@ -61,6 +61,20 @@ class QuestLabPackageTests(unittest.TestCase):
         )
         self.assertNotIn('$config = "enabled = true', source)
 
+    def test_packager_carries_the_allowlisted_local_event_companion(self) -> None:
+        source = PACKAGER.read_text(encoding="utf-8")
+        self.assertIn("$sheetsSource = Join-Path $root 'tools\\questlab-sheets'", source)
+        for filename in (
+            "questlab_sheets.py",
+            "Start-QuestLabSheets.ps1",
+            "requirements-google.txt",
+            "README.md",
+        ):
+            with self.subTest(filename=filename):
+                self.assertIn(filename, source)
+        self.assertIn("explicit file allowlist", source)
+        self.assertNotIn("Copy-Item $sheetsSource -Recurse", source)
+
     def test_release_dll_does_not_change_with_the_containing_git_commit(self) -> None:
         # SourceLink puts the repository revision into the PDB and its checksum into the
         # PE debug directory. That makes a docs-only landing change the DLL hash even when

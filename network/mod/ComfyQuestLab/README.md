@@ -75,6 +75,7 @@ update.
 | --- | --- |
 | `lab_setup` | write the starter quest, safely clear marked old builds, and raise one fresh compact practice course on the same site. Do this first. |
 | **F6** | open the console (or `questlab_panel`) |
+| **Exports** | open the fixed local event/CSV/Google Sheets companion at `127.0.0.1`; it never opens a configured or remote URL |
 | `lab_reload` | re-read your quest files and say what changed |
 | `lab_target [school]` | put a fresh practice target in front of you (default: combat) |
 | `questlab_help` | what this build can do |
@@ -200,6 +201,19 @@ schema,session_id,sequence,timestamp_utc,school,creator_event,target,detail,usab
 Use `questlab_archive` for the current path and accepted/written/dropped counts, or
 `questlab_archive flush` before opening the files in another tool. Archive policy is captured in
 the session header and therefore takes effect on the next Valheim launch after a config change.
+
+### Export dashboard and Google Sheets
+
+The live view's **Exports** button is a deliberately narrow handoff to
+`http://127.0.0.1:47631/`. Start
+[`Start-QuestLabSheets.ps1`](../../../tools/questlab-sheets/Start-QuestLabSheets.ps1)
+and the local companion discovers timestamped normalized event sessions, validates their
+multipart JSONL, and offers formula-safe CSV immediately. Google Sheets is optional: after
+one Desktop OAuth setup and one **Connect Google** consent, **Create Google Sheet** turns the
+selected session into Events, Summary, and Metadata tabs and opens the new workbook. The
+per-file `drive.file` scope cannot browse the rest of Drive; tokens stay outside BepInEx and
+the repo, protected by current-user DPAPI on Windows. See the
+[companion security/setup guide](../../../tools/questlab-sheets/README.md).
 
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Its world-action grid gives each integration one row with a colored

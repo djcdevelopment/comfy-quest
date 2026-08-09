@@ -45,6 +45,9 @@ public sealed class LabPanel {
   const float ScenarioProfileColumn = 82f;
   const float ScenarioSelectColumn = 70f;
   const float PanelScaleStep = 0.1f;
+  // Deliberately not configurable: this is a local handoff, never a remote-control or
+  // arbitrary-URL surface. The companion binds this exact IPv4 loopback address only.
+  const string SheetsExporterUrl = "http://127.0.0.1:47631/";
 
   readonly LabEventRing _ring;
   readonly HashSet<string> _visible = new HashSet<string>(LabCategory.DefaultVisible);
@@ -399,6 +402,10 @@ public sealed class LabPanel {
         GUILayout.Width(72f))) {
       _ring.Clear();
       _pausedRows.Clear();
+    }
+    if (GUILayout.Button(new GUIContent("Exports",
+        "open the optional local CSV / Google Sheets companion"), GUILayout.Width(66f))) {
+      OpenSheetsExporter();
     }
     GUILayout.EndHorizontal();
 
@@ -1462,6 +1469,15 @@ public sealed class LabPanel {
       ShowNotice("OPENED QUEST FOLDER");
     } catch (Exception ex) {
       ShowNotice("OPEN FAILED  /  " + ex.Message);
+    }
+  }
+
+  void OpenSheetsExporter() {
+    try {
+      Application.OpenURL(SheetsExporterUrl);
+      ShowNotice("OPENED LOCAL EXPORTS  /  START THE COMPANION IF THE PAGE IS OFFLINE");
+    } catch (Exception ex) {
+      ShowNotice("EXPORTS OPEN FAILED  /  " + ex.Message);
     }
   }
 

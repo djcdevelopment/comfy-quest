@@ -1,0 +1,4 @@
+# Optional. Local inspect/CSV/dashboard features use only the Python standard library.
+google-api-python-client>=2,<3
+google-auth>=2,<3
+google-auth-oauthlib>=1,<2
