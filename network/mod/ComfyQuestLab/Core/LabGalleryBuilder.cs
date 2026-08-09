@@ -484,6 +484,9 @@ public sealed class LabGalleryBuilder {
       if (!string.IsNullOrEmpty(fixture.Text)) {
         WriteSign(built, fixture.Text);
       }
+      if (!string.IsNullOrEmpty(fixture.TextGlowSchool)) {
+        GlowSignText(built, fixture.TextGlowSchool);
+      }
       if (!string.IsNullOrEmpty(fixture.LightSchool)) {
         // r5 proved that colour alone does not survive distance and mist: the long-form
         // school names were dark vertical threads over otherwise readable runes. The
@@ -1466,6 +1469,21 @@ public sealed class LabGalleryBuilder {
     }
     LabRuneLight.Mark(view.GetZDO(), school, style);
     LabRuneLight.Apply(built, school, style);
+  }
+
+  /// <summary>Persist and immediately apply an emissive school-coloured halo to a sign.
+  /// Kept separate from LightPiece so all sixty banner letters can glow without adding
+  /// sixty realtime point lights to the scene.</summary>
+  static void GlowSignText(GameObject built, string school) {
+    if (built == null || string.IsNullOrEmpty(school)) {
+      return;
+    }
+    var view = built.GetComponent<ZNetView>();
+    if (view == null || view.GetZDO() == null) {
+      return;
+    }
+    LabRuneLight.MarkTextGlow(view.GetZDO(), school);
+    LabRuneLight.ApplyTextGlow(built, school);
   }
 
   /// <summary>Make a dropped item a stack rather than a single. Best effort: if the

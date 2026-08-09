@@ -118,7 +118,7 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 5;", source)
+        self.assertIn("public const int PlanVersion = 6;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
         self.assertIn("public float PlatformClearance, GroundPortalX, GroundPortalZ;", source)
         self.assertIn("HallWidth, SpokeLength, FootprintRadius", source)
@@ -126,9 +126,11 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("public WelcomeFixture[] WelcomeFixtures;", source)
         self.assertIn("public bool AtGround;", source)
         self.assertIn("RuneNameHeaders, RuneNameSigns, RuneNameLights;", source)
+        self.assertIn("Orient, Text, LightSchool, TextGlowSchool;", source)
         self.assertEqual(source.count('Orient = "rune-name-lit"'), 16)
         self.assertEqual(source.count('Orient = "rune-name",'), 104)
         self.assertEqual(source.count('LightSchool = "combat"'), 2)
+        self.assertEqual(source.count('TextGlowSchool = "combat"'), 12)
         self.assertIn("public static Profile Find(string id)", source)
         self.assertIn("public static Monument[] Monuments", source)
 
@@ -169,6 +171,7 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn('+ " horizontal rune headers ("', source)
         self.assertIn('fixture.Orient == "rune-name-lit"', source)
         self.assertIn("LabRuneLight.BannerFaceStyle", source)
+        self.assertIn("GlowSignText(built, fixture.TextGlowSchool)", source)
         self.assertIn(
             "LightPiece(station, monument.Station.LightSchool, LabRuneLight.SignFaceStyle)",
             source,
@@ -176,6 +179,9 @@ class GalleryProfileTests(unittest.TestCase):
         light = (MOD / "Core" / "LabRuneLight.cs").read_text(encoding="utf-8")
         self.assertIn('public const string SignFaceStyle = "sign-face";', light)
         self.assertIn('public const string BannerFaceStyle = "banner-face";', light)
+        self.assertIn('public const string SignTextGlowMark = "comfyQuestLabSignTextGlow";', light)
+        self.assertIn("material.EnableKeyword(ShaderUtilities.Keyword_Glow)", light)
+        self.assertIn("colour.r * 2.2f", light)
         self.assertIn("? new Vector3(0f, 0f, -0.32f)", light)
         self.assertIn("Mathf.Min(configuredIntensity, 1.5f)", light)
         self.assertIn("Mathf.Min(configuredRange, 1.6f)", light)

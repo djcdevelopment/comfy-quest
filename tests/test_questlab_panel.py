@@ -77,7 +77,7 @@ class QuestLabPanelTests(unittest.TestCase):
             "LabRunes.For(category)",
             "LabRunes.ColorFor(category)",
             "QuestStateColor(quest.Armed)",
-            'new GUIContent(expanded ? "-" : "+"',
+            'new GUIContent(expanded ? "▲" : "▼"',
             "DrawQuestDetails(quest, eventName, target, cooldown)",
             'GUILayout.Label("verdict  /  " + quest.ArmedLine())',
             'GUILayout.Toggle(_showQuestFolder,',

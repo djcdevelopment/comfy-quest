@@ -1,5 +1,11 @@
 # Changelog
 
+**r14 presentation follow-up.** Every long-form school-banner letter now has a
+school-coloured TextMeshPro emissive halo while each word retains only one realtime point
+light. The glow persists on the sign ZDO and returns after zone reloads, improving rain and
+mist readability without paying for sixty lights. Quest-detail rows use down/up chevrons
+instead of `+`/`-`, leaving those symbols unambiguously reserved for panel zoom.
+
 ### 0.2.0 — 2026-08-08
 
 **Creator-event expansion.** The initial lab is now a release-cut, self-service package:

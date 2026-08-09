@@ -594,7 +594,7 @@ public sealed class LabPanel {
     GridCell(new GUIContent("EVENT -> TARGET"), _gridHeaderStyle, QuestTriggerColumn);
     GridCell(new GUIContent("STATE"), _gridHeaderStyle, QuestStateColumn);
     GridCell(new GUIContent("FIRES"), _gridHeaderStyle, QuestFiresColumn);
-    GridCell(new GUIContent("MORE", "expand one quest's diagnostics"), _gridHeaderStyle,
+    GridCell(new GUIContent("DETAIL", "open one quest's diagnostics"), _gridHeaderStyle,
         QuestExpandColumn);
     GUILayout.EndHorizontal();
   }
@@ -656,7 +656,7 @@ public sealed class LabPanel {
         : "since the last reload";
     GridCell(new GUIContent(quest.IsArmed ? quest.Fires.ToString() : "-", fireTip),
         style, QuestFiresColumn);
-    if (GUILayout.Button(new GUIContent(expanded ? "-" : "+",
+    if (GUILayout.Button(new GUIContent(expanded ? "▲" : "▼",
         expanded ? "collapse details" : "show source, verdict, cooldown, and advice"),
         GUILayout.Width(QuestExpandColumn),
         GUILayout.Height(28f))) {

@@ -601,12 +601,23 @@ def rune_name_signs(spec: dict, monuments: list[dict]):
                     orient="rune-name-lit" if index == lit_index else "rune-name",
                     text=rune_letter_text(monument["category"], letter),
                     light_school=monument["category"].lower() if index == lit_index else "",
+                    text_glow_school=monument["category"].lower(),
                 )
             )
     return signs
 
 
-def fixture(prefab, x, y, z, yaw, orient="", text="", light_school=""):
+def fixture(
+    prefab,
+    x,
+    y,
+    z,
+    yaw,
+    orient="",
+    text="",
+    light_school="",
+    text_glow_school="",
+):
     return {
         "prefab": prefab,
         "x": round(x, 3),
@@ -616,6 +627,7 @@ def fixture(prefab, x, y, z, yaw, orient="", text="", light_school=""):
         "orient": orient,
         "text": text,
         "lightSchool": light_school,
+        "textGlowSchool": text_glow_school,
     }
 
 
@@ -799,7 +811,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "",
         "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
         "public static class LabGalleryPlan {",
-        "  public const int PlanVersion = 5;",
+        "  public const int PlanVersion = 6;",
         f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
         "",
         "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",
@@ -814,7 +826,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "                                 public float X, Y, Z, Yaw; }",
         "  public struct Tile { public float X, Z; public string Prefab; }",
         "  public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;",
-        "                          public string Orient, Text, LightSchool; }",
+        "                          public string Orient, Text, LightSchool, TextGlowSchool; }",
         "",
         "  public sealed class Profile {",
         "    public string Id, Name, Description;",
@@ -894,11 +906,16 @@ def render_csharp(profiles: list[dict]) -> str:
                 if item["lightSchool"]
                 else ""
             )
+            text_glow = (
+                f", TextGlowSchool = {cs(item['textGlowSchool'])}"
+                if item["textGlowSchool"]
+                else ""
+            )
             lines.append(
                 "        new Fixture { "
                 f"Prefab = {cs(item['prefab'])}, X = {f(item['x'])}, Y = {f(item['y'])}, "
                 f"Z = {f(item['z'])}, Yaw = {f(item['yaw'])}, "
-                f"Orient = {cs(item['orient'])}, Text = {cs(item['text'])}{light} }},"
+                f"Orient = {cs(item['orient'])}, Text = {cs(item['text'])}{light}{text_glow} }},"
             )
         lines.extend(["      },", "      CourseDrops = new[] {"])
         for item in profile["courseDrops"]:

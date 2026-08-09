@@ -7,6 +7,8 @@ using BepInEx.Configuration;
 
 using HarmonyLib;
 
+using TMPro;
+
 using UnityEngine;
 
 /// <summary>Light the monuments and their long-form school headers.
@@ -34,6 +36,7 @@ public static class LabRuneLight {
   /// the value is the school, so the colour survives a reload without a lookup table.</summary>
   public const string RuneLightMark = "comfyQuestLabRuneLight";
   public const string RuneLightStyleMark = "comfyQuestLabRuneLightStyle";
+  public const string SignTextGlowMark = "comfyQuestLabSignTextGlow";
   public const string SignFaceStyle = "sign-face";
   public const string BannerFaceStyle = "banner-face";
 
@@ -115,12 +118,20 @@ public static class LabRuneLight {
         if (zdo == null) {
           continue;
         }
-        string school = SchoolOf(zdo);
-        if (school.Length == 0) {
-          continue;
+        bool changed = false;
+        string glowSchool = TextGlowSchoolOf(zdo);
+        if (glowSchool.Length > 0) {
+          ApplyTextGlow(wear.gameObject, glowSchool);
+          changed = true;
         }
-        Apply(wear.gameObject, school, StyleOf(zdo));
-        touched++;
+        string school = SchoolOf(zdo);
+        if (school.Length > 0) {
+          Apply(wear.gameObject, school, StyleOf(zdo));
+          changed = true;
+        }
+        if (changed) {
+          touched++;
+        }
       }
     } catch (Exception) {
       // Cosmetic. A lamp that will not retune is not worth interrupting anything for.
@@ -186,6 +197,20 @@ public static class LabRuneLight {
     }
   }
 
+  /// <summary>Mark a sign whose glyph material should carry a school-coloured halo.
+  /// This is deliberately not RuneLightMark: a whole banner may glow while only its
+  /// centre letter owns the single realtime point light.</summary>
+  public static void MarkTextGlow(ZDO zdo, string school) {
+    if (zdo == null || string.IsNullOrEmpty(school)) {
+      return;
+    }
+    try {
+      zdo.Set(SignTextGlowMark, school);
+    } catch (Exception) {
+      // Readability polish must never turn a successful gallery build into a failure.
+    }
+  }
+
   public static string SchoolOf(ZDO zdo) {
     if (zdo == null) {
       return string.Empty;
@@ -205,6 +230,58 @@ public static class LabRuneLight {
       return zdo.GetString(RuneLightStyleMark, string.Empty);
     } catch (Exception) {
       return string.Empty;
+    }
+  }
+
+  public static string TextGlowSchoolOf(ZDO zdo) {
+    if (zdo == null) {
+      return string.Empty;
+    }
+    try {
+      return zdo.GetString(SignTextGlowMark, string.Empty);
+    } catch (Exception) {
+      return string.Empty;
+    }
+  }
+
+  /// <summary>Give one sign's TextMeshPro material a compact HDR halo. Each widget gets
+  /// its own material instance, so school colour cannot leak into ordinary signs or the
+  /// neighbouring letters. The glow shader expands the glyph itself; unlike a point
+  /// light, it remains readable through rain and mist without illuminating the floor.</summary>
+  public static void ApplyTextGlow(GameObject host, string school) {
+    if (host == null || string.IsNullOrEmpty(school)) {
+      return;
+    }
+    try {
+      Sign sign = host.GetComponent<Sign>();
+      TextMeshProUGUI widget = sign == null ? null : sign.m_textWidget;
+      if (widget == null) {
+        return;
+      }
+      Material material = widget.fontMaterial;
+      if (material == null || !material.HasProperty(ShaderUtilities.ID_GlowColor)) {
+        return;
+      }
+
+      bool enabled = Enabled == null || Enabled.Value;
+      if (!enabled) {
+        material.DisableKeyword(ShaderUtilities.Keyword_Glow);
+      } else {
+        Color colour = ColourFor(school);
+        // Values above one are intentional: bloom sees the letters as emissive while
+        // the tight shader halo keeps their school colour and does not wash the marble.
+        Color glow = new Color(colour.r * 2.2f, colour.g * 2.2f, colour.b * 2.2f, 0.9f);
+        material.EnableKeyword(ShaderUtilities.Keyword_Glow);
+        material.SetColor(ShaderUtilities.ID_GlowColor, glow);
+        material.SetFloat(ShaderUtilities.ID_GlowOffset, 0f);
+        material.SetFloat(ShaderUtilities.ID_GlowInner, 0.02f);
+        material.SetFloat(ShaderUtilities.ID_GlowOuter, 0.22f);
+        material.SetFloat(ShaderUtilities.ID_GlowPower, 0.55f);
+      }
+      widget.UpdateMeshPadding();
+      widget.SetMaterialDirty();
+    } catch (Exception) {
+      // Cosmetic and client-local, exactly like the nearby point-light treatment.
     }
   }
 
@@ -305,6 +382,10 @@ public static class RuneLightPatches {
       ZDO zdo = view.GetZDO();
       if (zdo == null) {
         return;
+      }
+      string glowSchool = LabRuneLight.TextGlowSchoolOf(zdo);
+      if (glowSchool.Length > 0) {
+        LabRuneLight.ApplyTextGlow(__instance.gameObject, glowSchool);
       }
       string school = LabRuneLight.SchoolOf(zdo);
       if (school.Length == 0) {
