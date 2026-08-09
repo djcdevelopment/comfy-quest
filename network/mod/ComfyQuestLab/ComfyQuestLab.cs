@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260808-r17";
+  public const string ReleaseId = "questlab-v0.2.0-20260809-r18";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -285,7 +285,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       // when somebody types one of these. check first, always.
       new Terminal.ConsoleCommand("questlab_gallery",
           "manage Gallery v2: questlab_gallery "
-          + "<profiles|check|build|compare|identify|clear|rebuild> [profile-or-build-id]",
+          + "<profiles|check|build|compare|identify|clear|rebuild|trees|restore-trees> "
+          + "[profile-or-build-id]",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "check";
             string value = args.Length >= 3 ? args[2] : null;
@@ -302,6 +303,17 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
               Report(_gallery.Identify());
             } else if (verb == "profiles") {
               Report(LabGalleryBuilder.Profiles());
+            } else if (verb == "trees") {
+              Report(LabTreeRecovery.Status());
+            } else if (verb == "restore-trees") {
+              string selector = value ?? "all";
+              if (_gallery.StandingPieceCount(selector) > 0) {
+                Report("tree restore stopped safely: matching gallery pieces are still "
+                    + "standing. Use questlab_gallery clear " + selector + " instead; "
+                    + "clear restores the matching ledger after the structure is gone.");
+              } else {
+                Report(LabTreeRecovery.Restore(selector));
+              }
             } else {
               Report(_gallery.Check(value));
             }
@@ -399,6 +411,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_gallery check|build|rebuild [profile]   inspect or raise one profile");
     sb.AppendLine("  questlab_gallery compare [left] [right]   raise two profiles side by side");
     sb.AppendLine("  questlab_gallery identify|clear [profile-or-build-id]   inspect or remove marks safely");
+    sb.AppendLine("  questlab_gallery trees|restore-trees [profile-or-build-id]   inspect or recover pruned trees");
     sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   bounded evidence runs");
     sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");
     sb.AppendLine("  questlab_prefabs <name> | inspect <exact-name> | dump   search or inspect rendered state");

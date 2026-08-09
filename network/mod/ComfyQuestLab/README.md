@@ -37,8 +37,9 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r13 changes presentation and course layout, so those same suites must
-> be re-witnessed against the exact r13 DLL before the release cut is final. This README
+> 34/34 creator events. r18 changes the selected court's elevation, tree lifecycle, roof,
+> and ambience, so those same suites must be re-witnessed against the exact r18 DLL before
+> the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
 ## Why this exists
@@ -82,9 +83,11 @@ update.
 | `questlab_gallery check [profile]` | resolve every prefab without placing anything |
 | `questlab_gallery build [profile]` | raise one marked profile; default is `marble-grand` |
 | `questlab_gallery compare [left] [right]` | raise two profiles side by side under one build id |
-| `questlab_gallery identify` | report loaded profile and build marks before changing the world |
-| `questlab_gallery clear [profile-or-build-id]` | return safely to the terrain below, then remove only matching marked gallery objects |
+| `questlab_gallery identify` | report profile/build/role marks, live roof coverage, and tree-ledger state before changing the world |
+| `questlab_gallery clear [profile-or-build-id]` | return safely to terrain, remove only matching marked gallery objects, then restore matching ledgered trees |
 | `questlab_gallery rebuild [profile]` | safely clear and rebuild one profile at the same reusable site |
+| `questlab_gallery trees` | report pending/restored natural-tree recovery ledgers |
+| `questlab_gallery restore-trees [profile-or-build-id]` | restore a pending ledger only after matching gallery pieces are gone |
 | `questlab_prefabs inspect <exact-name>` | compare startup prefab, current prefab, and loaded-instance renderer state; export material, emission, property-block, GI, and light evidence as JSON |
 | `questlab_batch suites` | list the two bounded evidence classes |
 | `questlab_batch prepare all-schools` | write eight ordinary example quests, safely reset the marked site, and raise one fresh compact course with targets and supplies at point of use |
@@ -104,8 +107,8 @@ tune the same grid independently.
 
 The **Quests** tab is a compact dashboard rather than a prose dump. Its fixed columns show
 the colored school rune, quest name, creator event and target, armed state, and fire count.
-Use the row's **+** only when you need its source file, evaluator explanation, cooldown, or
-advisories; load errors are collapsed separately.
+Use the row's **down chevron** only when you need its source file, evaluator explanation,
+cooldown, or advisories; the up chevron collapses it and load errors are grouped separately.
 
 Hovering any clipped grid cell writes its full meaning into the help bar at the bottom of the
 window. Blue bindable-event cells are buttons: click one to copy the exact `trigger.event` ID
@@ -162,10 +165,17 @@ Gallery geometry is generated from the same eight rune definitions used by the p
 `classic` keeps the prior mixed-material shape as a comparison baseline. `marble-wide`
 has a solid black-marble floor, 8 m halls, larger runes, 1.5 m terrain clearance, and
 about 2,291 placed objects. The selected `marble-grand` direction is the default: it keeps
-10 m halls, 32 m clearance over the highest sampled ground, monumental runes, and horizontal
-school-name headers built from individually readable letters with one coloured light per
-word, but compresses each hub-to-station walk from 37 m to 9 m. Its 1,353 marked objects fit
-within a 48 m footprint.
+10 m halls, monumental runes, and horizontal school-name headers built from individually
+readable glowing letters, but compresses each hub-to-station walk from 37 m to 9 m. Its
+1,912 marked objects fit within a 48 m footprint.
+
+The grand floor now sits 6 m above the highest sampled terrain, below the altitude where the
+r17 live comparison showed Valheim coating every upward-facing slab and station in snow. A
+generated 550-slab black-marble canopy copies the hub, hall, and station-pad floor cells at an
+8 m ceiling height. Valheim's own roof check treats those non-leaky piece colliders as real
+cover; the 17 m rune stages stay open to the sky. One real ceiling brazier hangs at the hub and
+one halfway down each spoke. Their narrowly marked vanilla fireplaces stay fuelled across zone
+reloads, without changing any ordinary brazier in the world.
 
 The default is a course rather than an empty monument. Before the ascent portal, a ground
 welcome camp puts a Birch beside its bronze axe and serves cooked meat, Queens Jam, and bread
@@ -175,8 +185,18 @@ build. Combat leaves a bow and 100 wood arrows
 on the player's side with its Greyling at the rune. Building pairs its hammer and wood,
 Crafting puts coal directly in front of the smelter, and Social raises its illuminated
 `sign here` sign on a two-metre post in the hub. Every consumable is recreated by `lab_setup`
-or batch `prepare`, so a creator never needs prior inventory or a scavenger hunt. The 32 m
-lift clears the measured 30.5 m Meadows beech canopy without deleting natural world trees.
+or batch `prepare`, so a creator never needs prior inventory or a scavenger hunt.
+
+Before placing anything, the grand profile scans only loaded `TreeBase` roots whose trunks
+intersect the generated platform cells plus a bounded 12 m crown margin (the committed
+Meadows Beech survey is 21.5 m across). It records exact
+prefab, position, rotation, scale, and any non-default health in a JSON write-ahead ledger,
+then retires those roots
+directly—no damage, drops, or player statistics. The welcome Birch is placed afterwards and
+remains a marked gallery object. An ordinary `clear` restores matching pending ledgers only
+after every selected gallery mark is gone; setup/rebuild preserve the ledger while refreshing
+the course. `trees` reports recovery state, and `restore-trees` refuses to run through a
+standing matching gallery.
 
 Every object carries the plan version, profile id, and build id in its own ZDO. `identify`
 reads those durable marks from the locally known ZDO table; `clear` accepts either a profile or
@@ -184,7 +204,9 @@ one comparison build id and refuses to touch anything unmarked. A comparison giv
 sides one shared build id, so it can come down in one bounded operation. If the local player
 is standing on the selected raised floor, `clear` first uses Valheim's replicated teleport to
 return them to the natural terrain at the same X/Z; deletion starts only after that target is
-verified. `rebuild` inherits the same lifecycle, allowing one patch of ground to be reused.
+verified. Once deletion settles, ordinary clear restores any selected tree ledger. `rebuild`
+inherits the safe movement/deletion lifecycle but intentionally keeps the ledger active while
+the replacement occupies the site, allowing one patch of ground to be reused.
 `lab_setup` and `questlab_batch prepare all-schools` apply that lifecycle to selector `all`
 before every build, so old comparisons, spent targets, and abandoned drops cannot leak into
 the next test.

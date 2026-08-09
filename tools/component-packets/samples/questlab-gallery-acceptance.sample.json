@@ -6,8 +6,12 @@
   "comparison_request_id": "",
   "observations": {
     "solid_marble_floor": false,
+    "marble_floor_not_snow_coated": false,
     "scale_acceptable": false,
     "hall_width_acceptable": false,
+    "roof_canopy_acceptable": false,
+    "hanging_braziers_acceptable": false,
+    "natural_tree_clearance_acceptable": false,
     "runes_acceptable": false,
     "rune_banners_acceptable": false,
     "sign_lighting_acceptable": false,

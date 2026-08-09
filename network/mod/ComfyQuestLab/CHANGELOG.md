@@ -1,5 +1,16 @@
 # Changelog
 
+**r18 sheltered-court correction.** The r17 renderer receipt proved the shared
+`blackmarble_floor` material was non-emissive; the live white floor and matching white
+smelter were Valheim's altitude snow treatment on the 32 m deck. `marble-grand` now sits
+6 m above sampled terrain and recoverably prunes only loaded natural `TreeBase` roots
+intersecting its generated footprint. A JSON write-ahead ledger precedes every removal;
+ordinary clear restores the matching trees only after all selected gallery marks are gone,
+while setup/rebuild retain the ledger under the replacement. The generated court copies
+550 hub/hall/pad floor cells into a real 8 m black-marble roof, leaves the tall rune stages
+open, and hangs nine persistent vanilla ceiling braziers. Plan v7, profile JSON, counts,
+previews, console help, drift tests, and release identity move together.
+
 **r17 rendered-state observability.** `questlab_prefabs inspect <exact-name>` now
 records the renderer state Valheim is actually using rather than inferring appearance
 from placement code. It snapshots candidate surface materials when `ZNetScene` starts,

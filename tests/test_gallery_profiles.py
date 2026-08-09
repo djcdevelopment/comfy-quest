@@ -17,6 +17,7 @@ SUMMARY = TOOLS / "samples" / "gallery-profiles.json"
 GENERATOR = TOOLS / "generate_gallery.py"
 PLAN = MOD / "Core" / "LabGalleryPlan.g.cs"
 BUILDER = MOD / "Core" / "LabGalleryBuilder.cs"
+TREE_RECOVERY = MOD / "Core" / "LabTreeRecovery.cs"
 CONTROLLER = MOD / "Core" / "LabBatchController.cs"
 PLUGIN = MOD / "ComfyQuestLab.cs"
 
@@ -63,8 +64,13 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertLessEqual(grand["spokeLength"], 37.0 / 4.0)
         self.assertLess(grand["footprintRadius"], classic["footprintRadius"])
         self.assertLess(classic["platformClearance"], wide["platformClearance"])
-        self.assertLess(wide["platformClearance"], grand["platformClearance"])
-        self.assertEqual(grand["platformClearance"], 32.0)
+        self.assertEqual(grand["platformClearance"], 6.0)
+        self.assertTrue(grand["pruneNaturalTrees"])
+        self.assertEqual(grand["roofClearance"], 8.0)
+        self.assertEqual(grand["roofMaterials"], ["blackmarble_floor"])
+        self.assertGreater(grand["counts"]["roofTiles"], 0)
+        self.assertLess(grand["counts"]["roofTiles"], grand["counts"]["floorTiles"])
+        self.assertEqual(grand["counts"]["ceilingFixtures"], 9)
         self.assertEqual((grand["groundPortalX"], grand["groundPortalZ"]), (8.0, 0.0))
 
     def test_v2_profiles_have_one_horizontal_header_per_rune(self) -> None:
@@ -108,6 +114,8 @@ class GalleryProfileTests(unittest.TestCase):
             counts = profile["counts"]
             expected = (
                 counts["floorTiles"]
+                + counts["roofTiles"]
+                + counts["ceilingFixtures"]
                 + counts["fixtures"]
                 + counts["runeBeams"]
                 + counts["courseDrops"]
@@ -118,12 +126,18 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 6;", source)
+        self.assertIn("public const int PlanVersion = 7;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
-        self.assertIn("public float PlatformClearance, GroundPortalX, GroundPortalZ;", source)
+        self.assertIn(
+            "public float PlatformClearance, RoofClearance, GroundPortalX, GroundPortalZ;",
+            source,
+        )
         self.assertIn("HallWidth, SpokeLength, FootprintRadius", source)
         self.assertIn("public CourseDrop[] CourseDrops;", source)
         self.assertIn("public WelcomeFixture[] WelcomeFixtures;", source)
+        self.assertIn("public Tile[] RoofTiles;", source)
+        self.assertIn("public CeilingFixture[] CeilingFixtures;", source)
+        self.assertIn("public bool SolidMarbleFloor, PruneNaturalTrees;", source)
         self.assertIn("public bool AtGround;", source)
         self.assertIn("RuneNameHeaders, RuneNameSigns, RuneNameLights;", source)
         self.assertIn("Orient, Text, LightSchool, TextGlowSchool;", source)
@@ -162,11 +176,13 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("AttachDisplayItem(built, fixture.AttachedItem)", builder)
         self.assertIn("SetStack(drop, item.Stack)", builder)
         self.assertEqual(self.profiles["marble-grand"]["counts"]["welcomeFixtures"], 6)
-        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1353)
+        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1912)
 
     def test_runtime_reports_clearance_and_horizontal_headers(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")
         self.assertIn('Append(" m terrain clearance, ")', source)
+        self.assertIn('profile.RoofTiles.Length + " roof tiles, "', source)
+        self.assertIn('profile.CeilingFixtures.Length + " hanging fixtures, "', source)
         self.assertIn('Append(" m hub-to-station walks, ")', source)
         self.assertIn('+ " horizontal rune headers ("', source)
         self.assertIn('fixture.Orient == "rune-name-lit"', source)
@@ -192,6 +208,50 @@ class GalleryProfileTests(unittest.TestCase):
         )
         self.assertNotIn("Mathf.Min(configuredRange, 1.6f)", light)
         self.assertIn("Mathf.Min(configuredRange, 5.5f)", light)
+
+    def test_roof_is_real_marked_geometry_with_durable_braziers(self) -> None:
+        builder = BUILDER.read_text(encoding="utf-8")
+        structure = (MOD / "Patches" / "GalleryStructurePatches.cs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("foreach (LabGalleryPlan.Tile tile in profile.RoofTiles)", builder)
+        self.assertIn("floorY + profile.RoofClearance + BaseLift(tile.Prefab)", builder)
+        self.assertIn('Quaternion.identity, "floor"', builder)
+        self.assertIn('Quaternion.identity, "roof"', builder)
+        self.assertIn('"ceiling-brazier"', builder)
+        self.assertIn('GalleryRoleMark = "comfyQuestLabGalleryRole"', builder)
+        self.assertIn("WearNTear.RoofCheck", builder)
+        self.assertIn('AppendLine(" loaded marked floor slabs have a non-leaky piece above them.")', builder)
+        self.assertIn(
+            "foreach (LabGalleryPlan.CeilingFixture fixture in profile.CeilingFixtures)",
+            builder,
+        )
+        self.assertIn("GalleryStructurePatches.MarkAndLight", builder)
+        self.assertIn('InfiniteBrazierMark = "comfyQuestLabInfiniteBrazier"', structure)
+        self.assertIn("fireplace.m_infiniteFuel = true", structure)
+        self.assertIn("typeof(Fireplace)", structure)
+
+    def test_tree_pruning_is_write_ahead_bounded_and_recoverable(self) -> None:
+        source = TREE_RECOVERY.read_text(encoding="utf-8")
+        builder = BUILDER.read_text(encoding="utf-8")
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        write = source.index("WriteLedger(path, ledger); // Write before")
+        destroy = source.index("view.Destroy();")
+        self.assertLess(write, destroy)
+        self.assertIn("FindObjectsByType<TreeBase>", source)
+        self.assertIn("InsideFootprint(profile, origin", source)
+        self.assertIn("const float CanopyMargin = 12f", source)
+        self.assertIn("prefab.GetComponent<TreeBase>() == null", source)
+        self.assertIn("LabGalleryBuilder.IsGalleryPiece(zdo)", source)
+        self.assertNotIn("Damage(", source)
+        self.assertIn("AlreadyPresent(existing, record)", source)
+        self.assertIn("string ledgerId = NextLedgerId(buildId)", source)
+        self.assertIn("File.Replace(temporary, path, null)", source)
+        self.assertIn("File.Move(temporary, path)", source)
+        self.assertIn("LabTreeRecovery.Prune(profile, origin, _activeBuildId)", builder)
+        self.assertIn("LabTreeRecovery.Restore(selector)", builder)
+        self.assertIn('verb == "restore-trees"', plugin)
+        self.assertIn("StandingPieceCount(selector) > 0", plugin)
 
     def test_mounted_welcome_food_is_real_and_does_not_litter_on_clear(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")
@@ -275,7 +335,7 @@ class GalleryProfileTests(unittest.TestCase):
         controller = CONTROLLER.read_text(encoding="utf-8")
         plugin = PLUGIN.read_text(encoding="utf-8")
         self.assertIn("public IEnumerator ResetSite", builder)
-        self.assertIn('IEnumerator clear = ClearSafely("all")', builder)
+        self.assertIn('IEnumerator clear = ClearSafely("all", false)', builder)
         self.assertIn("_gallery.ResetSite(host, LabGalleryPlan.DefaultProfileId)", controller)
         self.assertIn("_gallery.ResetSite(this, LabGalleryPlan.DefaultProfileId)", plugin)
         self.assertNotIn("PrepareBatchTargets", controller)

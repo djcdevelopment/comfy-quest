@@ -148,15 +148,24 @@ PROFILE_SPECS = [
     {
         "id": "marble-grand",
         "name": "Marble grand",
-        "description": "Selected compact court: a ground welcome camp, 10 m halls with quarter-length walks, and a canopy-clear all-marble deck.",
+        "description": "Selected compact court: a ground welcome camp, 10 m quarter-length halls, and a sheltered marble canopy with hanging braziers.",
         "ring_radius": 27.0,
         "rune_width": 14.0,
         "rune_height": 17.0,
         "rune_base_y": 1.0,
-        # The committed prefab survey measures a Meadows Beech1 at 30.46 m tall. The
-        # gallery is reversible, so clear the canopy by elevation instead of deleting
-        # unmarked natural trees from a creator's world.
-        "platform_clearance": 32.0,
+        # r17 proved the 32 m canopy-clear deck crossed Valheim's altitude-driven snow
+        # treatment: every upward face went white while the same shared material stayed
+        # non-emissive. Keep the court modestly above terrain instead and recoverably
+        # prune TreeBase instances from its generated footprint before placing anything.
+        "platform_clearance": 6.0,
+        "prune_natural_trees": True,
+        # A black-marble floor slab is already a valid Valheim roof: roof checks raycast
+        # against any non-leaky piece collider. Copy the hub/hall/pad floor cells at an
+        # 8 m ceiling height; leave the rune stages open because their glyphs reach 17 m.
+        "roof_clearance": 8.0,
+        "roof_material": "blackmarble_floor",
+        "roof_kinds": ("plaza", "hall", "pad"),
+        "ceiling_braziers": True,
         "rune_name_headers": True,
         "compact_course": True,
         "ground_portal": (8.0, 0.0),
@@ -190,6 +199,7 @@ WALL_INSET = 0.5
 WALL_YAW_OFFSET = 90.0
 FIXED_PLACED_OBJECTS = 11  # 3 portals + 8 school stations
 PICNIC_TABLE_TOP = 0.84  # piece_table is 0.83332 m tall in the committed prefab dump
+CEILING_BRAZIER = "piece_brazierceiling01"
 
 
 def read_rune_segments(path: Path) -> dict[str, list[tuple[float, float, float, float]]]:
@@ -484,6 +494,54 @@ def platform_tiles(spec: dict, monuments: list[dict]):
     ]
 
 
+def roof_tiles(spec: dict, tiles: list[dict]):
+    """Clone selected floor cells into a level, collider-backed stone canopy."""
+
+    material = spec.get("roof_material")
+    kinds = set(spec.get("roof_kinds", ()))
+    if not material or not kinds:
+        return []
+    return [
+        {"x": tile["x"], "z": tile["z"], "kind": tile["kind"], "prefab": material}
+        for tile in tiles
+        if tile["kind"] in kinds
+    ]
+
+
+def ceiling_fixtures(spec: dict, monuments: list[dict]):
+    """One real hanging brazier at the hub and one midway down each roofed hall."""
+
+    if not spec.get("ceiling_braziers"):
+        return []
+    inner_end = spec["ring_radius"] - spec["pad_depth"] / 2.0
+    # Keep the flame beyond the letter banner at 55% of the throat; the first draft put
+    # both at the same X/Z and would have hung a brazier through the readable word.
+    along = spec["plaza_radius"] + (inner_end - spec["plaza_radius"]) * 0.82
+    fixtures = [
+        {
+            "prefab": CEILING_BRAZIER,
+            "x": 0.0,
+            "y": spec["roof_clearance"],
+            "z": 0.0,
+            "yaw": 0.0,
+            "infiniteFuel": True,
+        }
+    ]
+    for monument in monuments:
+        angle = math.radians(monument["angle"])
+        fixtures.append(
+            {
+                "prefab": CEILING_BRAZIER,
+                "x": round(math.sin(angle) * along, 3),
+                "y": spec["roof_clearance"],
+                "z": round(math.cos(angle) * along, 3),
+                "yaw": round(monument["angle"], 3),
+                "infiniteFuel": True,
+            }
+        )
+    return fixtures
+
+
 def backdrop_panels(spec: dict, monuments: list[dict]):
     panels = []
     back_along = spec["ring_radius"] + spec["rune_gap"] + spec["stage_depth"]
@@ -634,6 +692,8 @@ def fixture(
 def build_profile(spec: dict, segments: dict):
     monuments = build_monuments(spec, segments)
     tiles = platform_tiles(spec, monuments)
+    canopy = roof_tiles(spec, tiles)
+    hanging = ceiling_fixtures(spec, monuments)
     fixtures = (
         hall_walls(spec, monuments)
         + backdrop_panels(spec, monuments)
@@ -672,6 +732,9 @@ def build_profile(spec: dict, segments: dict):
         "ringRadius": spec["ring_radius"],
         "runeHeight": spec["rune_height"],
         "platformClearance": spec["platform_clearance"],
+        "pruneNaturalTrees": bool(spec.get("prune_natural_trees")),
+        "roofClearance": spec.get("roof_clearance", 0.0),
+        "roofMaterials": sorted({tile["prefab"] for tile in canopy}),
         "groundPortalX": ground_portal_x,
         "groundPortalZ": ground_portal_z,
         "welcomeAnchorX": welcome_x,
@@ -686,11 +749,15 @@ def build_profile(spec: dict, segments: dict):
         "footprintRadius": footprint,
         "monuments": monuments,
         "tiles": tiles,
+        "roofTiles": canopy,
+        "ceilingFixtures": hanging,
         "fixtures": fixtures,
         "courseDrops": course_drops,
         "welcomeFixtures": welcome_fixtures,
         "counts": {
             "floorTiles": len(tiles),
+            "roofTiles": len(canopy),
+            "ceilingFixtures": len(hanging),
             "fixtures": len(fixtures),
             "runeBeams": beam_count,
             "runeNameHeaders": len(ORDER) if spec["rune_name_headers"] else 0,
@@ -702,6 +769,8 @@ def build_profile(spec: dict, segments: dict):
             "welcomeFixtures": len(welcome_fixtures),
             "estimatedPlacedObjects": (
                 len(tiles)
+                + len(canopy)
+                + len(hanging)
                 + len(fixtures)
                 + beam_count
                 + len(course_drops)
@@ -719,7 +788,9 @@ def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
     wanted.update(prefab for prefab, _, _ in STATIONS.values())
     for profile in profiles:
         wanted.update(profile["floorMaterials"])
+        wanted.update(profile["roofMaterials"])
         wanted.update(item["prefab"] for item in profile["fixtures"])
+        wanted.update(item["prefab"] for item in profile["ceilingFixtures"])
         wanted.update(item["prefab"] for item in profile["courseDrops"])
         wanted.update(item["prefab"] for item in profile["welcomeFixtures"])
         wanted.update(
@@ -733,7 +804,7 @@ def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
         raise SystemExit("gallery prefab(s) absent from dump: " + ", ".join(missing))
 
     for profile in profiles:
-        for floor in profile["floorMaterials"]:
+        for floor in sorted(set(profile["floorMaterials"] + profile["roofMaterials"])):
             snaps = entries[floor].get("snapPoints") or []
             if not snaps:
                 raise SystemExit(f"{floor} has no snap points; floor span is unverified")
@@ -753,8 +824,27 @@ def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
         if profile["id"] != "classic" and profile["hallWidth"] <= 4.0:
             raise SystemExit(f"v2 profile {profile['id']} did not widen the classic halls")
         if profile["id"] == DEFAULT_PROFILE:
-            if profile["platformClearance"] < 31.0:
-                raise SystemExit("selected gallery does not clear the measured Meadows canopy")
+            if not 5.0 <= profile["platformClearance"] <= 8.0:
+                raise SystemExit("selected gallery clearance must stay below the witnessed snow line")
+            if not profile["pruneNaturalTrees"]:
+                raise SystemExit("selected low gallery does not recoverably prune natural trees")
+            if profile["roofClearance"] < profile["runeHeight"] * 0.4:
+                raise SystemExit("selected gallery roof is too low for its hall banners")
+            if profile["roofMaterials"] != ["blackmarble_floor"]:
+                raise SystemExit("selected gallery roof is not cloned black marble")
+            if profile["counts"]["roofTiles"] <= 0:
+                raise SystemExit("selected gallery has no generated roof cells")
+            if profile["counts"]["ceilingFixtures"] != len(ORDER) + 1:
+                raise SystemExit("selected gallery needs one hub and eight hall braziers")
+            if any(tile["kind"] == "stage" for tile in profile["roofTiles"]):
+                raise SystemExit("selected gallery roof blocks an open rune stage")
+            for fixture in profile["ceilingFixtures"]:
+                if not any(
+                    abs(fixture["x"] - tile["x"]) <= 1.01
+                    and abs(fixture["z"] - tile["z"]) <= 1.01
+                    for tile in profile["roofTiles"]
+                ):
+                    raise SystemExit("selected gallery has a hanging brazier without roof")
             attached = {
                 item["attachedItem"].split("|", 1)[0]
                 for item in profile["welcomeFixtures"]
@@ -811,7 +901,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "",
         "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
         "public static class LabGalleryPlan {",
-        "  public const int PlanVersion = 6;",
+        "  public const int PlanVersion = 7;",
         f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
         "",
         "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",
@@ -825,19 +915,23 @@ def render_csharp(profiles: list[dict]) -> str:
         "  public struct WelcomeFixture { public string Prefab, AttachedItem, Note;",
         "                                 public float X, Y, Z, Yaw; }",
         "  public struct Tile { public float X, Z; public string Prefab; }",
+        "  public struct CeilingFixture { public string Prefab; public float X, Y, Z, Yaw;",
+        "                                 public bool InfiniteFuel; }",
         "  public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;",
         "                          public string Orient, Text, LightSchool, TextGlowSchool; }",
         "",
         "  public sealed class Profile {",
         "    public string Id, Name, Description;",
         "    public float RingRadius, RuneHeight, BeamLength, HallWidth, SpokeLength, FootprintRadius;",
-        "    public float PlatformClearance, GroundPortalX, GroundPortalZ;",
+        "    public float PlatformClearance, RoofClearance, GroundPortalX, GroundPortalZ;",
         "    public float WelcomeAnchorX, WelcomeAnchorZ;",
-        "    public bool SolidMarbleFloor;",
+        "    public bool SolidMarbleFloor, PruneNaturalTrees;",
         "    public int EstimatedPlacedObjects, RuneNameHeaders, RuneNameSigns, RuneNameLights;",
-        "    public string[] FloorMaterials;",
+        "    public string[] FloorMaterials, RoofMaterials;",
         "    public Monument[] Monuments;",
         "    public Tile[] PlatformTiles;",
+        "    public Tile[] RoofTiles;",
+        "    public CeilingFixture[] CeilingFixtures;",
         "    public Fixture[] Fixtures;",
         "    public CourseDrop[] CourseDrops;",
         "    public WelcomeFixture[] WelcomeFixtures;",
@@ -855,16 +949,21 @@ def render_csharp(profiles: list[dict]) -> str:
                 f"      BeamLength = {f(profile['beamLength'])}, HallWidth = {f(profile['hallWidth'])},",
                 f"      SpokeLength = {f(profile['spokeLength'])},",
                 f"      PlatformClearance = {f(profile['platformClearance'])},",
+                f"      RoofClearance = {f(profile['roofClearance'])},",
                 f"      GroundPortalX = {f(profile['groundPortalX'])}, GroundPortalZ = {f(profile['groundPortalZ'])},",
                 f"      WelcomeAnchorX = {f(profile['welcomeAnchorX'])}, WelcomeAnchorZ = {f(profile['welcomeAnchorZ'])},",
                 f"      FootprintRadius = {f(profile['footprintRadius'])},",
                 f"      SolidMarbleFloor = {str(profile['solidMarbleFloor']).lower()},",
+                f"      PruneNaturalTrees = {str(profile['pruneNaturalTrees']).lower()},",
                 f"      EstimatedPlacedObjects = {profile['counts']['estimatedPlacedObjects']},",
                 f"      RuneNameHeaders = {profile['counts']['runeNameHeaders']},",
                 f"      RuneNameSigns = {profile['counts']['runeNameSigns']},",
                 f"      RuneNameLights = {profile['counts']['runeNameLights']},",
                 "      FloorMaterials = new[] { "
                 + ", ".join(cs(item) for item in profile["floorMaterials"])
+                + " },",
+                "      RoofMaterials = new string[] { "
+                + ", ".join(cs(item) for item in profile["roofMaterials"])
                 + " },",
                 "      Monuments = new[] {",
             ]
@@ -898,6 +997,19 @@ def render_csharp(profiles: list[dict]) -> str:
         for tile in profile["tiles"]:
             lines.append(
                 f"        new Tile {{ X = {f(tile['x'])}, Z = {f(tile['z'])}, Prefab = {cs(tile['prefab'])} }},"
+            )
+        lines.extend(["      },", "      RoofTiles = new Tile[] {"])
+        for tile in profile["roofTiles"]:
+            lines.append(
+                f"        new Tile {{ X = {f(tile['x'])}, Z = {f(tile['z'])}, Prefab = {cs(tile['prefab'])} }},"
+            )
+        lines.extend(["      },", "      CeilingFixtures = new CeilingFixture[] {"])
+        for item in profile["ceilingFixtures"]:
+            lines.append(
+                "        new CeilingFixture { "
+                f"Prefab = {cs(item['prefab'])}, X = {f(item['x'])}, Y = {f(item['y'])}, "
+                f"Z = {f(item['z'])}, Yaw = {f(item['yaw'])}, "
+                f"InfiniteFuel = {str(item['infiniteFuel']).lower()} }},"
             )
         lines.extend(["      },", "      Fixtures = new[] {"])
         for item in profile["fixtures"]:
@@ -951,6 +1063,8 @@ def render_csharp(profiles: list[dict]) -> str:
             "  // Source-compatible default aliases used by seed/tests and older call sites.",
             "  public static Monument[] Monuments { get { return Find(DefaultProfileId).Monuments; } }",
             "  public static Tile[] PlatformTiles { get { return Find(DefaultProfileId).PlatformTiles; } }",
+            "  public static Tile[] RoofTiles { get { return Find(DefaultProfileId).RoofTiles; } }",
+            "  public static CeilingFixture[] CeilingFixtures { get { return Find(DefaultProfileId).CeilingFixtures; } }",
             "  public static Fixture[] Fixtures { get { return Find(DefaultProfileId).Fixtures; } }",
             "  public static CourseDrop[] CourseDrops { get { return Find(DefaultProfileId).CourseDrops; } }",
             "  public static WelcomeFixture[] WelcomeFixtures { get { return Find(DefaultProfileId).WelcomeFixtures; } }",
@@ -977,6 +1091,9 @@ def summary_model(profiles: list[dict]) -> dict:
                     "ringRadius",
                     "runeHeight",
                     "platformClearance",
+                    "pruneNaturalTrees",
+                    "roofClearance",
+                    "roofMaterials",
                     "groundPortalX",
                     "groundPortalZ",
                     "welcomeAnchorX",
@@ -1028,6 +1145,15 @@ def render_previews(profiles: list[dict]) -> None:
             px, pz = point(tile["x"], tile["z"])
             fill = floor_fill if tile["prefab"] == "blackmarble_floor" else (55, 48, 42)
             draw.rectangle([px - half, pz - half, px + half, pz + half], fill=fill)
+        for tile in profile["roofTiles"]:
+            px, pz = point(tile["x"], tile["z"])
+            draw.rectangle(
+                [px - half, pz - half, px + half, pz + half],
+                outline=(58, 69, 78),
+            )
+        for fixture in profile["ceilingFixtures"]:
+            px, pz = point(fixture["x"], fixture["z"])
+            draw.ellipse([px - 3, pz - 3, px + 3, pz + 3], fill=(240, 140, 55))
         for item in profile["fixtures"]:
             px, pz = point(item["x"], item["z"])
             radius = 2 if item["text"] else 1
@@ -1122,7 +1248,8 @@ def main() -> int:
         counts = profile["counts"]
         print(
             f"  {profile['id']}: {profile['hallWidth']:.0f} m halls, "
-            f"{counts['floorTiles']} floor, {counts['fixtures']} fixtures, "
+            f"{counts['floorTiles']} floor, {counts['roofTiles']} roof, "
+            f"{counts['ceilingFixtures']} ceiling fixtures, {counts['fixtures']} fixtures, "
             f"{counts['runeBeams']} beams, ~{counts['estimatedPlacedObjects']} objects"
         )
     render_previews(profiles)

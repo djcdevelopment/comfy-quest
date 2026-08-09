@@ -62,6 +62,7 @@ public sealed class LabGalleryBuilder {
   const string GalleryMark = "comfyQuestLabGallery";
   const string GalleryProfileMark = "comfyQuestLabGalleryProfile";
   const string GalleryBuildMark = "comfyQuestLabGalleryBuild";
+  const string GalleryRoleMark = "comfyQuestLabGalleryRole";
   static readonly int VerticalItemStandPrefab = "itemstand".GetStableHashCode();
   static readonly int HorizontalItemStandPrefab = "itemstandh".GetStableHashCode();
 
@@ -98,6 +99,16 @@ public sealed class LabGalleryBuilder {
     }
   }
 
+  public static string GalleryRole(ZDO zdo) {
+    try {
+      return zdo == null
+          ? "other"
+          : zdo.GetString(GalleryRoleMark, "other");
+    } catch (Exception) {
+      return "other";
+    }
+  }
+
   public bool IsRunning { get { return _running; } }
   public string LastLifecycleResult { get { return _lastLifecycleResult; } }
   public bool LastLifecycleSucceeded { get { return _lastLifecycleSucceeded; } }
@@ -126,6 +137,12 @@ public sealed class LabGalleryBuilder {
     var wanted = new List<string> { "wood_beam", "portal_wood" };
     foreach (LabGalleryPlan.Tile tile in profile.PlatformTiles) {
       AddUnique(wanted, tile.Prefab);
+    }
+    foreach (LabGalleryPlan.Tile tile in profile.RoofTiles) {
+      AddUnique(wanted, tile.Prefab);
+    }
+    foreach (LabGalleryPlan.CeilingFixture fixture in profile.CeilingFixtures) {
+      AddUnique(wanted, fixture.Prefab);
     }
     foreach (LabGalleryPlan.Fixture fixture in profile.Fixtures) {
       AddUnique(wanted, fixture.Prefab);
@@ -160,6 +177,8 @@ public sealed class LabGalleryBuilder {
       sb.AppendLine("Find the right name with: questlab_prefabs <part of the name>");
     }
     sb.AppendLine(profile.PlatformTiles.Length + " floor tiles, "
+        + profile.RoofTiles.Length + " roof tiles, "
+        + profile.CeilingFixtures.Length + " hanging fixtures, "
         + profile.Fixtures.Length + " fixtures, "
         + CountBeams(profile) + " beams, " + profile.CourseDrops.Length
         + " interaction-local drops, " + profile.WelcomeFixtures.Length
@@ -171,6 +190,11 @@ public sealed class LabGalleryBuilder {
         + (profile.SolidMarbleFloor ? " (solid marble)" : " (mixed material)"));
     sb.AppendLine(profile.PlatformClearance.ToString("0.#", CultureInfo.InvariantCulture)
         + " m terrain clearance; "
+        + (profile.RoofTiles.Length > 0
+            ? profile.RoofClearance.ToString("0.#", CultureInfo.InvariantCulture)
+              + " m sheltered canopy; "
+            : "open sky; ")
+        + (profile.PruneNaturalTrees ? "recoverable tree pruning; " : string.Empty)
         + profile.RuneNameHeaders.ToString(CultureInfo.InvariantCulture)
         + " horizontal rune headers ("
         + profile.RuneNameSigns.ToString(CultureInfo.InvariantCulture) + " letter signs, "
@@ -231,6 +255,13 @@ public sealed class LabGalleryBuilder {
         .Append(profile.PlatformClearance.ToString("0.#", CultureInfo.InvariantCulture))
         .Append(" m terrain clearance, ")
         .Append(profile.SolidMarbleFloor ? "solid marble" : "mixed floor")
+        .Append(profile.RoofTiles.Length > 0
+            ? ", " + profile.RoofTiles.Length.ToString(CultureInfo.InvariantCulture)
+              + "-slab roof with "
+              + profile.CeilingFixtures.Length.ToString(CultureInfo.InvariantCulture)
+              + " hanging braziers"
+            : ", open sky")
+        .Append(profile.PruneNaturalTrees ? ", recoverable tree pruning" : string.Empty)
         .Append(", ")
         .Append(profile.RuneNameHeaders.ToString(CultureInfo.InvariantCulture))
         .Append(" horizontal rune headers")
@@ -385,6 +416,20 @@ public sealed class LabGalleryBuilder {
       }
     }
 
+    LabTreeRecovery.PruneResult prune = LabTreeRecovery.Prune(profile, origin, _activeBuildId);
+    if (!prune.Success) {
+      _running = false;
+      Report("gallery stopped safely: " + prune.Message + " Nothing was placed.");
+      yield break;
+    }
+    if (prune.Removed > 0) {
+      Report(prune.Message);
+      // ZNetView.Destroy retires the owned ZDO immediately and its Unity tree at frame
+      // end. Let both settle before laying a slab through the same footprint.
+      yield return null;
+      yield return null;
+    }
+
     int placed = 0;
 
     // 1. the floor
@@ -394,12 +439,45 @@ public sealed class LabGalleryBuilder {
       // which is what every other position in the plan is measured against.
       var at = new Vector3(origin.x + tile.X, floorY + SurfaceDrop(tile.Prefab),
                            origin.z + tile.Z);
-      if (Place(tile.Prefab, at, Quaternion.identity)) {
+      if (Place(tile.Prefab, at, Quaternion.identity, "floor")) {
         placed++;
       }
       if (placed % piecesPerFrame == 0) {
         yield return null;
       }
+    }
+
+    // 1a. a genuine stone roof, made from the same measured marble slab as the floor.
+    // Valheim's shipped roof check accepts any non-leaky collider on the piece layer;
+    // there is no separate roof flag to guess or mutate. The generator copies only the
+    // hub, hall, and station-pad cells so the 17 m rune stages remain open to the sky.
+    foreach (LabGalleryPlan.Tile tile in profile.RoofTiles) {
+      var at = new Vector3(
+          origin.x + tile.X,
+          floorY + profile.RoofClearance + BaseLift(tile.Prefab),
+          origin.z + tile.Z);
+      if (Place(tile.Prefab, at, Quaternion.identity, "roof")) {
+        placed++;
+      }
+      if (placed % piecesPerFrame == 0) {
+        yield return null;
+      }
+    }
+
+    // Actual vanilla ceiling braziers, not synthetic point lights. Their generated ZDO
+    // marker keeps them fuelled after zone reloads while clear still owns the whole object.
+    foreach (LabGalleryPlan.CeilingFixture fixture in profile.CeilingFixtures) {
+      var at = new Vector3(
+          origin.x + fixture.X,
+          floorY + fixture.Y,
+          origin.z + fixture.Z);
+      GameObject built = Place(fixture.Prefab, at,
+          Quaternion.Euler(0f, fixture.Yaw, 0f), "ceiling-brazier");
+      if (built != null) {
+        placed++;
+        GalleryStructurePatches.MarkAndLight(built, fixture.InfiniteFuel);
+      }
+      yield return null;
     }
 
     // 1b. a way up.
@@ -450,9 +528,9 @@ public sealed class LabGalleryBuilder {
 
     // 1d. the halls, and the sign at the mouth of each.
     //
-    // Two courses of marble a side and no roof: the corridor frames the glyph at its end
-    // without enclosing it, which is the composition — read the sign, walk the throat,
-    // and the rune is the lit thing against open sky.
+    // Marble walls frame each throat. A profile may roof the hub/halls/pads while leaving
+    // the stage open. Read the sign, walk the sheltered throat,
+    // and the tall rune is still the lit thing against open sky.
     foreach (LabGalleryPlan.Fixture fixture in profile.Fixtures) {
       bool panel = fixture.Orient == "panel";
 
@@ -599,8 +677,13 @@ public sealed class LabGalleryBuilder {
     SaveManifest();
     _running = false;
     Report("gallery raised: " + profile.Id + " build " + _activeBuildId + ", " + placed
-        + " objects. questlab_gallery identify reports it; clear " + profile.Id
-        + " takes that profile down.");
+        + " objects"
+        + (prune.Removed > 0
+            ? ", " + prune.Removed.ToString(CultureInfo.InvariantCulture)
+              + " natural tree(s) ledgered"
+            : string.Empty)
+        + ". questlab_gallery identify reports it; clear " + profile.Id
+        + " takes that profile down and restores its ledgered trees.");
   }
 
   /// <summary>Raise two profiles around one captured origin. Both carry the same build id,
@@ -665,7 +748,7 @@ public sealed class LabGalleryBuilder {
       Report(UnknownProfile(profileId));
       yield break;
     }
-    IEnumerator clear = ClearSafely(profile.Id);
+    IEnumerator clear = ClearSafely(profile.Id, false);
     while (clear.MoveNext()) {
       yield return clear.Current;
     }
@@ -693,7 +776,7 @@ public sealed class LabGalleryBuilder {
       Report(UnknownProfile(profileId));
       yield break;
     }
-    IEnumerator clear = ClearSafely("all");
+    IEnumerator clear = ClearSafely("all", false);
     while (clear.MoveNext()) {
       yield return clear.Current;
     }
@@ -715,7 +798,11 @@ public sealed class LabGalleryBuilder {
   ///
   /// "Off" is false on both wear flags. See the note at the assignment: they are opt-ins
   /// wearing a name that reads like an opt-out.</summary>
-  GameObject Place(string prefabName, Vector3 position, Quaternion rotation) {
+  GameObject Place(
+      string prefabName,
+      Vector3 position,
+      Quaternion rotation,
+      string galleryRole = null) {
     try {
       GameObject prefab = ZNetScene.instance.GetPrefab(prefabName);
       if (prefab == null) {
@@ -757,6 +844,9 @@ public sealed class LabGalleryBuilder {
         zdo.Set(GalleryMark, LabGalleryPlan.PlanVersion.ToString(CultureInfo.InvariantCulture));
         zdo.Set(GalleryProfileMark, _activeProfileId);
         zdo.Set(GalleryBuildMark, _activeBuildId);
+        if (!string.IsNullOrEmpty(galleryRole)) {
+          zdo.Set(GalleryRoleMark, galleryRole);
+        }
         _placed.Add(zdo.m_uid);
       }
       return go;
@@ -790,7 +880,7 @@ public sealed class LabGalleryBuilder {
   /// right back onto the object about to disappear. Valheim's own TeleportTo owns movement
   /// and replication. If it is cooling down, this waits a bounded four seconds; if the
   /// teleport never completes at the intended ground target, the gallery stays standing.</summary>
-  public IEnumerator ClearSafely(string selector = null) {
+  public IEnumerator ClearSafely(string selector = null, bool restoreNaturalTrees = true) {
     _lastLifecycleSucceeded = false;
     _lastLifecycleResult = "gallery clear has not completed.";
     if (ZNetScene.instance == null || Player.m_localPlayer == null) {
@@ -864,6 +954,9 @@ public sealed class LabGalleryBuilder {
         // destroy. Give it two frames before a rebuild can sample or occupy the same site.
         for (int frame = 0; frame < DestroyQuiescenceFrames; frame++) {
           yield return null;
+        }
+        if (restoreNaturalTrees) {
+          _lastLifecycleResult += " " + LabTreeRecovery.Restore(selector);
         }
       }
       Report(_lastLifecycleResult);
@@ -1082,10 +1175,13 @@ public sealed class LabGalleryBuilder {
     }
 
     var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    var roles = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
     var seen = new HashSet<ZDOID>();
+    int loadedFloors = 0;
+    int coveredFloors = 0;
     try {
       foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
-        AddIdentity(zdo, counts, seen);
+        AddIdentity(zdo, counts, roles, seen, ref loadedFloors, ref coveredFloors);
       }
     } catch (Exception ex) {
       LogOnce("could not identify locally known pieces: " + ex.Message);
@@ -1095,7 +1191,8 @@ public sealed class LabGalleryBuilder {
     foreach (ZDOID id in _placed) {
       try {
         if (ZDOMan.instance != null) {
-          AddIdentity(ZDOMan.instance.GetZDO(id), counts, seen);
+          AddIdentity(ZDOMan.instance.GetZDO(id), counts, roles, seen,
+              ref loadedFloors, ref coveredFloors);
         }
       } catch (Exception) {
       }
@@ -1111,6 +1208,21 @@ public sealed class LabGalleryBuilder {
       sb.Append("  ").Append(key.Replace("\t", " | build ")).Append(": ")
         .Append(counts[key].ToString(CultureInfo.InvariantCulture)).AppendLine(" marked objects");
     }
+    var roleKeys = new List<string>(roles.Keys);
+    roleKeys.Sort(StringComparer.OrdinalIgnoreCase);
+    sb.Append("  roles: ");
+    for (int i = 0; i < roleKeys.Count; i++) {
+      if (i > 0) sb.Append(", ");
+      string role = roleKeys[i];
+      sb.Append(role).Append(' ')
+        .Append(roles[role].ToString(CultureInfo.InvariantCulture));
+    }
+    sb.AppendLine();
+    sb.Append("  live roof check: ")
+      .Append(coveredFloors.ToString(CultureInfo.InvariantCulture)).Append('/')
+      .Append(loadedFloors.ToString(CultureInfo.InvariantCulture))
+      .AppendLine(" loaded marked floor slabs have a non-leaky piece above them.");
+    sb.AppendLine("  " + LabTreeRecovery.Status());
     sb.Append("Clear with questlab_gallery clear <profile-or-build-id>.");
     return sb.ToString();
   }
@@ -1118,7 +1230,10 @@ public sealed class LabGalleryBuilder {
   static void AddIdentity(
       ZDO zdo,
       Dictionary<string, int> counts,
-      HashSet<ZDOID> seen) {
+      Dictionary<string, int> roles,
+      HashSet<ZDOID> seen,
+      ref int loadedFloors,
+      ref int coveredFloors) {
     if (zdo == null || !IsGalleryPiece(zdo) || !seen.Add(zdo.m_uid)) {
       return;
     }
@@ -1126,6 +1241,29 @@ public sealed class LabGalleryBuilder {
     int count;
     counts.TryGetValue(key, out count);
     counts[key] = count + 1;
+
+    string role = GalleryRole(zdo);
+    int roleCount;
+    roles.TryGetValue(role, out roleCount);
+    roles[role] = roleCount + 1;
+    if (!string.Equals(role, "floor", StringComparison.OrdinalIgnoreCase)) {
+      return;
+    }
+    try {
+      ZNetView view = ZNetScene.instance.FindInstance(zdo);
+      if (view == null) {
+        return;
+      }
+      loadedFloors++;
+      GameObject roof;
+      // A black-marble floor centre is 0.5 m below its top. Start above the slab so the
+      // sphere cast cannot count the floor itself as its own roof.
+      if (WearNTear.RoofCheck(view.transform.position + Vector3.up * 0.75f, out roof)) {
+        coveredFloors++;
+      }
+    } catch (Exception) {
+      // Identity remains useful even on a game build whose roof helper changed.
+    }
   }
 
   // ---- manifest --------------------------------------------------------------------

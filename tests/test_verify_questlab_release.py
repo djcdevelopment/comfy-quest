@@ -99,8 +99,12 @@ class QuestLabReleaseVerifierTests(unittest.TestCase):
             VERIFIER.VISUAL_CHECKS,
             {
                 "solid_marble_floor",
+                "marble_floor_not_snow_coated",
                 "scale_acceptable",
                 "hall_width_acceptable",
+                "roof_canopy_acceptable",
+                "hanging_braziers_acceptable",
+                "natural_tree_clearance_acceptable",
                 "runes_acceptable",
                 "rune_banners_acceptable",
                 "sign_lighting_acceptable",
