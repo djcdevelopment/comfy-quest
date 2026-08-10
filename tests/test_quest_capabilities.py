@@ -24,6 +24,7 @@ MANIFEST = (
 )
 GENERATOR = REPO / "tools" / "component-packets" / "generate_seam_catalog.py"
 RULES = REPO / "tools" / "component-packets" / "quest-capability-rules.json"
+AUTHORING = REPO / "tools" / "component-packets" / "quest-event-authoring.json"
 PATCH_CHECKER = REPO / "tools" / "component-packets" / "check_lab_patches.py"
 PATCHES = REPO / "network" / "mod" / "ComfyQuestLab" / "Patches"
 JOURNAL_GENERATOR = REPO / "tools" / "component-packets" / "generate_journal.py"
@@ -115,6 +116,27 @@ class QuestCapabilityManifestTests(unittest.TestCase):
             {"hit": ["damage_dealt", "resource_damaged"]},
         )
 
+    def test_every_safe_event_has_creator_target_and_field_metadata(self) -> None:
+        creator_events = self.manifest["CreatorEvents"]
+        self.assertEqual(
+            [row["Name"] for row in creator_events],
+            self.manifest["CreatorSafeEvents"],
+        )
+        for row in creator_events:
+            with self.subTest(event=row["Name"]):
+                self.assertTrue(row["TargetKind"])
+                self.assertTrue(row["TargetDescription"])
+                self.assertTrue(row["ExampleTarget"])
+                names = [field["Name"] for field in row["Fields"]]
+                self.assertEqual(len(names), len(set(names)))
+                self.assertFalse(
+                    set(names) & {"event", "target", "weapon_skill", "projectile"}
+                )
+                for field in row["Fields"]:
+                    self.assertTrue(field["Description"])
+                    self.assertTrue(field["Example"])
+                    self.assertIsInstance(field["DraftByDefault"], bool)
+
     def test_known_local_rpc_routes_share_event_and_dedupe_group(self) -> None:
         pairs = (
             ("Character.Damage", "Character.RPC_Damage"),
@@ -180,6 +202,30 @@ class QuestCapabilityManifestTests(unittest.TestCase):
         self.assertIn("creator-safe runtime coverage 57/57", result.stdout)
         self.assertIn("practical atlas runtime coverage 86/86", result.stdout)
 
+    def test_durable_archive_is_owned_only_by_the_catalog_router(self) -> None:
+        mod = REPO / "network" / "mod" / "ComfyQuestLab"
+        runtime_callers = []
+        for path in mod.rglob("*.cs"):
+            source = path.read_text(encoding="utf-8")
+            if "ComfyQuestLab.ObserveRuntimeEvent(" in source:
+                runtime_callers.append(path.relative_to(mod).as_posix())
+        self.assertEqual(runtime_callers, ["Core/LabEventRouter.cs"])
+
+        plugin = (mod / "ComfyQuestLab.cs").read_text(encoding="utf-8")
+        self.assertIn("public static void ObserveRuntimeEvent", plugin)
+        self.assertIn("if (archive && self._eventArchive != null)", plugin)
+        self.assertEqual(plugin.count("_eventArchive.TryRecord(row, actionIdentity)"), 1)
+
+        router = (mod / "Core" / "LabEventRouter.cs").read_text(encoding="utf-8")
+        self.assertEqual(router.count("ComfyQuestLab.ObserveRuntimeEvent("), 2)
+        self.assertNotIn("quest.reloaded", router)
+        self.assertNotIn("quest.fired", router)
+
+        archive = (mod / "Core" / "LabEventArchive.cs").read_text(encoding="utf-8")
+        csv_retry = archive.index("if (!TryDelete(csv)) continue;")
+        json_delete = archive.index("TryDelete(candidate);", csv_retry)
+        self.assertLess(csv_retry, json_delete)
+
     def test_missing_creator_patch_turns_the_guard_red(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             copied = Path(temporary) / "Patches"
@@ -226,6 +272,26 @@ class QuestCapabilityManifestTests(unittest.TestCase):
                     CAPABILITY_GENERATOR.build_model()
             finally:
                 CAPABILITY_GENERATOR.RULES = original_rules
+
+    def test_missing_creator_metadata_turns_the_guard_red(self) -> None:
+        authoring = json.loads(AUTHORING.read_text(encoding="utf-8"))
+        authoring["Events"] = [
+            row for row in authoring["Events"] if row["Name"] != "sign_written"
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            mutated = Path(temporary) / "quest-event-authoring.json"
+            mutated.write_text(json.dumps(authoring), encoding="utf-8")
+            original = CAPABILITY_GENERATOR.AUTHORING
+            try:
+                CAPABILITY_GENERATOR.AUTHORING = mutated
+                atlas, rules, _, signatures = CAPABILITY_GENERATOR.build_model()
+                with self.assertRaisesRegex(
+                    CAPABILITY_GENERATOR.CapabilityError,
+                    "creator authoring drift.*sign_written",
+                ):
+                    CAPABILITY_GENERATOR.build_manifest(atlas, rules, signatures)
+            finally:
+                CAPABILITY_GENERATOR.AUTHORING = original
 
 
 if __name__ == "__main__":

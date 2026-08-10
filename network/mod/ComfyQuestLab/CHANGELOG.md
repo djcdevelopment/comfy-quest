@@ -1,5 +1,133 @@
 # Changelog
 
+**r24 durable creator-event archive.** Every accepted, deduplicated canonical row now also
+enters a bounded background writer; quest matching and the live ring remain unchanged and never
+wait for disk. Each session gets a descriptive UTC/release/profile JSONL name, a self-describing
+`comfy-questlab-events/v1` header in every rotated segment, UTC event timestamps, and a clean
+end summary when Valheim shuts down normally. JSONL flushes every second and is the append-only
+source of truth; a crash may leave only its final line partial. The loopback companion labels
+that exact tail automatically, while the offline parser requires an explicit recovery flag. A
+fixed 4,096-row queue drops instead of growing or delaying gameplay, and emits both a
+machine-readable overflow notice and a dropped-row count in status/end records.
+Quest reload/completion notices remain live-panel diagnostics rather than masquerading as
+creator events in the strict archive; durable rows enter only through the atlas/catalog router.
+Filename/header profile provenance is labelled `startup-default`; hot profile changes and
+bounded-suite overrides therefore cannot be mistaken for a per-row profile claim.
+
+The default privacy surface is creator event, school, target, and usability. Bounded detail and
+exact diagnostic seam/action identity are separate startup opt-ins; chat and sign text remain
+redacted before they ever reach the archive. Unknown runtime signatures map to the stable
+`unclassified_runtime_event`; their raw identity remains diagnostic opt-in. Segments rotate at 16 MiB and retain 24 JSONL/CSV
+pairs by default. The optional spreadsheet projection is enabled at a five-second interval and
+publishes each current-segment RFC 4180 CSV atomically, so a reader sees an old complete table or
+a new complete table rather than half a rewrite. Spreadsheet formula prefixes are neutralized in
+every CSV text cell (including after leading whitespace/control characters) while JSONL retains
+the sanitized literal. `questlab_archive [flush]` exposes the session,
+path, accepted/written/dropped counts, faults, and an on-demand nonblocking flush.
+
+**r24 local event portability and Google Sheets companion.** The live event view adds
+one fixed `127.0.0.1` **Exports** handoff—never a configured URL or command—and the Workbench
+package now carries the companion beside the DLL. Its dependency-free parser validates and
+combines authoritative `comfy-questlab-events/v1` JSONL parts, distinguishes clean, dropped,
+active/unclean, and retention-partial archives, detects unexplained gaps/tampering, and emits
+formula-neutralized RFC 4180 CSV. After an explicit Desktop OAuth setup, one **Create Google
+Sheet** click creates a three-tab Events/Summary/Metadata workbook, writes only RAW values in
+sub-1.5 MB batches, applies its filter/frozen headers/widths in one formatting batch, saves a
+local source-hash receipt, and opens the created file. Transient 429/5xx failures retry only the
+same idempotent ranges and formatting request with bounded backoff; workbook creation itself is
+never retried. The package also carries a strict dependency-free offline parser for filtered
+JSON/CSV, five-tab XLSX, and evidence ZIP output. Authorization uses the system browser,
+random loopback callback, PKCE/state, and only Google's non-sensitive per-file `drive.file`
+scope. Windows refresh tokens are DPAPI-protected under Local App Data; Disconnect attempts
+revocation and always removes the local token. Missing libraries, tenant denial, or offline
+Google never disables local JSONL/CSV.
+
+**r24 final acceptance.** The exact r24 OMEN DLL passed the source-shared creator contract at
+34/34 events and quests with zero double completions. A clean OMEN session produced 309 strict-
+parseable canonical rows, a matching CSV projection, and zero dropped rows. The offline parser
+produced a five-tab workbook and import bundle; the local Sheets doctor found one readable session
+and made zero network requests. Gallery v2 was rebuilt as `marble-grand-20260809T204409Z-01`;
+all nine braziers measured below the roof and human visual review accepted the rebuilt court.
+Truth Lens warnings for weather coverage and fresh-prefab differences remain intentionally honest
+follow-up evidence. A non-mutating compare request was delivered after acceptance but OMEN exited
+before its receipt returned; automated compare coverage remains green.
+
+**r23 self-guided scenario and accessible demo cockpits.** The panel now exposes its `INTERACTIVE` input ownership
+instead of making cursor behavior implicit, and every important verdict carries an ASCII
+`[OK]`, `[INFO]`, `[CHECK]`, or `[PROVED]` cue in addition to color. A new **Ready?** tab
+derives its summary from this process's actual Harmony outcomes, shared/generated creator-event
+counts, loaded and armed quests, eight-school coverage, and the bounded live suite. It only says
+`PROVED` after the real all-schools suite passes and explicitly refuses to certify rendered
+appearance. Ctrl+1-4, Ctrl+Tab, Ctrl+F, Ctrl+0, and F1 add discoverable keyboard navigation
+without changing Escape/F6 close semantics. Panel geometry is now a Unity-free tested policy:
+desktop-sized persisted bounds shrink into low-resolution/high-zoom viewports, resize and zoom
+save immediately, and Reset layout always returns to a visible 100% window.
+
+The new Scenarios tab makes all 34 safe canonical
+events browsable by colored school, with their shared target meaning, honest example, runtime
+profile, `trigger.where` fields, safety class, compact-course availability, and a concrete live
+action. Each `scenario-<event>` uses the existing bounded prepare/run/reset/report/export
+lifecycle. Prepare writes an ordinary editable schema-1 quest produced by `QuestAuthoring` plus
+a deterministic, hashed `comfy-questlab-scenario/v1` manifest into one fixed Lab-owned folder;
+it never loads or edits creator quests, reuses identical output, and refuses to overwrite a
+changed generated file. The panel can copy the draft JSON or exact file path and open its folder.
+Run feeds that draft and the catalog example through the exact source-shared loader/evaluator and
+exports the normal receipt with explicit `synthetic-scenario` provenance, never a false gameplay
+witness claim. The OMEN/i5 helper retains its eleven fixed operations and adds the 34 exact
+scenario IDs to its suite allowlist; no console text, keystroke, arbitrary path, or prefab surface
+was added. The compact `all-schools` lane remains the live witness proof.
+
+**r22 Creator Foundry, Gallery Truth, and build-by-example foundation.** Every safe canonical event now carries generated,
+shared creator metadata: target kind and meaning, an honest example target, meaningful
+weapon/projectile support, and the exact event-specific scalar fields a `trigger.where` may use.
+The 34-event metadata source is guarded against capability drift and expands into both the public
+manifest and the Unity-free `QuestEventCatalog`. New shared `QuestAuthoring` primitives turn one
+witnessed event into a complete backward-compatible schema-1 quest view, round-trip it through
+the shipping loader, and require the shipping evaluator to match it before returning. Structured
+miss diagnostics isolate constraints through counterfactual evaluator calls rather than copying
+matcher rules. No existing quest file or evaluator behavior changes. `questlab_gallery evidence
+[profile-or-build-id]`
+exports a read-only, machine-verifiable subject receipt: marked/loaded world bounds,
+Valheim roof protection and honest snow-risk classification, per-fixture roof-underface
+clearance, bounded fresh-prefab versus live render-configuration samples, and deterministic
+camera view plans. The existing OMEN/i5 mailbox gains only the explicit allowlisted
+`gallery_evidence` operation and retrieves the fixed-directory artifact after validating its
+path and schema. Evidence never moves the camera or world and never overrules the rendered
+frame or human visual acceptance.
+
+`questlab_blueprint capture` now exports either the
+local player's pieces or Quest Lab-marked pieces inside an explicit 1–40 m radius as a
+deterministic PlanBuild file plus a hashed metadata sidecar. Sign text, item-stand display
+state, and Quest Lab light/glow marks survive replay. `inspect` detects tampering or a mixed
+file pair before placement; translation-independent `diff` reports structural and metadata
+drift. Capture is read-only, refuses silent overwrite, caps selections at 2,048 pieces, and
+reuses the existing marked build/count/clear lifecycle. The Unity-free contract has executable
+round-trip, determinism, tamper, oversize, projection, metadata, and diff tests.
+
+Creator packs now have an exact certification and publishing lane. A Unity-free console host
+links the shipping schema-1 loader, generated 34-event catalog, evaluator, and Quest Lab armed
+probe; `publish` must pass that host before writing a reproducible `.questpack` and public-safe
+sidecar. Exact synthetic/live receipts can earn scoped, hash-backed badges only after full schema,
+coverage, coalescing, and zero-double-completion checks. Compatibility Doctor and Pacing Clinic
+reports are summarized without promoting advice to proof. Every published pack carries a generic
+getting-started guide plus read-only inspect/diagnose and no-side-effect install-preview commands;
+install/uninstall retain their no-overwrite and refuse-on-modification guarantees.
+
+**r21 executable ledger serializer correction.** A one-record r20 live probe proved that
+Unity's `JsonUtility` discarded every custom record array regardless of whether its DTO was
+nested or top-level. Recovery persistence now uses the data-contract JSON serializer already
+used by the shipping network mod, with explicit v1 field names. The serializer and DTOs live in
+a Unity-free shared source file; executable tests round-trip all 43 records and parse the exact
+forensic v1 field shape. The real ledger was restored unchanged after the probe.
+
+**r20 Unity-ledger shape correction.** The first r19 OMEN identify receipt proved two things
+before any destructive request ran: all nine r18 braziers were above the old roof underside,
+and Unity still read zero records from the manually repaired 43-tree ledger. Tree record and
+ledger DTOs now live at namespace scope, and the persisted collection is a plain record array
+instead of `List<T>` of a nested type. Write-ahead pruning still builds and sorts in memory, but
+it converts to this conservative Unity field-serializer shape before the mandatory write/read,
+count, and digest round trip. The existing v1 JSON field names stay compatible.
+
 **r19 high-canopy and recovery-ledger correction.** The selected roof moves from 8 m to
 16 m above the walking surface following the live sheltered-court review. All nine ceiling
 braziers now attach their measured topmost mesh point just below the marble underside, so the
@@ -265,7 +393,8 @@ machine-readable suites ship together. This supersedes the narrow 0.1.0 package.
 tome, so a newcomer needs no other instruction. It is a front door onto
 `questlab_gallery build` rather than a separate mechanism.
 
-**Not here yet:** the journal (a stub that shows the seam roster); and JSONL persistence.
+**Not here yet at that historical cut:** the journal (a stub that showed the seam roster), and
+JSONL persistence (added in r24).
 `GameplayEventTypes` is not linked — it shares a file with a 353-line Unity-dependent
 class and needs extracting first.
 

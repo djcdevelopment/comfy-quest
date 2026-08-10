@@ -37,10 +37,26 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r19 changes the selected court's roof and tree-ledger guard,
-> so those same suites must be re-witnessed against the exact r19 DLL before
+> 34/34 creator events. r24 adds a privacy-safe durable event archive; r23 added the accessible Ready? and Scenarios cockpits with editable
+> draft handoff after r22 added the shared Creator Foundry and Gallery Truth contracts, so
+> those same suites must be re-witnessed
+> against the exact r24 DLL before
 > the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
+
+## R24 acceptance update (2026-08-09)
+
+This update supersedes the earlier historical receipt boundary above.
+
+The exact r24 OMEN DLL passed the source-shared creator contract at 34/34 events and quests
+with zero double completions. Its clean session archive contains 309 strict-parseable canonical
+rows and a matching CSV projection with zero drops. The offline parser produced a five-tab
+workbook and import bundle; the local Sheets doctor found one readable session and made zero
+network requests. Gallery v2 was rebuilt as `marble-grand-20260809T204409Z-01`; all nine
+braziers measured below the roof and Derek visually accepted the rebuilt court. Truth Lens
+retains weather-coverage and fresh-prefab warnings as honest follow-up evidence. A later
+non-mutating compare request was delivered after acceptance but OMEN exited before its receipt
+returned; automated compare coverage is green.
 
 ## Why this exists
 
@@ -73,26 +89,34 @@ update.
 | --- | --- |
 | `lab_setup` | write the starter quest, safely clear marked old builds, and raise one fresh compact practice course on the same site. Do this first. |
 | **F6** | open the console (or `questlab_panel`) |
+| **Exports** | open the fixed local event/CSV/Google Sheets companion at `127.0.0.1`; it never opens a configured or remote URL |
 | `lab_reload` | re-read your quest files and say what changed |
 | `lab_target [school]` | put a fresh practice target in front of you (default: combat) |
 | `questlab_help` | what this build can do |
 | `questlab_seams` | which seams hooked on your game version, and which didn't |
 | `questlab_profile [core\|extended\|diagnostic]` | select stable-event breadth or inspect raw witnesses |
 | `questlab_clear` | empty the console |
+| `questlab_archive [flush]` | show the current timestamped archive, counts/faults, or request a nonblocking flush |
 | `questlab_gallery profiles` | list the generated Gallery v2 geometry choices and counts |
 | `questlab_gallery check [profile]` | resolve every prefab without placing anything |
 | `questlab_gallery build [profile]` | raise one marked profile; default is `marble-grand` |
 | `questlab_gallery compare [left] [right]` | raise two profiles side by side under one build id |
 | `questlab_gallery identify` | report profile/build/role marks, live roof coverage, and tree-ledger state before changing the world |
+| `questlab_gallery evidence [profile-or-build-id]` | export read-only Gallery Truth: bounds, weather exposure, fresh-prefab comparisons, fixture assertions, and named camera views |
 | `questlab_gallery clear [profile-or-build-id]` | return safely to terrain, remove only matching marked gallery objects, then restore matching ledgered trees |
 | `questlab_gallery rebuild [profile]` | safely clear and rebuild one profile at the same reusable site |
 | `questlab_gallery trees` | report pending/restored natural-tree recovery ledgers |
 | `questlab_gallery restore-trees [profile-or-build-id]` | restore a pending ledger only after matching gallery pieces are gone |
 | `questlab_prefabs inspect <exact-name>` | compare startup prefab, current prefab, and loaded-instance renderer state; export material, emission, property-block, GI, and light evidence as JSON |
-| `questlab_batch suites` | list the two bounded evidence classes |
+| `questlab_batch suites` | list the two release suites and the 34 `scenario-<event>` rehearsals |
 | `questlab_batch prepare all-schools` | write eight ordinary example quests, safely reset the marked site, and raise one fresh compact course with targets and supplies at point of use |
-| `questlab_batch run [all-schools\|creator-events]` | start live witnessing or run the explicitly synthetic 34-event contract probe |
+| `questlab_batch prepare scenario-<event>` | export one deterministic, editable schema-1 draft plus its scenario manifest without loading it or changing the world |
+| `questlab_batch run [all-schools\|creator-events\|scenario-<event>]` | start live witnessing, run the 34-event contract probe, or rehearse one event through the exact evaluator |
 | `questlab_batch reset\|report\|export` | reset safely, show progress, or write a machine-readable receipt |
+| `questlab_blueprint capture <name> <radius> [mine\|lab] [replace]` | copy your pieces or Quest Lab-marked pieces inside a 1–40 m sphere into a deterministic PlanBuild file plus metadata sidecar |
+| `questlab_blueprint inspect <name>` | validate the sidecar hash and prove its PlanBuild projection still agrees |
+| `questlab_blueprint diff <name> [radius] [mine\|lab]` | compare a live selection with the capture, independent of world translation |
+| `questlab_blueprint check\|build\|count\|clear <name>` | preflight, replay, inspect, or remove only that marked blueprint build |
 
 `lab_setup` is typed into **Valheim's** console, which is **F5**. **F6** opens the lab's own
 panel. Two different keys, and mixing them up is the most common first stumble.
@@ -105,10 +129,48 @@ the panel closes. The visible **− / +** controls zoom the whole panel from 65�
 steps; click the percentage to return to 100%. A windowed/1080p creator and a 4K creator can
 tune the same grid independently.
 
+Saved desktop bounds are clamped into the current logical viewport, including high zoom at
+low resolution, so a monitor or window-mode change cannot strand the controls off screen.
+Resize and zoom changes save immediately, and **Reset layout** restores a visible default
+window at 100%.
+
+The header says **[INTERACTIVE]** while the panel owns the pointer and blocks player actions;
+closing returns ownership to gameplay. State never depends on hue alone: rows also say
+**[OK]**, **[INFO]**, **[CHECK]**, or **[PROVED]**. Press **F1** or click **Keys** for the
+compact legend. Keyboard users can use **Ctrl+1-4** for the four tabs, **Ctrl+Tab** /
+**Ctrl+Shift+Tab** to cycle, **Ctrl+F** to focus event search, and **Ctrl+0** to return to
+100% zoom. F6 and Escape retain their single job: close the panel and release input even
+when search has focus.
+
+The **Ready?** tab is a pre-demo cockpit built from live state, not a checklist somebody can
+forget to update. It reports the loaded release/profile, real hook successes, agreement between
+the shared evaluator and generated creator-event manifest, quest parse/armed counts, bindable
+school coverage, and the current all-schools batch result. **[PROVED]** appears only after all
+eight live witnesses and all eight example quests pass in the bounded suite. Its summary is
+copyable for support or a demo handoff. Runtime readiness does not claim the Gallery looks good;
+scale, lighting, readability, and composition remain explicit human visual acceptance.
+
 The **Quests** tab is a compact dashboard rather than a prose dump. Its fixed columns show
 the colored school rune, quest name, creator event and target, armed state, and fire count.
 Use the row's **down chevron** only when you need its source file, evaluator explanation,
 cooldown, or advisories; the up chevron collapses it and load errors are grouped separately.
+
+The **Scenarios** tab is the self-guided creator cockpit. Pick a colored school, select any of
+the 34 canonical events, and read its real target meaning, example, runtime profile,
+`trigger.where` fields, safety class, and a plain-language live action. **Copy draft JSON** puts
+an ordinary editable schema-1 quest on the clipboard immediately. **Prepare draft** writes that
+same QuestAuthoring-generated file beside a deterministic `comfy-questlab-scenario/v1` manifest
+under `BepInEx/config/comfy-quest-lab/scenarios/scenario-<event>/`; neither file is loaded into the
+quest lane. The panel exposes the exact draft path and opens only that bounded folder. Preparing
+again reuses byte-identical output and refuses to overwrite a changed file, so experimenting in
+place cannot silently lose work.
+
+**Run evaluator** passes the generated quest and catalog example through the exact shared loader
+and evaluator, then auto-exports the normal suite receipt. Reset, Report, and Export are the same
+bounded lifecycle used by the live course and the allowlisted OMEN/i5 mailbox. Scenario receipts
+say `synthetic-scenario`: they prove the draft matches, never that a person performed the action
+in Valheim. Events staged by the compact course are labelled as such; risky world-key, death, and
+skill-loss actions remain clearly separated from their safe evaluator rehearsal.
 
 Hovering any clipped grid cell writes its full meaning into the help bar at the bottom of the
 window. Blue bindable-event cells are buttons: click one to copy the exact `trigger.event` ID
@@ -117,6 +179,68 @@ path can also be clicked to copy it. **Pause** freezes the retained moment while
 and school filters live over that snapshot; **Resume** returns to the live stream. **All** and
 **Default** recover the eight-school or quiet two-school filter presets. Clearing the search and
 clearing the retained log are separate, explicitly labelled actions.
+
+### Durable event files
+
+The in-memory console is backed by a local, bounded creator-event archive under
+`BepInEx/config/comfy-quest-lab/event-archive/`. JSONL is enabled by default and names each
+session for a human, for example
+`questlab-events-20260809T123456789Z-r24-startup-extended.jsonl`; rotations add `-part002` and repeat
+the same session header so every part is independently parseable. Each accepted canonical row
+has an ISO-8601 UTC timestamp, sequence, school, creator event, target, and usability. A clean
+shutdown adds an end/count summary; after a crash a consumer should ignore only an incomplete
+final line.
+
+Privacy is conservative: `[Archive] includeDetails=false` and
+`includeDiagnosticIdentity=false` by default. Turning them on adds bounded detail plus the exact
+atlas seam and deduplicated action identity. Chat and sign contents remain redacted at their
+source regardless. An unknown future runtime signature is archived as the stable
+`unclassified_runtime_event`; its raw identifier stays in the live ring and enters the file only
+with diagnostic identity enabled. Nothing archives arbitrary quest files, player names, world
+contents, or the event's internal field dictionary.
+Lab-owned administrative rows such as quest reload/completion notices remain visible in the
+live panel but stay out of creator archives; only atlas/catalog-routed runtime events cross the
+durable boundary.
+
+The filename/header profile is explicitly the configured default captured at Valheim startup,
+not per-row provenance. `questlab_profile` can change routing live and bounded suites can
+temporarily widen it; the canonical event and usability on each row are the event-level truth.
+
+JSONL flushes once per second. A 4,096-row memory queue and 16 MiB segments prevent an event
+storm from blocking gameplay or growing forever; overflow becomes an explicit archive notice
+and dropped-row count. The default retention is 24 segment pairs, oldest first. The optional CSV
+projection is on by default at `[Archive] csvSnapshotSeconds=5` (set it to `0` to disable) and
+uses the stable header below. It is replaced atomically, so spreadsheet readers never observe a
+half-written snapshot. Every text cell beginning with `=`, `+`, `-`, or `@` (including after
+leading whitespace/control characters) is prefixed with an apostrophe in CSV to prevent formula
+execution in Excel or Google Sheets; authoritative JSONL retains the sanitized literal value.
+
+```text
+schema,session_id,sequence,timestamp_utc,school,creator_event,target,detail,usability,diagnostic_seam,action_identity
+```
+
+Use `questlab_archive` for the current path and accepted/written/dropped counts, or
+`questlab_archive flush` before opening the files in another tool. Archive settings take effect
+on the next Valheim launch after a config change. The session header records release, startup
+profile, privacy flags, and segment identity; it does not claim every queue/flush/retention knob
+as per-file provenance.
+
+### Export dashboard and Google Sheets
+
+The live view's **Exports** button is a deliberately narrow handoff to
+`http://127.0.0.1:47631/`. Start
+[`Start-QuestLabSheets.ps1`](../../../tools/questlab-sheets/Start-QuestLabSheets.ps1)
+and the local companion discovers timestamped normalized event sessions, validates their
+multipart JSONL, and offers formula-safe CSV immediately. Google Sheets is optional: after
+one Desktop OAuth setup and one **Connect Google** consent, **Create Google Sheet** turns the
+selected session into Events, Summary, and Metadata tabs and opens the new workbook. The
+per-file `drive.file` scope cannot browse the rest of Drive; tokens stay outside BepInEx and
+the repo, protected by current-user DPAPI on Windows. See the
+[companion security/setup guide](../../../tools/questlab-sheets/README.md).
+
+The creator package also includes the dependency-free `questlab-events` parser for filtered
+JSON/CSV, a richer five-tab XLSX, or a portable evidence bundle. The dashboard is the fast
+single-session route; the offline parser is the analysis and large-archive route.
 
 The **Spellbook** tab is a page per rune: what that school covers, something to go and
 try, and the trap. Its world-action grid gives each integration one row with a colored
@@ -182,6 +306,21 @@ fireplaces stay fuelled across zone reloads, without changing any ordinary brazi
 reports whether every visible fixture body is actually below the slab; the role count alone is
 not treated as visual-placement evidence.
 
+`questlab_gallery evidence [profile-or-build-id]` is the repeatable Truth Lens pass. It writes
+`comfy-questlab-gallery-truth/v1` under
+`BepInEx/config/comfy-quest-lab/receipts/truth/` without moving the player, camera, clock,
+weather, or a single world object. Each standing profile/build records renderer-derived world
+bounds; live `RoofCheck` coverage; ceiling-brazier clearance from the overlapping roof
+underface; and up to two live-vs-fresh render-configuration samples per role/prefab group.
+Those comparisons include material illumination, snow/wet/rain surface signals, and configured
+light deltas.
+
+The same artifact plans deterministic `overview-north`, `overview-east`, `overhead`,
+`arrival-eye`, and—when a roof is loaded—`roof-underside` views for the camera proof lane. It
+can prove an intersection, exposure, or material/light delta. It cannot prove that a frame
+looks good: visible snow and final appearance remain human visual judgments. Verify a collected
+artifact with `python tools/component-packets/verify_questlab_truth.py <artifact.json>`.
+
 The default is a course rather than an empty monument. Before the ascent portal, a ground
 welcome camp puts a Birch beside its bronze axe and serves cooked meat, Queens Jam, and bread
 on real horizontal item stands atop a picnic table. Each display carries a generated, prefab-
@@ -197,7 +336,7 @@ intersect the generated platform cells plus a bounded 12 m crown margin (the com
 Meadows Beech survey is 21.5 m across). It records exact
 prefab, position, native Euler rotation, quaternion, scale, and any non-default health in a
 JSON write-ahead ledger. The ledger carries an expected record count and SHA-256 digest and is
-read back through Unity's own serializer before the first world mutation; an absent or partial
+read back through the source-shared data-contract serializer before the first world mutation; an absent or partial
 tree collection aborts the gallery build. It then retires those roots
 directly—no damage, drops, or player statistics. The welcome Birch is placed afterwards and
 remains a marked gallery object. An ordinary `clear` restores matching pending ledgers only
@@ -222,6 +361,37 @@ and previews live in
 [`gallery-profiles.json`](../../../tools/component-packets/samples/gallery-profiles.json)
 and `gallery-plan-comparison.png`; `generate_gallery.py --check` guards plan drift.
 
+## Capture a build by example
+
+Quest Lab can turn a bounded live build into a portable pair without changing the source
+objects. Stand near the build and run, for example:
+
+```text
+questlab_blueprint capture my-hall 24 mine
+questlab_blueprint inspect my-hall
+```
+
+`mine` selects only pieces whose durable Valheim creator id is the local player. `lab`
+selects only pieces already owned by the Gallery or blueprint lanes. Both are additionally
+limited to a sphere around the player, capped at 40 m and 2,048 pieces; there is deliberately
+no unbounded or arbitrary-world selection. Capture refuses to overwrite either output unless
+the final argument is the explicit word `replace`.
+
+The `.blueprint` is the community-standard PlanBuild projection. Its adjacent
+`.capture.json` sidecar preserves sign text, item-stand item/variant/quality/orientation, and
+Quest Lab's durable rune-light/text-glow marks. Piece coordinates are translated to a zero
+minimum, quaternions are canonicalized, the complete records are sorted, and a SHA-256 covers
+them. Capturing the same structure at a different world position therefore produces identical
+content. `inspect` verifies the hash and refuses a mixed sidecar/blueprint pair; a build does
+the same check before placing its first object. `diff` captures another bounded selection in
+memory and reports missing and extra structural or metadata records.
+
+Only metadata with a reviewed persistence path is portable. Arbitrary ZDO keys, container
+contents, door state, portal links, generic runtime `Light` component edits, terrain operations,
+and non-unit scale are intentionally excluded. Replayed objects use the existing blueprint
+mark, count, and selective-clear lifecycle, so a captured experiment remains removable without
+touching unrelated world pieces.
+
 ## Bounded suites and receipts
 
 `all-schools` prepares one schema-1, source-compatible example quest per school and safely
@@ -237,10 +407,17 @@ the exact source-shared evaluator and labels its receipt `synthetic-contract`. I
 bindability, not that a Valheim player performed those actions. Receipts are ordinary JSON
 under `BepInEx/config/comfy-quest-lab/receipts/`.
 
+Each `scenario-<event>` suite narrows that contract proof to one discoverable event. `prepare`
+writes the editable quest and hashed manifest into its fixed Lab-owned scenario folder; `run`
+uses the manifest's catalog example and generated quest with the shared evaluator, and emits a
+one-event `synthetic-scenario` receipt. Existing files under `quests/` are never enumerated,
+edited, loaded, or removed by this workflow.
+
 For an unattended i5 lane, [`Invoke-I5QuestLabBatch.ps1`](../../../tools/i5/Invoke-I5QuestLabBatch.ps1)
 deploys one expiring request through the SHA-verified config lane and collects its request,
-suite, and relevant-log receipts. Its ten operations, two suites, and three gallery profiles
-are fixed allowlists. The request schema has no console text, key, path, or prefab field.
+suite, Gallery Truth, and relevant-log receipts. Its eleven operations, two release suites,
+34 exact scenario IDs, and three gallery profiles are fixed allowlists. The request schema has
+no console text, key, path, or prefab field.
 
 ## Writing a quest
 
@@ -269,6 +446,49 @@ The shared evaluator understands every safe catalog event and retains `hit` as a
 alias for `damage_dealt` and `resource_damaged`. All eight schools reach the quest engine through
 the same canonical router. Alternative local/RPC and overload witnesses share a bounded action
 key, so even a zero-cooldown quest cannot complete twice for one action.
+
+### Creator Foundry contract
+
+Every canonical event now carries shared creator metadata in `QuestEventCatalog`: what its target
+actually means, one honest example target, whether weapon skill/projectile context is meaningful,
+and each event-specific scalar field accepted by `trigger.where`. The human-owned source is
+[`quest-event-authoring.json`](../../../tools/component-packets/quest-event-authoring.json); the
+generator refuses a missing or invented event and publishes the same rows into the capability
+manifest and both mod assemblies.
+
+`QuestAuthoring.FromEvent` is the Unity-free foundation behind the Scenarios panel. It turns one
+witnessed `QuestEvent` into a complete schema-1 view, feeds that JSON through the exact shipping
+`QuestViewLoader`, and requires the exact `QuestTriggerEvaluator` to match the original witness
+before returning it. Stable identity fields such as station/item are retained; volatile amount
+and quantity values stay discoverable but are not copied into a draft by default. The panel can
+copy that result directly or prepare it in the bounded scenario folder; existing quest files are
+unchanged.
+
+`QuestAuthoring.ValidateDraft` and `Diagnose` return structured parse/match diagnostics. A miss is
+explained by asking the evaluator counterfactual questions with one constraint at a time; there is
+no second parser or matcher. The metadata is deliberately honest about current producer limits:
+chat/sign text is redacted and cannot be filtered, while `item_crafted` currently identifies the
+crafting subject rather than the crafted item. The cockpit is deliberately a safe draft/export
+surface, not a free-form in-game editor: creators edit the ordinary file with their chosen tool,
+then place it under `quests/` and reload when they want it armed.
+
+### Certified creator packs
+
+[`tools/quest-packs`](../../../tools/quest-packs/README.md) turns a local course into a
+deterministic, data-only `.questpack`. The `publish` command does not mirror the matcher in a
+script: its Unity-free contract host links this release's `QuestViewLoader`, generated event
+catalog, `QuestTriggerEvaluator`, and armed-state probe, then embeds that exact verdict in a
+public-safe certification report. Included suite receipts are independently checked against the
+complete 34-event or eight-school schemas before they can earn a badge. Partial JSON with a
+plausible `verdict: pass` earns nothing.
+
+Every published pack includes a generated generic getting-started guide. `inspect` verifies the
+archive and claim hashes, `diagnose` explains catalog/contract drift without installing, and
+`install --dry-run` names every destination without touching it. Installation never overwrites;
+uninstall refuses before deleting anything if a creator changed an installed quest or asset.
+No Derek-specific service, path, account, or remote console is required. The generated guide and
+public certification sidecar contain no raw gameplay receipt; creators deliberately including raw
+receipts in the pack should review those source files before public distribution.
 
 The tab also shows **the last event the matcher was given** — canonical name, target, and context
 — which is what turns "why didn't it fire" from a guess into a read.
@@ -324,7 +544,7 @@ and pausing drops nothing — the ring keeps collecting behind it.
 | `panelShortcut` | `F6` | F7 is taken by the retired control surface. `None` = console commands only. |
 | `panelScale` | `1` | Whole-panel zoom, 0.65–2.00. The in-panel − / + buttons change and persist it in 10% steps. |
 | `panelX`, `panelY` | `80`, `90` | Saved logical screen position. Updated on close and clamped after resolution/zoom changes. |
-| `panelWidth`, `panelHeight` | `900`, `620` | Saved logical window size. Updated on close; the drag handle remains bounded to the current screen. |
+| `panelWidth`, `panelHeight` | `900`, `620` | Saved logical window size. Resize saves immediately; current-screen bounds win after a resolution/zoom change. |
 | `consoleRows` | `18` | Rows on screen; the ring holds 8× that so you can scroll back. |
 | `galleryPiecesPerFrame` | `24` | Gallery objects placed per frame, clamped to 1–200. Lower it on a slower client. |
 | `blueprintPiecesPerFrame` | `12` | Blueprint objects placed per frame, clamped to 1–200. |
@@ -358,7 +578,7 @@ predicate restating the matcher's rules is the thing that drifts silently, and "
 means fires there" is the only promise the lab makes. If the evaluator gains a lane, this
 answer changes with it for free.
 
-**`LabQuestSet`, `LabQuestAdvisor`, `LabQuestSeed`, and `LabBatchContract` are Unity-free and linked into
+**`LabQuestSet`, `LabQuestAdvisor`, `LabQuestSeed`, `QuestAuthoring`, and `LabBatchContract` are Unity-free and linked into
 ComfyNetworkSense.Tests**, so the logic a creator depends on is provable in seconds without a
 game install. `LabQuestSet.Build` takes file *contents*, not paths, for exactly that reason —
 keep disk IO in `LabQuestEngine`. `LabQuestAdvisor` takes world facts as injected delegates

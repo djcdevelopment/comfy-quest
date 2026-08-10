@@ -184,6 +184,12 @@ html = [
     'lab&rsquo;s own window. Two different keys, and mixing them up is the usual first stumble. '
     'The window owns the mouse while open; its &minus; / + controls persistently tune the whole '
     'panel from 65% to 200% for windowed, 1080p, or 4K play.</p></li>',
+    '<li><strong>Open <em>Scenarios</em> when you want one event, not the whole course.</strong>',
+    '<p>Choose a colored school and any of the 34 canonical events. The cockpit explains its '
+    'target, example, fields, safety, and live action. Copy an editable schema-1 quest immediately, '
+    'or Prepare it into one fixed Lab-owned folder beside a deterministic manifest; a changed file '
+    'is never overwritten. Run evaluator produces explicit synthetic evidence through the exact '
+    'shared matcher, not a false claim that gameplay happened.</p></li>',
     '<li><strong>Edit <code>BepInEx/config/comfy-quest-lab/quests/starter.json</code>, then '
     'run <code>lab_reload</code>.</strong>',
     '<p>No restart. The <em>Quests</em> tab names what changed, what will fire, and what '
@@ -200,7 +206,8 @@ html = [
     '<code>questlab_batch run all-schools</code> and follow the eight prepared prompts. '
     '<code>report</code> shows what remains and <code>export</code> writes a JSON receipt. The separate '
     '<code>creator-events</code> suite checks all 34 shared evaluator names, but labels itself synthetic '
-    'rather than claiming those actions happened in Valheim.</p></li>',
+    'rather than claiming those actions happened in Valheim. Every exact one-event rehearsal is also '
+    'available to the bounded mailbox as <code>scenario-&lt;event&gt;</code>.</p></li>',
     '</ol>',
 
     '<p class="note"><strong>The starter file holds two backward-compatible quests.</strong> '

@@ -10,6 +10,8 @@ REPO = Path(__file__).resolve().parents[1]
 MOD = REPO / "network" / "mod" / "ComfyQuestLab"
 PANEL = MOD / "Ui" / "LabPanel.cs"
 INPUT = MOD / "Core" / "InputGuard.cs"
+LAYOUT = MOD / "Core" / "LabPanelLayout.cs"
+READINESS = MOD / "Core" / "LabDemoReadiness.cs"
 PATCHES = MOD / "Patches" / "LabPanelInputPatches.cs"
 PLUGIN = MOD / "ComfyQuestLab.cs"
 PROJECT = MOD / "ComfyQuestLab.csproj"
@@ -20,6 +22,8 @@ class QuestLabPanelTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.panel = PANEL.read_text(encoding="utf-8")
         cls.input = INPUT.read_text(encoding="utf-8")
+        cls.layout = LAYOUT.read_text(encoding="utf-8")
+        cls.readiness = READINESS.read_text(encoding="utf-8")
         cls.patches = PATCHES.read_text(encoding="utf-8")
         cls.plugin = PLUGIN.read_text(encoding="utf-8")
 
@@ -43,6 +47,7 @@ class QuestLabPanelTests(unittest.TestCase):
         self.assertIn("InputGuard.ReleasePanelInput();", self.panel)
         self.assertIn("InputGuard.MaintainPanelInput();", self.patches)
         self.assertIn("InputGuard.PanelOwnsInput", self.patches)
+        self.assertIn("InputGuard.OwnershipMode", self.panel)
 
     def test_close_keys_release_even_when_the_filter_has_focus(self) -> None:
         panel_open = self.plugin.index(
@@ -96,7 +101,9 @@ class QuestLabPanelTests(unittest.TestCase):
             "_requestedWidth",
             "_requestedHeight",
             "ClampWindow(_window, _drawScale)",
-            "Mathf.Min(MinWidth, maxWidth)",
+            "LabPanelBounds layout = LayoutBounds(clamped, _drawScale)",
+            "GUILayout.MinWidth(layout.MinimumWidth)",
+            "LabPanelLayout.Clamp(",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.panel)
@@ -110,8 +117,9 @@ class QuestLabPanelTests(unittest.TestCase):
             "SetPanelScale(1f)",
             "Matrix4x4.Scale(new Vector3(_drawScale, _drawScale, 1f))",
             "(mouse - _resizeStartMouse) / _drawScale",
-            "Screen.width / Mathf.Max(MinPanelScale, scale)",
+            "LabPanelLayout.MinimumScale",
             "LabConfig.PanelScale.Value = scale",
+            "_saveLayoutAfterDraw = true",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.panel)
@@ -167,6 +175,28 @@ class QuestLabPanelTests(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.panel)
 
+    def test_scenario_cockpit_exposes_the_bounded_creator_handoff(self) -> None:
+        controller = (MOD / "Core" / "LabBatchController.cs").read_text(encoding="utf-8")
+        scenario = (MOD / "Core" / "LabScenarioContract.cs").read_text(encoding="utf-8")
+        for marker in (
+            'new GUIContent("Scenarios",',
+            "LabScenarioCatalog.All.Count",
+            'new GUIContent("1  Prepare draft",',
+            'new GUIContent("2  Run evaluator",',
+            'new GUIContent("Copy draft JSON",',
+            'new GUIContent("Copy draft path",',
+            'new GUIContent("Open artifacts",',
+            "scenario.BuildQuestView()",
+            "batch.Prepare(instance, scenario.Id)",
+            "batch.Run(scenario.Id)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+        self.assertIn("QuestAuthoring.FromEvent", scenario)
+        self.assertIn("QuestTriggerEvaluator", scenario)
+        self.assertIn("ExistingContentConflict(questPath, questView)", controller)
+        self.assertIn("refused to overwrite a changed generated file", controller)
+
     def test_window_position_and_size_persist_on_close(self) -> None:
         for key in ("panelX", "panelY", "panelWidth", "panelHeight"):
             with self.subTest(key=key):
@@ -178,11 +208,61 @@ class QuestLabPanelTests(unittest.TestCase):
             "LabConfig.PanelY.Value",
             "LabConfig.PanelWidth.Value",
             "LabConfig.PanelHeight.Value",
-            "float.IsNaN(rect.x) || float.IsInfinity(rect.x)",
-            "float.IsNaN(rect.width) || float.IsInfinity(rect.width)",
+            "LabPanelBounds bounds = LayoutBounds(rect, scale)",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.panel)
+        self.assertIn("float.IsNaN(value)", self.layout)
+        self.assertIn("viewportWidth / scale", self.layout)
+
+    def test_keyboard_navigation_and_help_are_discoverable(self) -> None:
+        for marker in (
+            "HandleKeyboardNavigation();",
+            "KeyCode.Alpha1",
+            "KeyCode.Alpha4",
+            "KeyCode.Alpha5",
+            "KeyCode.Tab",
+            "KeyCode.F",
+            "KeyCode.Alpha0",
+            "KeyCode.F1",
+            'new GUIContent("Keys", "show keyboard shortcuts and state legend")',
+            '"KEYBOARD  /  Ctrl+1..5 tabs',
+            "ResetPanelLayout()",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+
+    def test_state_is_never_communicated_by_color_alone(self) -> None:
+        for marker in (
+            'return "[" + cue + "] " + label;',
+            "[OK] usable  /",
+            '"[INFO] Runtime readiness',
+            'GUILayout.Label("[CHECK] " + issue)',
+            '? "PROVED"',
+            "UsabilityCue(row.Usability)",
+            "QuestStateCue(quest.Armed)",
+            "SpellUseCue(spell)",
+            "InputGuard.OwnershipMode.ToUpperInvariant()",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+
+    def test_readiness_tab_uses_runtime_state_and_disclaims_visual_proof(self) -> None:
+        for marker in (
+            'new GUIContent("Ready?", "runtime-backed demo readiness; Ctrl+5")',
+            "HooksApplied = LabPatching.AppliedCount",
+            "CatalogEventCount = QuestEventCatalog.Count",
+            "ManifestEventCount = LabSeamCatalog.CreatorSafeEventCount",
+            "QuestLoadErrors = set.Errors.Count",
+            "LiveSuiteVerdict = live == null ? null : live.Verdict",
+            '"[INFO] Runtime readiness is not visual acceptance.',
+            "LabDemoReadiness.Assess(input)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.panel)
+
+        self.assertIn('result.StatusLabel = "[PROVED] LIVE LAP WITNESSED"', self.readiness)
+        self.assertIn('string.Equals(input.LiveSuiteVerdict, "pass"', self.readiness)
 
     def test_native_panel_does_not_add_a_jotunn_dependency(self) -> None:
         project = PROJECT.read_text(encoding="utf-8")

@@ -25,6 +25,8 @@ public sealed class LabBatchController {
   LabBatchSession _session;
   bool _preparing;
   string _preparedSuiteId;
+  string _preparedArtifactPath;
+  string _preparedQuestPath;
   string _lastExportPath;
   string _lastAutoExportState;
   float _nextRequestPoll;
@@ -36,6 +38,10 @@ public sealed class LabBatchController {
   }
 
   public LabBatchSession Session { get { return _session; } }
+  public string PreparedSuiteId { get { return _preparedSuiteId; } }
+  public string PreparedArtifactPath { get { return _preparedArtifactPath; } }
+  public string PreparedQuestPath { get { return _preparedQuestPath; } }
+  public bool IsPreparing { get { return _preparing || _gallery.IsRunning; } }
   public string LastExportPath { get { return _lastExportPath; } }
   public bool IsLiveCaptureRunning {
     get {
@@ -60,6 +66,10 @@ public sealed class LabBatchController {
     get { return Path.Combine(Path.Combine(RootDir, "receipts"), "suites"); }
   }
 
+  static string ScenariosDir {
+    get { return Path.Combine(RootDir, "scenarios"); }
+  }
+
   static string RequestReceiptsDir {
     get { return Path.Combine(Path.Combine(RootDir, "receipts"), "requests"); }
   }
@@ -79,13 +89,33 @@ public sealed class LabBatchController {
       ComfyQuestLab.Report(UnknownSuite(suiteId));
       yield break;
     }
-    if (suite.EvidenceKind == "synthetic-contract") {
+    if (suite.EvidenceKind == "synthetic-scenario") {
+      LabScenarioDefinition scenario = LabScenarioCatalog.Find(suite.Id);
+      string prepared = WriteScenarioArtifacts(
+          scenario, out string questPath, out string manifestPath);
+      if (prepared != null) {
+        ComfyQuestLab.Report(prepared);
+        yield break;
+      }
       _preparedSuiteId = suite.Id;
+      _preparedArtifactPath = manifestPath;
+      _preparedQuestPath = questPath;
+      ComfyQuestLab.Report("prepared " + suite.Id + " without changing the world or loading "
+          + "creator quests. Exact schema-1 draft and scenario manifest: " + manifestPath
+          + "\nquestlab_batch run " + suite.Id + " rehearses it through the shared evaluator.");
+      yield break;
+    }
+    if (IsSynthetic(suite)) {
+      _preparedSuiteId = suite.Id;
+      _preparedArtifactPath = null;
+      _preparedQuestPath = null;
       ComfyQuestLab.Report(suite.Id + " needs no world setup; questlab_batch run " + suite.Id
           + " executes the source-shared evaluator probe.");
       yield break;
     }
     _preparedSuiteId = null;
+    _preparedArtifactPath = null;
+    _preparedQuestPath = null;
     if (host == null || Player.m_localPlayer == null || ZNetScene.instance == null) {
       ComfyQuestLab.Report("not in a world yet — load a private world before preparing the live suite.");
       yield break;
@@ -154,9 +184,21 @@ public sealed class LabBatchController {
     string now = NowUtc();
     string runId = NextRunId(suite.Id);
     _lastAutoExportState = null;
-    if (suite.EvidenceKind == "synthetic-contract") {
-      _session = LabBatchContract.RunCreatorEventContract(runId, now);
-      _preparedSuiteId = suite.Id;
+    if (IsSynthetic(suite)) {
+      LabScenarioDefinition scenario = LabScenarioCatalog.Find(suite.Id);
+      _session = scenario == null
+          ? LabBatchContract.RunCreatorEventContract(runId, now)
+          : LabScenarioCatalog.Run(scenario, runId, now);
+      if (scenario == null) {
+        _preparedSuiteId = suite.Id;
+      } else if (!string.Equals(
+          _preparedSuiteId, suite.Id, StringComparison.OrdinalIgnoreCase)) {
+        // A direct run is allowed, but it did not create a draft. Do not let an earlier
+        // scenario's path masquerade as this one's prepared creator handoff.
+        _preparedSuiteId = null;
+        _preparedArtifactPath = null;
+        _preparedQuestPath = null;
+      }
       string exported = SaveReceipt();
       return _session.Summary() + "\n" + exported;
     }
@@ -285,7 +327,7 @@ public sealed class LabBatchController {
         ReleaseId = ComfyQuestLab.ReleaseId,
         RuntimeProfile = _session.Suite.EvidenceKind == "live-gameplay"
             ? LabRuntimeProfile.Extended + " (volatile batch override)"
-            : "synthetic contract",
+            : _session.Suite.EvidenceKind.Replace('-', ' '),
         GeneratedUtc = NowUtc(),
       });
       WriteAtomic(path, json);
@@ -309,6 +351,54 @@ public sealed class LabBatchController {
     } catch (Exception ex) {
       return "could not write the owned suite quest file: " + ex.Message;
     }
+  }
+
+  static string WriteScenarioArtifacts(
+      LabScenarioDefinition scenario, out string questPath, out string manifestPath) {
+    questPath = null;
+    manifestPath = null;
+    if (scenario == null) return "scenario is not allowlisted.";
+    try {
+      string directory = Path.Combine(ScenariosDir, scenario.Id);
+      Directory.CreateDirectory(directory);
+      questPath = Path.Combine(directory, "quest-view.json");
+      manifestPath = Path.Combine(directory, "scenario.json");
+      string questView = scenario.BuildQuestView();
+      string manifest = scenario.BuildManifest(questView);
+
+      // Generated paths are Lab-owned, but a creator may reasonably open the draft in place.
+      // Never erase that experiment: identical output is reusable; changed output is a clear,
+      // bounded refusal with the exact file named.
+      string conflict = ExistingContentConflict(questPath, questView)
+          ?? ExistingContentConflict(manifestPath, manifest);
+      if (conflict != null) {
+        questPath = null;
+        manifestPath = null;
+        return conflict;
+      }
+      WriteIfMissing(questPath, questView);
+      WriteIfMissing(manifestPath, manifest);
+      return null;
+    } catch (Exception ex) {
+      questPath = null;
+      manifestPath = null;
+      return "could not prepare the owned scenario artifacts: " + ex.Message;
+    }
+  }
+
+  static string ExistingContentConflict(string path, string expected) {
+    if (!File.Exists(path)) return null;
+    return string.Equals(File.ReadAllText(path, Encoding.UTF8), expected, StringComparison.Ordinal)
+        ? null
+        : "scenario prepare refused to overwrite a changed generated file: " + path
+            + ". Copy or rename your edit, then remove only that generated file and prepare again.";
+  }
+
+  static void WriteIfMissing(string path, string content) {
+    if (File.Exists(path)) return;
+    string temporary = path + ".tmp";
+    File.WriteAllText(temporary, content, new UTF8Encoding(false));
+    File.Move(temporary, path);
   }
 
   static int CountPreparedQuests(LabBatchSuite suite, out int duplicates) {
@@ -341,7 +431,12 @@ public sealed class LabBatchController {
 
   static string UnknownSuite(string suiteId) {
     return "unknown batch suite '" + (suiteId ?? string.Empty)
-        + "'. One of: all-schools, creator-events.";
+        + "'. Use all-schools, creator-events, or an exact scenario-<event> from the panel.";
+  }
+
+  static bool IsSynthetic(LabBatchSuite suite) {
+    return suite != null && (suite.EvidenceKind ?? string.Empty).StartsWith(
+        "synthetic-", StringComparison.Ordinal);
   }
 
   string NextRunId(string suiteId) {
@@ -447,10 +542,14 @@ public sealed class LabBatchController {
       WriteRequestReceipt(request, "completed", _gallery.Identify());
       return;
     }
-    if (operation == "history_step") {
-      host.StartCoroutine(_history.Run(host, request.corpus, request.step, request.seed,
-          request.expected_previous_step,
-          detail => WriteRequestReceipt(request, detail == "completed" ? "completed" : "failed", detail)));
+    if (operation == "gallery_evidence") {
+      LabTruthLens.CaptureResult result = LabTruthLens.Capture(
+          request.selector, request.request_id);
+      WriteRequestReceipt(
+          request,
+          result.Succeeded ? "completed" : "failed",
+          result.Summary,
+          result.Path);
       return;
     }
     if (operation == "gallery_clear") {
@@ -610,7 +709,8 @@ public sealed class LabBatchController {
     }
   }
 
-  void WriteRequestReceipt(LabBatchRequest request, string state, string detail) {
+  void WriteRequestReceipt(
+      LabBatchRequest request, string state, string detail, string evidencePath = null) {
     try {
       Directory.CreateDirectory(RequestReceiptsDir);
       string path = Path.Combine(RequestReceiptsDir, request.request_id + ".json");
@@ -625,6 +725,8 @@ public sealed class LabBatchController {
       sb.AppendLine("  \"release_id\": \"" + ComfyQuestLab.ReleaseId + "\",");
       sb.AppendLine("  \"completed_utc\": \"" + NowUtc() + "\",");
       sb.AppendLine("  \"detail\": \"" + LabBatchContract.Json(detail) + "\",");
+      sb.AppendLine("  \"evidence_path\": \""
+          + LabBatchContract.Json(evidencePath ?? string.Empty) + "\",");
       string suiteReceiptPath = RequestExposesSuiteReceipt(request.operation)
           ? _lastExportPath
           : string.Empty;

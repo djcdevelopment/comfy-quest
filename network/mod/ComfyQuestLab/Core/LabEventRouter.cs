@@ -30,13 +30,13 @@ public static class LabEventRouter {
       bool evaluate = true) {
     try {
       if (!LabSeamCatalog.TryGet(signatureId, out LabSeamCatalog.Entry capability)) {
-        ComfyQuestLab.Observe(new LabEvent(
+        ComfyQuestLab.ObserveRuntimeEvent(new LabEvent(
             LabCategory.Combat,
             signatureId,
             signatureId,
             target,
             detail,
-            LabUsability.LabCandidate));
+            LabUsability.LabCandidate), null);
         return null;
       }
 
@@ -67,13 +67,13 @@ public static class LabEventRouter {
         string usability = capability.CreatorSafe
             ? LabUsability.Today
             : LabUsability.DiagnosticOnly;
-        ComfyQuestLab.Observe(new LabEvent(
+        ComfyQuestLab.ObserveRuntimeEvent(new LabEvent(
             capability.Category,
             capability.SignatureId,
             capability.CanonicalEvent,
             target,
             detail,
-            usability));
+            usability), actionKey);
       } else if (LabConfig.VerboseLogging != null && LabConfig.VerboseLogging.Value) {
         ComfyQuestLab.LogInfo(
             "[lab] coalesced " + capability.SignatureId + " into " + actionKey);

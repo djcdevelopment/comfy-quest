@@ -46,6 +46,14 @@ quests. The shared evaluator supports all 34, every safe signature has an explic
 patch, and alternative local/RPC and overload routes share a tested action-dedupe contract.
 In-game witness receipts remain a separate evidence tier from that built coverage.
 
+Creator-facing target meanings, filterable fields, and honest example values live in the
+human-owned [`quest-event-authoring.json`](quest-event-authoring.json). Generation requires
+that file to cover exactly the 34 safe events: a newly safe event without authoring metadata,
+or metadata for an event that is no longer safe, fails the check. The same run publishes the
+metadata as `CreatorEvents` in the capability manifest and as typed definitions in the shared
+Unity-free `QuestEventCatalog`, so documentation, draft generation, and runtime matching do
+not grow separate vocabularies.
+
 The distinction is deliberate:
 
 | Layer | Identity | Purpose |

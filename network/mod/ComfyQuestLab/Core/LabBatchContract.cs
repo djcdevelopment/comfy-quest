@@ -82,10 +82,18 @@ public static class LabBatchContract {
 
   public static LabBatchSuite FindSuite(string id) {
     string wanted = string.IsNullOrWhiteSpace(id) ? AllSchoolsSuite.Id : id.Trim();
+    LabBatchSuite builtin = FindBuiltinSuite(wanted);
+    if (builtin != null) return builtin;
+    LabScenarioDefinition scenario = LabScenarioCatalog.Find(wanted);
+    return scenario == null ? null : scenario.Suite;
+  }
+
+  /// <summary>The two release-verification suites, excluding one-event creator rehearsals.
+  /// Kept separate so the scenario catalog can classify course-backed events without a static
+  /// initialization loop.</summary>
+  internal static LabBatchSuite FindBuiltinSuite(string id) {
     foreach (LabBatchSuite suite in Suites) {
-      if (string.Equals(suite.Id, wanted, StringComparison.OrdinalIgnoreCase)) {
-        return suite;
-      }
+      if (string.Equals(suite.Id, id, StringComparison.OrdinalIgnoreCase)) return suite;
     }
     return null;
   }
@@ -98,7 +106,9 @@ public static class LabBatchContract {
         .Append(" required event(s), ").Append(suite.EvidenceKind).AppendLine();
       sb.AppendLine("    " + suite.Description);
     }
-    sb.Append("Use questlab_batch prepare all-schools before its live run.");
+    sb.Append("34 one-event rehearsals are also allowlisted as scenario-<event>. ")
+      .Append("Browse them in the Scenarios tab, then use the same prepare/run/reset/report/export ")
+      .Append("verbs. Use questlab_batch prepare all-schools before its live run.");
     return sb.ToString();
   }
 
@@ -221,9 +231,9 @@ public static class LabBatchContract {
 /// widening a string-to-console bridge.</summary>
 public static class LabBatchRequestPolicy {
   public static readonly string[] Operations = {
-    "prepare", "run", "reset", "report", "export", "reload",
-    "gallery_build", "gallery_compare", "gallery_identify", "gallery_clear", "gallery_rebuild",
-    "history_step",
+    "prepare", "run", "reset", "report", "export",
+    "gallery_build", "gallery_compare", "gallery_identify", "gallery_evidence",
+    "gallery_clear", "gallery_rebuild",
   };
 
   public static bool Validate(
@@ -248,6 +258,16 @@ public static class LabBatchRequestPolicy {
     if (operation == "reset" || operation == "report" || operation == "export"
         || operation == "gallery_identify") {
       return NoExtras(suite, profile, compareProfile, selector, out error);
+    }
+    if (operation == "gallery_evidence") {
+      if (string.IsNullOrWhiteSpace(selector)
+          || (!string.Equals(selector, "all", StringComparison.OrdinalIgnoreCase)
+              && LabGalleryPlan.Find(selector) == null
+              && !SafeToken(selector, 80))) {
+        error = "gallery_selector_invalid";
+        return false;
+      }
+      return NoExtras(suite, profile, compareProfile, out error);
     }
     if (operation == "gallery_build" || operation == "gallery_rebuild") {
       if (string.IsNullOrWhiteSpace(profile) || LabGalleryPlan.Find(profile) == null) {

@@ -16,11 +16,28 @@ param(
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateSet(
         'prepare', 'run', 'reset', 'report', 'export',
-        'gallery_build', 'gallery_compare', 'gallery_identify', 'gallery_clear', 'gallery_rebuild'
+        'gallery_build', 'gallery_compare', 'gallery_identify', 'gallery_evidence',
+        'gallery_clear', 'gallery_rebuild'
     )]
     [string]$Operation,
 
-    [ValidateSet('all-schools', 'creator-events')]
+    [ValidateSet(
+        'all-schools', 'creator-events',
+        'scenario-attack_blocked', 'scenario-character_healed',
+        'scenario-character_staggered', 'scenario-chat_sent',
+        'scenario-container_emptied', 'scenario-damage_dealt',
+        'scenario-global_key_removed', 'scenario-global_key_set',
+        'scenario-item_consumed', 'scenario-item_crafted', 'scenario-item_dropped',
+        'scenario-item_equipped', 'scenario-item_picked_up', 'scenario-item_unequipped',
+        'scenario-kill', 'scenario-max_health_changed', 'scenario-piece_damaged',
+        'scenario-piece_destroyed', 'scenario-piece_placed', 'scenario-piece_removed',
+        'scenario-piece_repaired', 'scenario-player_died', 'scenario-player_teleported',
+        'scenario-resource_damaged', 'scenario-resource_picked', 'scenario-sign_written',
+        'scenario-skill_raised', 'scenario-skills_lowered', 'scenario-stamina_gained',
+        'scenario-stamina_spent', 'scenario-station_fuel_added',
+        'scenario-station_input_added', 'scenario-station_output_collected',
+        'scenario-station_output_produced'
+    )]
     [string]$Suite = 'all-schools',
 
     [ValidateSet('classic', 'marble-wide', 'marble-grand')]
@@ -87,6 +104,10 @@ switch ($Operation) {
         break
     }
     'gallery_clear' {
+        $request.selector = $Selector
+        break
+    }
+    'gallery_evidence' {
         $request.selector = $Selector
         break
     }
@@ -279,11 +300,60 @@ if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
         Write-Error 'Quest Lab suite receipt records a same-action double completion.'
         exit 1
     }
-    if ($Operation -eq 'run' -and $Suite -eq 'creator-events' -and
+    if ($Operation -eq 'run' -and
+        ($Suite -eq 'creator-events' -or $Suite.StartsWith('scenario-')) -and
         $suiteObject.verdict -ne 'pass') {
-        Write-Error "creator-events contract suite did not pass: $($suiteObject.verdict)"
+        Write-Error "synthetic evaluator suite did not pass: $($suiteObject.verdict)"
         exit 1
     }
+}
+
+if (-not [string]::IsNullOrWhiteSpace([string]$receipt.evidence_path)) {
+    $evidencePathRaw = [string]$receipt.evidence_path
+    $evidencePathNormalized = $evidencePathRaw.Replace('\', '/')
+    $expectedEvidenceRoot = if ($Lane -eq 'i5') {
+        "$i5ValheimRoot/BepInEx/config/comfy-quest-lab/receipts/truth/"
+    } else {
+        ($omenValheimRoot.Replace('\', '/') + '/BepInEx/config/comfy-quest-lab/receipts/truth/')
+    }
+    if (-not $evidencePathNormalized.StartsWith(
+            $expectedEvidenceRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "truth evidence escaped the fixed receipt directory: $evidencePathRaw"
+    }
+    $evidenceLeaf = $evidencePathNormalized.Substring($expectedEvidenceRoot.Length)
+    if ($evidenceLeaf -notmatch '^[A-Za-z0-9._-]+\.json$') {
+        throw "truth evidence did not name one fixed-directory JSON file: $evidencePathRaw"
+    }
+    if ($Lane -eq 'i5') {
+        $escapedEvidencePath = $evidencePathRaw.Replace("'", "''")
+        $evidenceReadScript = @"
+`$path = '$escapedEvidencePath'
+if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding(`$false)
+[Console]::Write([System.IO.File]::ReadAllText(`$path))
+"@
+        $evidenceEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($evidenceReadScript))
+        $evidenceLines = & ssh -o BatchMode=yes -o ConnectTimeout=8 i5 `
+            "powershell.exe -NoProfile -EncodedCommand $evidenceEncoded" 2>$null
+        if ($LASTEXITCODE -ne 0) { throw 'truth evidence path was reported but could not be read' }
+        $evidenceJson = @($evidenceLines) -join [Environment]::NewLine
+    } else {
+        if (-not (Test-Path -LiteralPath $evidencePathRaw)) {
+            throw 'truth evidence path was reported but could not be read'
+        }
+        $evidenceJson = [System.IO.File]::ReadAllText($evidencePathRaw)
+    }
+    $evidenceObject = $evidenceJson | ConvertFrom-Json
+    if ($evidenceObject.schema -ne 'comfy-questlab-gallery-truth/v1') {
+        throw "unexpected truth evidence schema: $($evidenceObject.schema)"
+    }
+    $localEvidence = Join-Path $OutputDirectory "$requestId-truth.json"
+    [System.IO.File]::WriteAllText(
+        $localEvidence,
+        $evidenceJson + [Environment]::NewLine,
+        (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "truth evidence: $localEvidence"
+    Write-Host "truth verdict: $($evidenceObject.verdict)"
 }
 
 $logScript = @'

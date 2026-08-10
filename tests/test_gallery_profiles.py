@@ -18,6 +18,7 @@ GENERATOR = TOOLS / "generate_gallery.py"
 PLAN = MOD / "Core" / "LabGalleryPlan.g.cs"
 BUILDER = MOD / "Core" / "LabGalleryBuilder.cs"
 TREE_RECOVERY = MOD / "Core" / "LabTreeRecovery.cs"
+TREE_CONTRACT = MOD / "Core" / "LabTreeRecoveryContract.cs"
 CONTROLLER = MOD / "Core" / "LabBatchController.cs"
 PLUGIN = MOD / "ComfyQuestLab.cs"
 
@@ -240,21 +241,32 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_tree_pruning_is_write_ahead_bounded_and_recoverable(self) -> None:
         source = TREE_RECOVERY.read_text(encoding="utf-8")
+        contract = TREE_CONTRACT.read_text(encoding="utf-8")
         builder = BUILDER.read_text(encoding="utf-8")
         plugin = PLUGIN.read_text(encoding="utf-8")
         write = source.index("WriteLedger(path, ledger); // Write before")
-        read_back = source.index("Ledger persisted = ReadLedger(path);")
+        read_back = source.index("LabTreeRecoveryLedger persisted = ReadLedger(path);")
         validate = source.index("RecordsAreComplete(persisted, out ledgerError)")
         destroy = source.index("view.Destroy();")
         self.assertLess(write, destroy)
         self.assertLess(write, read_back)
         self.assertLess(read_back, validate)
         self.assertLess(validate, destroy)
-        self.assertIn("public sealed class TreeRecord", source)
-        self.assertIn("public sealed class Ledger", source)
-        self.assertIn("public int RecordCount;", source)
-        self.assertIn("public string RecordsSha256;", source)
-        self.assertIn("ledger.RecordCount = ledger.Trees.Count", source)
+        self.assertIn("public sealed class LabTreeRecoveryRecord", contract)
+        self.assertIn("public sealed class LabTreeRecoveryLedger", contract)
+        self.assertIn(
+            "public LabTreeRecoveryRecord[] Trees = new LabTreeRecoveryRecord[0];",
+            contract,
+        )
+        self.assertNotIn("List<LabTreeRecoveryRecord> Trees", contract)
+        self.assertIn("DataContractJsonSerializer", contract)
+        self.assertIn('[DataMember(Name = "Trees", Order = 12)]', contract)
+        self.assertIn("public int RecordCount;", contract)
+        self.assertIn("public string RecordsSha256;", contract)
+        self.assertIn("LabTreeRecoveryContract.Deserialize", source)
+        self.assertIn("LabTreeRecoveryContract.Serialize", source)
+        self.assertNotIn("JsonUtility", source)
+        self.assertIn("ledger.RecordCount = ledger.Trees.Length", source)
         self.assertIn("ledger.RecordsSha256 = RecordsDigest(ledger.Trees)", source)
         self.assertIn("Quaternion.Euler(record.Rx, record.Ry, record.Rz)", source)
         self.assertIn("if (!RecordsAreComplete(ledger, out ledgerError))", source)

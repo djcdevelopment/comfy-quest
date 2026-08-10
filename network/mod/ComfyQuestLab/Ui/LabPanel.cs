@@ -24,10 +24,10 @@ using UnityEngine;
 public sealed class LabPanel {
   const int WindowId = 481922;   // 481620 = retired control surface, 481921 = NetworkSense
   const string FilterControlName = "questlab_filter";
-  const float DefaultWidth = 900f;
-  const float DefaultHeight = 620f;
-  const float MinWidth = 700f;
-  const float MinHeight = 440f;
+  const float DefaultWidth = LabPanelLayout.DefaultWidth;
+  const float DefaultHeight = LabPanelLayout.DefaultHeight;
+  const float MinWidth = LabPanelLayout.PreferredMinimumWidth;
+  const float MinHeight = LabPanelLayout.PreferredMinimumHeight;
   const float ResizeHandle = 20f;
   const float TimeColumn = 62f;
   const float SchoolColumn = 112f;
@@ -39,9 +39,15 @@ public sealed class LabPanel {
   const float QuestExpandColumn = 44f;
   const float SpellUseColumn = 190f;
   const float SpellTrueNameColumn = 220f;
-  const float MinPanelScale = 0.65f;
-  const float MaxPanelScale = 2f;
+  const float MinPanelScale = LabPanelLayout.MinimumScale;
+  const float MaxPanelScale = LabPanelLayout.MaximumScale;
+  const float ScenarioEventColumn = 210f;
+  const float ScenarioProfileColumn = 82f;
+  const float ScenarioSelectColumn = 70f;
   const float PanelScaleStep = 0.1f;
+  // Deliberately not configurable: this is a local handoff, never a remote-control or
+  // arbitrary-URL surface. The companion binds this exact IPv4 loopback address only.
+  const string SheetsExporterUrl = "http://127.0.0.1:47631/";
 
   readonly LabEventRing _ring;
   readonly HashSet<string> _visible = new HashSet<string>(LabCategory.DefaultVisible);
@@ -51,7 +57,11 @@ public sealed class LabPanel {
   Vector2 _scroll;
   Vector2 _journalScroll;
   Vector2 _questScroll;
+  Vector2 _readinessScroll;
+  Vector2 _scenarioScroll;
   string _journalCategory = LabCategory.Harvest;   // where a new builder starts
+  string _scenarioCategory = LabCategory.Harvest;
+  string _selectedScenarioId = "scenario-resource_damaged";
   string _filterText = string.Empty;
   string _notice = string.Empty;
   float _noticeUntil;
@@ -59,6 +69,8 @@ public sealed class LabPanel {
   bool _showTrueNames;
   bool _showQuestFolder;
   bool _showQuestErrors;
+  bool _showKeyboardHelp;
+  bool _focusFilter;
   string _expandedQuestKey;
   bool _resizing;
   Vector2 _resizeStartMouse;
@@ -66,6 +78,7 @@ public sealed class LabPanel {
   float _requestedWidth = -1f;
   float _requestedHeight = -1f;
   float _drawScale = 1f;
+  bool _saveLayoutAfterDraw;
   Texture2D _windowBackground;
   Texture2D _gridHeaderBackground;
   Texture2D _gridEvenBackground;
@@ -82,7 +95,7 @@ public sealed class LabPanel {
   GUIStyle _resizeStyle;
   Tab _tab = Tab.Console;
 
-  enum Tab { Console, Spellbook, Quests }
+  enum Tab { Console, Spellbook, Scenarios, Quests, Readiness }
 
   /// <summary>One rune, used as a toggle. The same call renders a spellbook tab and a
   /// console filter, which is the whole reason the runes exist: learning the book
@@ -151,13 +164,21 @@ public sealed class LabPanel {
       label.wordWrap = true;
       label.normal.textColor = new Color(0.94f, 0.96f, 1f, 1f);
       GUI.contentColor = Color.white;
-      _window = GUILayout.Window(WindowId, ClampWindow(_window, _drawScale), DrawWindow, "Quest Lab",
-          _windowStyle, GUILayout.MinWidth(MinWidth), GUILayout.MinHeight(MinHeight));
+      Rect clamped = ClampWindow(_window, _drawScale);
+      LabPanelBounds layout = LayoutBounds(clamped, _drawScale);
+      _window = GUILayout.Window(WindowId, clamped, DrawWindow, "Quest Lab",
+          _windowStyle,
+          GUILayout.MinWidth(layout.MinimumWidth),
+          GUILayout.MinHeight(layout.MinimumHeight));
       if (_requestedWidth > 0f && _requestedHeight > 0f) {
         _window.width = _requestedWidth;
         _window.height = _requestedHeight;
       }
       _window = ClampWindow(_window, _drawScale);
+      if (_saveLayoutAfterDraw) {
+        SaveWindow();
+        _saveLayoutAfterDraw = false;
+      }
     } finally {
       label.fontSize = oldFontSize;
       label.wordWrap = oldWordWrap;
@@ -168,8 +189,12 @@ public sealed class LabPanel {
   }
 
   void DrawWindow(int id) {
+    HandleKeyboardNavigation();
     if (DrawTabs()) {
       return;
+    }
+    if (_showKeyboardHelp) {
+      DrawKeyboardHelp();
     }
     GUILayout.Space(4f);
 
@@ -177,8 +202,12 @@ public sealed class LabPanel {
       DrawConsole();
     } else if (_tab == Tab.Spellbook) {
       DrawSpellbook();
-    } else {
+    } else if (_tab == Tab.Scenarios) {
+      DrawScenarioCockpit();
+    } else if (_tab == Tab.Quests) {
       DrawQuestDashboard();
+    } else {
+      DrawReadiness();
     }
 
     DrawHelpBar();
@@ -189,19 +218,34 @@ public sealed class LabPanel {
   bool DrawTabs() {
     GUILayout.BeginHorizontal();
     if (GUILayout.Toggle(_tab == Tab.Console,
-        new GUIContent("What just happened", "live creator events and quest usability"),
+        new GUIContent("What just happened",
+            "live creator events and quest usability; Ctrl+1"),
         GUI.skin.button)) {
       _tab = Tab.Console;
     }
     if (GUILayout.Toggle(_tab == Tab.Spellbook,
-        new GUIContent("Spellbook", "browse the eight event schools"), GUI.skin.button)) {
+        new GUIContent("Spellbook", "browse the eight event schools; Ctrl+2"),
+        GUI.skin.button)) {
       _tab = Tab.Spellbook;
     }
+    if (GUILayout.Toggle(_tab == Tab.Scenarios,
+        new GUIContent("Scenarios", "prepare and rehearse one canonical event; Ctrl+3"),
+        GUI.skin.button)) {
+      _tab = Tab.Scenarios;
+    }
     if (GUILayout.Toggle(_tab == Tab.Quests,
-        new GUIContent("Quests", "loaded quest files and evaluator state"), GUI.skin.button)) {
+        new GUIContent("Quests", "loaded quest files and evaluator state; Ctrl+4"),
+        GUI.skin.button)) {
       _tab = Tab.Quests;
     }
+    if (GUILayout.Toggle(_tab == Tab.Readiness,
+        new GUIContent("Ready?", "runtime-backed demo readiness; Ctrl+5"), GUI.skin.button)) {
+      _tab = Tab.Readiness;
+    }
     GUILayout.FlexibleSpace();
+    GUILayout.Label(new GUIContent("[" + InputGuard.OwnershipMode.ToUpperInvariant() + "]",
+        "input ownership: interactive means pointer owned and player actions blocked"),
+        GUILayout.Width(108f));
     GUILayout.Label(new GUIContent(_ring.Count + " held · " + _ring.TotalSeen + " seen",
         "events currently retained / events observed this session"));
     if (GUILayout.Button(new GUIContent("-", "zoom out"), GUILayout.Width(28f))) {
@@ -214,6 +258,10 @@ public sealed class LabPanel {
     if (GUILayout.Button(new GUIContent("+", "zoom in"), GUILayout.Width(28f))) {
       SetPanelScale(_drawScale + PanelScaleStep);
     }
+    if (GUILayout.Button(new GUIContent("Keys", "show keyboard shortcuts and state legend"),
+        GUILayout.Width(44f))) {
+      _showKeyboardHelp = !_showKeyboardHelp;
+    }
     if (GUILayout.Button(new GUIContent("Close", "F6 or Escape"), GUILayout.Width(58f))) {
       GUILayout.EndHorizontal();
       Close();
@@ -221,6 +269,70 @@ public sealed class LabPanel {
     }
     GUILayout.EndHorizontal();
     return false;
+  }
+
+  void HandleKeyboardNavigation() {
+    Event current = Event.current;
+    if (current == null || current.type != EventType.KeyDown) {
+      return;
+    }
+    if (current.keyCode == KeyCode.F1) {
+      _showKeyboardHelp = !_showKeyboardHelp;
+      current.Use();
+      return;
+    }
+    if (!current.control) {
+      return;
+    }
+
+    if (current.keyCode == KeyCode.Alpha1) {
+      SelectTab(Tab.Console);
+    } else if (current.keyCode == KeyCode.Alpha2) {
+      SelectTab(Tab.Spellbook);
+    } else if (current.keyCode == KeyCode.Alpha3) {
+      SelectTab(Tab.Scenarios);
+    } else if (current.keyCode == KeyCode.Alpha4) {
+      SelectTab(Tab.Quests);
+    } else if (current.keyCode == KeyCode.Alpha5) {
+      SelectTab(Tab.Readiness);
+    } else if (current.keyCode == KeyCode.Tab) {
+      int count = Enum.GetValues(typeof(Tab)).Length;
+      int delta = current.shift ? -1 : 1;
+      SelectTab((Tab) (((int) _tab + delta + count) % count));
+    } else if (current.keyCode == KeyCode.F) {
+      SelectTab(Tab.Console);
+      _focusFilter = true;
+    } else if (current.keyCode == KeyCode.Alpha0) {
+      SetPanelScale(1f);
+      ShowNotice("ZOOM RESET  /  100%");
+    } else {
+      return;
+    }
+    current.Use();
+  }
+
+  void SelectTab(Tab tab) {
+    _tab = tab;
+    GUI.FocusControl(null);
+    InputGuard.TypingInLab = false;
+  }
+
+  void DrawKeyboardHelp() {
+    GUILayout.BeginVertical(_questDetailStyle);
+    GUILayout.BeginHorizontal();
+    GUILayout.Label("KEYBOARD  /  Ctrl+1..5 tabs  /  Ctrl+Tab cycle  /  Ctrl+F find  /  "
+        + "Ctrl+0 zoom  /  F1 help  /  F6 or Esc close");
+    if (GUILayout.Button(new GUIContent("Reset layout",
+        "restore 100% zoom and a visible default window"), GUILayout.Width(96f))) {
+      ResetPanelLayout();
+    }
+    if (GUILayout.Button("Hide", GUILayout.Width(46f))) {
+      _showKeyboardHelp = false;
+    }
+    GUILayout.EndHorizontal();
+    GUILayout.Label("STATE WORDS  /  [OK] usable  /  [INFO] observation only  /  "
+        + "[CHECK] action needed  /  [PROVED] machine receipt passed");
+    GUILayout.EndVertical();
   }
 
   void DrawConsole() {
@@ -248,6 +360,10 @@ public sealed class LabPanel {
     // stops every keystroke in this box from also being a game hotkey.
     GUI.SetNextControlName(FilterControlName);
     _filterText = GUILayout.TextField(_filterText ?? string.Empty, GUILayout.MinWidth(160f));
+    if (_focusFilter) {
+      GUI.FocusControl(FilterControlName);
+      _focusFilter = false;
+    }
     InputGuard.TypingInLab = GUI.GetNameOfFocusedControl() == FilterControlName;
 
     bool controlsEnabled = GUI.enabled;
@@ -286,6 +402,10 @@ public sealed class LabPanel {
         GUILayout.Width(72f))) {
       _ring.Clear();
       _pausedRows.Clear();
+    }
+    if (GUILayout.Button(new GUIContent("Exports",
+        "open the optional local CSV / Google Sheets companion"), GUILayout.Width(66f))) {
+      OpenSheetsExporter();
     }
     GUILayout.EndHorizontal();
 
@@ -417,7 +537,7 @@ public sealed class LabPanel {
     Color usabilityColor = UsabilityColor(row.Usability);
     style.normal.textColor = usabilityColor;
     style.hover.textColor = usabilityColor;
-    GridCell(new GUIContent(UsabilityLabel(row.Usability), UsabilityLine(row.Usability)),
+    GridCell(new GUIContent(UsabilityCue(row.Usability), UsabilityLine(row.Usability)),
         style, UseColumn);
     style.normal.textColor = prior;
     style.hover.textColor = priorHover;
@@ -450,6 +570,17 @@ public sealed class LabPanel {
       default:
         return "NO TRIGGER";
     }
+  }
+
+  static string UsabilityCue(string usability) {
+    string cue = usability == LabUsability.Today
+        ? "OK"
+        : (usability == LabUsability.DiagnosticOnly ? "INFO" : "NO");
+    return StatusCue(cue, UsabilityLabel(usability));
+  }
+
+  static string StatusCue(string cue, string label) {
+    return "[" + cue + "] " + label;
   }
 
   static Color UsabilityColor(string usability) {
@@ -548,7 +679,7 @@ public sealed class LabPanel {
       GUI.contentColor = new Color(1f, 0.62f, 0.46f, 1f);
       _showQuestErrors = GUILayout.Toggle(_showQuestErrors,
           new GUIContent(
-              (_showQuestErrors ? "-" : "+") + "  " + set.Errors.Count + " LOAD ERROR"
+              (_showQuestErrors ? "▲" : "▼") + "  " + set.Errors.Count + " LOAD ERROR"
                   + (set.Errors.Count == 1 ? string.Empty : "S"),
               "show or hide quest-file parse failures"),
           GUI.skin.button);
@@ -645,7 +776,7 @@ public sealed class LabPanel {
     Color stateColor = QuestStateColor(quest.Armed);
     style.normal.textColor = stateColor;
     style.hover.textColor = stateColor;
-    GridCell(new GUIContent(QuestStateLabel(quest.Armed), quest.ArmedLine()),
+    GridCell(new GUIContent(QuestStateCue(quest.Armed), quest.ArmedLine()),
         style, QuestStateColumn);
     style.normal.textColor = prior;
     style.hover.textColor = priorHover;
@@ -737,6 +868,13 @@ public sealed class LabPanel {
     }
   }
 
+  static string QuestStateCue(string armed) {
+    string cue = armed == LabArmed.Yes
+        ? "OK"
+        : (armed == LabArmed.UnsupportedEvent || armed == LabArmed.Unknown ? "CHECK" : "INFO");
+    return StatusCue(cue, QuestStateLabel(armed));
+  }
+
   static Color QuestStateColor(string armed) {
     switch (armed) {
       case LabArmed.Yes: return new Color(0.55f, 1f, 0.64f, 1f);
@@ -745,6 +883,198 @@ public sealed class LabPanel {
       case LabArmed.Irl: return new Color(0.72f, 0.76f, 0.82f, 1f);
       case LabArmed.UnsupportedEvent: return new Color(1f, 0.48f, 0.42f, 1f);
       default: return new Color(1f, 0.66f, 0.42f, 1f);
+    }
+  }
+
+  /// <summary>A bounded rehearsal cockpit over the shared 34-event authoring catalog.
+  /// Preparing writes only Lab-owned artifacts; running feeds one generated ordinary quest and
+  /// one catalog example to the exact shared evaluator. The UI calls the existing batch
+  /// lifecycle, so local clicks and allowlisted OMEN/i5 requests produce the same receipts.</summary>
+  void DrawScenarioCockpit() {
+    for (int row = 0; row < 2; row++) {
+      GUILayout.BeginHorizontal();
+      for (int i = row * 4; i < (row + 1) * 4 && i < LabCategory.All.Length; i++) {
+        string category = LabCategory.All[i];
+        bool selected = string.Equals(
+            _scenarioCategory, category, StringComparison.OrdinalIgnoreCase);
+        if (RuneToggle(selected, category, LabJournal.For(category).Title, 138f) && !selected) {
+          _scenarioCategory = category;
+          LabScenarioDefinition first = LabScenarioCatalog.FirstForSchool(category);
+          _selectedScenarioId = first == null ? null : first.Id;
+          _scenarioScroll = Vector2.zero;
+        }
+      }
+      GUILayout.EndHorizontal();
+    }
+    GUILayout.Space(5f);
+
+    GUILayout.BeginHorizontal();
+    GUILayout.Label("Pick one creator event. Preview runs are exact evaluator evidence, not a "
+        + "claim that gameplay happened.");
+    GUILayout.FlexibleSpace();
+    GUILayout.Label(LabScenarioCatalog.All.Count + " events");
+    GUILayout.EndHorizontal();
+
+    DrawScenarioGridHeader();
+    _scenarioScroll = GUILayout.BeginScrollView(
+        _scenarioScroll, GUILayout.Height(Mathf.Min(218f, _window.height * 0.34f)));
+    int visibleIndex = 0;
+    foreach (LabScenarioDefinition scenario in LabScenarioCatalog.All) {
+      if (!string.Equals(
+          scenario.School, _scenarioCategory, StringComparison.OrdinalIgnoreCase)) {
+        continue;
+      }
+      DrawScenarioGridRow(scenario, visibleIndex++);
+    }
+    GUILayout.EndScrollView();
+
+    LabScenarioDefinition current = LabScenarioCatalog.Find(_selectedScenarioId)
+        ?? LabScenarioCatalog.FirstForSchool(_scenarioCategory);
+    if (current == null) return;
+
+    Color schoolColor = LabRunes.ColorFor(current.School);
+    DrawSectionHeading(current.EventName.ToUpperInvariant(), schoolColor,
+        LabRunes.For(current.School));
+    GUILayout.BeginVertical(_questDetailStyle);
+    GUILayout.Label("target  /  " + current.TargetKind + "  /  " + current.TargetDescription);
+    GUILayout.Label("example  /  " + current.ExampleTarget
+        + "    profile  /  " + current.Profile.ToUpperInvariant()
+        + "    safety  /  " + current.Safety);
+    GUILayout.Label("try live  /  " + current.LiveAction);
+    if (current.Fields.Count > 0) {
+      var fields = new List<string>();
+      foreach (QuestEventCatalog.FieldDefinition field in current.Fields) {
+        fields.Add(field.Name + "=" + field.Example
+            + (field.DraftByDefault ? " (drafted)" : " (optional)"));
+      }
+      GUILayout.Label("where fields  /  " + string.Join("  Â·  ", fields.ToArray()));
+    }
+    GUILayout.Label(current.CourseWitnessAvailable
+        ? "live lane  /  staged in the all-schools compact course"
+        : "live lane  /  follow the action above; this one is not staged by the compact course");
+    GUILayout.EndVertical();
+
+    DrawScenarioControls(current);
+  }
+
+  void DrawScenarioGridHeader() {
+    GUILayout.BeginHorizontal();
+    GridCell(new GUIContent("EVENT"), _gridHeaderStyle, ScenarioEventColumn);
+    GridCell(new GUIContent("TARGET / EXAMPLE"), _gridHeaderStyle, -1f);
+    GridCell(new GUIContent("PROFILE"), _gridHeaderStyle, ScenarioProfileColumn);
+    GridCell(new GUIContent("OPEN"), _gridHeaderStyle, ScenarioSelectColumn);
+    GUILayout.EndHorizontal();
+  }
+
+  void DrawScenarioGridRow(LabScenarioDefinition scenario, int index) {
+    GUIStyle style = index % 2 == 0 ? _gridEvenStyle : _gridOddStyle;
+    bool selected = string.Equals(
+        _selectedScenarioId, scenario.Id, StringComparison.OrdinalIgnoreCase);
+    Color prior = style.normal.textColor;
+    Color priorHover = style.hover.textColor;
+    if (selected) {
+      style.normal.textColor = LabRunes.ColorFor(scenario.School);
+      style.hover.textColor = Color.white;
+    }
+    GUILayout.BeginHorizontal();
+    if (GridButton(new GUIContent((selected ? "â–¶  " : string.Empty) + scenario.EventName,
+        "click to select; canonical trigger.event is " + scenario.EventName),
+        style, ScenarioEventColumn)) {
+      _selectedScenarioId = scenario.Id;
+    }
+    GridCell(new GUIContent(scenario.TargetKind + " / " + scenario.ExampleTarget,
+        scenario.TargetDescription), style, -1f);
+    GridCell(new GUIContent(scenario.Profile.ToUpperInvariant(),
+        scenario.Profile + " runtime profile"), style, ScenarioProfileColumn);
+    if (GridButton(new GUIContent("Select", "open this rehearsal"),
+        style, ScenarioSelectColumn)) {
+      _selectedScenarioId = scenario.Id;
+    }
+    GUILayout.EndHorizontal();
+    style.normal.textColor = prior;
+    style.hover.textColor = priorHover;
+  }
+
+  void DrawScenarioControls(LabScenarioDefinition scenario) {
+    LabBatchController batch = ComfyQuestLab.Batch;
+    if (batch == null) {
+      GUILayout.Label("Scenario runner is unavailable in this game state.");
+      return;
+    }
+
+    GUILayout.BeginHorizontal();
+    bool controlsEnabled = GUI.enabled;
+    GUI.enabled = controlsEnabled && !batch.IsPreparing && !batch.IsLiveCaptureRunning;
+    if (GUILayout.Button(new GUIContent("1  Prepare draft",
+        "write an owned scenario manifest and ordinary schema-1 quest; do not load it"))) {
+      ComfyQuestLab instance = ComfyQuestLab.Instance;
+      if (instance != null) instance.StartCoroutine(batch.Prepare(instance, scenario.Id));
+    }
+    if (GUILayout.Button(new GUIContent("2  Run evaluator",
+        "run this one example through the exact shared loader and evaluator"))) {
+      ComfyQuestLab.Report(batch.Run(scenario.Id));
+    }
+    GUI.enabled = controlsEnabled;
+    if (GUILayout.Button(new GUIContent("Reset", "clear volatile evidence and restore cooldown"),
+        GUILayout.Width(70f))) {
+      ComfyQuestLab.Report(batch.Reset());
+    }
+    if (GUILayout.Button(new GUIContent("Report", "show current scenario progress"),
+        GUILayout.Width(70f))) {
+      ComfyQuestLab.Report(batch.Report());
+    }
+    GUI.enabled = controlsEnabled && batch.Session != null;
+    if (GUILayout.Button(new GUIContent("Export", "write a machine-readable suite receipt"),
+        GUILayout.Width(70f))) {
+      ComfyQuestLab.Report(batch.Export());
+    }
+    GUI.enabled = controlsEnabled;
+    GUILayout.EndHorizontal();
+
+    bool prepared = string.Equals(
+        batch.PreparedSuiteId, scenario.Id, StringComparison.OrdinalIgnoreCase);
+    LabBatchSession session = batch.Session;
+    bool currentRun = session != null && string.Equals(
+        session.Suite.Id, scenario.Id, StringComparison.OrdinalIgnoreCase);
+    Color prior = GUI.contentColor;
+    GUI.contentColor = currentRun && session.Verdict == "pass"
+        ? new Color(0.55f, 1f, 0.64f, 1f)
+        : (prepared
+            ? new Color(0.72f, 0.88f, 1f, 1f)
+            : new Color(0.72f, 0.76f, 0.82f, 1f));
+    GUILayout.Label(currentRun
+        ? "STATUS  /  " + session.Summary()
+        : (prepared
+            ? "STATUS  /  PREPARED  /  " + batch.PreparedArtifactPath
+            : "STATUS  /  choose Prepare, then Run evaluator"));
+    GUI.contentColor = prior;
+
+    GUILayout.BeginHorizontal();
+    if (GUILayout.Button(new GUIContent("Copy draft JSON",
+        "copy the exact editable schema-1 quest generated by QuestAuthoring"),
+        GUILayout.Width(128f))) {
+      CopyScenarioDraft(scenario);
+    }
+    if (prepared && !string.IsNullOrWhiteSpace(batch.PreparedArtifactPath)) {
+      if (GUILayout.Button(new GUIContent("Copy draft path",
+          "copy the generated quest-view.json path"), GUILayout.Width(128f))) {
+        CopyToClipboard("scenario draft", batch.PreparedQuestPath);
+      }
+      if (GUILayout.Button(new GUIContent("Open artifacts",
+          "open the generated scenario folder"), GUILayout.Width(118f))) {
+        OpenDirectory("scenario artifacts", Path.GetDirectoryName(batch.PreparedArtifactPath));
+      }
+    }
+    GUILayout.FlexibleSpace();
+    GUILayout.EndHorizontal();
+  }
+
+  void CopyScenarioDraft(LabScenarioDefinition scenario) {
+    try {
+      GUIUtility.systemCopyBuffer = scenario.BuildQuestView();
+      ShowNotice("COPIED EDITABLE SCHEMA-1 DRAFT  /  " + scenario.EventName);
+    } catch (Exception ex) {
+      ShowNotice("COPY FAILED  /  " + ex.Message);
     }
   }
 
@@ -815,7 +1145,8 @@ public sealed class LabPanel {
     Color statusColor = unavailable == 0
         ? new Color(0.55f, 1f, 0.64f, 1f)
         : new Color(1f, 0.78f, 0.38f, 1f);
-    DrawSectionHeading("BUILD COVERAGE  /  " + LabPatching.AppliedCount + " OF "
+    DrawSectionHeading((unavailable == 0 ? "[OK] " : "[CHECK] ")
+        + "BUILD COVERAGE  /  " + LabPatching.AppliedCount + " OF "
         + LabPatching.Outcomes.Count + " HOOKS AVAILABLE", statusColor);
     if (unavailable > 0) {
       foreach (LabPatching.Outcome outcome in LabPatching.Outcomes) {
@@ -868,12 +1199,12 @@ public sealed class LabPanel {
     style.normal.textColor = useColor;
     style.hover.textColor = string.IsNullOrEmpty(bindableEvent) ? useColor : Color.white;
     if (!string.IsNullOrEmpty(bindableEvent)) {
-      if (GridButton(new GUIContent(SpellUseLabel(spell),
+      if (GridButton(new GUIContent(SpellUseCue(spell),
           "click to copy trigger.event: " + bindableEvent), style, SpellUseColumn)) {
         CopyToClipboard("trigger.event", bindableEvent);
       }
     } else {
-      GridCell(new GUIContent(SpellUseLabel(spell), spell.Verdict), style, SpellUseColumn);
+      GridCell(new GUIContent(SpellUseCue(spell), spell.Verdict), style, SpellUseColumn);
     }
     style.normal.textColor = rowColor;
     style.hover.textColor = rowColor;
@@ -901,6 +1232,13 @@ public sealed class LabPanel {
     return "OBSERVED";
   }
 
+  static string SpellUseCue(LabJournal.Spell spell) {
+    string cue = !spell.Bound
+        ? "NO"
+        : (!string.IsNullOrEmpty(BindableEventName(spell)) ? "OK" : "INFO");
+    return StatusCue(cue, SpellUseLabel(spell));
+  }
+
   static string BindableEventName(LabJournal.Spell spell) {
     string verdict = spell.Verdict ?? string.Empty;
     return spell.Bound && verdict.StartsWith("bindable:", StringComparison.OrdinalIgnoreCase)
@@ -920,6 +1258,170 @@ public sealed class LabPanel {
       return new Color(1f, 0.78f, 0.38f, 1f);
     }
     return new Color(0.62f, 0.82f, 1f, 1f);
+  }
+
+  /// <summary>A factual pre-demo cockpit. It reports loaded runtime state and the bounded
+  /// live suite only; it deliberately cannot certify how the gallery looks.</summary>
+  void DrawReadiness() {
+    LabReadinessSnapshot readiness = CaptureReadiness();
+    Color heading = readiness.Status == LabReadinessSnapshot.NeedsAttention
+        ? new Color(1f, 0.62f, 0.46f, 1f)
+        : (readiness.Status == LabReadinessSnapshot.LiveLapProved
+            ? new Color(0.55f, 1f, 0.64f, 1f)
+            : new Color(0.72f, 0.88f, 1f, 1f));
+    _readinessScroll = GUILayout.BeginScrollView(_readinessScroll);
+    DrawSectionHeading(readiness.StatusLabel, heading);
+    GUILayout.Label(readiness.Summary);
+
+    LabQuestSet set = LabQuestEngine.Set;
+    LabBatchSession live = LiveAllSchoolsSession();
+    int hookTotal = LabPatching.Outcomes.Count;
+    int hookApplied = LabPatching.AppliedCount;
+    DrawReadinessRow("RELEASE",
+        "[INFO] " + ComfyQuestLab.ReleaseId + "  /  profile " + CurrentRuntimeProfile(),
+        "build identity and active integration profile");
+    DrawReadinessRow("INPUT",
+        StatusCue(InputGuard.PanelOwnsInput ? "OK" : "CHECK",
+            InputGuard.OwnershipMode.ToUpperInvariant()
+                + (InputGuard.PanelOwnsInput
+                    ? " / pointer owned, player actions blocked"
+                    : " / Valheim owns controls")),
+        "the clickable panel must own input; closing restores gameplay");
+    DrawReadinessRow("INTEGRATIONS",
+        StatusCue(hookTotal > 0 && hookApplied == hookTotal ? "OK" : "CHECK",
+            hookApplied + "/" + hookTotal + " hooks available"),
+        "real Harmony outcomes from this running Valheim build");
+    DrawReadinessRow("CREATOR EVENTS",
+        StatusCue(QuestEventCatalog.Count == LabSeamCatalog.CreatorSafeEventCount ? "OK" : "CHECK",
+            QuestEventCatalog.Count + " evaluator / "
+                + LabSeamCatalog.CreatorSafeEventCount + " manifest"),
+        "safe canonical names must agree across the shared evaluator and generated atlas");
+    DrawReadinessRow("QUEST FILES",
+        StatusCue(set.Errors.Count == 0 && set.ArmedCount > 0 ? "OK" : "CHECK",
+            set.ArmedCount + "/" + set.Quests.Count + " armed / "
+                + set.Errors.Count + " load errors"),
+        "current quest directory after the latest reload");
+    int schoolCount = ArmedSchoolCount(set);
+    DrawReadinessRow("EXAMPLE SCHOOLS",
+        StatusCue(schoolCount == LabDemoReadiness.RequiredSchools ? "OK" : "CHECK",
+            schoolCount + "/" + LabDemoReadiness.RequiredSchools + " have an armed quest"),
+        "one bindable loaded example in each creator school");
+    if (live == null) {
+      DrawReadinessRow("LIVE SUITE", "[READY] not run in this process",
+          "a passed machine receipt requires eight real actions and eight completions");
+    } else {
+      string cue = live.Verdict == "pass"
+          ? "PROVED"
+          : (live.Verdict == "fail_double_completion" ? "CHECK" : "INFO");
+      DrawReadinessRow("LIVE SUITE",
+          StatusCue(cue, live.WitnessedCount + "/" + live.Suite.Expectations.Length
+              + " witnessed / " + live.CompletedQuestCount + "/"
+              + live.Suite.Expectations.Length + " completed / " + live.Verdict),
+          "bounded all-schools suite state from this process; export writes the receipt");
+    }
+
+    if (readiness.Issues.Count > 0) {
+      DrawSectionHeading("WHAT NEEDS ATTENTION", heading);
+      foreach (string issue in readiness.Issues) {
+        GUILayout.Label("[CHECK] " + issue);
+      }
+    } else {
+      DrawSectionHeading("NEXT SAFE STEP", heading);
+      if (live != null && live.Verdict == "pass") {
+        GUILayout.Label("F5  /  questlab_batch export    writes the machine-readable receipt.");
+      } else if (live != null) {
+        GUILayout.Label("Continue the missing gallery spokes, then F5  /  questlab_batch report.");
+      } else {
+        GUILayout.Label("F5  /  questlab_batch prepare all-schools    then    "
+            + "questlab_batch run all-schools");
+      }
+    }
+
+    GUILayout.Space(6f);
+    GUILayout.BeginHorizontal();
+    if (GUILayout.Button(new GUIContent("Copy summary", "copy this factual readiness line"),
+        GUILayout.Width(104f))) {
+      CopyToClipboard("readiness", readiness.Summary);
+    }
+    if (GUILayout.Button(new GUIContent("Reload quests", "re-read every quest file"),
+        GUILayout.Width(104f))) {
+      ComfyQuestLab.Report(LabQuestEngine.Reload());
+    }
+    if (GUILayout.Button(new GUIContent("Open quest folder", "open the local quest directory"),
+        GUILayout.Width(126f))) {
+      OpenQuestFolder();
+    }
+    if (GUILayout.Button(new GUIContent("Reset layout",
+        "restore 100% zoom and a visible default window"), GUILayout.Width(104f))) {
+      ResetPanelLayout();
+    }
+    GUILayout.EndHorizontal();
+
+    GUILayout.Space(8f);
+    GUILayout.Label("[INFO] Runtime readiness is not visual acceptance. Gallery scale, lighting, "
+        + "readability, and composition still require a human look at the rendered frame.");
+    GUILayout.EndScrollView();
+  }
+
+  void DrawReadinessRow(string label, string value, string tooltip) {
+    GUILayout.BeginHorizontal();
+    GridCell(new GUIContent(label), _gridHeaderStyle, 152f);
+    GridCell(new GUIContent(value, tooltip), _gridEvenStyle, -1f);
+    GUILayout.EndHorizontal();
+  }
+
+  LabReadinessSnapshot CaptureReadiness() {
+    LabQuestSet set = LabQuestEngine.Set;
+    LabBatchSession live = LiveAllSchoolsSession();
+    var input = new LabReadinessInput {
+      HooksApplied = LabPatching.AppliedCount,
+      HooksExpected = LabPatching.Outcomes.Count,
+      CatalogEventCount = QuestEventCatalog.Count,
+      ManifestEventCount = LabSeamCatalog.CreatorSafeEventCount,
+      QuestsLoaded = set.Quests.Count,
+      QuestsArmed = set.ArmedCount,
+      QuestLoadErrors = set.Errors.Count,
+      ArmedSchoolCount = ArmedSchoolCount(set),
+      QuestsEnabled = LabConfig.QuestsEnabled != null && LabConfig.QuestsEnabled.Value,
+      InputOwned = InputGuard.PanelOwnsInput,
+      RuntimeProfile = CurrentRuntimeProfile(),
+      ReleaseId = ComfyQuestLab.ReleaseId,
+      HasLiveSuite = live != null,
+      LiveSuiteRequired = live == null ? 0 : live.Suite.Expectations.Length,
+      LiveSuiteWitnessed = live == null ? 0 : live.WitnessedCount,
+      LiveSuiteCompleted = live == null ? 0 : live.CompletedQuestCount,
+      LiveSuiteVerdict = live == null ? null : live.Verdict,
+    };
+    return LabDemoReadiness.Assess(input);
+  }
+
+  static int ArmedSchoolCount(LabQuestSet set) {
+    var schools = new List<string>();
+    if (set != null) {
+      foreach (LabQuest quest in set.Quests) {
+        if (quest.IsArmed) {
+          schools.Add(QuestSchool(quest));
+        }
+      }
+    }
+    return LabDemoReadiness.DistinctKnownSchools(schools);
+  }
+
+  static LabBatchSession LiveAllSchoolsSession() {
+    LabBatchController batch = ComfyQuestLab.Batch;
+    LabBatchSession session = batch == null ? null : batch.Session;
+    return session != null
+        && session.Suite != null
+        && string.Equals(session.Suite.Id, "all-schools", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(session.Suite.EvidenceKind, "live-gameplay", StringComparison.OrdinalIgnoreCase)
+            ? session
+            : null;
+  }
+
+  static string CurrentRuntimeProfile() {
+    return LabConfig.EventProfile == null || string.IsNullOrWhiteSpace(LabConfig.EventProfile.Value)
+        ? LabRuntimeProfile.Extended
+        : LabConfig.EventProfile.Value;
   }
 
   void DrawHelpBar() {
@@ -965,6 +1467,26 @@ public sealed class LabPanel {
       Directory.CreateDirectory(LabQuestEngine.QuestDir);
       Application.OpenURL(new Uri(LabQuestEngine.QuestDir).AbsoluteUri);
       ShowNotice("OPENED QUEST FOLDER");
+    } catch (Exception ex) {
+      ShowNotice("OPEN FAILED  /  " + ex.Message);
+    }
+  }
+
+  void OpenSheetsExporter() {
+    try {
+      Application.OpenURL(SheetsExporterUrl);
+      ShowNotice("OPENED LOCAL EXPORTS  /  START THE COMPANION IF THE PAGE IS OFFLINE");
+    } catch (Exception ex) {
+      ShowNotice("EXPORTS OPEN FAILED  /  " + ex.Message);
+    }
+  }
+
+  void OpenDirectory(string label, string path) {
+    try {
+      if (string.IsNullOrWhiteSpace(path)) return;
+      Directory.CreateDirectory(path);
+      Application.OpenURL(new Uri(path).AbsoluteUri);
+      ShowNotice("OPENED " + (label ?? "folder").ToUpperInvariant());
     } catch (Exception ex) {
       ShowNotice("OPEN FAILED  /  " + ex.Message);
     }
@@ -1097,6 +1619,7 @@ public sealed class LabPanel {
     }
     if (_resizing && current.rawType == EventType.MouseUp) {
       _resizing = false;
+      _saveLayoutAfterDraw = true;
     }
   }
 
@@ -1115,6 +1638,24 @@ public sealed class LabPanel {
     } catch (Exception) {
     }
     _window = ClampWindow(_window, scale);
+    _saveLayoutAfterDraw = true;
+  }
+
+  void ResetPanelLayout() {
+    try {
+      LabConfig.PanelScale.Value = 1f;
+    } catch (Exception) {
+    }
+    _drawScale = 1f;
+    _window = ClampWindow(new Rect(
+        LabPanelLayout.DefaultX,
+        LabPanelLayout.DefaultY,
+        DefaultWidth,
+        DefaultHeight), 1f);
+    _requestedWidth = -1f;
+    _requestedHeight = -1f;
+    _saveLayoutAfterDraw = true;
+    ShowNotice("LAYOUT RESET  /  100% AND VISIBLE BOUNDS");
   }
 
   static Rect SavedWindow() {
@@ -1125,7 +1666,11 @@ public sealed class LabPanel {
           LabConfig.PanelWidth.Value,
           LabConfig.PanelHeight.Value);
     } catch (Exception) {
-      return new Rect(80f, 90f, DefaultWidth, DefaultHeight);
+      return new Rect(
+          LabPanelLayout.DefaultX,
+          LabPanelLayout.DefaultY,
+          DefaultWidth,
+          DefaultHeight);
     }
   }
 
@@ -1142,26 +1687,12 @@ public sealed class LabPanel {
   }
 
   static Rect ClampWindow(Rect rect, float scale) {
-    if (float.IsNaN(rect.x) || float.IsInfinity(rect.x)) {
-      rect.x = 80f;
-    }
-    if (float.IsNaN(rect.y) || float.IsInfinity(rect.y)) {
-      rect.y = 90f;
-    }
-    if (float.IsNaN(rect.width) || float.IsInfinity(rect.width)) {
-      rect.width = DefaultWidth;
-    }
-    if (float.IsNaN(rect.height) || float.IsInfinity(rect.height)) {
-      rect.height = DefaultHeight;
-    }
-    float logicalWidth = Screen.width / Mathf.Max(MinPanelScale, scale);
-    float logicalHeight = Screen.height / Mathf.Max(MinPanelScale, scale);
-    float maxWidth = Mathf.Max(360f, logicalWidth - 24f);
-    float maxHeight = Mathf.Max(280f, logicalHeight - 24f);
-    rect.width = Mathf.Clamp(rect.width, Mathf.Min(MinWidth, maxWidth), maxWidth);
-    rect.height = Mathf.Clamp(rect.height, Mathf.Min(MinHeight, maxHeight), maxHeight);
-    rect.x = Mathf.Clamp(rect.x, 0f, Mathf.Max(0f, logicalWidth - rect.width));
-    rect.y = Mathf.Clamp(rect.y, 0f, Mathf.Max(0f, logicalHeight - rect.height));
-    return rect;
+    LabPanelBounds bounds = LayoutBounds(rect, scale);
+    return new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height);
+  }
+
+  static LabPanelBounds LayoutBounds(Rect rect, float scale) {
+    return LabPanelLayout.Clamp(
+        rect.x, rect.y, rect.width, rect.height, scale, Screen.width, Screen.height);
   }
 }

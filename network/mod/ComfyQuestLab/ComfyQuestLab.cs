@@ -2,6 +2,7 @@ namespace ComfyQuestLab;
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 using BepInEx;
@@ -21,7 +22,7 @@ using UnityEngine;
 /// server, and it can be uninstalled the moment somebody is done learning.
 ///
 /// What it shares with the shipping mod is the quest contract itself — TrackedQuest,
-/// QuestEvent, QuestViewLoader, QuestEventCatalog, and QuestTriggerEvaluator are compiled from the same files (see the
+/// QuestEvent, QuestViewLoader, QuestEventCatalog, QuestAuthoring, and QuestTriggerEvaluator are compiled from the same files (see the
 /// csproj), so a quest that behaves one way here behaves the same way there. That is
 /// the only promise the lab makes, and it is the one that matters.
 ///
@@ -36,7 +37,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260809-r19";
+  public const string ReleaseId = "questlab-v0.2.0-20260809-r24";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -47,6 +48,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   LabGalleryBuilder _gallery;
   LabBatchController _batch;
   LabBlueprintBuilder _blueprints;
+  LabEventArchive _eventArchive;
 
   public static LabEventRing Ring { get { return Instance == null ? null : Instance._ring; } }
   public static LabBatchController Batch { get { return Instance == null ? null : Instance._batch; } }
@@ -68,6 +70,27 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     if (IsDedicatedServer()) {
       LogInfo("dedicated server detected — quest lab is client-only, doing nothing.");
       return;
+    }
+
+    if (LabConfig.ArchiveEnabled.Value) {
+      try {
+        _eventArchive = new LabEventArchive(new LabEventArchiveOptions {
+          DirectoryPath = Path.Combine(Paths.ConfigPath, "comfy-quest-lab", "event-archive"),
+          ReleaseId = ReleaseId,
+          RuntimeProfile = LabConfig.EventProfile.Value,
+          IncludeDetails = LabConfig.ArchiveIncludeDetails.Value,
+          IncludeDiagnosticIdentity = LabConfig.ArchiveIncludeDiagnosticIdentity.Value,
+          JsonlFlushSeconds = LabConfig.ArchiveFlushSeconds.Value,
+          CsvFlushSeconds = LabConfig.ArchiveCsvSeconds.Value,
+          MaxSegmentBytes = LabConfig.ArchiveMaxSegmentMiB.Value * 1024 * 1024,
+          MaxSegments = LabConfig.ArchiveMaxSegments.Value,
+        });
+        LogInfo(_eventArchive.Status());
+      } catch (Exception exception) {
+        // Persistence is an observer of the lab, never a precondition for the lab.
+        LogInfo("event archive unavailable; live events and quests continue: "
+            + exception.GetType().Name + ": " + exception.Message);
+      }
     }
 
     _harmony = new Harmony(PluginGuid);
@@ -159,18 +182,37 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       _harmony.UnpatchSelf();
       _harmony = null;
     }
+    if (_eventArchive != null) {
+      _eventArchive.Dispose();
+      LogInfo(_eventArchive.Status());
+      _eventArchive = null;
+    }
     Instance = null;
   }
 
   // ---- what the patches call -------------------------------------------------------
 
-  /// <summary>Record one thing the game did. Safe to call from any postfix.</summary>
-  public static void Observe(LabEvent row) {
+  /// <summary>Record a Lab-owned status/diagnostic row in the live ring only.</summary>
+  public static void Observe(LabEvent row, string actionIdentity = null) {
+    Record(row, actionIdentity, false);
+  }
+
+  /// <summary>Record one catalog-routed runtime event in the live ring and durable archive.</summary>
+  public static void ObserveRuntimeEvent(LabEvent row, string actionIdentity = null) {
+    Record(row, actionIdentity, true);
+  }
+
+  static void Record(LabEvent row, string actionIdentity, bool archive) {
     ComfyQuestLab self = Instance;
     if (self == null || self._ring == null || !LabConfig.Enabled.Value) {
       return;
     }
     self._ring.Add(row);
+    // The archive owns its own bounded queue and worker. This call never waits for disk,
+    // and any archive failure leaves the ring and quest evaluator untouched.
+    if (archive && self._eventArchive != null) {
+      self._eventArchive.TryRecord(row, actionIdentity);
+    }
     if (LabConfig.VerboseLogging.Value) {
       LogInfo("[lab] " + row.Category + " " + row.Seam + " " + row.Target + " " + row.Detail);
     }
@@ -290,7 +332,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       // when somebody types one of these. check first, always.
       new Terminal.ConsoleCommand("questlab_gallery",
           "manage Gallery v2: questlab_gallery "
-          + "<profiles|check|build|compare|identify|clear|rebuild|trees|restore-trees> "
+          + "<profiles|check|build|compare|identify|evidence|clear|rebuild|trees|restore-trees> "
           + "[profile-or-build-id]",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "check";
@@ -306,6 +348,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
               StartCoroutine(_gallery.Rebuild(this, value));
             } else if (verb == "identify") {
               Report(_gallery.Identify());
+            } else if (verb == "evidence") {
+              Report(LabTruthLens.Capture(value).Summary);
             } else if (verb == "profiles") {
               Report(LabGalleryBuilder.Profiles());
             } else if (verb == "trees") {
@@ -326,7 +370,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
       new Terminal.ConsoleCommand("questlab_batch",
           "bounded integration suites: questlab_batch "
-          + "<suites|prepare|run|reset|report|export> [all-schools|creator-events]",
+          + "<suites|prepare|run|reset|report|export> "
+          + "[all-schools|creator-events|scenario-<event>]",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "suites";
             string suite = args.Length >= 3 ? args[2] : "all-schools";
@@ -348,9 +393,9 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       // The other world-changing lane. Same rule as the gallery: it only ever moves
       // when somebody types one of these, and check comes before build, always.
       new Terminal.ConsoleCommand("questlab_blueprint",
-          "build a PlanBuild .blueprint file: questlab_blueprint <list|check|build|clear> "
-          + "[name] — build <name> sky raises it overhead with a portal pair bound to "
-          + "the blueprint's name, ground door at your crosshair",
+          "capture or build PlanBuild files: capture <name> <radius 1-40> [mine|lab] "
+          + "[replace]; inspect|diff|check|build|count|clear <name>; build <name> sky "
+          + "raises it overhead with a named portal pair",
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "list";
             string name = args.Length >= 3 ? args[2] : null;
@@ -358,6 +403,16 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
                 && string.Equals(args[3], "sky", StringComparison.OrdinalIgnoreCase);
             if (verb == "build") {
               StartCoroutine(_blueprints.Build(this, name, sky));
+            } else if (verb == "capture") {
+              bool replace = args.Length >= 6
+                  && string.Equals(args[5], "replace", StringComparison.OrdinalIgnoreCase);
+              Report(_blueprints.Capture(name, args.Length >= 4 ? args[3] : null,
+                  args.Length >= 5 ? args[4] : "mine", replace));
+            } else if (verb == "inspect") {
+              Report(_blueprints.Inspect(name));
+            } else if (verb == "diff") {
+              Report(_blueprints.Diff(name, args.Length >= 4 ? args[3] : null,
+                  args.Length >= 5 ? args[4] : null));
             } else if (verb == "clear") {
               Report(_blueprints.Clear(name));
             } else if (verb == "count") {
@@ -397,6 +452,23 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       new Terminal.ConsoleCommand("questlab_clear",
           "empty the event console: questlab_clear",
           delegate { _ring.Clear(); Report("console cleared"); });
+
+      new Terminal.ConsoleCommand("questlab_archive",
+          "show or flush the durable canonical event archive: questlab_archive [flush]",
+          delegate (Terminal.ConsoleEventArgs args) {
+            if (_eventArchive == null) {
+              Report("event archive is disabled or unavailable; set [Archive] archiveEnabled=true "
+                  + "and restart Valheim");
+              return;
+            }
+            if (args.Length >= 2
+                && string.Equals(args[1], "flush", StringComparison.OrdinalIgnoreCase)) {
+              _eventArchive.RequestFlush();
+              Report("event archive flush requested · " + _eventArchive.Status());
+              return;
+            }
+            Report(_eventArchive.Status());
+          });
     } catch (Exception ex) {
       LogInfo("could not register console commands: " + ex);
     }
@@ -411,14 +483,18 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_panel   open the live event console (" + LabConfig.PanelShortcut.Value + ")");
     sb.AppendLine("  questlab_seams   which seams are hooked on this game build");
     sb.AppendLine("  questlab_profile [core|extended|diagnostic]   choose integration noise");
+    sb.AppendLine("  questlab_archive [flush]   show or flush the timestamped event archive");
     sb.AppendLine("  questlab_clear   empty the live view");
     sb.AppendLine("  questlab_gallery profiles   list Gallery v2 geometry choices");
     sb.AppendLine("  questlab_gallery check|build|rebuild [profile]   inspect or raise one profile");
     sb.AppendLine("  questlab_gallery compare [left] [right]   raise two profiles side by side");
     sb.AppendLine("  questlab_gallery identify|clear [profile-or-build-id]   inspect or remove marks safely");
+    sb.AppendLine("  questlab_gallery evidence [profile-or-build-id]   export read-only truth and named views");
     sb.AppendLine("  questlab_gallery trees|restore-trees [profile-or-build-id]   inspect or recover pruned trees");
-    sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   bounded evidence runs");
-    sb.AppendLine("  questlab_blueprint list | check <n> | build <n> [sky] | clear [n]   build a .blueprint file");
+    sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   "
+        + "bounded live, contract, or scenario evidence runs");
+    sb.AppendLine("  questlab_blueprint capture <n> <1-40m> [mine|lab] [replace]   copy a bounded live build");
+    sb.AppendLine("  questlab_blueprint inspect|diff <n> | check|build|count|clear <n>   verify or replay it");
     sb.AppendLine("  questlab_prefabs <name> | inspect <exact-name> | dump   search or inspect rendered state");
     sb.AppendLine("Try one action at a monument with the panel open; every school has bindable events.");
     return sb.ToString().TrimEnd();
@@ -477,6 +553,13 @@ public static class LabConfig {
   public static ConfigEntry<int> BlueprintPiecesPerFrame { get; private set; }
   public static ConfigEntry<bool> QuestsEnabled { get; private set; }
   public static ConfigEntry<float> QuestCooldownSeconds { get; private set; }
+  public static ConfigEntry<bool> ArchiveEnabled { get; private set; }
+  public static ConfigEntry<bool> ArchiveIncludeDetails { get; private set; }
+  public static ConfigEntry<bool> ArchiveIncludeDiagnosticIdentity { get; private set; }
+  public static ConfigEntry<float> ArchiveFlushSeconds { get; private set; }
+  public static ConfigEntry<float> ArchiveCsvSeconds { get; private set; }
+  public static ConfigEntry<int> ArchiveMaxSegmentMiB { get; private set; }
+  public static ConfigEntry<int> ArchiveMaxSegments { get; private set; }
 
   public static void Bind(ConfigFile config) {
     Enabled =
@@ -519,14 +602,16 @@ public static class LabConfig {
         "Lab", "panelWidth", 900f,
         new ConfigDescription(
             "Saved Quest Lab window width. Drag the lower-right handle; the value is saved "
-            + "when the panel closes.",
-            new AcceptableValueRange<float>(700f, 2400f)));
+            + "when resizing finishes or the panel closes. Small values remain recoverable "
+            + "on a low-resolution or high-zoom viewport.",
+            new AcceptableValueRange<float>(240f, 2400f)));
     PanelHeight = config.Bind(
         "Lab", "panelHeight", 620f,
         new ConfigDescription(
             "Saved Quest Lab window height. Drag the lower-right handle; the value is saved "
-            + "when the panel closes.",
-            new AcceptableValueRange<float>(440f, 1800f)));
+            + "when resizing finishes or the panel closes. Small values remain recoverable "
+            + "on a low-resolution or high-zoom viewport.",
+            new AcceptableValueRange<float>(180f, 1800f)));
 
     ConsoleRows =
         config.Bind(
@@ -569,6 +654,72 @@ public static class LabConfig {
             + "Turn it on to see the shape of a stamina event, then turn it off again. "
             + "Changing this needs a game restart, because it decides whether the patch "
             + "is applied at all.");
+
+    ArchiveEnabled =
+        config.Bind(
+            "Archive",
+            "archiveEnabled",
+            true,
+            "Write accepted canonical Quest Lab events to a timestamped JSONL session under "
+            + "BepInEx/config/comfy-quest-lab/event-archive. Captured once at startup; restart "
+            + "after changing this setting.");
+
+    ArchiveIncludeDetails =
+        config.Bind(
+            "Archive",
+            "includeDetails",
+            false,
+            "Default OFF for privacy. Include the bounded human-readable detail column. Chat "
+            + "and sign text remains redacted at its source even when this is ON. Restart required.");
+
+    ArchiveIncludeDiagnosticIdentity =
+        config.Bind(
+            "Archive",
+            "includeDiagnosticIdentity",
+            false,
+            "Default OFF for privacy and readability. Include exact atlas signature/seam and "
+            + "deduplicated action identity beside creator vocabulary. Restart required.");
+
+    ArchiveFlushSeconds =
+        config.Bind(
+            "Archive",
+            "jsonlFlushSeconds",
+            1f,
+            new ConfigDescription(
+                "How often queued JSONL lines are flushed for live readers. Writing happens on a "
+                + "bounded background worker and never on a gameplay hook. Restart required.",
+                new AcceptableValueRange<float>(0.1f, 60f)));
+
+    ArchiveCsvSeconds =
+        config.Bind(
+            "Archive",
+            "csvSnapshotSeconds",
+            5f,
+            new ConfigDescription(
+                "Write the spreadsheet-ready CSV projection and flush it this often. Default 5 "
+                + "seconds; set 0 to disable CSV while retaining authoritative JSONL. Restart required.",
+                new AcceptableValueRange<float>(0f, 3600f)));
+
+    ArchiveMaxSegmentMiB =
+        config.Bind(
+            "Archive",
+            "maxSegmentMiB",
+            16,
+            new ConfigDescription(
+                "Maximum size of each JSONL/CSV segment before a new self-describing part is opened. "
+                + "Restart required.",
+                new AcceptableValueRange<int>(1, 256)));
+
+    ArchiveMaxSegments =
+        config.Bind(
+            "Archive",
+            "maxSegments",
+            24,
+            new ConfigDescription(
+                "Maximum timestamped archive segments retained across sessions. Old Quest Lab "
+                + "JSONL/CSV pairs are removed oldest-first; each file is also size-bounded. "
+                + "Restart required.",
+                new AcceptableValueRange<int>(2, 200)));
 
     GalleryPiecesPerFrame =
         config.Bind(

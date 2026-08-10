@@ -34,8 +34,10 @@ without the newer fields parse unchanged.
   34 canonical names are currently safe for the shared evaluator. `hit` remains a
   compatibility alias accepting both `damage_dealt` and `resource_damaged`.
 - `target` — optional subject substring, case-insensitive; empty or `any` is a wildcard.
-  The subject is a creature for `kill`, an item for `item_crafted`, a prefab for piece
-  events, a key for world-key events, and so on.
+  The subject meaning is event-specific: a creature for `kill`, a station for
+  `item_crafted` with the current producer, a prefab for piece events, a key for world-key
+  events, and so on. The generated capability manifest exposes each event's exact target
+  meaning and example instead of asking creators to infer it from a method name.
 - `weapon_skill`, `projectile`, and `shots` — the existing kill/hit fields. `shots` is
   retained for file compatibility but no longer changes completion behavior now that a
   durable EventLog row, rather than paired screenshots, is the proof.
@@ -44,11 +46,19 @@ without the newer fields parse unchanged.
   and booleans are accepted. Arrays, nested objects, `null`, empty names, and duplicate
   names are rejected instead of silently widening a trigger.
 
+The human-owned field and target descriptions behind that generated contract live in
+[`quest-event-authoring.json`](../../tools/component-packets/quest-event-authoring.json).
+Quest Lab's shared `QuestAuthoring` helper uses those definitions to turn a witnessed event
+into schema-1 JSON, then proves the result by round-tripping the real loader and evaluator.
+Volatile measurements such as amount and quantity remain available to deliberate authors
+but are omitted from automatic drafts so a single observation does not accidentally become
+an over-specific quest.
+
 ```json
 {
-  "event": "item_crafted",
-  "target": "SwordIron",
-  "where": { "station": "forge", "quality": 2 }
+  "event": "station_input_added",
+  "target": "CopperOre",
+  "where": { "station": "smelter", "item": "CopperOre" }
 }
 ```
 
