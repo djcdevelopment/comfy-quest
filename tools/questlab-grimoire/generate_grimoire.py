@@ -32,7 +32,7 @@ RUNE = {
 def catalog(path: Path = CATALOG) -> list[dict[str, str]]:
     text = path.read_text(encoding="utf-8")
     rows = re.findall(
-        r'\{ "(?P<event>[a-z0-9_]+)", new Definition\("[a-z0-9_]+", "(?P<category>[a-z]+)", "(?P<profile>[a-z]+)"\) \}',
+        r'\{ "(?P<event>[a-z0-9_]+)",\s*new Definition\("[a-z0-9_]+",\s*"(?P<category>[a-z]+)",\s*"(?P<profile>[a-z]+)"',
         text,
     )
     if not rows:
