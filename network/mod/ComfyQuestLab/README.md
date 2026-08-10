@@ -37,8 +37,8 @@ did — and whether a quest could actually fire on it.
 > **Live receipt boundary:** an exact-r4 OMEN run passed all eight schools — 8/8 canonical
 > events witnessed, 8/8 ordinary example quests completed, 12 local/RPC witnesses coalesced,
 > and zero same-action double completions. The synthetic shared-contract suite also passed
-> 34/34 creator events. r18 changes the selected court's elevation, tree lifecycle, roof,
-> and ambience, so those same suites must be re-witnessed against the exact r18 DLL before
+> 34/34 creator events. r19 changes the selected court's roof and tree-ledger guard,
+> so those same suites must be re-witnessed against the exact r19 DLL before
 > the release cut is final. This README
 > distinguishes that remaining exact-release check from the already witnessed runtime claim.
 
@@ -171,11 +171,16 @@ readable glowing letters, but compresses each hub-to-station walk from 37 m to 9
 
 The grand floor now sits 6 m above the highest sampled terrain, below the altitude where the
 r17 live comparison showed Valheim coating every upward-facing slab and station in snow. A
-generated 550-slab black-marble canopy copies the hub, hall, and station-pad floor cells at an
-8 m ceiling height. Valheim's own roof check treats those non-leaky piece colliders as real
+generated 550-slab black-marble canopy copies the hub, hall, and station-pad floor cells at a
+16 m ceiling height. Valheim's own roof check treats those non-leaky piece colliders as real
 cover; the 17 m rune stages stay open to the sky. One real ceiling brazier hangs at the hub and
-one halfway down each spoke. Their narrowly marked vanilla fireplaces stay fuelled across zone
-reloads, without changing any ordinary brazier in the world.
+one halfway down each spoke. Each fixture's measured upper mesh extent attaches just below the
+16 m roof underside, leaving its roughly 1.945 m body visibly hanging below instead of trusting
+the prefab pivot or burying the body in the slab. Their narrowly marked vanilla
+fireplaces stay fuelled across zone reloads, without changing any ordinary brazier in the world.
+`questlab_gallery identify` also measures loaded roof and fixture meshes in world space and
+reports whether every visible fixture body is actually below the slab; the role count alone is
+not treated as visual-placement evidence.
 
 The default is a course rather than an empty monument. Before the ascent portal, a ground
 welcome camp puts a Birch beside its bronze axe and serves cooked meat, Queens Jam, and bread
@@ -190,8 +195,10 @@ or batch `prepare`, so a creator never needs prior inventory or a scavenger hunt
 Before placing anything, the grand profile scans only loaded `TreeBase` roots whose trunks
 intersect the generated platform cells plus a bounded 12 m crown margin (the committed
 Meadows Beech survey is 21.5 m across). It records exact
-prefab, position, rotation, scale, and any non-default health in a JSON write-ahead ledger,
-then retires those roots
+prefab, position, native Euler rotation, quaternion, scale, and any non-default health in a
+JSON write-ahead ledger. The ledger carries an expected record count and SHA-256 digest and is
+read back through Unity's own serializer before the first world mutation; an absent or partial
+tree collection aborts the gallery build. It then retires those roots
 directly—no damage, drops, or player statistics. The welcome Birch is placed afterwards and
 remains a marked gallery object. An ordinary `clear` restores matching pending ledgers only
 after every selected gallery mark is gone; setup/rebuild preserve the ledger while refreshing

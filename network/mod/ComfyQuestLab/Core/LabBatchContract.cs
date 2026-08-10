@@ -221,8 +221,9 @@ public static class LabBatchContract {
 /// widening a string-to-console bridge.</summary>
 public static class LabBatchRequestPolicy {
   public static readonly string[] Operations = {
-    "prepare", "run", "reset", "report", "export",
+    "prepare", "run", "reset", "report", "export", "reload",
     "gallery_build", "gallery_compare", "gallery_identify", "gallery_clear", "gallery_rebuild",
+    "history_step",
   };
 
   public static bool Validate(
@@ -240,6 +241,9 @@ public static class LabBatchRequestPolicy {
         return false;
       }
       return NoExtras(profile, compareProfile, selector, out error);
+    }
+    if (operation == "reload") {
+      return NoExtras(suite, profile, compareProfile, selector, out error);
     }
     if (operation == "reset" || operation == "report" || operation == "export"
         || operation == "gallery_identify") {
@@ -274,6 +278,15 @@ public static class LabBatchRequestPolicy {
     }
     error = "operation_not_allowlisted";
     return false;
+  }
+
+  public static bool ValidateHistory(string corpus, int step, int expectedPreviousStep,
+      string suite, string profile, string compareProfile, string selector, out string error) {
+    if (!SafeToken(corpus, 80) || step < 1 || step > 5 || expectedPreviousStep != step - 1) {
+      error = "history_arguments_invalid";
+      return false;
+    }
+    return NoExtras(suite, profile, compareProfile, selector, out error);
   }
 
   static bool NoExtras(string one, string two, string three, out string error) {

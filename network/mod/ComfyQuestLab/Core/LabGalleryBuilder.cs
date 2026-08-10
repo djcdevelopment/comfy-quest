@@ -464,12 +464,18 @@ public sealed class LabGalleryBuilder {
       }
     }
 
-    // Actual vanilla ceiling braziers, not synthetic point lights. Their generated ZDO
-    // marker keeps them fuelled after zone reloads while clear still owns the whole object.
+    // Actual vanilla ceiling braziers, not synthetic point lights. Their generated Y is
+    // the underside attachment plane, never an assumed prefab pivot. Measuring the upper
+    // mesh extent keeps the body below the slab even when a game update moves that pivot.
+    // Their ZDO marker keeps them fuelled after zone reloads while clear owns the object.
     foreach (LabGalleryPlan.CeilingFixture fixture in profile.CeilingFixtures) {
+      PieceMetrics fixtureMetrics = Measure(fixture.Prefab);
+      float topFromPivot = fixtureMetrics.Size.y <= 0f
+          ? 0f
+          : fixtureMetrics.Center.y + fixtureMetrics.Size.y * 0.5f;
       var at = new Vector3(
           origin.x + fixture.X,
-          floorY + fixture.Y,
+          floorY + fixture.Y - topFromPivot - CeilingAttachmentClearance,
           origin.z + fixture.Z);
       GameObject built = Place(fixture.Prefab, at,
           Quaternion.Euler(0f, fixture.Yaw, 0f), "ceiling-brazier");
@@ -859,6 +865,7 @@ public sealed class LabGalleryBuilder {
   // ---- clear -----------------------------------------------------------------------
 
   const float TerrainRetreatThreshold = 0.45f;
+  const float CeilingAttachmentClearance = 0.08f;
   const float SupportingPieceRadius = 3f;
   const float SupportingPieceVerticalRange = 4f;
   const float TerrainRetreatLift = 0.5f;
@@ -1179,9 +1186,15 @@ public sealed class LabGalleryBuilder {
     var seen = new HashSet<ZDOID>();
     int loadedFloors = 0;
     int coveredFloors = 0;
+    int loadedCeilingFixtures = 0;
+    float fixtureMeshBottom = float.PositiveInfinity;
+    float fixtureMeshTop = float.NegativeInfinity;
+    float roofMeshUnderface = float.PositiveInfinity;
     try {
       foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
-        AddIdentity(zdo, counts, roles, seen, ref loadedFloors, ref coveredFloors);
+        AddIdentity(zdo, counts, roles, seen, ref loadedFloors, ref coveredFloors,
+            ref loadedCeilingFixtures, ref fixtureMeshBottom, ref fixtureMeshTop,
+            ref roofMeshUnderface);
       }
     } catch (Exception ex) {
       LogOnce("could not identify locally known pieces: " + ex.Message);
@@ -1192,7 +1205,8 @@ public sealed class LabGalleryBuilder {
       try {
         if (ZDOMan.instance != null) {
           AddIdentity(ZDOMan.instance.GetZDO(id), counts, roles, seen,
-              ref loadedFloors, ref coveredFloors);
+              ref loadedFloors, ref coveredFloors, ref loadedCeilingFixtures,
+              ref fixtureMeshBottom, ref fixtureMeshTop, ref roofMeshUnderface);
         }
       } catch (Exception) {
       }
@@ -1222,6 +1236,22 @@ public sealed class LabGalleryBuilder {
       .Append(coveredFloors.ToString(CultureInfo.InvariantCulture)).Append('/')
       .Append(loadedFloors.ToString(CultureInfo.InvariantCulture))
       .AppendLine(" loaded marked floor slabs have a non-leaky piece above them.");
+    if (loadedCeilingFixtures > 0 && !float.IsPositiveInfinity(roofMeshUnderface)) {
+      bool whollyBelow = fixtureMeshTop < roofMeshUnderface;
+      sb.Append("  live ceiling fixture check: ")
+        .Append(loadedCeilingFixtures.ToString(CultureInfo.InvariantCulture))
+        .Append(" loaded; mesh y ")
+        .Append(fixtureMeshBottom.ToString("0.00", CultureInfo.InvariantCulture))
+        .Append("..")
+        .Append(fixtureMeshTop.ToString("0.00", CultureInfo.InvariantCulture))
+        .Append(", roof underside y ")
+        .Append(roofMeshUnderface.ToString("0.00", CultureInfo.InvariantCulture))
+        .AppendLine(whollyBelow
+            ? " (fixture bodies are below the slab)."
+            : " (WARNING: fixture mesh intersects or sits above the slab).");
+    } else {
+      sb.AppendLine("  live ceiling fixture check: not enough roof/fixture meshes are loaded.");
+    }
     sb.AppendLine("  " + LabTreeRecovery.Status());
     sb.Append("Clear with questlab_gallery clear <profile-or-build-id>.");
     return sb.ToString();
@@ -1233,7 +1263,11 @@ public sealed class LabGalleryBuilder {
       Dictionary<string, int> roles,
       HashSet<ZDOID> seen,
       ref int loadedFloors,
-      ref int coveredFloors) {
+      ref int coveredFloors,
+      ref int loadedCeilingFixtures,
+      ref float fixtureMeshBottom,
+      ref float fixtureMeshTop,
+      ref float roofMeshUnderface) {
     if (zdo == null || !IsGalleryPiece(zdo) || !seen.Add(zdo.m_uid)) {
       return;
     }
@@ -1246,12 +1280,22 @@ public sealed class LabGalleryBuilder {
     int roleCount;
     roles.TryGetValue(role, out roleCount);
     roles[role] = roleCount + 1;
-    if (!string.Equals(role, "floor", StringComparison.OrdinalIgnoreCase)) {
-      return;
-    }
     try {
       ZNetView view = ZNetScene.instance.FindInstance(zdo);
       if (view == null) {
+        return;
+      }
+      Bounds meshBounds;
+      if (string.Equals(role, "ceiling-brazier", StringComparison.OrdinalIgnoreCase)
+          && TryWorldMeshBounds(view.gameObject, out meshBounds)) {
+        loadedCeilingFixtures++;
+        fixtureMeshBottom = Mathf.Min(fixtureMeshBottom, meshBounds.min.y);
+        fixtureMeshTop = Mathf.Max(fixtureMeshTop, meshBounds.max.y);
+      } else if (string.Equals(role, "roof", StringComparison.OrdinalIgnoreCase)
+          && TryWorldMeshBounds(view.gameObject, out meshBounds)) {
+        roofMeshUnderface = Mathf.Min(roofMeshUnderface, meshBounds.min.y);
+      }
+      if (!string.Equals(role, "floor", StringComparison.OrdinalIgnoreCase)) {
         return;
       }
       loadedFloors++;
@@ -1264,6 +1308,35 @@ public sealed class LabGalleryBuilder {
     } catch (Exception) {
       // Identity remains useful even on a game build whose roof helper changed.
     }
+  }
+
+  static bool TryWorldMeshBounds(GameObject host, out Bounds world) {
+    world = default;
+    bool any = false;
+    if (host == null) {
+      return false;
+    }
+    foreach (MeshFilter filter in host.GetComponentsInChildren<MeshFilter>(true)) {
+      Mesh mesh = filter.sharedMesh;
+      if (mesh == null) {
+        continue;
+      }
+      Bounds local = mesh.bounds;
+      for (int i = 0; i < 8; i++) {
+        var corner = new Vector3(
+            (i & 1) == 0 ? local.min.x : local.max.x,
+            (i & 2) == 0 ? local.min.y : local.max.y,
+            (i & 4) == 0 ? local.min.z : local.max.z);
+        Vector3 point = filter.transform.TransformPoint(corner);
+        if (!any) {
+          world = new Bounds(point, Vector3.zero);
+          any = true;
+        } else {
+          world.Encapsulate(point);
+        }
+      }
+    }
+    return any;
   }
 
   // ---- manifest --------------------------------------------------------------------
@@ -1403,7 +1476,10 @@ public sealed class LabGalleryBuilder {
       Report(prefabName + " measures " + size.x.ToString("0.00") + " x "
           + size.y.ToString("0.00") + " x " + size.z.ToString("0.00")
           + " — drawing along local " + named + ", pivot "
-          + (Mathf.Abs(local.center.y) < 0.05f ? "centre" : "offset") + ".");
+          + (Mathf.Abs(local.center.y) < 0.05f ? "centre" : "offset")
+          + "; vertical mesh offsets "
+          + (local.center.y - size.y * 0.5f).ToString("0.00") + ".."
+          + (local.center.y + size.y * 0.5f).ToString("0.00") + " m.");
       var measured = new PieceMetrics { LongAxis = axis, Center = local.center, Size = size };
       _metrics[prefabName] = measured;
       return measured;

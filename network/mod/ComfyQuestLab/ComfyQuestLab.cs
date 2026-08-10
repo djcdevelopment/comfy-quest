@@ -36,7 +36,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260809-r18";
+  public const string ReleaseId = "questlab-v0.2.0-20260809-r19";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -105,6 +105,11 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   }
 
   void Update() {
+    // The bounded filesystem mailbox is also used by the dedicated validation server,
+    // where no IMGUI panel is created. Poll it before every client/UI early return.
+    if (_batch != null) {
+      _batch.Poll(this);
+    }
     if (_panel == null) {
       return;
     }
@@ -117,12 +122,9 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
     // Poll before the keyboard guard: a bounded request is filesystem input, not a key, and
     // must continue while the F5 console or a text field has focus.
-    if (_batch != null) {
-      _batch.Poll(this);
-    }
-
     if (_panel.IsOpen) {
       InputGuard.MaintainPanelInput();
+      LabArcaneSight.Enable();
       // Closing is an ownership release, not an ordinary text-field hotkey. Escape and
       // the activation key therefore work even while the match box has IMGUI focus.
       if (Input.GetKeyDown(KeyCode.Escape) || LabConfig.PanelShortcut.Value.IsDown()) {
@@ -130,6 +132,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       }
       return;
     }
+
+    LabArcaneSight.Disable();
 
     // Every remaining keystroke is a hotkey unless something says otherwise.
     if (!InputGuard.ShouldIgnoreKeystrokes() && LabConfig.PanelShortcut.Value.IsDown()) {
@@ -150,6 +154,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     } else {
       InputGuard.ReleasePanelInput();
     }
+    LabArcaneSight.Disable();
     if (_harmony != null) {
       _harmony.UnpatchSelf();
       _harmony = null;

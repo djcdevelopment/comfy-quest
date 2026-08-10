@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 
 using UnityEngine;
 
@@ -26,18 +28,23 @@ public static class LabTreeRecovery {
   const float DuplicateDistance = 0.35f;
 
   [Serializable]
-  sealed class TreeRecord {
+  public sealed class TreeRecord {
     public string Prefab;
     public int PrefabHash;
     public float X, Y, Z;
     public float Qx, Qy, Qz, Qw;
+    // Additive v1 fields used by forensic recovery. Valheim persists object rotation as
+    // Euler angles; retaining that native representation avoids guessing Unity's Euler
+    // conversion outside the running game when rebuilding a ledger from a save snapshot.
+    public bool HasEuler;
+    public float Rx, Ry, Rz;
     public float Sx, Sy, Sz;
     public bool HasHealth;
     public float Health;
   }
 
   [Serializable]
-  sealed class Ledger {
+  public sealed class Ledger {
     public string Schema;
     public string PluginRelease;
     public string ProfileId;
@@ -45,6 +52,8 @@ public static class LabTreeRecovery {
     public string CreatedUtc;
     public string RestoredUtc;
     public bool Restored;
+    public int RecordCount;
+    public string RecordsSha256;
     public int RemovedCount;
     public int RestoredCount;
     public List<TreeRecord> Trees = new List<TreeRecord>();
@@ -111,6 +120,7 @@ public static class LabTreeRecovery {
 
         Vector3 position = zdo.GetPosition();
         Quaternion rotation = zdo.GetRotation();
+        Vector3 euler = tree.transform.eulerAngles;
         Vector3 scale = tree.transform.localScale;
         float health = zdo.GetFloat(ZDOVars.s_health, float.NaN);
         ledger.Trees.Add(new TreeRecord {
@@ -123,6 +133,10 @@ public static class LabTreeRecovery {
           Qy = rotation.y,
           Qz = rotation.z,
           Qw = rotation.w,
+          HasEuler = true,
+          Rx = euler.x,
+          Ry = euler.y,
+          Rz = euler.z,
           Sx = scale.x,
           Sy = scale.y,
           Sz = scale.z,
@@ -148,7 +162,18 @@ public static class LabTreeRecovery {
       string ledgerId = NextLedgerId(buildId);
       string path = Path.Combine(RecoveryDirectory, ledgerId + ".json");
       result.LedgerId = ledgerId;
+      ledger.RecordCount = ledger.Trees.Count;
+      ledger.RecordsSha256 = RecordsDigest(ledger.Trees);
       WriteLedger(path, ledger); // Write before the first world mutation.
+      Ledger persisted = ReadLedger(path);
+      string ledgerError;
+      if (!RecordsAreComplete(persisted, out ledgerError)
+          || persisted.RecordCount != ledger.RecordCount
+          || !string.Equals(persisted.RecordsSha256, ledger.RecordsSha256,
+              StringComparison.OrdinalIgnoreCase)) {
+        throw new InvalidDataException("tree recovery ledger did not round-trip every record: "
+            + ledgerError);
+      }
 
       int removed = 0;
       foreach (TreeBase tree in candidates) {
@@ -191,14 +216,16 @@ public static class LabTreeRecovery {
     int restored = 0;
     int alreadyPresent = 0;
     int failed = 0;
+    string firstFailure = string.Empty;
     var existing = new List<TreeBase>(UnityEngine.Object.FindObjectsByType<TreeBase>(
         FindObjectsSortMode.None));
     foreach (string path in Directory.GetFiles(RecoveryDirectory, "*.json")) {
       Ledger ledger;
       try {
-        ledger = JsonUtility.FromJson<Ledger>(File.ReadAllText(path));
-      } catch (Exception) {
+        ledger = ReadLedger(path);
+      } catch (Exception ex) {
         failed++;
+        RememberFailure(ref firstFailure, path, ex.Message);
         continue;
       }
       if (ledger == null || ledger.Schema != Schema || ledger.Restored
@@ -206,6 +233,12 @@ public static class LabTreeRecovery {
         continue;
       }
       ledgers++;
+      string ledgerError;
+      if (!RecordsAreComplete(ledger, out ledgerError)) {
+        failed++;
+        RememberFailure(ref firstFailure, path, ledgerError);
+        continue;
+      }
       int ledgerRestored = 0;
       int ledgerFailed = 0;
       foreach (TreeRecord record in ledger.Trees) {
@@ -221,13 +254,18 @@ public static class LabTreeRecovery {
           if (prefab == null || prefab.name != record.Prefab
               || prefab.GetComponent<TreeBase>() == null) {
             ledgerFailed++;
+            RememberFailure(ref firstFailure, path,
+                "tree prefab is unavailable or no longer a TreeBase");
             continue;
           }
           var position = new Vector3(record.X, record.Y, record.Z);
-          var rotation = new Quaternion(record.Qx, record.Qy, record.Qz, record.Qw);
+          Quaternion rotation = record.HasEuler
+              ? Quaternion.Euler(record.Rx, record.Ry, record.Rz)
+              : new Quaternion(record.Qx, record.Qy, record.Qz, record.Qw);
           GameObject tree = UnityEngine.Object.Instantiate(prefab, position, rotation);
           if (tree == null || tree.GetComponent<TreeBase>() == null) {
             ledgerFailed++;
+            RememberFailure(ref firstFailure, path, "Valheim did not instantiate the tree");
             continue;
           }
           var view = tree.GetComponent<ZNetView>();
@@ -243,8 +281,9 @@ public static class LabTreeRecovery {
           }
           existing.Add(tree.GetComponent<TreeBase>());
           ledgerRestored++;
-        } catch (Exception) {
+        } catch (Exception ex) {
           ledgerFailed++;
+          RememberFailure(ref firstFailure, path, ex.Message);
         }
       }
       restored += ledgerRestored;
@@ -256,18 +295,22 @@ public static class LabTreeRecovery {
       }
       try {
         WriteLedger(path, ledger);
-      } catch (Exception) {
+      } catch (Exception ex) {
         failed++;
+        RememberFailure(ref firstFailure, path, ex.Message);
       }
     }
 
     if (ledgers == 0) {
       return "no pending tree-recovery ledgers matched '" + selector + "'.";
     }
-    return "tree recovery matched " + ledgers.ToString(CultureInfo.InvariantCulture)
+    string summary = "tree recovery matched " + ledgers.ToString(CultureInfo.InvariantCulture)
         + " ledger(s): restored " + restored.ToString(CultureInfo.InvariantCulture)
         + ", already present " + alreadyPresent.ToString(CultureInfo.InvariantCulture)
         + ", failed " + failed.ToString(CultureInfo.InvariantCulture) + ".";
+    return string.IsNullOrEmpty(firstFailure)
+        ? summary
+        : summary + " First failure: " + firstFailure + ".";
   }
 
   public static string Status() {
@@ -278,26 +321,38 @@ public static class LabTreeRecovery {
     int pendingTrees = 0;
     int restoredLedgers = 0;
     int unreadable = 0;
+    string firstUnreadable = string.Empty;
     foreach (string path in Directory.GetFiles(RecoveryDirectory, "*.json")) {
       try {
-        Ledger ledger = JsonUtility.FromJson<Ledger>(File.ReadAllText(path));
+        Ledger ledger = ReadLedger(path);
         if (ledger == null || ledger.Schema != Schema) {
           unreadable++;
+          RememberFailure(ref firstUnreadable, path, "schema is absent or unsupported");
         } else if (ledger.Restored) {
           restoredLedgers++;
         } else {
-          pendingLedgers++;
-          pendingTrees += ledger.Trees == null ? 0 : ledger.Trees.Count;
+          string ledgerError;
+          if (!RecordsAreComplete(ledger, out ledgerError)) {
+            unreadable++;
+            RememberFailure(ref firstUnreadable, path, ledgerError);
+          } else {
+            pendingLedgers++;
+            pendingTrees += ledger.Trees.Count;
+          }
         }
-      } catch (Exception) {
+      } catch (Exception ex) {
         unreadable++;
+        RememberFailure(ref firstUnreadable, path, ex.Message);
       }
     }
-    return pendingLedgers.ToString(CultureInfo.InvariantCulture)
+    string summary = pendingLedgers.ToString(CultureInfo.InvariantCulture)
         + " pending tree-recovery ledger(s), "
         + pendingTrees.ToString(CultureInfo.InvariantCulture) + " recorded tree(s); "
         + restoredLedgers.ToString(CultureInfo.InvariantCulture) + " restored, "
         + unreadable.ToString(CultureInfo.InvariantCulture) + " unreadable.";
+    return string.IsNullOrEmpty(firstUnreadable)
+        ? summary
+        : summary + " First unreadable: " + firstUnreadable + ".";
   }
 
   static bool InsideFootprint(
@@ -343,6 +398,14 @@ public static class LabTreeRecovery {
         || string.Equals(ledger.BuildId, selector, StringComparison.OrdinalIgnoreCase);
   }
 
+  static void RememberFailure(ref string first, string path, string reason) {
+    if (!string.IsNullOrEmpty(first)) {
+      return;
+    }
+    first = Path.GetFileName(path) + ": "
+        + (string.IsNullOrWhiteSpace(reason) ? "unknown recovery error" : reason.Trim());
+  }
+
   static string SafeId(string value) {
     if (string.IsNullOrWhiteSpace(value)) {
       return "gallery-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture);
@@ -368,6 +431,65 @@ public static class LabTreeRecovery {
       suffix++;
     }
     return candidate;
+  }
+
+  static Ledger ReadLedger(string path) {
+    return JsonUtility.FromJson<Ledger>(File.ReadAllText(path));
+  }
+
+  /// <summary>Never let a syntactically valid but record-empty JSON file authorize a
+  /// destructive prune or claim that removed trees were restored.</summary>
+  static bool RecordsAreComplete(Ledger ledger, out string error) {
+    if (ledger == null) {
+      error = "the ledger could not be parsed";
+      return false;
+    }
+    if (ledger.Trees == null) {
+      error = "the Trees collection is absent";
+      return false;
+    }
+    int expected = ledger.RecordCount > 0 ? ledger.RecordCount : ledger.RemovedCount;
+    if (expected != ledger.Trees.Count) {
+      error = "expected " + expected.ToString(CultureInfo.InvariantCulture)
+          + " record(s), read " + ledger.Trees.Count.ToString(CultureInfo.InvariantCulture);
+      return false;
+    }
+    if (!string.IsNullOrEmpty(ledger.RecordsSha256)
+        && !string.Equals(ledger.RecordsSha256, RecordsDigest(ledger.Trees),
+            StringComparison.OrdinalIgnoreCase)) {
+      error = "the record digest does not match";
+      return false;
+    }
+    error = string.Empty;
+    return true;
+  }
+
+  static string RecordsDigest(List<TreeRecord> records) {
+    var canonical = new StringBuilder();
+    foreach (TreeRecord record in records) {
+      canonical.Append(record.Prefab).Append('\0')
+        .Append(record.PrefabHash.ToString(CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.X.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Y.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Z.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Qx.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Qy.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Qz.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Qw.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.HasEuler ? '1' : '0').Append('\0')
+        .Append(record.Rx.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Ry.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Rz.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Sx.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Sy.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.Sz.ToString("R", CultureInfo.InvariantCulture)).Append('\0')
+        .Append(record.HasHealth ? '1' : '0').Append('\0')
+        .Append(record.Health.ToString("R", CultureInfo.InvariantCulture)).Append('\n');
+    }
+    using (SHA256 sha = SHA256.Create()) {
+      byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes(canonical.ToString()));
+      return BitConverter.ToString(digest).Replace("-", string.Empty).ToLowerInvariant();
+    }
   }
 
   static void WriteLedger(string path, Ledger ledger) {

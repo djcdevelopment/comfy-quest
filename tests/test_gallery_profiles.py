@@ -66,11 +66,12 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertLess(classic["platformClearance"], wide["platformClearance"])
         self.assertEqual(grand["platformClearance"], 6.0)
         self.assertTrue(grand["pruneNaturalTrees"])
-        self.assertEqual(grand["roofClearance"], 8.0)
+        self.assertEqual(grand["roofClearance"], 16.0)
         self.assertEqual(grand["roofMaterials"], ["blackmarble_floor"])
         self.assertGreater(grand["counts"]["roofTiles"], 0)
         self.assertLess(grand["counts"]["roofTiles"], grand["counts"]["floorTiles"])
         self.assertEqual(grand["counts"]["ceilingFixtures"], 9)
+        self.assertEqual(grand["ceilingFixtureHeights"], [16.0])
         self.assertEqual((grand["groundPortalX"], grand["groundPortalZ"]), (8.0, 0.0))
 
     def test_v2_profiles_have_one_horizontal_header_per_rune(self) -> None:
@@ -126,7 +127,7 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 7;", source)
+        self.assertIn("public const int PlanVersion = 8;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
         self.assertIn(
             "public float PlatformClearance, RoofClearance, GroundPortalX, GroundPortalZ;",
@@ -226,6 +227,12 @@ class GalleryProfileTests(unittest.TestCase):
             "foreach (LabGalleryPlan.CeilingFixture fixture in profile.CeilingFixtures)",
             builder,
         )
+        self.assertIn("fixture.Y - topFromPivot - CeilingAttachmentClearance", builder)
+        self.assertIn("fixtureMetrics.Center.y + fixtureMetrics.Size.y * 0.5f", builder)
+        self.assertIn("vertical mesh offsets", builder)
+        self.assertIn("live ceiling fixture check", builder)
+        self.assertIn("TryWorldMeshBounds", builder)
+        self.assertIn("fixture bodies are below the slab", builder)
         self.assertIn("GalleryStructurePatches.MarkAndLight", builder)
         self.assertIn('InfiniteBrazierMark = "comfyQuestLabInfiniteBrazier"', structure)
         self.assertIn("fireplace.m_infiniteFuel = true", structure)
@@ -236,8 +243,21 @@ class GalleryProfileTests(unittest.TestCase):
         builder = BUILDER.read_text(encoding="utf-8")
         plugin = PLUGIN.read_text(encoding="utf-8")
         write = source.index("WriteLedger(path, ledger); // Write before")
+        read_back = source.index("Ledger persisted = ReadLedger(path);")
+        validate = source.index("RecordsAreComplete(persisted, out ledgerError)")
         destroy = source.index("view.Destroy();")
         self.assertLess(write, destroy)
+        self.assertLess(write, read_back)
+        self.assertLess(read_back, validate)
+        self.assertLess(validate, destroy)
+        self.assertIn("public sealed class TreeRecord", source)
+        self.assertIn("public sealed class Ledger", source)
+        self.assertIn("public int RecordCount;", source)
+        self.assertIn("public string RecordsSha256;", source)
+        self.assertIn("ledger.RecordCount = ledger.Trees.Count", source)
+        self.assertIn("ledger.RecordsSha256 = RecordsDigest(ledger.Trees)", source)
+        self.assertIn("Quaternion.Euler(record.Rx, record.Ry, record.Rz)", source)
+        self.assertIn("if (!RecordsAreComplete(ledger, out ledgerError))", source)
         self.assertIn("FindObjectsByType<TreeBase>", source)
         self.assertIn("InsideFootprint(profile, origin", source)
         self.assertIn("const float CanopyMargin = 12f", source)

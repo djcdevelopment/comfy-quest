@@ -148,7 +148,7 @@ PROFILE_SPECS = [
     {
         "id": "marble-grand",
         "name": "Marble grand",
-        "description": "Selected compact court: a ground welcome camp, 10 m quarter-length halls, and a sheltered marble canopy with hanging braziers.",
+        "description": "Selected compact court: a ground welcome camp, 10 m quarter-length halls, and a high sheltered marble canopy with visible hanging braziers.",
         "ring_radius": 27.0,
         "rune_width": 14.0,
         "rune_height": 17.0,
@@ -161,8 +161,9 @@ PROFILE_SPECS = [
         "prune_natural_trees": True,
         # A black-marble floor slab is already a valid Valheim roof: roof checks raycast
         # against any non-leaky piece collider. Copy the hub/hall/pad floor cells at an
-        # 8 m ceiling height; leave the rune stages open because their glyphs reach 17 m.
-        "roof_clearance": 8.0,
+        # 16 m ceiling height; leave the rune stages open because their glyphs reach 17 m.
+        # The r18 live pass selected the shelter but asked for another 8 m of headroom.
+        "roof_clearance": 16.0,
         "roof_material": "blackmarble_floor",
         "roof_kinds": ("plaza", "hall", "pad"),
         "ceiling_braziers": True,
@@ -200,6 +201,8 @@ WALL_YAW_OFFSET = 90.0
 FIXED_PLACED_OBJECTS = 11  # 3 portals + 8 school stations
 PICNIC_TABLE_TOP = 0.84  # piece_table is 0.83332 m tall in the committed prefab dump
 CEILING_BRAZIER = "piece_brazierceiling01"
+# The committed prefab survey measures this piece at 1.945 m tall. Its pivot location is
+# deliberately irrelevant: runtime bounds align its topmost mesh point to the underface.
 
 
 def read_rune_segments(path: Path) -> dict[str, list[tuple[float, float, float, float]]]:
@@ -521,6 +524,8 @@ def ceiling_fixtures(spec: dict, monuments: list[dict]):
         {
             "prefab": CEILING_BRAZIER,
             "x": 0.0,
+            # Y is the roof-underface attachment plane, not a guessed prefab pivot.
+            # Runtime measurement moves the topmost mesh point onto this plane.
             "y": spec["roof_clearance"],
             "z": 0.0,
             "yaw": 0.0,
@@ -735,6 +740,7 @@ def build_profile(spec: dict, segments: dict):
         "pruneNaturalTrees": bool(spec.get("prune_natural_trees")),
         "roofClearance": spec.get("roof_clearance", 0.0),
         "roofMaterials": sorted({tile["prefab"] for tile in canopy}),
+        "ceilingFixtureHeights": sorted({fixture["y"] for fixture in hanging}),
         "groundPortalX": ground_portal_x,
         "groundPortalZ": ground_portal_z,
         "welcomeAnchorX": welcome_x,
@@ -901,7 +907,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "",
         "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
         "public static class LabGalleryPlan {",
-        "  public const int PlanVersion = 7;",
+        "  public const int PlanVersion = 8;",
         f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
         "",
         "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",
@@ -1094,6 +1100,7 @@ def summary_model(profiles: list[dict]) -> dict:
                     "pruneNaturalTrees",
                     "roofClearance",
                     "roofMaterials",
+                    "ceilingFixtureHeights",
                     "groundPortalX",
                     "groundPortalZ",
                     "welcomeAnchorX",

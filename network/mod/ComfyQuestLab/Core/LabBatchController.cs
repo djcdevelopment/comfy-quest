@@ -21,6 +21,7 @@ public sealed class LabBatchController {
   const int MaxRequestBytes = 4096;
 
   readonly LabGalleryBuilder _gallery;
+  readonly LabHistoryScenarioRunner _history;
   LabBatchSession _session;
   bool _preparing;
   string _preparedSuiteId;
@@ -31,6 +32,7 @@ public sealed class LabBatchController {
 
   public LabBatchController(LabGalleryBuilder gallery) {
     _gallery = gallery ?? throw new ArgumentNullException(nameof(gallery));
+    _history = new LabHistoryScenarioRunner();
   }
 
   public LabBatchSession Session { get { return _session; } }
@@ -427,6 +429,11 @@ public sealed class LabBatchController {
       WriteRequestReceipt(request, "completed", Reset());
       return;
     }
+    if (operation == "reload") {
+      string detail = LabQuestEngine.Reload();
+      WriteRequestReceipt(request, "completed", detail);
+      return;
+    }
     if (operation == "report") {
       WriteRequestReceipt(request, "completed", Report());
       return;
@@ -438,6 +445,12 @@ public sealed class LabBatchController {
     }
     if (operation == "gallery_identify") {
       WriteRequestReceipt(request, "completed", _gallery.Identify());
+      return;
+    }
+    if (operation == "history_step") {
+      host.StartCoroutine(_history.Run(host, request.corpus, request.step, request.seed,
+          request.expected_previous_step,
+          detail => WriteRequestReceipt(request, detail == "completed" ? "completed" : "failed", detail)));
       return;
     }
     if (operation == "gallery_clear") {
@@ -563,6 +576,11 @@ public sealed class LabBatchController {
   }
 
   static bool ValidRequestArguments(LabBatchRequest request, out string error) {
+    if (string.Equals(request.operation, "history_step", StringComparison.OrdinalIgnoreCase)) {
+      return LabBatchRequestPolicy.ValidateHistory(request.corpus, request.step,
+          request.expected_previous_step, request.suite, request.profile,
+          request.compare_profile, request.selector, out error);
+    }
     return LabBatchRequestPolicy.Validate(
         request.operation,
         request.suite,
@@ -638,4 +656,8 @@ public sealed class LabBatchRequest {
   public string selector;
   public string created_utc;
   public string expires_utc;
+  public string corpus;
+  public int step;
+  public int seed;
+  public int expected_previous_step;
 }
