@@ -1,0 +1,43 @@
+{
+  "schema": "comfy-quest-experience/v1",
+  "id": "omen-mutation-proof",
+  "title": "OMEN Reward and Marked Spawn",
+  "entry_stage": "ready",
+  "stages": [
+    {
+      "id": "ready",
+      "transitions": [
+        {
+          "id": "cast",
+          "priority": 100,
+          "when": { "op": "EVENT", "event": "sign_written" },
+          "actions": [
+            { "id": "message-cast", "type": "message", "text": "The Charm grants one wood and raises a marked floor." },
+            { "id": "grant-wood", "type": "grant_item", "item": "Wood", "quantity": 1 },
+            { "id": "raise-floor", "type": "spawn", "kind": "piece", "prefab": "wood_floor", "count": 1, "radius": 3 },
+            { "id": "cleanup-timer", "type": "timer_start", "timer_id": "cleanup", "seconds": 5 }
+          ],
+          "next_stage": "cleanup"
+        }
+      ]
+    },
+    {
+      "id": "cleanup",
+      "transitions": [
+        {
+          "id": "clear-marked-floor",
+          "priority": 100,
+          "when": { "op": "EVENT", "event": "timer_elapsed", "where": { "timer_id": "cleanup" } },
+          "actions": [
+            { "id": "clear-floor", "type": "clear_spawned", "action_id": "raise-floor" },
+            { "id": "message-cleared", "type": "message", "text": "The marked floor fades; everything else remains." }
+          ],
+          "outcome": "complete"
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    { "id": "default", "experience_id": "omen-mutation-proof", "target_kinds": ["sign"] }
+  ]
+}
