@@ -60,12 +60,22 @@ param(
     [switch]$DryRun,
 
     [ValidateSet('i5', 'omen')]
-    [string]$Lane = 'i5'
+    [string]$Lane = 'i5',
+
+    # This script relocates to comfy-quest at extraction (Phase 2), but Deploy-ToI5.ps1 is the
+    # networksense-owned i5 deploy lane and stays in tools/i5. Defaulting to the current sibling
+    # path preserves today's monorepo behavior; a future cross-repo caller can point this at
+    # wherever the networksense checkout's Deploy-ToI5.ps1 lives.
+    [string]$DeployScriptPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$deployScript = Join-Path $PSScriptRoot 'Deploy-ToI5.ps1'
+$deployScript = if ([string]::IsNullOrWhiteSpace($DeployScriptPath)) {
+    Join-Path $PSScriptRoot 'Deploy-ToI5.ps1'
+} else {
+    $DeployScriptPath
+}
 $omenValheimRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim'
 $i5ValheimRoot = 'C:/Program Files (x86)/Steam/steamapps/common/Valheim'
 if (-not $OutputDirectory) {

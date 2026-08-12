@@ -5,12 +5,15 @@ This is the web-facing version of the in-game spellbook, generated from the same
 source files: journal-pages.json and valheim-event-atlas.json. It also includes
 SVG representations of the runes drawn from LabRunes.cs.
 
-Writes Lumberjacks/src/Game.Gateway/Community/questlab.html. Pass --check to verify drift.
+Writes Lumberjacks/src/Game.Gateway/Community/questlab.html by default. Pass --check to verify
+drift, or --out <path> to write (or check) somewhere else -- e.g. once this tool's comfy-quest
+lane no longer shares a repo with the Lumberjacks Gateway it publishes into, and the Gateway
+side vendors the published artifact instead (see Lumberjacks/tools/Update-QuestLabHtml.ps1).
 """
+import argparse
 import json
 import os
 import re
-import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -18,7 +21,20 @@ ATLAS = os.path.join(HERE, "samples", "valheim-event-atlas.json")
 CAPABILITIES = os.path.join(HERE, "samples", "quest-capability-manifest.json")
 PAGES = os.path.join(HERE, "journal-pages.json")
 PATCHES = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Patches")
-OUT = os.path.join(REPO, "Lumberjacks", "src", "Game.Gateway", "Community", "questlab.html")
+DEFAULT_OUT = os.path.join(REPO, "Lumberjacks", "src", "Game.Gateway", "Community", "questlab.html")
+
+_parser = argparse.ArgumentParser(
+    description="Render the Quest Lab Web Tome HTML page from journal-pages.json "
+    "and valheim-event-atlas.json."
+)
+_parser.add_argument(
+    "--check", action="store_true", help="verify the output is up to date; exit 1 on drift"
+)
+_parser.add_argument(
+    "--out", default=DEFAULT_OUT, help="output path (default: %(default)s)"
+)
+_args = _parser.parse_args()
+OUT = os.path.abspath(_args.out)
 
 ORDER = ["combat", "harvest", "inventory", "building", "crafting", "progression",
          "world", "social"]
@@ -267,7 +283,7 @@ for cat in ORDER:
 html.append('</div></body></html>')
 
 rendered = "\n".join(html)
-checking = "--check" in sys.argv[1:]
+checking = _args.check
 if checking:
     existing = open(OUT, encoding="utf-8").read() if os.path.exists(OUT) else None
     if existing != rendered:
