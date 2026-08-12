@@ -141,11 +141,11 @@
       "Category": "social",
       "Event": "chat_received",
       "Route": "diagnostic",
-      "Profile": "diagnostic",
+      "Profile": "extended",
       "CreatorSafe": false,
       "Dedupe": "chat-received",
       "Actor": "observed-player",
-      "Reason": "Inbound chat is duplicated across routes and message text is private."
+      "Reason": "Inbound chat is a redacted observation surface; it is deduplicated across routes and never enters the legacy creator evaluator."
     },
     {
       "Methods": ["Chat.SendText"],

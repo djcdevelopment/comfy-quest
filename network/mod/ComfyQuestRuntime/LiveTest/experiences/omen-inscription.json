@@ -1,36 +1,42 @@
 {
   "schema": "comfy-quest-experience/v1",
-  "id": "omen-mutation-proof",
-  "title": "OMEN Reward and Marked Spawn",
-  "entry_stage": "ready",
+  "id": "omen-cooperative-ritual",
+  "title": "Two Voices, One Rune",
+  "entry_stage": "await-peer-shout",
   "stages": [
     {
-      "id": "ready",
+      "id": "await-peer-shout",
       "transitions": [
         {
-          "id": "cast",
+          "id": "peer-wakes-charm",
           "priority": 100,
-          "when": { "op": "EVENT", "event": "sign_written" },
+          "when": {
+            "op": "EVENT",
+            "event": "chat_received",
+            "target": "shout",
+            "where": { "actor_role": "peer" }
+          },
           "actions": [
-            { "id": "message-cast", "type": "message", "text": "The Charm grants one wood and raises a marked floor." },
-            { "id": "grant-wood", "type": "grant_item", "item": "Wood", "quantity": 1 },
-            { "id": "raise-floor", "type": "spawn", "kind": "piece", "prefab": "wood_floor", "count": 1, "radius": 3 },
-            { "id": "cleanup-timer", "type": "timer_start", "timer_id": "cleanup", "seconds": 5 }
+            { "id": "message-peer-heard", "type": "message", "text": "A distant voice wakes the Charm." }
           ],
-          "next_stage": "cleanup"
+          "next_stage": "await-host-sign"
         }
       ]
     },
     {
-      "id": "cleanup",
+      "id": "await-host-sign",
       "transitions": [
         {
-          "id": "clear-marked-floor",
+          "id": "host-answers-with-rune",
           "priority": 100,
-          "when": { "op": "EVENT", "event": "timer_elapsed", "where": { "timer_id": "cleanup" } },
+          "when": {
+            "op": "EVENT",
+            "event": "piece_placed",
+            "target": "sign",
+            "where": { "actor_role": "listen_host" }
+          },
           "actions": [
-            { "id": "clear-floor", "type": "clear_spawned", "action_id": "raise-floor" },
-            { "id": "message-cleared", "type": "message", "text": "The marked floor fades; everything else remains." }
+            { "id": "message-ritual-complete", "type": "message", "text": "The host raises the answering rune. The ritual is complete." }
           ],
           "outcome": "complete"
         }
@@ -38,6 +44,6 @@
     }
   ],
   "bindings": [
-    { "id": "default", "experience_id": "omen-mutation-proof", "target_kinds": ["sign"] }
+    { "id": "default", "experience_id": "omen-cooperative-ritual", "target_kinds": ["sign"] }
   ]
 }

@@ -99,6 +99,16 @@ public static class SocialPatches {
         nameof(SendTextPostfix), "Chat.SendText");
     LabPatching.TryPatch(harmony, typeof(Sign), "SetText", new[] { typeof(string) },
         nameof(SetTextPostfix), "Sign.SetText");
+    LabPatching.TryPatch(harmony, typeof(Chat), "OnNewChatMessage",
+        new[] {
+          typeof(GameObject), typeof(long), typeof(Vector3), typeof(Talker.Type),
+          typeof(UserInfo), typeof(string),
+        }, nameof(OnNewChatMessagePostfix),
+        "Chat.OnNewChatMessage(GameObject, long, Vector3, Type, UserInfo, string)");
+    LabPatching.TryPatch(harmony, typeof(Chat), "RPC_ChatMessage",
+        new[] { typeof(long), typeof(Vector3), typeof(int), typeof(UserInfo), typeof(string) },
+        nameof(RpcChatMessagePostfix),
+        "Chat.RPC_ChatMessage(long, Vector3, int, UserInfo, string)");
   }
 
   static void SendTextPostfix(Talker.Type __0, string __1) {
@@ -115,6 +125,38 @@ public static class SocialPatches {
         LabObserve.Clean(__instance == null ? null : __instance.name),
         "sign text redacted",
         __instance);
+  }
+
+  static void OnNewChatMessagePostfix(long __1, Talker.Type __3, string __5) {
+    ObserveIncoming(__1, __3.ToString(), __5,
+        "Chat.OnNewChatMessage(GameObject, long, Vector3, Type, UserInfo, string)");
+  }
+
+  static void RpcChatMessagePostfix(long __0, int __2, string __4) {
+    ObserveIncoming(__0, ((Talker.Type)__2).ToString(), __4,
+        "Chat.RPC_ChatMessage(long, Vector3, int, UserInfo, string)");
+  }
+
+  static void ObserveIncoming(long senderId, string mode, string message, string signatureId) {
+    if (senderId == 0L || string.IsNullOrWhiteSpace(message)) {
+      return;
+    }
+    string role = "peer";
+    try {
+      if (ZNet.instance != null
+          && senderId == ZNet.instance.LocalPlayerCharacterID.UserID) {
+        role = "listen_host";
+      }
+    } catch {
+      return;
+    }
+    LabEventRouter.Emit(
+        signatureId,
+        (mode ?? string.Empty).Trim().ToLowerInvariant(),
+        "message text redacted · actor " + role,
+        senderId.ToString(),
+        (mode ?? string.Empty) + "|" + message.GetHashCode(),
+        evaluate: false);
   }
 
   /// <summary>A console row is not a chat log. Long messages are cut so one paragraph

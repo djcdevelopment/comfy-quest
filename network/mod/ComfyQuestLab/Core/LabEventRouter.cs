@@ -50,7 +50,7 @@ public static class LabEventRouter {
       double now = Time.realtimeSinceStartup;
       string actionKey = null;
       bool firstCreatorWitness = true;
-      if (capability.CreatorSafe) {
+      if (capability.CreatorSafe || !string.IsNullOrWhiteSpace(fingerprint)) {
         actionKey = ActionKeys.Key(
             capability.DedupeGroup,
             string.IsNullOrWhiteSpace(subjectIdentity) ? target : subjectIdentity,

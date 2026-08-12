@@ -863,11 +863,11 @@
       "CanonicalCategory": "social",
       "CanonicalEvent": "chat_received",
       "Route": "diagnostic",
-      "Profile": "diagnostic",
+      "Profile": "extended",
       "CreatorSafe": false,
       "DedupeGroup": "chat-received",
       "ActorScope": "observed-player",
-      "Reason": "Inbound chat is duplicated across routes and message text is private."
+      "Reason": "Inbound chat is a redacted observation surface; it is deduplicated across routes and never enters the legacy creator evaluator."
     },
     {
       "SignatureId": "Chat.RPC_ChatMessage(long, Vector3, int, UserInfo, string)",
@@ -894,11 +894,11 @@
       "CanonicalCategory": "social",
       "CanonicalEvent": "chat_received",
       "Route": "diagnostic",
-      "Profile": "diagnostic",
+      "Profile": "extended",
       "CreatorSafe": false,
       "DedupeGroup": "chat-received",
       "ActorScope": "observed-player",
-      "Reason": "Inbound chat is duplicated across routes and message text is private."
+      "Reason": "Inbound chat is a redacted observation surface; it is deduplicated across routes and never enters the legacy creator evaluator."
     },
     {
       "SignatureId": "Chat.SendText(Type, string)",

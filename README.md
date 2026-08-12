@@ -14,6 +14,7 @@ checkout.
 - Runtime plugin: network/mod/ComfyQuestRuntime
 - Shared contract package: network/mod/ComfyQuestContracts
 - Studio package: src/Quest.Studio
+- Standalone Studio host: src/Quest.Studio.Host
 - Generated web tome: docs/generated/questlab.html
 - Quest package builders: tools/questlab-package
 - NuGet publication runbook: docs/runbooks/NUGET-PUBLICATION.md
@@ -32,6 +33,17 @@ installation. Do not set ComfyCopyToPlugins during verification.
     python -m unittest discover -s tests
     python tools/component-packets/render_quest_lab.py --check
     dotnet build src/Quest.Studio/Quest.Studio.csproj -c Release
+    dotnet test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release
+
+Run the sovereign, loopback-only Studio on its own port (the retired Baseline
+Workbench may still occupy 8080):
+
+    tools/quest-studio/Start-QuestStudio.ps1
+
+Then open `http://127.0.0.1:8085/quest-studio`. Studio authors linear multi-stage
+graphs from the Runtime event adapters that actually exist, certifies them against
+the shared contract, and publishes immutable `.questpack` files to the local Runtime
+inbox. Runtime still requires explicit F10 Check and F11 Load.
 
 The interim packages-local feed exists only until the first public 0.1.0 NuGet
 publication and exact consumer repin.

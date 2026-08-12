@@ -91,15 +91,6 @@ public static class DiagnosticPatches {
     TryAtlasPatch(harmony, typeof(Skills), "OnDeath", System.Type.EmptyTypes,
         "Skills.OnDeath()");
 
-    TryAtlasPatch(harmony, typeof(Chat), "OnNewChatMessage",
-        new[] {
-          typeof(GameObject), typeof(long), typeof(Vector3), typeof(Talker.Type),
-          typeof(UserInfo), typeof(string),
-        },
-        "Chat.OnNewChatMessage(GameObject, long, Vector3, Type, UserInfo, string)");
-    TryAtlasPatch(harmony, typeof(Chat), "RPC_ChatMessage",
-        new[] { typeof(long), typeof(Vector3), typeof(int), typeof(UserInfo), typeof(string) },
-        "Chat.RPC_ChatMessage(long, Vector3, int, UserInfo, string)");
     TryAtlasPatch(harmony, typeof(Talker), "Say", new[] { typeof(Talker.Type), typeof(string) },
         "Talker.Say(Type, string)");
   }

@@ -28,28 +28,33 @@ public static class QuestStudioEndpoints
         });
         app.MapPost("/api/v1/workbench/quest-studio/save", (HttpRequest request, QuestStudioProject? body, QuestStudioService studio) =>
         {
-            if (!host.Authorize(request)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (!host.Authorize(request)) return Forbidden(host);
             var result = studio.Save(body);
             return result.Ok ? Results.Ok(result) : Results.BadRequest(result);
         });
         app.MapPost("/api/v1/workbench/quest-studio/certify", (HttpRequest request, QuestStudioProject? body, QuestStudioService studio) =>
         {
-            if (!host.Authorize(request)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (!host.Authorize(request)) return Forbidden(host);
             var result = studio.Certify(body);
             return result.Ok ? Results.Ok(result) : Results.BadRequest(result);
         });
         app.MapPost("/api/v1/workbench/quest-studio/publish-project", async (HttpRequest request, QuestStudioProject? body, QuestStudioService studio, CancellationToken cancellationToken) =>
         {
-            if (!host.Authorize(request)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (!host.Authorize(request)) return Forbidden(host);
             var result = await studio.PublishAsync(body, cancellationToken);
             return result.Ok ? Results.Ok(result) : Results.BadRequest(result);
         });
         app.MapPost("/api/v1/workbench/quest-studio/publish", async (HttpRequest request, QuestPackPublisher publisher, CancellationToken cancellationToken) =>
         {
-            if (!host.Authorize(request)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (!host.Authorize(request)) return Forbidden(host);
             var filename = request.Headers["X-Questpack-Filename"].ToString();
             var receipt = await publisher.PublishAsync(request.Body, filename, cancellationToken);
             return receipt.Ok ? Results.Ok(receipt) : Results.BadRequest(receipt);
         });
     }
+
+    static IResult Forbidden(IQuestStudioHost host) => Results.Json(
+        new { error = "browser_authorization_required", detail = "Refresh the loopback browser token and retry." },
+        host.Json,
+        statusCode: StatusCodes.Status403Forbidden);
 }

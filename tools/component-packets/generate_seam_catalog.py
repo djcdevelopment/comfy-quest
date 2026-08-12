@@ -166,8 +166,8 @@ def validate_policy(method_id: str, policy: dict, atlas_categories: set[str]) ->
         raise CapabilityError(f"{method_id}: CreatorSafe must be boolean")
     if safe and profile not in {"core", "extended"}:
         raise CapabilityError(f"{method_id}: safe event cannot use {profile!r} profile")
-    if not safe and profile in {"core", "extended"}:
-        raise CapabilityError(f"{method_id}: unsafe event cannot use {profile!r} profile")
+    if not safe and profile == "core":
+        raise CapabilityError(f"{method_id}: unsafe event cannot use the core profile")
     for field in ("Dedupe", "Actor", "Reason"):
         if not isinstance(policy[field], str) or not policy[field].strip():
             raise CapabilityError(f"{method_id}: {field} must be a non-empty string")

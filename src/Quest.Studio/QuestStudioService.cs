@@ -8,6 +8,7 @@ namespace Comfy.Quest.Studio;
 
 public sealed class QuestStudioService
 {
+    static readonly string[] RuntimeEvents = { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written" };
     readonly object _lock = new();
     readonly string _projectPath;
     readonly string _historyPath;
@@ -34,7 +35,19 @@ public sealed class QuestStudioService
         }
     }
 
-    public object Events() => new { schema_version = 1, events = CanonicalEventCatalog.All };
+    public object Events() => new
+    {
+        schema_version = 2,
+        events = RuntimeEvents,
+        event_definitions = new object[]
+        {
+            new { id = "chat_received", actor_roles = new[] { "peer", "listen_host" }, note = "Listen-host observed chat; message text is never persisted." },
+            new { id = "piece_placed", actor_roles = new[] { "listen_host" }, note = "A piece placed locally by the authoritative listen host." },
+            new { id = "kill", actor_roles = Array.Empty<string>(), note = "A local-player-caused creature kill." },
+            new { id = "piece_damaged", actor_roles = Array.Empty<string>(), note = "Damage to the bound player-built piece by the local player." },
+            new { id = "sign_written", actor_roles = Array.Empty<string>(), note = "A local sign text update; Studio never captures the text." }
+        }
+    };
 
     public object Receipts()
     {
@@ -93,6 +106,8 @@ public sealed class QuestStudioService
             Add("event", left.Project.Event, right.Project.Event, changes);
             Add("target", left.Project.Target, right.Project.Target, changes);
             Add("message", left.Project.Message, right.Project.Message, changes);
+            Add("binding_target_kind", left.Project.BindingTargetKind, right.Project.BindingTargetKind, changes);
+            Add("stages", StageFingerprint(left.Project), StageFingerprint(right.Project), changes);
             return new(true, null, left, right, changes);
         }
     }
@@ -126,13 +141,27 @@ public sealed class QuestStudioService
         if (p is null) return "project_required";
         if (!SafeId(p.PackId) || !SafeId(p.ExperienceId)) return "stable_id_invalid";
         if (!SemanticVersion.TryParse(p.Version, out _)) return "version_invalid";
-        if (!CanonicalEventCatalog.Contains(p.Event)) return "event_unknown";
-        if (p.Title?.Length is < 1 or > 120 || p.Target?.Length > 120 || p.Message?.Length is < 1 or > 500) return "field_bounds_invalid";
+        if (p.Title?.Length is < 1 or > 120) return "field_bounds_invalid";
+        if (p.BindingTargetKind is not null && p.BindingTargetKind is not ("sign" or "player_built_piece" or "item_stand" or "dedicated_charm")) return "binding_target_kind_invalid";
+        var stages = EffectiveStages(p);
+        if (stages.Count is < 1 or > ExperienceSchema.MaxStages) return "stage_count_invalid";
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var stage in stages)
+        {
+            if (!SafeId(stage.Id) || !ids.Add(stage.Id) || stage.Id.StartsWith("transition-", StringComparison.Ordinal) || stage.Id.StartsWith("message-", StringComparison.Ordinal) || stage.Id == "default") return "stage_id_invalid";
+            if (!KnownStudioEvent(stage.Event)) return "event_unknown";
+            if (stage.Target?.Length > 120 || stage.Message?.Length is < 1 or > 500) return "field_bounds_invalid";
+            if (stage.ActorRole is not null && stage.ActorRole is not (CooperativeEventContract.PeerRole or CooperativeEventContract.ListenHostRole)) return "actor_role_invalid";
+            if (stage.Event == ExperienceSchema.ChatReceivedEvent && stage.ActorRole is null) return "chat_actor_role_required";
+            if (stage.Event == "piece_placed" && stage.ActorRole != CooperativeEventContract.ListenHostRole) return "piece_placed_listen_host_required";
+            if (stage.Event is "kill" or "piece_damaged" or "sign_written" && stage.ActorRole is not null) return "actor_role_not_supported";
+        }
         return null;
     }
 
     static bool SafeId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 64 && value.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_');
     static bool SafeHash(string? value) => value?.Length == 64 && value.All(Uri.IsHexDigit);
+    static bool KnownStudioEvent(string? value) => !string.IsNullOrWhiteSpace(value) && RuntimeEvents.Contains(value, StringComparer.Ordinal);
 
     void StoreSnapshot(QuestStudioProject project, string contentHash)
     {
@@ -154,15 +183,47 @@ public sealed class QuestStudioService
 
     static string BuildExperienceJson(QuestStudioProject p)
     {
-        var trigger = new TriggerExpression { Op = "EVENT", Event = p.Event, Target = string.IsNullOrWhiteSpace(p.Target) ? null : p.Target };
-        var action = new ExperienceAction { Id = "message-1", Type = "message", Parameters = new Dictionary<string, Newtonsoft.Json.Linq.JToken> { ["text"] = p.Message } };
+        var authored = EffectiveStages(p);
+        var stages = new List<ExperienceStage>();
+        for (var index = 0; index < authored.Count; index++)
+        {
+            var stage = authored[index];
+            var where = string.IsNullOrWhiteSpace(stage.ActorRole)
+                ? null
+                : new Dictionary<string, string> { ["actor_role"] = stage.ActorRole };
+            var trigger = new TriggerExpression { Op = "EVENT", Event = stage.Event, Target = string.IsNullOrWhiteSpace(stage.Target) ? null : stage.Target, Where = where };
+            var action = new ExperienceAction { Id = $"message-{index + 1:00}", Type = "message", Parameters = new Dictionary<string, Newtonsoft.Json.Linq.JToken> { ["text"] = stage.Message } };
+            stages.Add(new ExperienceStage
+            {
+                Id = stage.Id,
+                EntryActions = new(),
+                Transitions = new()
+                {
+                    new ExperienceTransition
+                    {
+                        Id = $"transition-{index + 1:00}",
+                        Priority = 100,
+                        When = trigger,
+                        Actions = new() { action },
+                        NextStage = index + 1 < authored.Count ? authored[index + 1].Id : null,
+                        Outcome = index + 1 == authored.Count ? "complete" : null
+                    }
+                }
+            });
+        }
         var document = new ExperienceDocument {
-            Schema = ExperienceSchema.Id, Id = p.ExperienceId, Title = p.Title, EntryStage = "start",
-            Stages = new() { new ExperienceStage { Id = "start", Transitions = new() { new ExperienceTransition { Id = "complete", Priority = 100, When = trigger, Actions = new() { action }, Outcome = "complete" } } } },
-            Bindings = new() { new ExperienceBinding { Id = "default", ExperienceId = p.ExperienceId } }
+            Schema = ExperienceSchema.Id, Id = p.ExperienceId, Title = p.Title, EntryStage = authored[0].Id,
+            Stages = stages,
+            Bindings = new() { new ExperienceBinding { Id = "default", ExperienceId = p.ExperienceId, TargetKinds = string.IsNullOrWhiteSpace(p.BindingTargetKind) ? null : new() { p.BindingTargetKind } } }
         };
         return JsonConvert.SerializeObject(document, Formatting.Indented);
     }
+
+    static IReadOnlyList<QuestStudioStage> EffectiveStages(QuestStudioProject p) => p.Stages is { Count: > 0 }
+        ? p.Stages
+        : new[] { new QuestStudioStage("start", p.Event, p.Target, null, p.Message) };
+
+    static string StageFingerprint(QuestStudioProject p) => System.Text.Json.JsonSerializer.Serialize(EffectiveStages(p));
 
     static byte[] BuildPack(QuestStudioProject p, string experienceJson, string contentHash)
     {
@@ -178,10 +239,34 @@ public sealed class QuestStudioService
     static void Write(ZipArchive archive, string name, string content) { using var writer = new StreamWriter(archive.CreateEntry(name, CompressionLevel.Optimal).Open(), new UTF8Encoding(false)); writer.Write(content); }
 }
 
-public sealed record QuestStudioProject(string PackId, string Version, string ExperienceId, string Title, string Event, string? Target, string Message, string? LastError = null)
+public sealed record QuestStudioProject(
+    string PackId,
+    string Version,
+    string ExperienceId,
+    string Title,
+    string Event,
+    string? Target,
+    string Message,
+    string? LastError = null,
+    string? BindingTargetKind = null,
+    IReadOnlyList<QuestStudioStage>? Stages = null)
 {
-    public static QuestStudioProject Starter() => new("first-quest", "1.0.0", "first-quest", "First Quest", "kill", "$enemy_greyling", "The Charm answers your deed.");
+    public static QuestStudioProject Starter() => new(
+        "studio-two-voices-one-rune",
+        "1.0.0",
+        "two-voices-one-rune",
+        "Two Voices, One Rune",
+        ExperienceSchema.ChatReceivedEvent,
+        "shout",
+        "A distant voice wakes the Charm.",
+        BindingTargetKind: "sign",
+        Stages: new[]
+        {
+            new QuestStudioStage("await-peer-shout", ExperienceSchema.ChatReceivedEvent, "shout", CooperativeEventContract.PeerRole, "A distant voice wakes the Charm."),
+            new QuestStudioStage("await-host-sign", "piece_placed", "sign", CooperativeEventContract.ListenHostRole, "The host raises the answering rune. The ritual is complete.")
+        });
 }
+public sealed record QuestStudioStage(string Id, string Event, string? Target, string? ActorRole, string Message);
 public sealed record QuestStudioResult(bool Ok, string Status, string? Error, string? ExperienceJson, string? ContentHash, IReadOnlyList<ContractDiagnostic> Diagnostics)
 {
     public static QuestStudioResult Success(string status, string json, string hash) => new(true, status, null, json, hash, Array.Empty<ContractDiagnostic>());

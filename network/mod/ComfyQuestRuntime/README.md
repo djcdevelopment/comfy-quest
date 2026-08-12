@@ -3,7 +3,7 @@
 Small gameplay-side consumer for certified `comfy-quest-experience/v1` documents. It owns explicit
 inbox checking and atomic activation; it does not watch files and never executes schema-1 quests.
 The current shell exposes an F9 compact drawer, explicit F10 Check and F11 Load latest, immutable JSON
-receipts, and a fixed Open Studio button. The drawer previews a bounded aimed target and can inscribe
+receipts, and a configurable loopback Open Studio button (default `127.0.0.1:8085`). The drawer previews a bounded aimed target and can inscribe
 five namespaced references onto a locally owned creator-built object after explicit private-world
 confirmation. A one-stage `kill` or exact-bound-object `piece_damaged` to `message` executor uses a durable
 world/player/ZDO/content/stage/transition/action claim to suppress duplicates and restart replays. OMEN has
@@ -40,5 +40,18 @@ transition. i5 joined through Steam Friends, activated the identical certified c
 mutation with `mutation_authority_unavailable`, and executed zero actions. The deployment payload must include
 `ComfyQuestRuntime.dll`, `ComfyQuestContracts.dll`, and the pinned `Newtonsoft.Json.dll`; the peer harness
 hash-verifies all three.
+
+The first genuinely cooperative Runtime transition was live-proven on 2026-08-12 in a native OMEN
+listen-host world with i5 as the Steam Friends peer. Quest Lab on OMEN observed an i5 Shout exactly once
+as `chat_received / shout / actor peer`, with the message text redacted. Peer-local sign edits, building,
+portal travel, and inventory actions did not surface through the current host Lab seams. Pack 1.6 therefore
+used the proven boundary: an i5 Shout advanced the bound sign from `await-peer-shout` to
+`await-host-sign`; one OMEN sign placement completed the experience. No AM4, Gateway, Lumberjacks, or
+NetworkSense execution participated.
+
+Standalone Quest Studio then authored, certified, and published a three-stage 1.7.0 successor: peer
+Shout, listen-host sign placement, and local sign inscription. OMEN explicitly activated content hash
+`374c43056f479089fca1faf680a3a074b55db0bcc098884b5c212cce0118bab1` through F10/F11. The unchanged
+peer-Shout adapter was not replayed a second time; its expectation is inherited from the direct 1.6 proof.
 
 Inbox: `BepInEx/config/comfy-quest-runtime/inbox/*.questpack`.
