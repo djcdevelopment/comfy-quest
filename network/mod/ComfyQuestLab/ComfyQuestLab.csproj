@@ -13,7 +13,11 @@
          SHA-verified DLL directly, so unchanged plugin source must rebuild to unchanged
          bytes; local source paths remain deterministic through PathMap below. -->
     <EnableSourceLink>false</EnableSourceLink>
-    <PathMap Condition="'$(PathMap)' == ''">$(MSBuildProjectDirectory)=C:\src\ComfyQuestLab</PathMap>
+    <!-- The quest contract now arrives via contentFiles from the NuGet global-packages cache
+         (a per-machine path under the user profile, not a repo-relative one). Map it too, so the
+         SHA-verified single-DLL lane stays deterministic across machines/profiles, not just across
+         directories inside this repo. -->
+    <PathMap Condition="'$(PathMap)' == ''">$(MSBuildProjectDirectory)=C:\src\ComfyQuestLab,$(NuGetPackageRoot)=C:\nuget\</PathMap>
     <Optimize>true</Optimize>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <ValheimDir Condition="'$(ValheimDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimDir>
@@ -75,15 +79,14 @@
     </Reference>
   </ItemGroup>
 
-  <!-- LINKED, not ProjectReference, and that is the whole point. A quest authored in
-       the lab has to behave identically in the shipping mod, and the only way that is
-       true rather than hoped-for is if both assemblies compile the SAME contract. These
-       six files are already proven linkable - ComfyNetworkSense.Tests links the same
-       set - because they are deliberately Unity-free.
-
-       Both namespaces are ComfyNetworkSense, so the lab refers to the quest types by
-       their real names. That is intentional: if this ever needs an adapter, the
-       contract has drifted and the fix is upstream, not here.
+  <!-- The quest contract (TrackedQuest/QuestEvent/QuestViewLoader/QuestTriggerEvaluator/
+       QuestEventCatalog/QuestAuthoring) now travels as the Comfy.Quest.Contracts NuGet package
+       (network/mod/ComfyQuestContracts/ModGlue/), consumed here via contentFiles so the lab keeps
+       compiling the IDENTICAL source into its own single BepInEx DLL — no assembly reference, no
+       ProjectReference; see the PackageReference below and PD-9 (repo split). Both namespaces are
+       ComfyNetworkSense, so the lab refers to the quest types by their real names. That is
+       intentional: if this ever needs an adapter, the contract has drifted and the fix is
+       upstream, not here.
 
        NOT linked yet: GameplayEventTypes. It shares GameplayEventProducer.cs with a
        353-line Unity- and BepInEx-dependent class, so linking it would drag the whole
@@ -91,12 +94,11 @@
        and owes a roadmap note; until then the lab declares its own copy in LabEvents
        and a test will pin the two together. -->
   <ItemGroup>
-    <Compile Include="..\ComfyNetworkSense\Core\Models\TrackedQuest.cs" Link="Contract\TrackedQuest.cs" />
-    <Compile Include="..\ComfyNetworkSense\Core\Models\QuestEvent.cs" Link="Contract\QuestEvent.cs" />
-    <Compile Include="..\ComfyNetworkSense\Core\Services\QuestViewLoader.cs" Link="Contract\QuestViewLoader.cs" />
-    <Compile Include="..\ComfyNetworkSense\Core\Services\QuestTriggerEvaluator.cs" Link="Contract\QuestTriggerEvaluator.cs" />
-    <Compile Include="..\ComfyNetworkSense\Core\Services\QuestEventCatalog.g.cs" Link="Contract\QuestEventCatalog.g.cs" />
-    <Compile Include="..\ComfyNetworkSense\Core\Services\QuestAuthoring.cs" Link="Contract\QuestAuthoring.cs" />
+    <PackageReference Include="Comfy.Quest.Contracts" Version="0.1.0-local"
+                       IncludeAssets="contentFiles" ExcludeAssets="compile;runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="CHANGELOG.md" />
     <None Include="djcdevelopment.valheim.comfyquestlab.cfg" />
     <None Include="manifest.json" />

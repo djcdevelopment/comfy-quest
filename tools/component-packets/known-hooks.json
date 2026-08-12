@@ -103,7 +103,7 @@
   ],
   "evaluator": {
     "_note": "What QuestTriggerEvaluator will actually match, as of the read below.",
-    "source": "network/mod/ComfyNetworkSense/Core/Services/QuestTriggerEvaluator.cs:59",
+    "source": "network/mod/ComfyQuestContracts/ModGlue/QuestTriggerEvaluator.cs:59",
     "matches_trigger_events": ["kill"],
     "parsed_but_dead": ["hit"],
     "dead_targets": ["tree_or_bush", "tree", "bush"],

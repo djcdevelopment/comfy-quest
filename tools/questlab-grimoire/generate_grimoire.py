@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CATALOG = ROOT / "network" / "mod" / "ComfyNetworkSense" / "Core" / "Services" / "QuestEventCatalog.g.cs"
+CATALOG = ROOT / "network" / "mod" / "ComfyQuestContracts" / "ModGlue" / "QuestEventCatalog.g.cs"
 DEFAULT_JSON = ROOT / "artifacts" / "questlab-grimoire.json"
 DEFAULT_MD = ROOT / "docs" / "questlab-grimoire.md"
 

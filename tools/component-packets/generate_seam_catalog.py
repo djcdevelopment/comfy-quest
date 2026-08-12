@@ -16,7 +16,7 @@ Reads:
 Writes:
   tools/component-packets/samples/quest-capability-manifest.json
   network/mod/ComfyQuestLab/Core/LabSeamCatalog.g.cs
-  network/mod/ComfyNetworkSense/Core/Services/QuestEventCatalog.g.cs
+  network/mod/ComfyQuestContracts/ModGlue/QuestEventCatalog.g.cs
 """
 
 from __future__ import annotations
@@ -40,9 +40,8 @@ EVENT_CATALOG = (
     REPO
     / "network"
     / "mod"
-    / "ComfyNetworkSense"
-    / "Core"
-    / "Services"
+    / "ComfyQuestContracts"
+    / "ModGlue"
     / "QuestEventCatalog.g.cs"
 )
 

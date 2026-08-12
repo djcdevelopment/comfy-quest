@@ -553,11 +553,11 @@ def zip_write(archive: zipfile.ZipFile, name: str, data: bytes) -> None:
 def contract_source_files() -> list[dict[str, str]]:
     root = repo_root()
     paths = [
-        root / "network/mod/ComfyNetworkSense/Core/Models/TrackedQuest.cs",
-        root / "network/mod/ComfyNetworkSense/Core/Models/QuestEvent.cs",
-        root / "network/mod/ComfyNetworkSense/Core/Services/QuestViewLoader.cs",
-        root / "network/mod/ComfyNetworkSense/Core/Services/QuestTriggerEvaluator.cs",
-        root / "network/mod/ComfyNetworkSense/Core/Services/QuestEventCatalog.g.cs",
+        root / "network/mod/ComfyQuestContracts/ModGlue/TrackedQuest.cs",
+        root / "network/mod/ComfyQuestContracts/ModGlue/QuestEvent.cs",
+        root / "network/mod/ComfyQuestContracts/ModGlue/QuestViewLoader.cs",
+        root / "network/mod/ComfyQuestContracts/ModGlue/QuestTriggerEvaluator.cs",
+        root / "network/mod/ComfyQuestContracts/ModGlue/QuestEventCatalog.g.cs",
         root / "network/mod/ComfyQuestLab/Core/LabQuestSet.cs",
     ]
     return [

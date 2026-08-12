@@ -8,4 +8,40 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
+
+  <!-- Comfy.Quest.Contracts packing: ModGlue/*.cs (the quest contract: TrackedQuest, QuestEvent,
+       QuestViewLoader, QuestTriggerEvaluator, QuestEventCatalog, QuestAuthoring) ships
+       SOURCE-ONLY, as contentFiles (buildAction=Compile) — it is excluded from this project's own
+       compiled lib/netstandard2.0 output below. That keeps exactly one compiled definition of
+       these types in existence at a time in any consumer: ComfyNetworkSense/ComfyQuestLab pull
+       the contentFiles (IncludeAssets="contentFiles" ExcludeAssets="compile;runtime") and compile
+       the identical source straight into their own single BepInEx DLL; ComfyNetworkSense.Tests
+       keeps its own direct links to the same files (see its csproj) alongside a ProjectReference
+       to this project for RuntimeContract/ExperienceContract — if ModGlue were ALSO compiled into
+       this assembly, both consumers would get "type exists in both" duplicate-definition errors.
+       Game.Companion only needs the RuntimeContract/ExperienceContract side (ExcludeAssets=
+       "contentFiles") and has no use for the quest contract types at all.
+
+       A netstandard2.0 compile of the moved ModGlue source was verified clean (0 errors) with
+       this Remove commented out before the split landed — the files are BCL-only (System /
+       System.Collections.Generic / System.Text / System.Text.RegularExpressions / System.IO),
+       no Unity references. -->
+  <ItemGroup>
+    <Compile Remove="ModGlue\**\*.cs" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PackageId>Comfy.Quest.Contracts</PackageId>
+    <Version>0.1.0-local</Version>
+    <Authors>djcdevelopment</Authors>
+    <Description>Quest contract types (RuntimeContract/ExperienceContract) plus the ModGlue quest-glue source shared byte-for-byte between ComfyNetworkSense, ComfyQuestLab, and Game.Companion.</Description>
+    <ContentTargetFolders>contentFiles</ContentTargetFolders>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="ModGlue\*.cs"
+          Pack="true"
+          PackagePath="contentFiles\cs\any\ModGlue\%(Filename)%(Extension)"
+          BuildAction="Compile"
+          CopyToOutput="false" />
+  </ItemGroup>
 </Project>

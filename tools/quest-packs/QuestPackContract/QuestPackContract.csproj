@@ -9,11 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\network\mod\ComfyNetworkSense\Core\Models\TrackedQuest.cs" Link="TrackedQuest.cs" />
-    <Compile Include="..\..\..\network\mod\ComfyNetworkSense\Core\Models\QuestEvent.cs" Link="QuestEvent.cs" />
-    <Compile Include="..\..\..\network\mod\ComfyNetworkSense\Core\Services\QuestViewLoader.cs" Link="QuestViewLoader.cs" />
-    <Compile Include="..\..\..\network\mod\ComfyNetworkSense\Core\Services\QuestTriggerEvaluator.cs" Link="QuestTriggerEvaluator.cs" />
-    <Compile Include="..\..\..\network\mod\ComfyNetworkSense\Core\Services\QuestEventCatalog.g.cs" Link="QuestEventCatalog.g.cs" />
+    <Compile Include="..\..\..\network\mod\ComfyQuestContracts\ModGlue\TrackedQuest.cs" Link="TrackedQuest.cs" />
+    <Compile Include="..\..\..\network\mod\ComfyQuestContracts\ModGlue\QuestEvent.cs" Link="QuestEvent.cs" />
+    <Compile Include="..\..\..\network\mod\ComfyQuestContracts\ModGlue\QuestViewLoader.cs" Link="QuestViewLoader.cs" />
+    <Compile Include="..\..\..\network\mod\ComfyQuestContracts\ModGlue\QuestTriggerEvaluator.cs" Link="QuestTriggerEvaluator.cs" />
+    <Compile Include="..\..\..\network\mod\ComfyQuestContracts\ModGlue\QuestEventCatalog.g.cs" Link="QuestEventCatalog.g.cs" />
     <Compile Include="..\..\..\network\mod\ComfyQuestLab\Core\LabQuestSet.cs" Link="LabQuestSet.cs" />
   </ItemGroup>
 
