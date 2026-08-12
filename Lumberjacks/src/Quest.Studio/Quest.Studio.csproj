@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Comfy.Quest.Studio</AssemblyName>
+    <RootNamespace>Comfy.Quest.Studio</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Quest Studio maps ASP.NET Core minimal-API endpoints (WebApplication/HttpRequest/Results)
+         but is not itself a web host — a plain class library + FrameworkReference keeps it a thin,
+         packable seam. Companion (Microsoft.NET.Sdk.Web) stays the actual host. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Game.Companion.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Cross-repo boundary (comfy-quest owns Comfy.Quest.Contracts): the compiled assembly only
+         (ExcludeAssets="contentFiles" — Studio needs ExperienceContract/QuestPackContent/etc,
+         not the mod's single-DLL ModGlue source). -->
+    <PackageReference Include="Comfy.Quest.Contracts" ExcludeAssets="contentFiles" />
+  </ItemGroup>
+
+  <!-- Comfy.Quest.Studio packing: carved from Lumberjacks/src/Game.Companion per
+       docs/internal/repo-split/DETAILED-MANIFEST.md finding F4. Companion stays the host
+       (implements IQuestStudioHost); .questpack files remain the runtime handoff per
+       docs/quest-studio-runtime-boundary.md. -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Comfy.Quest.Studio</PackageId>
+    <Version>0.1.0-local</Version>
+    <Authors>djcdevelopment</Authors>
+    <Description>Quest Studio: the loopback Workbench surface for authoring, certifying, and publishing quest experiences to Runtime via .questpack. Carved from Game.Companion; the host (Companion) implements IQuestStudioHost.</Description>
+  </PropertyGroup>
+</Project>
