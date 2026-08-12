@@ -63,7 +63,7 @@ Postgres is expected to already be running on the **host** at port 5433; the dev
 does not start one (`docker-compose.dev.yml:1`).
 
 ```powershell
-docker compose -f Lumberjacks\infra\docker\docker-compose.dev.yml up -d gateway eventlog
+Start the platform's Gateway and EventLog services from its documented compose lane.
 ```
 
 Confirm the EventLog is answering before going near the game — this is the cheapest
@@ -169,6 +169,6 @@ Work down the path; each step tells you which half is at fault.
 - Only `schema_version: 2` thin submissions are accepted here. The old
   `schema_version: 1` outbox envelopes belong to the archived consumer at
   `recipes/quest-submission-bridge/bridge-consumer/`.
-- When it lands: flip `first_tasks` in `Lumberjacks/docs/workbench/workbench.json`, then
+- When it lands: ask the platform owner to update its Workbench `first_tasks`, then
   render → commit inputs → re-render → commit HTML → `Publish-WorkbenchAssets.ps1`, and
   run `workbench_discord.py plan` so the thread does not drift from the catalog.

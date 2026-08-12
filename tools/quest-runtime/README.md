@@ -27,7 +27,7 @@ tools\quest-runtime\Invoke-QuestRuntimePeerAcceptance.ps1 -Action Run -RunId <ru
 
 The run requires positive OMEN listen-host action receipts and an i5
 `mutation_authority_unavailable` receipt with zero peer actions. Evidence is written beneath
-`fieldlab/runs/quest-runtime-peer/<run-id>/`, and both Quest Runtime configs are restored byte-for-byte.
+`captures/quest-runtime-peer/<run-id>/`, and both Quest Runtime configs are restored byte-for-byte.
 
 For an interrupted run:
 

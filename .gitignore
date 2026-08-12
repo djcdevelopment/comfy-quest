@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/__pycache__/
+*.pyc
+.vs/
+.idea/
+captures/
+tools/questlab-package/dist/
+artifacts/*
+!artifacts/questlab-grimoire.json

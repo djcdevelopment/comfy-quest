@@ -11,7 +11,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 MOD = REPO / "network" / "mod" / "ComfyQuestLab"
 CONFIG = MOD / "djcdevelopment.valheim.comfyquestlab.cfg"
-PACKAGER = REPO / "tools" / "workbench" / "New-WorkbenchZip.ps1"
+PACKAGER = REPO / "tools" / "questlab-package" / "New-QuestLabZip.ps1"
 CSPROJ = MOD / "ComfyQuestLab.csproj"
 
 
@@ -116,7 +116,7 @@ class QuestLabPackageTests(unittest.TestCase):
         self.assertIn("$readmeLinks = [ordered]@{", source)
         self.assertIn("questlab-sheets/Start-QuestLabSheets.ps1", source)
         self.assertIn("questlab-sheets/README.md", source)
-        self.assertIn("https://github.com/djcdevelopment/baseline/blob/main/", source)
+        self.assertIn("https://github.com/djcdevelopment/comfy-quest/blob/main/", source)
         self.assertIn("package README retains a repository-relative link", source)
         self.assertIn("Quest Lab package README target is missing", source)
         self.assertIn("Quest Lab package README has a broken local link", source)

@@ -8,7 +8,7 @@ existing SHA256-verified i5 config lane or a fixed local OMEN config path, and w
 plugin's request receipt. This is not a console: operation, suite, gallery profiles, and lane
 are ValidateSet allowlists; there is no command text, path, key, or prefab field.
 
-Run Test-I5Link.ps1 once before the first request in a live test block. This script does not
+Run `tools/i5-deploy/Test-I5Link.ps1` once before the first request in a live test block. This script does not
 repeat that preflight and does not fall back to password authentication.
 #>
 [CmdletBinding()]
@@ -60,22 +60,14 @@ param(
     [switch]$DryRun,
 
     [ValidateSet('i5', 'omen')]
-    [string]$Lane = 'i5',
-
-    # This script relocates to comfy-quest at extraction (Phase 2), but Deploy-ToI5.ps1 is the
-    # networksense-owned i5 deploy lane and stays in tools/i5. Defaulting to the current sibling
-    # path preserves today's monorepo behavior; a future cross-repo caller can point this at
-    # wherever the networksense checkout's Deploy-ToI5.ps1 lives.
-    [string]$DeployScriptPath = ''
+    [string]$Lane = 'i5'
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$deployScript = if ([string]::IsNullOrWhiteSpace($DeployScriptPath)) {
-    Join-Path $PSScriptRoot 'Deploy-ToI5.ps1'
-} else {
-    $DeployScriptPath
-}
+$deployScript = Join-Path $repoRoot 'tools\i5-deploy\Deploy-ToI5.ps1'
+& (Join-Path $repoRoot 'tools\Assert-RepoIdentity.ps1') | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Repository identity check failed.' }
 $omenValheimRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim'
 $i5ValheimRoot = 'C:/Program Files (x86)/Steam/steamapps/common/Valheim'
 if (-not $OutputDirectory) {

@@ -413,7 +413,7 @@ uses the manifest's catalog example and generated quest with the shared evaluato
 one-event `synthetic-scenario` receipt. Existing files under `quests/` are never enumerated,
 edited, loaded, or removed by this workflow.
 
-For an unattended i5 lane, [`Invoke-I5QuestLabBatch.ps1`](../../../tools/i5/Invoke-I5QuestLabBatch.ps1)
+For an unattended i5 lane, [`Invoke-I5QuestLabBatch.ps1`](../../../tools/questlab-batch/Invoke-I5QuestLabBatch.ps1)
 deploys one expiring request through the SHA-verified config lane and collects its request,
 suite, Gallery Truth, and relevant-log receipts. Its eleven operations, two release suites,
 34 exact scenario IDs, and three gallery profiles are fixed allowlists. The request schema has

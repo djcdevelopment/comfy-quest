@@ -31,7 +31,7 @@ JOURNAL_GENERATOR = REPO / "tools" / "component-packets" / "generate_journal.py"
 TOME_GENERATOR = REPO / "tools" / "component-packets" / "render_quest_lab.py"
 JOURNAL_SOURCE = REPO / "tools" / "component-packets" / "journal-pages.json"
 JOURNAL_OUTPUT = REPO / "network" / "mod" / "ComfyQuestLab" / "Ui" / "LabJournal.g.cs"
-TOME_OUTPUT = REPO / "Lumberjacks" / "src" / "Game.Gateway" / "Community" / "questlab.html"
+TOME_OUTPUT = REPO / "docs" / "generated" / "questlab.html"
 
 SPEC = importlib.util.spec_from_file_location("quest_capability_generator", GENERATOR)
 CAPABILITY_GENERATOR = importlib.util.module_from_spec(SPEC)

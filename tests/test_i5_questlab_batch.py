@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPT = REPO / "tools" / "i5" / "Invoke-I5QuestLabBatch.ps1"
+SCRIPT = REPO / "tools" / "questlab-batch" / "Invoke-I5QuestLabBatch.ps1"
 CAPABILITIES = (
     REPO / "tools" / "component-packets" / "samples" / "quest-capability-manifest.json"
 )
@@ -47,6 +47,7 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
 
     def test_uses_verified_config_lane_and_batchmode_reads(self) -> None:
         self.assertIn("Deploy-ToI5.ps1", self.source)
+        self.assertIn("tools\\i5-deploy\\Deploy-ToI5.ps1", self.source)
         self.assertIn("-ValheimConfig", self.source)
         self.assertGreaterEqual(self.source.count("BatchMode=yes"), 3)
         self.assertIn("comfy-questlab-batch-request/v1", self.source)
@@ -61,6 +62,7 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
             'Join-Path $repoRoot ("captures\\questlab\\{0}" -f $Lane)',
             self.source,
         )
+        self.assertNotIn("DeployScriptPath", self.source)
 
     def test_suite_allowlist_contains_exactly_the_two_suites_and_all_scenarios(self) -> None:
         match = re.search(

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Deny-list privacy scanner that gates Community Workbench tool zips before publish.
+Deny-list privacy scanner that gates Comfy Quest tool zips before publish.
 Windows PowerShell 5.1 compatible ONLY.
 
 .DESCRIPTION
@@ -31,9 +31,9 @@ Directory to build self-test fixtures under. Defaults to a per-run directory in 
 system temp location. Nothing machine-specific is baked into this script.
 
 .EXAMPLE
-powershell -NoProfile -ExecutionPolicy Bypass -File Test-WorkbenchZipPrivacy.ps1 -Path C:\staging\quest-picker
+powershell -NoProfile -ExecutionPolicy Bypass -File Test-PackagePrivacy.ps1 -Path C:\staging\quest-picker
 .EXAMPLE
-powershell -NoProfile -ExecutionPolicy Bypass -File Test-WorkbenchZipPrivacy.ps1 -SelfTest
+powershell -NoProfile -ExecutionPolicy Bypass -File Test-PackagePrivacy.ps1 -SelfTest
 
 .NOTES
 Exit codes: 0 = clean, 1 = findings (or self-test failure), 2 = usage error.
@@ -56,13 +56,13 @@ param(
 # Both roots are resolved from context, never hardcoded: this script is itself a
 # distributable artifact, so a machine-specific path baked in here would be the
 # very leak it exists to catch (and the self-test now proves it stays clean).
-# tools\workbench\ -> tools\ -> repo root.
+# tools\questlab-package\ -> tools\ -> repo root.
 $Script:RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).ProviderPath
 
 if ($ScratchRoot) {
     $Script:ScratchpadRoot = $ScratchRoot
 } else {
-    $Script:ScratchpadRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'workbench-zip-privacy'
+    $Script:ScratchpadRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'comfy-quest-package-privacy'
 }
 
 # Text files get a full content scan on top of the always-on filename scan.
@@ -365,9 +365,9 @@ function Invoke-RuleScan {
 #
 # DESIGN DEVIATION from the literal spec: an xlsx matching *guild*tracker*/*guild*
 # is NOT flagged when its name also contains "sample". The repo already ships a
-# legitimate synthetic fixture, tools\workbench\samples\quest-picker\
+# legitimate synthetic fixture, tools\questlab-package\samples\quest-picker\
 # make_sample_tracker.py, whose documented output is "sample-guild-tracker.xlsx"
-# ("every name here is invented") and which New-WorkbenchZip.ps1 stages into every
+# ("every name here is invented") and which New-QuestPickerZip.ps1 stages into every
 # quest-picker zip. A literal "any *.xlsx with guild in the name" rule would
 # permanently fail that tool's mandatory privacy gate. The real files this rule
 # exists to catch - data\raw\ranger-guild-tracker.xlsx and
@@ -441,7 +441,7 @@ function Invoke-FileScan {
     # poisoned self-test fixtures. Keep structural/filename checks active, but do
     # not report those deliberate literals as leaks in the enclosing package.
     $normalizedRelative = $relative.Replace('/', '\')
-    $isBundledScannerSource = $normalizedRelative -ieq 'tools\workbench\Test-WorkbenchZipPrivacy.ps1'
+    $isBundledScannerSource = $normalizedRelative -ieq 'tools\questlab-package\Test-PackagePrivacy.ps1'
 
     # Content scan: only allowlisted text extensions.
     $ext = $FileInfo.Extension.ToLowerInvariant()
@@ -537,13 +537,13 @@ function Write-ScanReport {
         'e.cred-header'        = 'Non-default service credential header value'
         'e.cred-generic'       = 'Generic secret/password/token/api-key literal'
         'f.path-user-profile'  = 'Absolute path into a user profile (C:\Users\<name>\)'
-        'f.path-commandcenter' = 'Absolute path leaking C:\work\commandcenter'
+        'f.path-commandcenter' = 'Absolute path leaking a private work-root checkout'
         'f.path-private-interpreter' = 'Machine-specific private interpreter/service path'
         'g.gcp-external-ip'    = "P7 GCP VM external IPv4 address"
         'h.private-hearth-endpoint' = 'Private HEARTH gateway endpoint (host:port)'
     }
 
-    Write-Host "Test-WorkbenchZipPrivacy scan of: $SourcePath"
+    Write-Host "Test-PackagePrivacy scan of: $SourcePath"
     Write-Host ("Player-handle deny list : {0} real name(s) loaded from waypoints.json" -f $Context.OwnerCount)
     if ($Context.GcpIp) {
         Write-Host ("Rule (g) GCP external IP: ACTIVE - flagging literal {0}" -f $Context.GcpIp)
@@ -660,7 +660,8 @@ function New-PoisonedFixture {
 
     Write-TextFileUtf8 -Path (Join-Path $Dir 'poison-e-header.cfg') -Content 'x-hearth-key: totally-not-the-default-abc123'
 
-    Write-TextFileUtf8 -Path (Join-Path $Dir 'poison-e-generic.cfg') -Content 'secret = "fixture-value"'
+    $fakeCredential = ('synthetic-' + ('x' * 24))
+    Write-TextFileUtf8 -Path (Join-Path $Dir 'poison-e-generic.cfg') -Content ("secret = `"$fakeCredential`"")
 
     # Assembled from parts on purpose. A complete user-profile path written as a
     # literal here would be a user-specific absolute path *in this script*, which
@@ -669,7 +670,8 @@ function New-PoisonedFixture {
     $profilePath = @('C:\Users', 'fixtureaccount', 'projects', 'secret-notes') -join '\'
     Write-TextFileUtf8 -Path (Join-Path $Dir 'poison-f-users.txt') -Content "Local path: $profilePath"
 
-    Write-TextFileUtf8 -Path (Join-Path $Dir 'poison-f-commandcenter.txt') -Content 'See C:\work\commandcenter\.mcp.json for the key'
+    $privateWorkPath = 'C:' + '\work' + '\commandcenter' + '\.mcp.json'
+    Write-TextFileUtf8 -Path (Join-Path $Dir 'poison-f-commandcenter.txt') -Content "See $privateWorkPath for the key"
 
     Write-TextFileUtf8 -Path (Join-Path $Dir 'poison-f-interpreter.txt') -Content (
         'Interpreter: C:\somewhere\fleet-worker-node\.venv-omen\Scripts\python.exe'
@@ -693,7 +695,7 @@ function New-PoisonedFixture {
 
 function Test-NoUserSpecificPathInSelf {
     $selfPath = $PSCommandPath
-    if (-not $selfPath) { $selfPath = Join-Path $PSScriptRoot 'Test-WorkbenchZipPrivacy.ps1' }
+    if (-not $selfPath) { $selfPath = Join-Path $PSScriptRoot 'Test-PackagePrivacy.ps1' }
     if (-not (Test-Path -LiteralPath $selfPath)) {
         return [PSCustomObject]@{ Pass = $false; Detail = "could not locate own source at $selfPath" }
     }
@@ -711,7 +713,7 @@ function Test-NoUserSpecificPathInSelf {
 # ----------------------------------------------------------------------------
 
 function Invoke-SelfTest {
-    Write-Host '=== Test-WorkbenchZipPrivacy SelfTest ==='
+    Write-Host '=== Test-PackagePrivacy SelfTest ==='
     Write-Host "Repo root: $Script:RepoRoot"
 
     try {
@@ -724,7 +726,7 @@ function Invoke-SelfTest {
         }
 
         $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
-        $fixtureRoot = Join-Path $Script:ScratchpadRoot "workbench-zip-privacy-selftest\$stamp"
+        $fixtureRoot = Join-Path $Script:ScratchpadRoot "comfy-quest-package-privacy-selftest\$stamp"
         $cleanDir = Join-Path $fixtureRoot 'clean'
         $poisonDir = Join-Path $fixtureRoot 'poisoned'
 
@@ -862,8 +864,8 @@ if ($SelfTest) {
 
 if (-not $Path) {
     Write-Host 'Usage:'
-    Write-Host '  Test-WorkbenchZipPrivacy.ps1 -Path <zip-file-or-directory>'
-    Write-Host '  Test-WorkbenchZipPrivacy.ps1 -SelfTest'
+    Write-Host '  Test-PackagePrivacy.ps1 -Path <zip-file-or-directory>'
+    Write-Host '  Test-PackagePrivacy.ps1 -SelfTest'
     exit 2
 }
 

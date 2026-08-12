@@ -23,7 +23,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) { $EvidenceRoot = Join-Path $repoRoot 'fieldlab\runs\quest-runtime-peer' }
+& (Join-Path $repoRoot 'tools\Assert-RepoIdentity.ps1') | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Repository identity check failed.' }
+if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) { $EvidenceRoot = Join-Path $repoRoot 'captures\quest-runtime-peer' }
 if ([string]::IsNullOrWhiteSpace($RunId)) { $RunId = 'quest-peer-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss') }
 if ($RunId -notmatch '^[A-Za-z0-9._-]{1,80}$') { throw 'RunId must be a safe token.' }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version must be semantic major.minor.patch.' }
@@ -32,8 +34,8 @@ $runRoot = [IO.Path]::GetFullPath((Join-Path $EvidenceRoot $RunId))
 $contextPath = Join-Path $runRoot 'context.json'
 $workbookPath = Join-Path $runRoot 'operator-workbook.md'
 $resultPath = Join-Path $runRoot 'result.json'
-$i5Deploy = Join-Path $repoRoot 'tools\i5\Deploy-ToI5.ps1'
-$i5Link = Join-Path $repoRoot 'tools\i5\Test-I5Link.ps1'
+$i5Deploy = Join-Path $repoRoot 'tools\i5-deploy\Deploy-ToI5.ps1'
+$i5Link = Join-Path $repoRoot 'tools\i5-deploy\Test-I5Link.ps1'
 $valheimRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim'
 $omenPluginRoot = Join-Path $valheimRoot 'BepInEx\plugins'
 $omenRuntimeRoot = Join-Path $valheimRoot 'BepInEx\config\comfy-quest-runtime'
@@ -43,7 +45,7 @@ $contractsDll = Join-Path $repoRoot 'network\mod\ComfyQuestContracts\bin\Release
 $jsonDll = Join-Path $repoRoot 'network\mod\ComfyQuestRuntime\bin\Release\net48\Newtonsoft.Json.dll'
 $pack = Join-Path $repoRoot "network\mod\ComfyQuestRuntime\LiveTest\omen-inscription-proof-$Version.questpack"
 $manifest = Join-Path $repoRoot 'network\mod\ComfyQuestRuntime\LiveTest\manifest.json'
-$remoteEvidence = 'C:\deploy\baseline\fieldlab\runs\quest-runtime-peer'
+$remoteEvidence = 'C:\deploy\comfy-quest\captures\quest-runtime-peer'
 $remoteRuntimeRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim\BepInEx\config\comfy-quest-runtime'
 $remoteConfig = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim\BepInEx\config\djcdevelopment.valheim.comfyquestruntime.cfg'
 $contentHash = if (Test-Path $manifest) { [string]((Get-Content $manifest -Raw | ConvertFrom-Json).content_hash) } else { '' }

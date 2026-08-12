@@ -1,0 +1,473 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ComfyQuestLab — The Tome</title>
+<style>
+:root { --bg: #0b1013; --paper: #11191d; --panel: #162126; --panel-2: #1b292e; --line: #2c3a3f; --ink: #edf5f2; --muted: #9eb0ad; --wood: #d7a86e; --green: #68d391; --sans: Inter, ui-sans-serif, system-ui, sans-serif; --mono: "SFMono-Regular", Consolas, monospace; }
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(circle at 15% 0%, #18302e 0, transparent 28rem), var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.55; }
+.topbar { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(11,16,19,.92); backdrop-filter: blur(14px); }
+.topbar-inner { max-width: 900px; margin: 0 auto; min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .02em; }
+.mark { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--wood); color: var(--wood); border-radius: 7px; font-family: var(--mono); }
+nav { display: flex; gap: 14px; font-size: .85rem; }
+nav a { color: var(--muted); text-decoration: none; }
+nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
+.wrap { max-width: 900px; margin: 0 auto; padding: 2rem 16px; }
+h1 { font-size: 2.5rem; letter-spacing: -.02em; margin-bottom: 1rem; }
+.intro { color: var(--muted); font-size: 1.1rem; max-width: 65ch; margin-bottom: 3rem; }
+.school { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 2rem; padding: 2rem; }
+.school-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+.school-header h2 { margin: 0; font-size: 1.8rem; }
+.rune { width: 48px; height: 48px; }
+.spell-list { list-style: none; padding: 0; margin: 0; }
+.spell { display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.spell:last-child { border-bottom: none; }
+.spell-name { font-weight: 600; }
+.spell-true-name { font-family: var(--mono); font-size: 0.85rem; color: var(--wood); margin-left: 0.5rem; }
+.spell-verdict { font-size: 0.85rem; color: var(--muted); text-align: right; }
+.verdict-today { color: var(--green); }
+.bound-badge { display: inline-block; background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase; margin-left: 0.5rem; }
+.start { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; }
+.start h2 { margin-top: 0; font-size: 1.5rem; }
+ol.steps { margin: 0; padding-left: 1.3rem; }
+ol.steps > li { margin-bottom: 1rem; }
+ol.steps > li > strong { display: block; }
+ol.steps p { margin: .25rem 0 0; color: var(--muted); font-size: .95rem; }
+kbd { font-family: var(--mono); font-size: .85rem; background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: .1rem .4rem; color: var(--ink); }
+code { font-family: var(--mono); font-size: .9rem; color: var(--wood); }
+.cta { display: inline-block; margin-bottom: 1.25rem; background: var(--wood); color: #1a1206; font-weight: 700; text-decoration: none; padding: .6rem 1.1rem; border-radius: 8px; }
+.cta:hover { filter: brightness(1.08); }
+.note { border-left: 3px solid var(--wood); background: var(--panel-2); padding: .85rem 1rem; border-radius: 0 8px 8px 0; margin: 1.25rem 0 0; color: var(--muted); font-size: .95rem; }
+.note strong { color: var(--ink); }
+.watch { color: var(--muted); font-size: .95rem; border-left: 3px solid var(--line); padding-left: .9rem; margin: 1rem 0 0; }
+.watch strong { color: var(--ink); }
+</style>
+</head><body>
+<div class="topbar"><div class="topbar-inner">
+<div class="brand"><div class="mark">Q</div>Comfy Quest</div>
+<nav aria-label="Gateway surfaces">
+<a href="/roadmap">Roadmap</a>
+<a href="/community">Community</a>
+<a href="/workbench">Workbench</a>
+<a href="/questpicker">Quest Picker</a>
+<a href="/steward">Steward</a>
+<a href="/questlab" aria-current="page">Quest Lab</a>
+<a href="/networksense">NetworkSense</a>
+<a href="/events">Events</a>
+<a href="/testing">Testing</a>
+</nav></div></div>
+<div class="wrap">
+<h1>The Quest Lab Tome</h1>
+<p class="intro">This is the web-facing version of the in-game spellbook. It lists every spell the world genuinely answers to, categorized by rune school. An Integrated badge means the exact runtime patch exists; the verdict names stable creator vocabulary or an explicit diagnostic-only boundary.</p>
+<div class="start">
+<h2>Start here</h2>
+<a class="cta" href="/workbench/downloads/quest-lab">Download the Quest Lab</a>
+<ol class="steps">
+<li><strong>Install BepInEx on your Valheim client.</strong>
+<p>The lab is a BepInEx plugin. If you already run mods, you have this.</p></li>
+<li><strong>Drop <code>ComfyQuestLab.dll</code> into <code>BepInEx/plugins</code>.</strong>
+<p>That is the whole install. The zip also carries a README and a default config.</p></li>
+<li><strong>Launch a private, single-player world.</strong>
+<p>The lab is client-only and does nothing at all on a dedicated server. Nothing it does touches anyone else, and uninstalling it changes nothing about your game.</p></li>
+<li><strong>Press <kbd>F5</kbd> and type <code>lab_setup</code>.</strong>
+<p>This writes a starter quest, safely clears marked old builds, and raises a fresh compact black-marble course with eight rune monuments and each target/tool at its point of use.</p></li>
+<li><strong>Press <kbd>F6</kbd> to open the lab panel.</strong>
+<p><kbd>F5</kbd> is Valheim&rsquo;s console, where you type commands. <kbd>F6</kbd> is the lab&rsquo;s own window. Two different keys, and mixing them up is the usual first stumble. The window owns the mouse while open; its &minus; / + controls persistently tune the whole panel from 65% to 200% for windowed, 1080p, or 4K play.</p></li>
+<li><strong>Open <em>Scenarios</em> when you want one event, not the whole course.</strong>
+<p>Choose a colored school and any of the 34 canonical events. The cockpit explains its target, example, fields, safety, and live action. Copy an editable schema-1 quest immediately, or Prepare it into one fixed Lab-owned folder beside a deterministic manifest; a changed file is never overwritten. Run evaluator produces explicit synthetic evidence through the exact shared matcher, not a false claim that gameplay happened.</p></li>
+<li><strong>Edit <code>BepInEx/config/comfy-quest-lab/quests/starter.json</code>, then run <code>lab_reload</code>.</strong>
+<p>No restart. The <em>Quests</em> tab names what changed, what will fire, and what cannot &mdash; and shows the last event the matcher was actually handed, which is how you find out why something did not fire.</p></li>
+<li><strong>Need another target? <code>lab_target</code>.</strong>
+<p>Puts a fresh practice target in front of you &mdash; <code>lab_target harvest</code> for a tree, and so on for all eight schools. You should never be walking across the map looking for the thing your quest is about; that is what the gallery is for.</p></li>
+<li><strong>Want to prove every school? <code>questlab_batch prepare all-schools</code>.</strong>
+<p>Prepare safely clears marked old builds, stages a ground welcome camp with Birch, axe, and mounted picnic food, then raises one canopy-clear compact course with building materials, fuel, targets, tools, and the lit hub sign at point of use. Then run <code>questlab_batch run all-schools</code> and follow the eight prepared prompts. <code>report</code> shows what remains and <code>export</code> writes a JSON receipt. The separate <code>creator-events</code> suite checks all 34 shared evaluator names, but labels itself synthetic rather than claiming those actions happened in Valheim. Every exact one-event rehearsal is also available to the bounded mailbox as <code>scenario-&lt;event&gt;</code>.</p></li>
+</ol>
+<p class="note"><strong>The starter file holds two backward-compatible quests.</strong> <code>first_blood</code> is armed: kill the Greyling standing under the combat monument and it fires &mdash; and <code>lab_target</code> puts a fresh one in front of you whenever you need another, so testing twice never means going to look for a second one. <code>punchwood</code> is also armed: <code>hit</code> remains a compatibility alias for creature and resource damage. All eight schools feed the same shared evaluator. Low-level mutations can still be inspected under <code>questlab_profile diagnostic</code>, but those witnesses are structurally barred from completing quests.</p>
+<p class="note"><strong>Each school&rsquo;s rune is also its filter.</strong> The mark beside each heading is the same mark you click in the lab&rsquo;s console to show or hide that school &mdash; so learning the book teaches the console for free. One fight emits more rows than the window holds, which is why the filters matter.</p>
+</div>
+<div class="school">
+<div class="school-header"><svg viewBox="0 0 100 100" class="rune" aria-hidden="true"><line x1="50.0" y1="10.0" x2="50.0" y2="95.0" stroke="#ed7366" stroke-width="12" stroke-linecap="round"/><line x1="50.0" y1="10.0" x2="15.0" y2="42.0" stroke="#ed7366" stroke-width="12" stroke-linecap="round"/><line x1="50.0" y1="10.0" x2="85.0" y2="42.0" stroke="#ed7366" stroke-width="12" stroke-linecap="round"/></svg><h2>Combat</h2></div>
+<div style="margin-bottom: 1.5rem">
+<p><strong>What it covers:</strong> Hitting things, blocking, healing, staggering, and things dying. Each deliberate act has stable quest vocabulary; the lower-level witnesses that corroborate it remain visible only as diagnostics.</p>
+<p><strong>Go and try:</strong> Find a Greyling and hit it once, then finish it. You get two kinds of row: the hits, and the death.</p>
+<p class="watch"><strong>Worth knowing:</strong> A hit and a kill are different creator events: damage_dealt and kill. Bind to the precise one when you can; the older hit spelling remains a compatibility alias for creature or resource damage. A local blow and its server-carried echo share one action identity, so one swing cannot complete a quest twice.</p>
+</div>
+<ul class="spell-list">
+<li class="spell">
+<div><span class="spell-name">a blow being blocked</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.BlockAttack</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a blow blocked by something carrying a shield</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Humanoid.BlockAttack</span></div>
+<div class="spell-verdict verdict-today">bindable: attack_blocked</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a creature dies</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.OnDeath</span></div>
+<div class="spell-verdict verdict-today">bindable: kill</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a creature is staggered</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.Stagger</span></div>
+<div class="spell-verdict verdict-today">bindable: character_staggered</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a creature is staggered, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.RPC_Stagger</span></div>
+<div class="spell-verdict verdict-today">bindable: character_staggered</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">health set outright, rather than damaged or healed</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.SetHealth</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">something being healed</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.Heal</span></div>
+<div class="spell-verdict verdict-today">bindable: character_healed</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">something being healed, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.RPC_Heal</span></div>
+<div class="spell-verdict verdict-today">bindable: character_healed</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">stagger building up on a creature</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.AddStaggerDamage</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a living thing</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: damage_dealt</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a living thing, when the server carries the blow</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Character.RPC_Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: damage_dealt</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">you die</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.OnDeath</span></div>
+<div class="spell-verdict verdict-today">bindable: player_died</div>
+</li>
+</ul></div>
+<div class="school">
+<div class="school-header"><svg viewBox="0 0 100 100" class="rune" aria-hidden="true"><line x1="12.0" y1="20.0" x2="50.0" y2="42.0" stroke="#7ace85" stroke-width="12" stroke-linecap="round"/><line x1="50.0" y1="42.0" x2="12.0" y2="62.0" stroke="#7ace85" stroke-width="12" stroke-linecap="round"/><line x1="88.0" y1="80.0" x2="50.0" y2="57.99999999999999" stroke="#7ace85" stroke-width="12" stroke-linecap="round"/><line x1="50.0" y1="57.99999999999999" x2="88.0" y2="38.0" stroke="#7ace85" stroke-width="12" stroke-linecap="round"/></svg><h2>Harvest</h2></div>
+<div style="margin-bottom: 1.5rem">
+<p><strong>What it covers:</strong> Chopping trees, breaking bushes and rocks, picking berries. The first thing most people try, and the reason this lab exists: hitting a bush used to fire a quest, and the mod that could do it was retired.</p>
+<p><strong>Go and try:</strong> Punch a tree with bare fists, then punch a raspberry bush, then pick one. Three rows, and the third is a different shape from the first two.</p>
+<p class="watch"><strong>Worth knowing:</strong> A standing tree and a felled trunk are different things to the game, so they are different rows. And picking a berry is not damage at all — it is an interact. Bind damage as resource_damaged and picking as resource_picked; the older hit alias still covers resource damage, but it does not mean picking.</p>
+</div>
+<ul class="spell-list">
+<li class="spell">
+<div><span class="spell-name">a picked thing marked as taken</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Pickable.SetPicked</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a picked thing marked as taken, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Pickable.RPC_SetPicked</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">picking a berry, mushroom or flower</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Pickable.Interact</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_picked</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">something being picked, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Pickable.RPC_Pick</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_picked</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a bush, or other breakable scenery</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Destructible.Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a fallen trunk</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">TreeLog.Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a fallen trunk, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">TreeLog.RPC_Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a large rock or ore vein</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">MineRock5.Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a large rock, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">MineRock5.RPC_Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a rock or ore vein</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">MineRock.Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a standing tree</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">TreeBase.Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking a standing tree, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">TreeBase.RPC_Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">striking breakable scenery, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Destructible.RPC_Damage</span></div>
+<div class="spell-verdict verdict-today">bindable: resource_damaged</div>
+</li>
+</ul></div>
+<div class="school">
+<div class="school-header"><svg viewBox="0 0 100 100" class="rune" aria-hidden="true"><line x1="28.000000000000004" y1="5.0" x2="28.000000000000004" y2="95.0" stroke="#d9b76b" stroke-width="12" stroke-linecap="round"/><line x1="28.000000000000004" y1="28.000000000000004" x2="80.0" y2="8.0" stroke="#d9b76b" stroke-width="12" stroke-linecap="round"/><line x1="28.000000000000004" y1="55.00000000000001" x2="80.0" y2="35.0" stroke="#d9b76b" stroke-width="12" stroke-linecap="round"/></svg><h2>Inventory</h2></div>
+<div style="margin-bottom: 1.5rem">
+<p><strong>What it covers:</strong> Picking things up, equipping them, eating them, emptying chests. The largest group of seams in the game and the noisiest, because the game moves items around constantly for reasons that have nothing to do with you.</p>
+<p><strong>Go and try:</strong> Drop something and pick it back up, then equip a weapon and eat food. Then open a chest and take everything.</p>
+<p class="watch"><strong>Worth knowing:</strong> The lab watches what you DID, not every time the item list changed. Adding an item internally happens on crafting, on stacking, on moving between chests — a quest built on that would fire constantly and mean nothing. It is left diagnostic-only on purpose. Pickup, drop, equip, unequip, consume, and emptying a container are stable creator events and can each bind a quest.</p>
+</div>
+<ul class="spell-list">
+<li class="spell">
+<div><span class="spell-name">an item landing on the ground</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">ItemDrop.DropItem</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">an item on the ground being taken</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">ItemDrop.Pickup</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">anything at all entering your pack, including shuffles you did not cause</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Inventory.AddItem</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">anything at all leaving your pack</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Inventory.RemoveItem</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">claiming a dropped item before taking it</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">ItemDrop.RPC_RequestOwn</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">dropping something</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Humanoid.DropItem</span></div>
+<div class="spell-verdict verdict-today">bindable: item_dropped</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">eating or drinking</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Humanoid.ConsumeItem</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">eating or drinking, as a player</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.ConsumeItem</span></div>
+<div class="spell-verdict verdict-today">bindable: item_consumed</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">emptying a chest</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Container.TakeAll</span></div>
+<div class="spell-verdict verdict-today">bindable: container_emptied</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">emptying a chest, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Container.RPC_RequestTakeAll</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">picking something up off the ground</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Humanoid.Pickup</span></div>
+<div class="spell-verdict verdict-today">bindable: item_picked_up</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">putting something away</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Humanoid.UnequipItem</span></div>
+<div class="spell-verdict verdict-today">bindable: item_unequipped</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">putting something in your hands</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Humanoid.EquipItem</span></div>
+<div class="spell-verdict verdict-today">bindable: item_equipped</div>
+</li>
+</ul></div>
+<div class="school">
+<div class="school-header"><svg viewBox="0 0 100 100" class="rune" aria-hidden="true"><line x1="50.0" y1="8.0" x2="18.0" y2="38.0" stroke="#c79961" stroke-width="12" stroke-linecap="round"/><line x1="50.0" y1="8.0" x2="82.0" y2="38.0" stroke="#c79961" stroke-width="12" stroke-linecap="round"/><line x1="18.0" y1="38.0" x2="50.0" y2="57.99999999999999" stroke="#c79961" stroke-width="12" stroke-linecap="round"/><line x1="82.0" y1="38.0" x2="50.0" y2="57.99999999999999" stroke="#c79961" stroke-width="12" stroke-linecap="round"/><line x1="32.0" y1="50.0" x2="12.0" y2="95.0" stroke="#c79961" stroke-width="12" stroke-linecap="round"/><line x1="68.0" y1="50.0" x2="88.0" y2="95.0" stroke="#c79961" stroke-width="12" stroke-linecap="round"/></svg><h2>Building</h2></div>
+<div style="margin-bottom: 1.5rem">
+<p><strong>What it covers:</strong> Placing pieces, repairing them, taking them down, and structures breaking. The category a settlement steward actually wants: build a longhouse, repair the dock, keep the walls up.</p>
+<p><strong>Go and try:</strong> Place a workbench, hit it with a hammer to repair it, then remove it. If something of yours is damaged, let it break and watch that row too.</p>
+<p class="watch"><strong>Worth knowing:</strong> Placing is something YOU do; breaking is something that HAPPENS. So breaking is reported whoever caused it, and the row says whether it was you. That distinction is what lets a 'defend the base' quest work at all. Placement, removal, repair, damage, and destruction have separate bindable names.</p>
+</div>
+<ul class="spell-list">
+<li class="spell">
+<div><span class="spell-name">a structure being repaired</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">WearNTear.Repair</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a structure being repaired, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">WearNTear.RPC_Repair</span></div>
+<div class="spell-verdict verdict-today">bindable: piece_repaired</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a structure being taken away</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">WearNTear.Remove</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a structure being taken away, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">WearNTear.RPC_Remove</span></div>
+<div class="spell-verdict verdict-today">bindable: piece_removed</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a structure breaking</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">WearNTear.Destroy</span></div>
+<div class="spell-verdict verdict-today">bindable: piece_destroyed</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a structure taking damage</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">WearNTear.ApplyDamage</span></div>
+<div class="spell-verdict verdict-today">bindable: piece_damaged</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">placing a piece of building</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.PlacePiece</span></div>
+<div class="spell-verdict verdict-today">bindable: piece_placed</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">repairing something with a hammer</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.Repair</span></div>
+<div class="spell-verdict verdict-today">bindable: piece_repaired</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">taking a piece back down</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.RemovePiece</span></div>
+<div class="spell-verdict verdict-today">bindable: piece_removed</div>
+</li>
+</ul></div>
+<div class="school">
+<div class="school-header"><svg viewBox="0 0 100 100" class="rune" aria-hidden="true"><line x1="78.0" y1="8.0" x2="25.0" y2="50.0" stroke="#eb9e4c" stroke-width="12" stroke-linecap="round"/><line x1="25.0" y1="50.0" x2="78.0" y2="92.0" stroke="#eb9e4c" stroke-width="12" stroke-linecap="round"/></svg><h2>Crafting</h2></div>
+<div style="margin-bottom: 1.5rem">
+<p><strong>What it covers:</strong> Making things at a bench, and feeding the machines that make things — smelters, kilns, cooking stations. Two different acts that people tend to lump together.</p>
+<p><strong>Go and try:</strong> Craft anything at a workbench. Then put ore and coal into a smelter. Notice they are separate rows with separate names.</p>
+<p class="watch"><strong>Worth knowing:</strong> The craft is reported by the crafting WINDOW, not by your character. That is genuinely surprising and it is why searching for a 'player crafts' event turns up nothing and people conclude crafting cannot be tracked. It can: the crafted item, station input, fuel, produced output, and collected output are separate bindable events.</p>
+</div>
+<ul class="spell-list">
+<li class="spell">
+<div><span class="spell-name">a smelter finishing something</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Smelter.Spawn</span></div>
+<div class="spell-verdict verdict-today">bindable: station_output_produced</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">crafting something at a bench</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">InventoryGui.DoCrafting</span></div>
+<div class="spell-verdict verdict-today">bindable: item_crafted</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">feeding a cooking station</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">CookingStation.RPC_AddFuel</span></div>
+<div class="spell-verdict verdict-today">bindable: station_fuel_added</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">feeding coal or wood to a smelter</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Smelter.OnAddFuel</span></div>
+<div class="spell-verdict verdict-today">bindable: station_fuel_added</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">feeding ore to a smelter or kiln</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Smelter.OnAddOre</span></div>
+<div class="spell-verdict verdict-today">bindable: station_input_added</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">fuel reaching the smelter, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Smelter.RPC_AddFuel</span></div>
+<div class="spell-verdict verdict-today">bindable: station_fuel_added</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">ore reaching the smelter, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Smelter.RPC_AddOre</span></div>
+<div class="spell-verdict verdict-today">bindable: station_input_added</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">pressing the craft button</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">InventoryGui.OnCraftPressed</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">putting food on a cooking station</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">CookingStation.RPC_AddItem</span></div>
+<div class="spell-verdict verdict-today">bindable: station_input_added</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">starting a fermenter</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Fermenter.RPC_AddItem</span></div>
+<div class="spell-verdict verdict-today">bindable: station_input_added</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">taking cooked food off</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">CookingStation.RPC_RemoveDoneItem</span></div>
+<div class="spell-verdict verdict-today">bindable: station_output_collected</div>
+</li>
+</ul></div>
+<div class="school">
+<div class="school-header"><svg viewBox="0 0 100 100" class="rune" aria-hidden="true"><line x1="80.0" y1="10.0" x2="32.0" y2="10.0" stroke="#f5d66b" stroke-width="12" stroke-linecap="round"/><line x1="32.0" y1="10.0" x2="68.0" y2="50.0" stroke="#f5d66b" stroke-width="12" stroke-linecap="round"/><line x1="68.0" y1="50.0" x2="20.0" y2="50.0" stroke="#f5d66b" stroke-width="12" stroke-linecap="round"/><line x1="20.0" y1="50.0" x2="56.00000000000001" y2="90.0" stroke="#f5d66b" stroke-width="12" stroke-linecap="round"/></svg><h2>Progression</h2></div>
+<div style="margin-bottom: 1.5rem">
+<p><strong>What it covers:</strong> Skills going up, stamina being spent, and dying. The category people ask for by name and then cannot find, because the names they ask for do not exist.</p>
+<p><strong>Go and try:</strong> Swing an axe at a tree a few times until the skill-up message appears. You will see the skill row fire at the same moment.</p>
+<p class="watch"><strong>Worth knowing:</strong> There is an event for 'a skill went up'. There is no event for 'my skill is level 30' — that is a question you can ask, not something the game announces. A quest can fire on the first and cannot on the second, and that difference catches everybody once. Skill raises, skill loss, death, maximum-health changes, and stamina changes are bindable. Stamina observation is off by default because running can bury everything; enable it only for that experiment.</p>
+</div>
+<ul class="spell-list">
+<li class="spell">
+<div><span class="spell-name">a skill going up</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Skills.RaiseSkill</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a skill going up, asked for by you</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.RaiseSkill</span></div>
+<div class="spell-verdict verdict-today">bindable: skill_raised</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">regaining stamina</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.AddStamina</span></div>
+<div class="spell-verdict verdict-today">bindable: stamina_gained</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">skills being lost, as on death</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Skills.LowerAllSkills</span></div>
+<div class="spell-verdict verdict-today">bindable: skills_lowered</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">spending stamina</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.UseStamina</span></div>
+<div class="spell-verdict verdict-today">bindable: stamina_spent</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">you die</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.OnDeath</span></div>
+<div class="spell-verdict verdict-today">bindable: player_died</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">your maximum health changing</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.SetMaxHealth</span></div>
+<div class="spell-verdict verdict-today">bindable: max_health_changed</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">your skills taking the death penalty</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Skills.OnDeath</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a skill raised by console command</span><br><span class="spell-true-name">Skills.CheatRaiseSkill</span></div>
+<div class="spell-verdict ">intentionally disabled</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">asking what a skill stands at — a question, not something that happens</span><br><span class="spell-true-name">Skills.GetSkillLevel</span></div>
+<div class="spell-verdict ">intentionally disabled</div>
+</li>
+</ul></div>
+<div class="school">
+<div class="school-header"><svg viewBox="0 0 100 100" class="rune" aria-hidden="true"><line x1="25.0" y1="5.0" x2="25.0" y2="95.0" stroke="#75c2eb" stroke-width="12" stroke-linecap="round"/><line x1="25.0" y1="5.0" x2="75.0" y2="22.0" stroke="#75c2eb" stroke-width="12" stroke-linecap="round"/><line x1="75.0" y1="22.0" x2="25.0" y2="48.0" stroke="#75c2eb" stroke-width="12" stroke-linecap="round"/><line x1="35.0" y1="48.0" x2="80.0" y2="95.0" stroke="#75c2eb" stroke-width="12" stroke-linecap="round"/></svg><h2>World</h2></div>
+<div style="margin-bottom: 1.5rem">
+<p><strong>What it covers:</strong> Moving through the world, and the world itself changing state. Small, and it contains the most interesting seam nobody has used.</p>
+<p><strong>Go and try:</strong> Take a portal. If you are on a world where a boss has been killed, that already fired.</p>
+<p class="watch"><strong>Worth knowing:</strong> Valheim keeps a short list of world-wide flags — which bosses are dead, and so what the world allows. That is the nearest thing the game has to a server-wide event. Portal travel and global-key set/remove each have stable bindable names; asking which biome a coordinate occupies remains a query, not an event.</p>
+</div>
+<ul class="spell-list">
+<li class="spell">
+<div><span class="spell-name">the world forgetting something</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">ZoneSystem.RemoveGlobalKey</span></div>
+<div class="spell-verdict verdict-today">bindable: global_key_removed</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">the world recording something, as when a boss falls</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">ZoneSystem.SetGlobalKey</span></div>
+<div class="spell-verdict verdict-today">bindable: global_key_set</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">the world recording something, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">ZoneSystem.RPC_SetGlobalKey</span></div>
+<div class="spell-verdict verdict-today">bindable: global_key_set</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">travelling by portal</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Player.TeleportTo</span></div>
+<div class="spell-verdict verdict-today">bindable: player_teleported</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">asking which biome a place is — a question, not something that happens</span><br><span class="spell-true-name">WorldGenerator.GetBiome</span></div>
+<div class="spell-verdict ">intentionally disabled</div>
+</li>
+</ul></div>
+<div class="school">
+<div class="school-header"><svg viewBox="0 0 100 100" class="rune" aria-hidden="true"><line x1="15.0" y1="8.0" x2="15.0" y2="92.0" stroke="#c2a8f0" stroke-width="12" stroke-linecap="round"/><line x1="85.0" y1="8.0" x2="85.0" y2="92.0" stroke="#c2a8f0" stroke-width="12" stroke-linecap="round"/><line x1="15.0" y1="12.0" x2="85.0" y2="57.99999999999999" stroke="#c2a8f0" stroke-width="12" stroke-linecap="round"/><line x1="85.0" y1="12.0" x2="15.0" y2="57.99999999999999" stroke="#c2a8f0" stroke-width="12" stroke-linecap="round"/></svg><h2>Social</h2></div>
+<div style="margin-bottom: 1.5rem">
+<p><strong>What it covers:</strong> Talking, and writing on signs. The quietest category and the one with the most room, because it needs nothing from combat at all.</p>
+<p><strong>Go and try:</strong> Say something in chat, then place a sign and write on it.</p>
+<p class="watch"><strong>Worth knowing:</strong> A quest that completes when somebody writes a particular sign, or says a phrase somewhere specific, is directly bindable through sign_written or chat_sent. Community rituals tend to look far more like this than like killing things — which is worth remembering. Messages merely received from somebody else stay diagnostic-only, so another player cannot complete your speaking quest for you.</p>
+</div>
+<ul class="spell-list">
+<li class="spell">
+<div><span class="spell-name">a message appearing in the chat window</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Chat.OnNewChatMessage</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">a message reaching everyone, server-carried</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Chat.RPC_ChatMessage</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">something speaking aloud</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Talker.Say</span></div>
+<div class="spell-verdict ">diagnostic only — never bindable</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">writing on a sign</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Sign.SetText</span></div>
+<div class="spell-verdict verdict-today">bindable: sign_written</div>
+</li>
+<li class="spell">
+<div><span class="spell-name">you saying something</span><span class="bound-badge">Integrated</span><br><span class="spell-true-name">Chat.SendText</span></div>
+<div class="spell-verdict verdict-today">bindable: chat_sent</div>
+</li>
+</ul></div>
+</div></body></html>

@@ -1,0 +1,311 @@
+{
+  "schema": "comfy-questlab-grimoire/v1",
+  "events": [
+    {
+      "event": "attack_blocked",
+      "category": "combat",
+      "profile": "core",
+      "rune": "Tiwaz",
+      "color": "crimson",
+      "invocation": "When the spear-rune witnesses a foe fall...",
+      "bindable": true
+    },
+    {
+      "event": "character_healed",
+      "category": "combat",
+      "profile": "core",
+      "rune": "Tiwaz",
+      "color": "crimson",
+      "invocation": "When the spear-rune witnesses a foe fall...",
+      "bindable": true
+    },
+    {
+      "event": "character_staggered",
+      "category": "combat",
+      "profile": "core",
+      "rune": "Tiwaz",
+      "color": "crimson",
+      "invocation": "When the spear-rune witnesses a foe fall...",
+      "bindable": true
+    },
+    {
+      "event": "chat_sent",
+      "category": "social",
+      "profile": "core",
+      "rune": "Mannaz",
+      "color": "sapphire",
+      "invocation": "When your voice speaks to the hall...",
+      "bindable": true
+    },
+    {
+      "event": "container_emptied",
+      "category": "inventory",
+      "profile": "core",
+      "rune": "Fehu",
+      "color": "amber",
+      "invocation": "When you claim a thing from the hall...",
+      "bindable": true
+    },
+    {
+      "event": "damage_dealt",
+      "category": "combat",
+      "profile": "extended",
+      "rune": "Tiwaz",
+      "color": "crimson",
+      "invocation": "When the spear-rune witnesses a foe fall...",
+      "bindable": true
+    },
+    {
+      "event": "global_key_removed",
+      "category": "world",
+      "profile": "core",
+      "rune": "Raidho",
+      "color": "sapphire",
+      "invocation": "When the road carries you between worlds...",
+      "bindable": true
+    },
+    {
+      "event": "global_key_set",
+      "category": "world",
+      "profile": "core",
+      "rune": "Raidho",
+      "color": "sapphire",
+      "invocation": "When the road carries you between worlds...",
+      "bindable": true
+    },
+    {
+      "event": "item_consumed",
+      "category": "inventory",
+      "profile": "core",
+      "rune": "Fehu",
+      "color": "amber",
+      "invocation": "When you claim a thing from the hall...",
+      "bindable": true
+    },
+    {
+      "event": "item_crafted",
+      "category": "crafting",
+      "profile": "core",
+      "rune": "Kenaz",
+      "color": "amber",
+      "invocation": "When the forge answers your hands...",
+      "bindable": true
+    },
+    {
+      "event": "item_dropped",
+      "category": "inventory",
+      "profile": "core",
+      "rune": "Fehu",
+      "color": "amber",
+      "invocation": "When you claim a thing from the hall...",
+      "bindable": true
+    },
+    {
+      "event": "item_equipped",
+      "category": "inventory",
+      "profile": "core",
+      "rune": "Fehu",
+      "color": "amber",
+      "invocation": "When you claim a thing from the hall...",
+      "bindable": true
+    },
+    {
+      "event": "item_picked_up",
+      "category": "inventory",
+      "profile": "core",
+      "rune": "Fehu",
+      "color": "amber",
+      "invocation": "When you claim a thing from the hall...",
+      "bindable": true
+    },
+    {
+      "event": "item_unequipped",
+      "category": "inventory",
+      "profile": "core",
+      "rune": "Fehu",
+      "color": "amber",
+      "invocation": "When you claim a thing from the hall...",
+      "bindable": true
+    },
+    {
+      "event": "kill",
+      "category": "combat",
+      "profile": "core",
+      "rune": "Tiwaz",
+      "color": "crimson",
+      "invocation": "When the spear-rune witnesses a foe fall...",
+      "bindable": true
+    },
+    {
+      "event": "max_health_changed",
+      "category": "progression",
+      "profile": "extended",
+      "rune": "Ansuz",
+      "color": "sapphire",
+      "invocation": "When your strength crosses a new threshold...",
+      "bindable": true
+    },
+    {
+      "event": "piece_damaged",
+      "category": "building",
+      "profile": "extended",
+      "rune": "Othala",
+      "color": "amber",
+      "invocation": "When you raise a structure upon the hearth...",
+      "bindable": true
+    },
+    {
+      "event": "piece_destroyed",
+      "category": "building",
+      "profile": "core",
+      "rune": "Othala",
+      "color": "amber",
+      "invocation": "When you raise a structure upon the hearth...",
+      "bindable": true
+    },
+    {
+      "event": "piece_placed",
+      "category": "building",
+      "profile": "core",
+      "rune": "Othala",
+      "color": "amber",
+      "invocation": "When you raise a structure upon the hearth...",
+      "bindable": true
+    },
+    {
+      "event": "piece_removed",
+      "category": "building",
+      "profile": "core",
+      "rune": "Othala",
+      "color": "amber",
+      "invocation": "When you raise a structure upon the hearth...",
+      "bindable": true
+    },
+    {
+      "event": "piece_repaired",
+      "category": "building",
+      "profile": "core",
+      "rune": "Othala",
+      "color": "amber",
+      "invocation": "When you raise a structure upon the hearth...",
+      "bindable": true
+    },
+    {
+      "event": "player_died",
+      "category": "progression",
+      "profile": "core",
+      "rune": "Ansuz",
+      "color": "sapphire",
+      "invocation": "When your strength crosses a new threshold...",
+      "bindable": true
+    },
+    {
+      "event": "player_teleported",
+      "category": "world",
+      "profile": "core",
+      "rune": "Raidho",
+      "color": "sapphire",
+      "invocation": "When the road carries you between worlds...",
+      "bindable": true
+    },
+    {
+      "event": "resource_damaged",
+      "category": "harvest",
+      "profile": "extended",
+      "rune": "Jera",
+      "color": "emerald",
+      "invocation": "When your steel bites the living wood...",
+      "bindable": true
+    },
+    {
+      "event": "resource_picked",
+      "category": "harvest",
+      "profile": "core",
+      "rune": "Jera",
+      "color": "emerald",
+      "invocation": "When your steel bites the living wood...",
+      "bindable": true
+    },
+    {
+      "event": "sign_written",
+      "category": "social",
+      "profile": "core",
+      "rune": "Mannaz",
+      "color": "sapphire",
+      "invocation": "When your voice speaks to the hall...",
+      "bindable": true
+    },
+    {
+      "event": "skill_raised",
+      "category": "progression",
+      "profile": "core",
+      "rune": "Ansuz",
+      "color": "sapphire",
+      "invocation": "When your strength crosses a new threshold...",
+      "bindable": true
+    },
+    {
+      "event": "skills_lowered",
+      "category": "progression",
+      "profile": "core",
+      "rune": "Ansuz",
+      "color": "sapphire",
+      "invocation": "When your strength crosses a new threshold...",
+      "bindable": true
+    },
+    {
+      "event": "stamina_gained",
+      "category": "progression",
+      "profile": "extended",
+      "rune": "Ansuz",
+      "color": "sapphire",
+      "invocation": "When your strength crosses a new threshold...",
+      "bindable": true
+    },
+    {
+      "event": "stamina_spent",
+      "category": "progression",
+      "profile": "extended",
+      "rune": "Ansuz",
+      "color": "sapphire",
+      "invocation": "When your strength crosses a new threshold...",
+      "bindable": true
+    },
+    {
+      "event": "station_fuel_added",
+      "category": "crafting",
+      "profile": "core",
+      "rune": "Kenaz",
+      "color": "amber",
+      "invocation": "When the forge answers your hands...",
+      "bindable": true
+    },
+    {
+      "event": "station_input_added",
+      "category": "crafting",
+      "profile": "core",
+      "rune": "Kenaz",
+      "color": "amber",
+      "invocation": "When the forge answers your hands...",
+      "bindable": true
+    },
+    {
+      "event": "station_output_collected",
+      "category": "crafting",
+      "profile": "core",
+      "rune": "Kenaz",
+      "color": "amber",
+      "invocation": "When the forge answers your hands...",
+      "bindable": true
+    },
+    {
+      "event": "station_output_produced",
+      "category": "crafting",
+      "profile": "core",
+      "rune": "Kenaz",
+      "color": "amber",
+      "invocation": "When the forge answers your hands...",
+      "bindable": true
+    }
+  ]
+}

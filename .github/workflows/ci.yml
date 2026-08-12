@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: No cross-repository reach-in
+        run: |
+          python tools/assert_no_reach_in.py
+          python tools/assert_no_reach_in.py --self-test
+
+  identity:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert repository identity
+        shell: pwsh
+        run: ./tools/Assert-RepoIdentity.ps1
+
+  quest:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restore interim packages
+        shell: pwsh
+        run: |
+          dotnet restore network/mod/ComfyQuestLab.Tests/ComfyQuestLab.Tests.csproj
+          dotnet restore src/Quest.Studio/Quest.Studio.csproj
+      - name: Game-independent xUnit suite
+        shell: pwsh
+        run: dotnet test network/mod/ComfyQuestLab.Tests/ComfyQuestLab.Tests.csproj -c Release --no-restore
+      - name: Python suite and generated drift
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests
+          python tools/component-packets/render_quest_lab.py --check
+          python tools/component-packets/generate_seam_catalog.py --check
+          python tools/component-packets/check_lab_patches.py
+      - name: Studio package
+        shell: pwsh
+        run: dotnet pack src/Quest.Studio/Quest.Studio.csproj -c Release --no-restore
+
+  licensed-mod-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Explain local release gate
+        run: |
+          test -f network/mod/ComfyQuestLab/ComfyQuestLab.csproj
+          echo "The Quest Lab release build runs on the local cutter with licensed Valheim assemblies."

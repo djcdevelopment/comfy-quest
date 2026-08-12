@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
     <AssemblyName>Comfy.Quest.Studio</AssemblyName>
     <RootNamespace>Comfy.Quest.Studio</RootNamespace>
   </PropertyGroup>
@@ -16,13 +21,13 @@
     <!-- Cross-repo boundary (comfy-quest owns Comfy.Quest.Contracts): the compiled assembly only
          (ExcludeAssets="contentFiles" — Studio needs ExperienceContract/QuestPackContent/etc,
          not the mod's single-DLL ModGlue source). -->
-    <PackageReference Include="Comfy.Quest.Contracts" ExcludeAssets="contentFiles" />
+    <PackageReference Include="Comfy.Quest.Contracts" Version="[0.1.0-local]"
+                      ExcludeAssets="contentFiles" />
   </ItemGroup>
 
-  <!-- Comfy.Quest.Studio packing: carved from Lumberjacks/src/Game.Companion per
-       docs/internal/repo-split/DETAILED-MANIFEST.md finding F4. Companion stays the host
-       (implements IQuestStudioHost); .questpack files remain the runtime handoff per
-       docs/quest-studio-runtime-boundary.md. -->
+  <!-- Companion stays the host (implements IQuestStudioHost); .questpack files remain
+       the versioned Runtime handoff. This project is intentionally self-contained so it
+       does not inherit build or package versions from the platform repository. -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Comfy.Quest.Studio</PackageId>

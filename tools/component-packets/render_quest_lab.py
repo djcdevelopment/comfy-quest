@@ -5,10 +5,9 @@ This is the web-facing version of the in-game spellbook, generated from the same
 source files: journal-pages.json and valheim-event-atlas.json. It also includes
 SVG representations of the runes drawn from LabRunes.cs.
 
-Writes Lumberjacks/src/Game.Gateway/Community/questlab.html by default. Pass --check to verify
-drift, or --out <path> to write (or check) somewhere else -- e.g. once this tool's comfy-quest
-lane no longer shares a repo with the Lumberjacks Gateway it publishes into, and the Gateway
-side vendors the published artifact instead (see Lumberjacks/tools/Update-QuestLabHtml.ps1).
+Writes docs/generated/questlab.html by default. Pass --check to verify drift, or --out <path>
+to write (or check) somewhere else. The platform consumes the released artifact by manifest
+hash; this generator never writes into another repository.
 """
 import argparse
 import json
@@ -21,7 +20,7 @@ ATLAS = os.path.join(HERE, "samples", "valheim-event-atlas.json")
 CAPABILITIES = os.path.join(HERE, "samples", "quest-capability-manifest.json")
 PAGES = os.path.join(HERE, "journal-pages.json")
 PATCHES = os.path.join(REPO, "network", "mod", "ComfyQuestLab", "Patches")
-DEFAULT_OUT = os.path.join(REPO, "Lumberjacks", "src", "Game.Gateway", "Community", "questlab.html")
+DEFAULT_OUT = os.path.join(REPO, "docs", "generated", "questlab.html")
 
 _parser = argparse.ArgumentParser(
     description="Render the Quest Lab Web Tome HTML page from journal-pages.json "
@@ -163,7 +162,7 @@ html = [
     '</style>',
     '</head><body>',
     '<div class="topbar"><div class="topbar-inner">',
-    '<div class="brand"><div class="mark">B</div>Baseline</div>',
+    '<div class="brand"><div class="mark">Q</div>Comfy Quest</div>',
     '<nav aria-label="Gateway surfaces">',
     '<a href="/roadmap">Roadmap</a>',
     '<a href="/community">Community</a>',

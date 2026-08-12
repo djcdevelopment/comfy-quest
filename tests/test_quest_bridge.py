@@ -102,10 +102,7 @@ class QuestBridgeEndToEnd(unittest.TestCase):
 
     def test_consumer_rejects_schema_one_outbox_payloads(self):
         self.inbox.mkdir(parents=True)
-        legacy = (
-            ROOT / "recipes" / "quest-submission-bridge" / "bridge-consumer"
-            / "mikers-demo" / "outbox" / "20260701-210000-slayer-rank-thrall-demo.json"
-        )
+        legacy = FIXTURE.parent / "schema-v1-outbox.json"
         (self.inbox / legacy.name).write_text(
             legacy.read_text(encoding="utf-8"), encoding="utf-8"
         )
