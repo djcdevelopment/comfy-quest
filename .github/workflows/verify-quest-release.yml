@@ -1,0 +1,88 @@
+name: verify published Quest release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing quest-vX.Y.Z-split-proof release to verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-assets-only:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Reject non-Quest release lanes
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^quest-v[0-9]+\.[0-9]+\.[0-9]+-split-proof$ ]]; then
+            echo "Unexpected release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || inputs.release_tag }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download the exact public asset set
+        shell: bash
+        run: |
+          actual="$(
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+              --jq '.assets[].name' | sort
+          )"
+          expected="$(
+            printf '%s\n' \
+              SHA256SUMS \
+              quest-lab.zip \
+              quest-picker.html \
+              quest-picker.zip \
+              questlab.html \
+              release-manifest.json | sort
+          )"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "Published asset set drifted." >&2
+            echo "Expected:" >&2
+            echo "$expected" >&2
+            echo "Actual:" >&2
+            echo "$actual" >&2
+            exit 1
+          fi
+          mkdir release-assets
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir release-assets \
+            --pattern questlab.html \
+            --pattern quest-lab.zip \
+            --pattern quest-picker.html \
+            --pattern quest-picker.zip \
+            --pattern release-manifest.json \
+            --pattern SHA256SUMS
+
+      - name: Verify hashes, identity, tagged HTML, and ZIP relationships
+        shell: bash
+        run: |
+          revision="$(git rev-parse HEAD)"
+          python tools/release/verify_quest_release.py \
+            --release-dir release-assets \
+            --expected-tag "$RELEASE_TAG" \
+            --expected-questlab docs/generated/questlab.html \
+            --expected-revision "$revision"
+
+      - name: Licensed build intentionally excluded
+        shell: bash
+        run: |
+          echo "Verified published bytes only; no Valheim assemblies or cloud mod build were used."

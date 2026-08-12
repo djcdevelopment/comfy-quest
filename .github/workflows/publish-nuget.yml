@@ -1,0 +1,141 @@
+name: publish NuGet packages
+
+on:
+  push:
+    tags:
+      - "nuget-v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-nuget-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-in-dependency-order:
+    runs-on: ubuntu-latest
+    environment: nuget-production
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate tag and publication authority
+        id: version
+        shell: python
+        run: |
+          import os
+          tag = os.environ["GITHUB_REF_NAME"]
+          if tag != "nuget-v0.1.0":
+              raise SystemExit(
+                  f"this first-publication lane accepts only nuget-v0.1.0, got {tag!r}"
+              )
+          if not os.environ.get("NUGET_API_KEY", "").strip():
+              raise SystemExit("NUGET_API_KEY is not configured")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("value=0.1.0\n")
+
+      - name: Pack Contracts first
+        run: |
+          dotnet pack network/mod/ComfyQuestContracts/ComfyQuestContracts.csproj \
+            -c Release \
+            -o artifacts/nuget/contracts \
+            -p:Version=${{ steps.version.outputs.value }} \
+            -p:RepositoryCommit=${{ github.sha }} \
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Inspect Contracts package before push
+        run: |
+          python tools/nuget/validate_nupkg.py \
+            --package artifacts/nuget/contracts/Comfy.Quest.Contracts.${{ steps.version.outputs.value }}.nupkg \
+            --kind contracts \
+            --version ${{ steps.version.outputs.value }} \
+            --commit ${{ github.sha }}
+
+      - name: Push Contracts
+        run: |
+          dotnet nuget push artifacts/nuget/contracts/Comfy.Quest.Contracts.${{ steps.version.outputs.value }}.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
+      - name: Wait for and inspect public Contracts bytes
+        run: |
+          python tools/nuget/wait_for_nuget.py \
+            --id Comfy.Quest.Contracts \
+            --version ${{ steps.version.outputs.value }} \
+            --out artifacts/nuget/public/Comfy.Quest.Contracts.${{ steps.version.outputs.value }}.nupkg \
+            --timeout 900
+          python tools/nuget/validate_nupkg.py \
+            --package artifacts/nuget/public/Comfy.Quest.Contracts.${{ steps.version.outputs.value }}.nupkg \
+            --kind contracts \
+            --version ${{ steps.version.outputs.value }} \
+            --commit ${{ github.sha }} \
+            --allow-repository-signature
+
+      - name: Restore Studio against NuGet.org only and exact Contracts version
+        run: |
+          dotnet nuget locals all --clear
+          dotnet restore src/Quest.Studio/Quest.Studio.csproj \
+            --configfile tools/nuget/nuget.public.config \
+            '-p:QuestContractsVersion=[${{ steps.version.outputs.value }}]'
+
+      - name: Pack Studio only after public Contracts verification
+        run: |
+          dotnet pack src/Quest.Studio/Quest.Studio.csproj \
+            -c Release \
+            --no-restore \
+            -o artifacts/nuget/studio \
+            -p:Version=${{ steps.version.outputs.value }} \
+            '-p:QuestContractsVersion=[${{ steps.version.outputs.value }}]' \
+            -p:RepositoryCommit=${{ github.sha }} \
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Inspect Studio exact dependency and payload before push
+        run: |
+          python tools/nuget/validate_nupkg.py \
+            --package artifacts/nuget/studio/Comfy.Quest.Studio.${{ steps.version.outputs.value }}.nupkg \
+            --kind studio \
+            --version ${{ steps.version.outputs.value }} \
+            --commit ${{ github.sha }}
+
+      - name: Push Studio
+        run: |
+          dotnet nuget push artifacts/nuget/studio/Comfy.Quest.Studio.${{ steps.version.outputs.value }}.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
+      - name: Wait for and inspect public Studio bytes
+        run: |
+          python tools/nuget/wait_for_nuget.py \
+            --id Comfy.Quest.Studio \
+            --version ${{ steps.version.outputs.value }} \
+            --out artifacts/nuget/public/Comfy.Quest.Studio.${{ steps.version.outputs.value }}.nupkg \
+            --timeout 900
+          python tools/nuget/validate_nupkg.py \
+            --package artifacts/nuget/public/Comfy.Quest.Studio.${{ steps.version.outputs.value }}.nupkg \
+            --kind studio \
+            --version ${{ steps.version.outputs.value }} \
+            --commit ${{ github.sha }} \
+            --allow-repository-signature
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inspected-nuget-packages-${{ github.sha }}
+          path: artifacts/nuget/
+          if-no-files-found: error

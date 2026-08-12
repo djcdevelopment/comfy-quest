@@ -33,11 +33,21 @@
   <PropertyGroup>
     <PackageId>Comfy.Quest.Contracts</PackageId>
     <Version>0.1.0-local</Version>
+    <Title>Comfy Quest Contracts</Title>
     <Authors>djcdevelopment</Authors>
+    <PackageProjectUrl>https://github.com/djcdevelopment/comfy-quest</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/djcdevelopment/comfy-quest</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageLicenseExpression>BUSL-1.1</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>PACKAGE-README.md</PackageReadmeFile>
+    <PackageTags>quest;valheim;contracts;modding</PackageTags>
     <Description>Quest contract types (RuntimeContract/ExperienceContract) plus the ModGlue quest-glue source shared byte-for-byte between ComfyNetworkSense, ComfyQuestLab, and Game.Companion.</Description>
     <ContentTargetFolders>contentFiles</ContentTargetFolders>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="PACKAGE-README.md" Pack="true" PackagePath="\" />
     <None Include="ModGlue\*.cs"
           Pack="true"
           PackagePath="contentFiles\cs\any\ModGlue\%(Filename)%(Extension)"

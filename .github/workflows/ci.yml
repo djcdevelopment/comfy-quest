@@ -50,6 +50,8 @@ jobs:
         shell: pwsh
         run: |
           python -m unittest discover -s tests
+          python tools/nuget/repin_public.py --check-interim
+          python tools/release/verify_quest_release.py --self-test
           python tools/component-packets/render_quest_lab.py --check
           python tools/component-packets/generate_seam_catalog.py --check
           python tools/component-packets/check_lab_patches.py

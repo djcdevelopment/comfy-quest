@@ -7,6 +7,9 @@
     <Deterministic>true</Deterministic>
     <AssemblyName>Comfy.Quest.Studio</AssemblyName>
     <RootNamespace>Comfy.Quest.Studio</RootNamespace>
+    <!-- The workflow overrides this only after the matching Contracts package has
+         been downloaded back from NuGet.org and inspected. -->
+    <QuestContractsVersion Condition="'$(QuestContractsVersion)' == ''">[0.1.0-local]</QuestContractsVersion>
   </PropertyGroup>
   <ItemGroup>
     <!-- Quest Studio maps ASP.NET Core minimal-API endpoints (WebApplication/HttpRequest/Results)
@@ -21,7 +24,7 @@
     <!-- Cross-repo boundary (comfy-quest owns Comfy.Quest.Contracts): the compiled assembly only
          (ExcludeAssets="contentFiles" — Studio needs ExperienceContract/QuestPackContent/etc,
          not the mod's single-DLL ModGlue source). -->
-    <PackageReference Include="Comfy.Quest.Contracts" Version="[0.1.0-local]"
+    <PackageReference Include="Comfy.Quest.Contracts" Version="$(QuestContractsVersion)"
                       ExcludeAssets="contentFiles" />
   </ItemGroup>
 
@@ -32,7 +35,19 @@
     <IsPackable>true</IsPackable>
     <PackageId>Comfy.Quest.Studio</PackageId>
     <Version>0.1.0-local</Version>
+    <Title>Comfy Quest Studio</Title>
     <Authors>djcdevelopment</Authors>
+    <PackageProjectUrl>https://github.com/djcdevelopment/comfy-quest</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/djcdevelopment/comfy-quest</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageLicenseExpression>BUSL-1.1</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>PACKAGE-README.md</PackageReadmeFile>
+    <PackageTags>quest;valheim;authoring;studio</PackageTags>
     <Description>Quest Studio: the loopback Workbench surface for authoring, certifying, and publishing quest experiences to Runtime via .questpack. Carved from Game.Companion; the host (Companion) implements IQuestStudioHost.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="PACKAGE-README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

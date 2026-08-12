@@ -16,6 +16,9 @@ checkout.
 - Studio package: src/Quest.Studio
 - Generated web tome: docs/generated/questlab.html
 - Quest package builders: tools/questlab-package
+- NuGet publication runbook: docs/runbooks/NUGET-PUBLICATION.md
+- Split-proof release runbook: docs/runbooks/QUEST-RELEASE.md
+- OMEN Studio-to-Runtime acceptance: docs/runbooks/I2-QUESTPACK-OMEN.md
 - Repository boundary: BOUNDARY.md
 - Extraction record: PROVENANCE.md
 
@@ -32,3 +35,14 @@ installation. Do not set ComfyCopyToPlugins during verification.
 
 The interim packages-local feed exists only until the first public 0.1.0 NuGet
 publication and exact consumer repin.
+
+Publication readiness is checked without publishing:
+
+    python tools/nuget/repin_public.py --check-interim
+    python tools/release/verify_quest_release.py --self-test
+
+The local release builder emits and verifies the four split-proof Quest assets plus
+their manifest and checksums. It requires a clean checkout and never creates a tag
+or release:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools/release/New-QuestRelease.ps1
