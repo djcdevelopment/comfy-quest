@@ -16,8 +16,12 @@ jobs:
   publish-in-dependency-order:
     runs-on: ubuntu-latest
     environment: nuget-production
-    env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    permissions:
+      contents: read
+      # Trusted Publishing: the job mints a short-lived OIDC token and trades it
+      # at nuget.org for an API key that lives one hour. No long-lived secret is
+      # stored anywhere, so there is nothing to rotate or leak.
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,6 +40,8 @@ jobs:
       - name: Validate tag and publication authority
         id: version
         shell: python
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER }}
         run: |
           import os
           tag = os.environ["GITHUB_REF_NAME"]
@@ -43,8 +49,12 @@ jobs:
               raise SystemExit(
                   f"this first-publication lane accepts only nuget-v0.1.0, got {tag!r}"
               )
-          if not os.environ.get("NUGET_API_KEY", "").strip():
-              raise SystemExit("NUGET_API_KEY is not configured")
+          if not os.environ.get("NUGET_USER", "").strip():
+              raise SystemExit(
+                  "repository variable NUGET_USER is not set — it must be the "
+                  "nuget.org profile name (not an email address) that owns the "
+                  "Trusted Publishing policy"
+              )
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write("value=0.1.0\n")
 
@@ -65,11 +75,17 @@ jobs:
             --version ${{ steps.version.outputs.value }} \
             --commit ${{ github.sha }}
 
+      - name: NuGet login (OIDC, key valid one hour)
+        uses: NuGet/login@v1
+        id: login-contracts
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push Contracts
         run: |
           dotnet nuget push artifacts/nuget/contracts/Comfy.Quest.Contracts.${{ steps.version.outputs.value }}.nupkg \
             --source https://api.nuget.org/v3/index.json \
-            --api-key "$NUGET_API_KEY" \
+            --api-key "${{ steps.login-contracts.outputs.NUGET_API_KEY }}" \
             --skip-duplicate
 
       - name: Wait for and inspect public Contracts bytes
@@ -112,11 +128,20 @@ jobs:
             --version ${{ steps.version.outputs.value }} \
             --commit ${{ github.sha }}
 
+      # A second login, because the Contracts publish waits on public indexing
+      # before Studio is even packed; the first hour-long key could be stale by
+      # now, and each OIDC token is single-use anyway.
+      - name: NuGet login again for Studio
+        uses: NuGet/login@v1
+        id: login-studio
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push Studio
         run: |
           dotnet nuget push artifacts/nuget/studio/Comfy.Quest.Studio.${{ steps.version.outputs.value }}.nupkg \
             --source https://api.nuget.org/v3/index.json \
-            --api-key "$NUGET_API_KEY" \
+            --api-key "${{ steps.login-studio.outputs.NUGET_API_KEY }}" \
             --skip-duplicate
 
       - name: Wait for and inspect public Studio bytes
