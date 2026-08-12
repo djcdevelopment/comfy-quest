@@ -538,6 +538,26 @@ render();
 """
 
 
+def data_root():
+    """Where the guild data lives.
+
+    Creators pass explicit paths (see RUN-ME.md) and never reach here. The
+    zero-argument convenience form used to assume this file sat two levels below
+    a tree that also held `data/` — true in the old monorepo, false since the
+    guild data stayed in the baseline index repo. Point QUEST_DATA_ROOT at that
+    checkout; the old layout still resolves without it.
+    """
+    return os.environ.get("QUEST_DATA_ROOT") or os.path.join(HERE, "..", "..")
+
+
+def resolve_from_data_root(relative):
+    """Map a sources.json path (written `../../data/...`) onto the data root."""
+    relative = relative.replace("\\", "/")
+    if relative.startswith("../../"):
+        relative = relative[len("../../") :]
+    return os.path.normpath(os.path.join(data_root(), relative))
+
+
 def main():
     if len(sys.argv) > 2:
         out = sys.argv[1]
@@ -546,14 +566,27 @@ def main():
         with open(os.path.join(HERE, "sources.json"), encoding="utf-8-sig") as f:
             config = json.load(f)
         catalog_paths = [
-            os.path.normpath(os.path.join(HERE, s["output"]))
+            resolve_from_data_root(s["output"])
             for s in config["sources"]
             if s.get("enabled", True) and s.get("output")
             # the picker only speaks quest catalogs; other kinds (rank-ladder)
             # have their own renderers
             and s.get("kind", "quest-catalog") == "quest-catalog"
         ]
-        out = os.path.normpath(os.path.join(HERE, "../../data/processed/quest-picker.html"))
+        missing = [p for p in catalog_paths if not os.path.exists(p)]
+        if missing:
+            raise SystemExit(
+                "cannot find the harvested catalogs:\n  "
+                + "\n  ".join(missing)
+                + "\n\nThe guild data lives in the baseline index repo. Either point\n"
+                "QUEST_DATA_ROOT at that checkout:\n"
+                "  QUEST_DATA_ROOT=C:/work/baseline python "
+                "recipes/quest-catalogs/render_quest_picker.py\n"
+                "or pass paths explicitly:\n"
+                "  python recipes/quest-catalogs/render_quest_picker.py "
+                "<out.html> <catalog.json> [...]"
+            )
+        out = resolve_from_data_root("../../data/processed/quest-picker.html")
 
     catalogs = []
     for path in catalog_paths:

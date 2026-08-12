@@ -707,7 +707,10 @@ def main():
     with open(os.path.join(HERE, "sources.json"), encoding="utf-8-sig") as f:
         config = json.load(f)
 
-    out_dir = os.path.normpath(os.path.join(HERE, "../../data/processed"))
+    # The guild data lives in the baseline index repo since the split; point
+    # QUEST_DATA_ROOT at that checkout. The old monorepo layout still resolves.
+    root = os.environ.get("QUEST_DATA_ROOT") or os.path.join(HERE, "..", "..")
+    out_dir = os.path.normpath(os.path.join(root, "data/processed"))
     harvested, entries = [], []
     for source in config["sources"]:
         enabled = source.get("enabled", True) and source.get("output")
@@ -715,10 +718,16 @@ def main():
             entries.append({"id": source["id"], "guild": source.get("guild"),
                             "note": source.get("note"), "page": None})
             continue
-        stem = os.path.normpath(os.path.join(HERE, source["output"]))[: -len(".json")]
+        relative = source["output"].replace("\\", "/")
+        if relative.startswith("../../"):
+            relative = relative[len("../../") :]
+        stem = os.path.normpath(os.path.join(root, relative))[: -len(".json")]
         prov_path, cat_path = stem + "-provenance.json", stem + ".json"
         if not os.path.exists(prov_path):
-            raise SystemExit(f"[{source['id']}] no provenance sidecar at {prov_path} — run harvest.py first")
+            raise SystemExit(
+                f"[{source['id']}] no provenance sidecar at {prov_path} — run harvest.py first, "
+                "or set QUEST_DATA_ROOT to the baseline checkout that owns data/"
+            )
         harvested.append((source, load(prov_path), load(cat_path)))
 
     picker_total = sum(len(c["quests"]) for _, _, c in harvested if "quests" in c)
