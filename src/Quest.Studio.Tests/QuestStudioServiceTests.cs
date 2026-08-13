@@ -66,11 +66,26 @@ public sealed class QuestStudioServiceTests : IDisposable
     {
         var project = QuestStudioProject.Starter() with
         {
-            Stages = new[] { new QuestStudioStage("start", "item_picked_up", "Wood", null, "Picked up.") }
+            Stages = new[] { new QuestStudioStage("start", "station_fuel_added", "Wood", null, "Fuel added.") }
         };
         var result = CreateService().Certify(project);
         Assert.False(result.Ok);
         Assert.Equal("event_unknown", result.Error);
+    }
+
+    [Fact]
+    public void Fast_signal_catalog_is_generated_from_reviewed_primary_seams()
+    {
+        Assert.Equal(
+            new[] { "say", "shout", "drop", "pickup", "equip", "consume", "heal", "wait" },
+            CreatorSignalCatalog.All.Select(signal => signal.Id));
+        Assert.All(CreatorSignalCatalog.All.Where(signal => signal.Id != "wait"), signal =>
+        {
+            Assert.Equal("core", signal.LabProfile);
+            Assert.Equal("primary", signal.LabRoute);
+            Assert.StartsWith("RuntimeEasyEventPatches.", signal.RuntimeAdapter);
+        });
+        Assert.Equal("DurableTimerStore", CreatorSignalCatalog.All.Single(signal => signal.Id == "wait").RuntimeAdapter);
     }
 
     [Fact]
@@ -263,12 +278,73 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal(5, result.Trace.Count);
     }
 
+    [Fact]
+    public void Repeated_beat_compiles_and_rehearses_a_sliding_time_window()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        project.Nodes = new() { Beat("drop-twice", "item_dropped", null, null, repeatCount: 2, withinSeconds: 30) };
+        project.EntryNodeId = "drop-twice";
+        Assert.True(service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project)).Ok);
+
+        var compiled = service.CertifyGraph(project.ProjectId);
+        Assert.True(compiled.Ok, string.Join("; ", compiled.Diagnostics.Select(value => value.Code)));
+        var trigger = Assert.Single(Assert.Single(compiled.Document!.Stages).Transitions).When;
+        Assert.Equal("COUNT", trigger.Op);
+        Assert.Equal(2, trigger.Count);
+        Assert.Equal(30, trigger.WithinSeconds);
+
+        var result = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Steps = new()
+        {
+            new() { Kind = "event", EventName = "item_dropped", Target = "Wood" },
+            new() { Kind = "advance", Seconds = 31 },
+            new() { Kind = "event", EventName = "item_dropped", Target = "Stone" },
+            new() { Kind = "event", EventName = "item_dropped", Target = "Coal" }
+        }});
+        Assert.Equal("complete", result.Outcome);
+        Assert.Collection(result.Trace,
+            first => { Assert.Equal("ignored", first.Status); Assert.Equal((1, 2), (first.CurrentCount, first.RequiredCount)); },
+            second => { Assert.Equal("ignored", second.Status); Assert.Equal((1, 2), (second.CurrentCount, second.RequiredCount)); },
+            third => { Assert.Equal("matched", third.Status); Assert.Equal((2, 2), (third.CurrentCount, third.RequiredCount)); });
+    }
+
+    [Fact]
+    public void Signal_circuit_crosses_every_fast_adapter_lane_in_one_rehearsal()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("signal-circuit");
+        Assert.Equal(8, project.Nodes.Count);
+        var repeat = project.Nodes.Single(node => node.Id == "drop-twice").Routes.Single();
+        Assert.Equal(2, repeat.RepeatCount);
+        Assert.Equal(30, repeat.WithinSeconds);
+
+        var result = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { ScenarioId = "signal-circuit", Steps = new()
+        {
+            new() { Kind = "event", EventName = "chat_sent", Target = "normal" },
+            new() { Kind = "advance", Seconds = 5 },
+            new() { Kind = "event", EventName = "chat_sent", Target = "shout" },
+            new() { Kind = "event", EventName = "item_dropped", Target = "Wood" },
+            new() { Kind = "event", EventName = "item_picked_up", Target = "Wood" },
+            new() { Kind = "event", EventName = "item_dropped", Target = "Wood" },
+            new() { Kind = "event", EventName = "item_picked_up", Target = "Wood" },
+            new() { Kind = "event", EventName = "item_equipped", Target = "Hammer" },
+            new() { Kind = "event", EventName = "item_consumed", Target = "CookedMeat" },
+            new() { Kind = "event", EventName = "character_healed", Target = "you" }
+        }});
+        Assert.Equal("complete", result.Outcome);
+        Assert.Equal(5, result.Inventory["Wood"]);
+        Assert.Contains(result.Trace, trace => trace.Status == "ignored" && trace.EventName == "item_picked_up");
+        Assert.Contains(result.Trace, trace => trace.RequiredCount == 2 && trace.CurrentCount == 1);
+    }
+
     static StudioNode Beat(string id, string eventName, string? target, string? next,
-        string? timerId = null, List<StudioAction>? actions = null) => new()
+        string? timerId = null, int repeatCount = 1, int? withinSeconds = null,
+        List<StudioAction>? actions = null) => new()
     {
         Id = id, Label = id, X = 100, Y = 100,
         Routes = new() { new StudioRoute { Id = "advance-" + id, Priority = 100,
             Event = eventName, Target = target, TimerId = timerId,
+            RepeatCount = repeatCount, WithinSeconds = withinSeconds,
             DestinationNodeId = next, Outcome = next is null ? "complete" : null,
             Actions = actions ?? new() } }
     };
@@ -326,6 +402,39 @@ public sealed class QuestStudioServiceTests : IDisposable
         var candidate = new QuestPackStore(runtimeRoot).LoadLatest();
         new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt { Operation = "load", Status = "activated", PackId = candidate.Manifest.PackId, Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, Diagnostics = Array.Empty<ContractDiagnostic>() });
         Assert.Equal("active", service.RuntimeStatus(project.ProjectId).Phase);
+    }
+
+    [Fact]
+    public async Task Runtime_cockpit_reports_the_exact_live_beat_and_partial_count()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        project.Nodes[0].Routes[0].RepeatCount = 2;
+        project.Nodes[0].Routes[0].WithinSeconds = 30;
+        var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(saved.Ok, saved.Error);
+        project = saved.Project!;
+        var published = await service.PublishGraphAsync(project.ProjectId, CancellationToken.None);
+        Assert.True(published.Ok, published.Error);
+
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var candidate = new QuestPackStore(runtimeRoot).LoadLatest();
+        var receipts = new RuntimeReceiptStore(runtimeRoot);
+        receipts.Write(new RuntimeReceipt { Operation = "bind", Status = "inscribed", PackId = candidate.Manifest.PackId,
+            Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, Diagnostics = Array.Empty<ContractDiagnostic>() });
+        receipts.Write(new RuntimeReceipt { Operation = "event", Status = "ignored", PackId = candidate.Manifest.PackId,
+            Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, EventName = "chat_sent", EventTarget = "normal",
+            CurrentStageId = "start", CurrentCount = 1, RequiredCount = 2, Diagnostics = Array.Empty<ContractDiagnostic>() });
+
+        var status = service.RuntimeStatus(project.ProjectId);
+        Assert.Equal("bound", status.Phase);
+        Assert.Equal("start", status.CurrentStageId);
+        Assert.Equal(1, status.CurrentCount);
+        Assert.Equal(2, status.RequiredCount);
+        Assert.Equal("Say something in normal chat. (1/2)", status.NextInstruction);
     }
 
     [Fact]

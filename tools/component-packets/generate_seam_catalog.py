@@ -16,6 +16,7 @@ Reads:
 Writes:
   tools/component-packets/samples/quest-capability-manifest.json
   network/mod/ComfyQuestLab/Core/LabSeamCatalog.g.cs
+  network/mod/ComfyQuestContracts/CreatorSignalCatalog.g.cs
   network/mod/ComfyQuestContracts/ModGlue/QuestEventCatalog.g.cs
 """
 
@@ -43,6 +44,13 @@ EVENT_CATALOG = (
     / "ComfyQuestContracts"
     / "ModGlue"
     / "QuestEventCatalog.g.cs"
+)
+SIGNAL_CATALOG = (
+    REPO
+    / "network"
+    / "mod"
+    / "ComfyQuestContracts"
+    / "CreatorSignalCatalog.g.cs"
 )
 
 CATEGORY_ORDER = (
@@ -81,6 +89,10 @@ ROUTES = {"primary", "alternate", "corroborating", "diagnostic", "suppressed"}
 PROFILES = {"core", "extended", "diagnostic", "disabled"}
 EVENT_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 FIELD_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+FAST_SIGNAL_FIELDS = {
+    "Id", "Event", "Label", "Instruction", "Target", "TargetPolicy", "Privacy",
+    "RuntimeAdapter",
+}
 RULE_FIELDS = {
     "Methods",
     "Category",
@@ -311,6 +323,7 @@ def build_manifest(atlas: dict, rules_document: dict, signatures: list[dict]) ->
             ),
         }
     authoring = build_authoring(safe_events)
+    fast_signals = build_fast_signals(rules_document, signatures)
     return {
         "Schema": "comfy-quest-capabilities/v1",
         "SourceAtlas": "tools/component-packets/samples/valheim-event-atlas.json",
@@ -327,10 +340,72 @@ def build_manifest(atlas: dict, rules_document: dict, signatures: list[dict]) ->
         },
         "CreatorSafeEvents": safe_events,
         "CreatorEvents": authoring,
+        "FastSignals": fast_signals,
         "TriggerAliases": rules_document.get("TriggerAliases", {}),
         "CategoryCounts": category_counts,
         "Signatures": signatures,
     }
+
+
+def build_fast_signals(rules_document: dict, signatures: list[dict]) -> list[dict]:
+    """Validate the narrow Studio/Runtime lane against the generated Grimoire policy."""
+    rows = rules_document.get("FastSignals")
+    if not isinstance(rows, list) or not rows:
+        raise CapabilityError("FastSignals must be a non-empty array")
+    primary = {
+        entry["CanonicalEvent"]: entry
+        for entry in signatures
+        if entry["CreatorSafe"] and entry["Profile"] == "core"
+        and entry["Route"] == "primary"
+    }
+    output: list[dict] = []
+    ids: set[str] = set()
+    event_targets: set[tuple[str, str | None]] = set()
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict) or set(row) != FAST_SIGNAL_FIELDS:
+            raise CapabilityError(
+                f"fast signal {index} must contain exactly {sorted(FAST_SIGNAL_FIELDS)}"
+            )
+        signal_id = row["Id"]
+        event = row["Event"]
+        target = row["Target"]
+        if not isinstance(signal_id, str) or not EVENT_NAME.fullmatch(signal_id):
+            raise CapabilityError(f"fast signal {index} has invalid Id {signal_id!r}")
+        if signal_id in ids:
+            raise CapabilityError(f"duplicate fast signal id {signal_id}")
+        ids.add(signal_id)
+        if not isinstance(event, str) or not EVENT_NAME.fullmatch(event):
+            raise CapabilityError(f"{signal_id}: invalid Event {event!r}")
+        if target is not None and (not isinstance(target, str) or not target.strip()):
+            raise CapabilityError(f"{signal_id}: Target must be null or non-empty")
+        event_target = (event, target)
+        if event_target in event_targets:
+            raise CapabilityError(f"duplicate fast signal event/target {event_target}")
+        event_targets.add(event_target)
+        for field in ("Label", "Instruction", "Privacy", "RuntimeAdapter"):
+            if not isinstance(row[field], str) or not row[field].strip():
+                raise CapabilityError(f"{signal_id}: {field} must be non-empty")
+        if row["TargetPolicy"] not in {"fixed", "wildcard", "engine"}:
+            raise CapabilityError(f"{signal_id}: invalid TargetPolicy")
+        if row["TargetPolicy"] == "fixed" and target is None:
+            raise CapabilityError(f"{signal_id}: fixed signals require Target")
+        if row["TargetPolicy"] != "fixed" and target is not None:
+            raise CapabilityError(f"{signal_id}: only fixed signals may declare Target")
+        if event == "timer_elapsed":
+            if row["TargetPolicy"] != "engine":
+                raise CapabilityError("timer_elapsed fast signal must be engine-owned")
+            lab_profile, lab_route = "engine", "engine"
+        else:
+            seam = primary.get(event)
+            if seam is None:
+                raise CapabilityError(
+                    f"{signal_id}: {event} is not a core primary creator-safe Grimoire seam"
+                )
+            if row["TargetPolicy"] == "engine":
+                raise CapabilityError(f"{signal_id}: Harmony signals cannot be engine-owned")
+            lab_profile, lab_route = seam["Profile"], seam["Route"]
+        output.append({**row, "LabProfile": lab_profile, "LabRoute": lab_route})
+    return output
 
 
 def build_authoring(safe_events: list[str]) -> list[dict]:
@@ -743,12 +818,94 @@ def render_event_catalog(
     return "\n".join(lines)
 
 
+def render_signal_catalog(signals: list[dict]) -> str:
+    """Render the small, compiled bridge from Grimoire policy to Studio and Runtime."""
+    lines = [
+        "// <auto-generated>",
+        "//   Generated by tools/component-packets/generate_seam_catalog.py from the",
+        "//   FastSignals projection in quest-capability-rules.json. Do not edit.",
+        "// </auto-generated>",
+        "",
+        "namespace ComfyQuestContracts;",
+        "",
+        "using System;",
+        "using System.Collections.Generic;",
+        "",
+        "/// <summary>The intentionally small, live-backed signal lane used by Quest Studio.</summary>",
+        "public static class CreatorSignalCatalog {",
+        "  public readonly struct Definition {",
+        "    public string Id { get; }",
+        "    public string EventName { get; }",
+        "    public string Label { get; }",
+        "    public string Instruction { get; }",
+        "    public string Target { get; }",
+        "    public string TargetPolicy { get; }",
+        "    public string Privacy { get; }",
+        "    public string LabProfile { get; }",
+        "    public string LabRoute { get; }",
+        "    public string RuntimeAdapter { get; }",
+        "",
+        "    public Definition(string id, string eventName, string label, string instruction,",
+        "        string target, string targetPolicy, string privacy, string labProfile,",
+        "        string labRoute, string runtimeAdapter) {",
+        "      Id = id; EventName = eventName; Label = label; Instruction = instruction;",
+        "      Target = target; TargetPolicy = targetPolicy; Privacy = privacy;",
+        "      LabProfile = labProfile; LabRoute = labRoute; RuntimeAdapter = runtimeAdapter;",
+        "    }",
+        "  }",
+        "",
+        "  static readonly Definition[] _all = new[] {",
+    ]
+    for signal in signals:
+        target = "null" if signal["Target"] is None else cs(signal["Target"])
+        lines.append(
+            "    new Definition("
+            + ", ".join(
+                [
+                    cs(signal["Id"]), cs(signal["Event"]), cs(signal["Label"]),
+                    cs(signal["Instruction"]), target, cs(signal["TargetPolicy"]),
+                    cs(signal["Privacy"]), cs(signal["LabProfile"]),
+                    cs(signal["LabRoute"]), cs(signal["RuntimeAdapter"]),
+                ]
+            )
+            + "),"
+        )
+    lines += [
+        "  };",
+        "",
+        "  public static IReadOnlyList<Definition> All { get { return _all; } }",
+        "",
+        "  public static bool TryGet(string id, out Definition definition) {",
+        "    foreach (Definition candidate in _all) {",
+        "      if (string.Equals(candidate.Id, id, StringComparison.Ordinal)) {",
+        "        definition = candidate; return true;",
+        "      }",
+        "    }",
+        "    definition = default(Definition); return false;",
+        "  }",
+        "",
+        "  public static bool TryDescribe(string eventName, string target, out Definition definition) {",
+        "    foreach (Definition candidate in _all) {",
+        "      if (!string.Equals(candidate.EventName, eventName, StringComparison.OrdinalIgnoreCase)) continue;",
+        "      if (candidate.Target != null",
+        "          && !string.Equals(candidate.Target, target, StringComparison.OrdinalIgnoreCase)) continue;",
+        "      definition = candidate; return true;",
+        "    }",
+        "    definition = default(Definition); return false;",
+        "  }",
+        "}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def render_outputs() -> dict[Path, str]:
     atlas, rules_document, method_rules, signatures = build_model()
     manifest = build_manifest(atlas, rules_document, signatures)
     return {
         MANIFEST: json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
         CSHARP: render_csharp(atlas, signatures),
+        SIGNAL_CATALOG: render_signal_catalog(manifest["FastSignals"]),
         EVENT_CATALOG: render_event_catalog(
             signatures, rules_document.get("TriggerAliases", {}), manifest["CreatorEvents"]
         ),

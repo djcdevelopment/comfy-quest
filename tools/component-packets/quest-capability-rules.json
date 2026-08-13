@@ -14,6 +14,88 @@
   "TriggerAliases": {
     "hit": ["damage_dealt", "resource_damaged"]
   },
+  "FastSignals": [
+    {
+      "Id": "say",
+      "Event": "chat_sent",
+      "Label": "Say something",
+      "Instruction": "Say something in normal chat.",
+      "Target": "normal",
+      "TargetPolicy": "fixed",
+      "Privacy": "Message text is never persisted.",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ChatSent"
+    },
+    {
+      "Id": "shout",
+      "Event": "chat_sent",
+      "Label": "Shout",
+      "Instruction": "Shout in chat.",
+      "Target": "shout",
+      "TargetPolicy": "fixed",
+      "Privacy": "Message text is never persisted.",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ChatSent"
+    },
+    {
+      "Id": "drop",
+      "Event": "item_dropped",
+      "Label": "Drop something",
+      "Instruction": "Drop any item from your inventory.",
+      "Target": null,
+      "TargetPolicy": "wildcard",
+      "Privacy": "Only the stable item prefab is retained.",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ItemDropped"
+    },
+    {
+      "Id": "pickup",
+      "Event": "item_picked_up",
+      "Label": "Pick something up",
+      "Instruction": "Pick up any item from the ground.",
+      "Target": null,
+      "TargetPolicy": "wildcard",
+      "Privacy": "Only the stable item prefab is retained.",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ItemPickedUp"
+    },
+    {
+      "Id": "equip",
+      "Event": "item_equipped",
+      "Label": "Equip something",
+      "Instruction": "Equip any tool, weapon, shield, or armor item.",
+      "Target": null,
+      "TargetPolicy": "wildcard",
+      "Privacy": "Only the stable item prefab is retained.",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ItemEquipped"
+    },
+    {
+      "Id": "consume",
+      "Event": "item_consumed",
+      "Label": "Consume something",
+      "Instruction": "Consume any food, mead, or usable item.",
+      "Target": null,
+      "TargetPolicy": "wildcard",
+      "Privacy": "Only the stable item prefab is retained.",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ItemConsumed"
+    },
+    {
+      "Id": "heal",
+      "Event": "character_healed",
+      "Label": "Regain health",
+      "Instruction": "Regain any amount of health.",
+      "Target": null,
+      "TargetPolicy": "wildcard",
+      "Privacy": "The healing amount is not persisted.",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.CharacterHealed"
+    },
+    {
+      "Id": "wait",
+      "Event": "timer_elapsed",
+      "Label": "Wait",
+      "Instruction": "Wait for the quest timer.",
+      "Target": null,
+      "TargetPolicy": "engine",
+      "Privacy": "No player payload is captured.",
+      "RuntimeAdapter": "DurableTimerStore"
+    }
+  ],
   "Rules": [
     {
       "Methods": ["Character.AddStaggerDamage"],

@@ -9,8 +9,10 @@ namespace Comfy.Quest.Studio;
 internal sealed class QuestStudioWorkspace
 {
     const int MaxDraftBytes = 1024 * 1024;
-    static readonly string[] SupportedEvents =
-        { "chat_sent", "item_dropped", "character_healed", "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written", "timer_elapsed" };
+    static readonly HashSet<string> SupportedEvents = new(
+        CreatorSignalCatalog.All.Select(signal => signal.EventName).Concat(
+            new[] { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written" }),
+        StringComparer.Ordinal);
     static readonly string[] SupportedActions =
         { "message", "timer_start", "timer_cancel", "grant_item", "spawn", "clear_spawned" };
 
@@ -37,18 +39,7 @@ internal sealed class QuestStudioWorkspace
     public object Catalog() => new
     {
         schema_version = 2,
-        events = new object[]
-        {
-            new { id = "chat_sent", label = "Say something", targets = new[] { "normal", "shout" }, actor_roles = Array.Empty<string>(), note = "Local chat mode only; message text is never persisted." },
-            new { id = "item_dropped", label = "Drop something", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "Any item dropped by the local player." },
-            new { id = "character_healed", label = "Regain health", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "Any positive local-player healing tick." },
-            new { id = "chat_received", label = "Chat received", targets = new[] { "shout", "normal" }, actor_roles = new[] { "peer", "listen_host" }, note = "Listen-host observation; message text is never persisted." },
-            new { id = "kill", label = "Creature killed", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "A creature killed by the local authoritative player." },
-            new { id = "piece_damaged", label = "Bound piece damaged", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "Local-player damage to the exact bound piece." },
-            new { id = "piece_placed", label = "Piece placed", targets = new[] { "sign", "wood_floor" }, actor_roles = new[] { "listen_host" }, note = "A piece placed by the listen host." },
-            new { id = "sign_written", label = "Sign written", targets = new[] { "sign" }, actor_roles = Array.Empty<string>(), note = "A local sign edit; text remains private." },
-            new { id = "timer_elapsed", label = "Timer elapsed", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "An engine timer created by an earlier action." }
-        },
+        events = CatalogEvents(),
         actions = new object[]
         {
             new { id = "message", label = "Show message" },
@@ -60,21 +51,49 @@ internal sealed class QuestStudioWorkspace
         },
         templates = new object[]
         {
-            new { id = "blank", label = "Blank local quest", note = "One local sign step." },
+            new { id = "blank", label = "Blank local quest", note = "One low-friction local beat." },
+            new { id = "signal-circuit", label = "R&D Signal Circuit", note = "One compact lap across chat, timing, inventory, healing, and reward." },
             new { id = "cooperative-ritual", label = "Two Voices, One Rune", note = "Captured 1.6 peer Shout then listen-host sign placement." },
             new { id = "reward-cleanup", label = "Reward, spawn, and cleanup", note = "Proven 1.5 grant, marked spawn, timer, and cleanup." }
         },
         scenarios = Scenarios(),
-        simple_triggers = new object[]
+        simple_triggers = CreatorSignalCatalog.All.Select(signal => new
         {
-            new { id = "say", label = "Say something in chat", event_name = "chat_sent", target = "normal" },
-            new { id = "shout", label = "Shout in chat", event_name = "chat_sent", target = "shout" },
-            new { id = "drop", label = "Drop something", event_name = "item_dropped", target = (string?)null },
-            new { id = "heal", label = "Regain health", event_name = "character_healed", target = (string?)null },
-            new { id = "wait", label = "Wait", event_name = "timer_elapsed", target = (string?)null }
-        },
+            id = signal.Id,
+            label = signal.Label,
+            instruction = signal.Instruction,
+            event_name = signal.EventName,
+            target = signal.Target,
+            target_policy = signal.TargetPolicy,
+            privacy = signal.Privacy,
+            lab_profile = signal.LabProfile,
+            lab_route = signal.LabRoute,
+            runtime_adapter = signal.RuntimeAdapter
+        }).ToArray(),
         charm_target_kinds = AllCharmTargetKinds
     };
+
+    static object[] CatalogEvents()
+    {
+        var fast = CreatorSignalCatalog.All
+            .GroupBy(signal => signal.EventName, StringComparer.Ordinal)
+            .Select(group => (object)new
+            {
+                id = group.Key,
+                label = group.First().Label,
+                targets = group.Where(signal => signal.Target is not null).Select(signal => signal.Target!).ToArray(),
+                actor_roles = Array.Empty<string>(),
+                note = string.Join(" ", group.Select(signal => signal.Privacy).Distinct(StringComparer.Ordinal))
+            });
+        return fast.Concat(new object[]
+        {
+            new { id = "chat_received", label = "Chat received", targets = new[] { "shout", "normal" }, actor_roles = new[] { "peer", "listen_host" }, note = "Listen-host observation; message text is never persisted." },
+            new { id = "kill", label = "Creature killed", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "A creature killed by the local authoritative player." },
+            new { id = "piece_damaged", label = "Bound piece damaged", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "Local-player damage to the exact bound piece." },
+            new { id = "piece_placed", label = "Piece placed", targets = new[] { "sign", "wood_floor" }, actor_roles = new[] { "listen_host" }, note = "A piece placed by the listen host." },
+            new { id = "sign_written", label = "Sign written", targets = new[] { "sign" }, actor_roles = Array.Empty<string>(), note = "A local sign edit; text remains private." }
+        }).ToArray();
+    }
 
     static readonly string[] AllCharmTargetKinds =
         { "sign", "player_built_piece", "item_stand", "dedicated_charm" };
@@ -107,6 +126,7 @@ internal sealed class QuestStudioWorkspace
             var suffix = projectId[^6..];
             var project = (templateId ?? "blank") switch
             {
+                "signal-circuit" => SignalCircuitTemplate(projectId, suffix),
                 "cooperative-ritual" => CooperativeTemplate(projectId, suffix),
                 "reward-cleanup" => RewardTemplate(projectId, suffix),
                 _ => BlankTemplate(projectId, suffix)
@@ -257,24 +277,58 @@ internal sealed class QuestStudioWorkspace
             }
             catch { }
         }
+        var orderedReceipts = receipts
+            .OrderByDescending(value => value.AtUtc)
+            .ThenByDescending(value => value.Operation == "transition")
+            .ToArray();
         var isActive = active?.PackId == project.PackId && active.Version == project.Version
             && string.Equals(active.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase);
-        var checkedOk = receipts.Any(value => value.Operation == "check" && value.Status == "accepted");
-        var bound = receipts.Any(value => value.Operation == "bind" && value.Status is "inscribed" or "accepted");
-        var completed = receipts.FirstOrDefault(value => value.Operation == "transition" && value.Status is "complete" or "fail");
+        var checkedOk = orderedReceipts.Any(value => value.Operation == "check" && value.Status == "accepted");
+        var bound = orderedReceipts.Any(value => value.Operation == "bind" && value.Status is "inscribed" or "accepted");
+        var completed = orderedReceipts.FirstOrDefault(value => value.Operation == "transition" && value.Status is "complete" or "fail");
+        var liveReceipt = orderedReceipts.FirstOrDefault(value =>
+            (value.Operation == "transition" && value.Status == "advanced")
+            || (value.Operation == "event" && value.Status is "matched" or "ignored"));
+        var currentStageId = liveReceipt?.Operation == "transition"
+            ? liveReceipt.NextStageId ?? liveReceipt.CurrentStageId ?? liveReceipt.StageId
+            : liveReceipt?.CurrentStageId ?? liveReceipt?.StageId;
+        if (bound && string.IsNullOrWhiteSpace(currentStageId)) currentStageId = compiled.Document!.EntryStage;
+        var currentCount = liveReceipt?.Operation == "event" ? liveReceipt.CurrentCount : null;
+        var requiredCount = liveReceipt?.Operation == "event" ? liveReceipt.RequiredCount : null;
         var phase = completed is not null ? completed.Status : bound ? "bound" : isActive ? "active" : checkedOk ? "checked" : published is not null ? "published" : "certified";
+        var currentStage = compiled.Document!.Stages.FirstOrDefault(value => value.Id == currentStageId);
+        var currentRoute = currentStage?.Transitions?
+            .OrderByDescending(value => value.Priority)
+            .ThenBy(value => value.Id, StringComparer.Ordinal)
+            .FirstOrDefault();
+        var liveInstruction = DescribeLiveTrigger(currentRoute?.When);
+        if (requiredCount > 1)
+            liveInstruction += $" ({currentCount.GetValueOrDefault()}/{requiredCount})";
         var instruction = phase switch
         {
             "certified" => "Publish this version to the Runtime inbox.",
             "published" => "In Valheim, press F10 to check the published update.",
             "checked" => "In Valheim, press F11 to load the validated update.",
             "active" => "Open F9, aim at the Charm target, then press backtick twice for CHECK and CAST.",
-            "bound" => "Perform the quest's first live event and watch this graph advance.",
+            "bound" => liveInstruction,
             "complete" => "The live Runtime reports this quest complete.",
             "fail" => "The live Runtime reports the fail outcome.",
             _ => "Inspect the latest Runtime receipt."
         };
-        return new(2, true, phase, instruction, compiled.ContentHash, published?.Sha256, active, receipts.Take(20).ToArray(), compiled.Diagnostics);
+        return new(2, true, phase, instruction, compiled.ContentHash, published?.Sha256, active,
+            currentStageId, currentCount, requiredCount, orderedReceipts.Take(20).ToArray(), compiled.Diagnostics);
+    }
+
+    static string DescribeLiveTrigger(TriggerExpression? trigger)
+    {
+        var leaf = string.Equals(trigger?.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
+            ? trigger?.Children?.FirstOrDefault()
+            : trigger;
+        if (leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal))
+            return signal.Instruction;
+        return string.IsNullOrWhiteSpace(leaf?.Event)
+            ? "Perform the current quest beat."
+            : "Perform: " + leaf.Event.Replace('_', ' ');
     }
 
     void EnsureLegacyMigration()
@@ -395,6 +449,55 @@ internal sealed class QuestStudioWorkspace
         }
     };
 
+    static StudioProjectDocument SignalCircuitTemplate(string projectId, string suffix) => new()
+    {
+        ProjectId = projectId, Revision = 1, UpdatedUtc = DateTimeOffset.UtcNow,
+        PackId = "signal-circuit-" + suffix, Version = "1.0.0", ExperienceId = "signal-circuit-" + suffix,
+        Title = "R&D Signal Circuit", BindingTargetKind = null, BindingTargetKinds = AllCharmTargetKinds.ToList(), EntryNodeId = "say",
+        Nodes = new()
+        {
+            FastBeat("say", "say", "wait", actions: new()
+            {
+                new StudioAction { Id = "message-start", Type = "message", Text = "The circuit wakes. Hold the rhythm." },
+                new StudioAction { Id = "start-wait", Type = "timer_start", TimerId = "circuit-wait", Seconds = 5 }
+            }),
+            FastBeat("wait", "wait", "shout", timerId: "circuit-wait"),
+            FastBeat("shout", "shout", "drop-twice"),
+            FastBeat("drop-twice", "drop", "pickup", repeatCount: 2, withinSeconds: 30,
+                actions: new() { new StudioAction { Id = "message-drop", Type = "message", Text = "Two offerings heard." } }),
+            FastBeat("pickup", "pickup", "equip"),
+            FastBeat("equip", "equip", "consume"),
+            FastBeat("consume", "consume", "heal"),
+            FastBeat("heal", "heal", null, actions: new()
+            {
+                new StudioAction { Id = "message-complete", Type = "message", Text = "The signal circuit is complete." },
+                new StudioAction { Id = "reward-wood", Type = "grant_item", Item = "Wood", Quantity = 5 }
+            })
+        }
+    };
+
+    static StudioNode FastBeat(string nodeId, string signalId, string? nextNodeId,
+        int repeatCount = 1, int? withinSeconds = null, string? timerId = null,
+        List<StudioAction>? actions = null)
+    {
+        if (!CreatorSignalCatalog.TryGet(signalId, out var signal))
+            throw new InvalidOperationException("Generated signal catalog is missing " + signalId);
+        return new StudioNode
+        {
+            Id = nodeId, Label = signal.Label, X = 100, Y = 100,
+            Routes = new()
+            {
+                new StudioRoute
+                {
+                    Id = "advance-" + nodeId, Priority = 100, Event = signal.EventName,
+                    Target = signal.Target, TimerId = timerId, RepeatCount = repeatCount,
+                    WithinSeconds = withinSeconds, DestinationNodeId = nextNodeId,
+                    Outcome = nextNodeId is null ? "complete" : null, Actions = actions ?? new()
+                }
+            }
+        };
+    }
+
     static object[] Scenarios() => new object[]
     {
         new { id = "captured-1.6", label = "Captured 1.6 multiplayer contract", proof_level = "captured_contract_fixture", steps = new object[]
@@ -406,6 +509,19 @@ internal sealed class QuestStudioWorkspace
         {
             new { kind = "event", event_name = "sign_written", target = "sign", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
             new { kind = "advance", event_name = (string?)null, target = (string?)null, actor_role = (string?)null, timer_id = (string?)null, seconds = 5 }
+        } },
+        new { id = "signal-circuit", label = "R&D Signal Circuit", proof_level = "rehearsal", steps = new object[]
+        {
+            new { kind = "event", event_name = "chat_sent", target = "normal", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
+            new { kind = "advance", event_name = (string?)null, target = (string?)null, actor_role = (string?)null, timer_id = (string?)null, seconds = 5 },
+            new { kind = "event", event_name = "chat_sent", target = "shout", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
+            new { kind = "event", event_name = "item_dropped", target = "Wood", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
+            new { kind = "event", event_name = "item_picked_up", target = "Wood", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
+            new { kind = "event", event_name = "item_dropped", target = "Wood", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
+            new { kind = "event", event_name = "item_picked_up", target = "Wood", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
+            new { kind = "event", event_name = "item_equipped", target = "Hammer", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
+            new { kind = "event", event_name = "item_consumed", target = "CookedMeat", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 },
+            new { kind = "event", event_name = "character_healed", target = "you", actor_role = (string?)null, timer_id = (string?)null, seconds = 0 }
         } }
     };
 
@@ -477,7 +593,10 @@ internal static class StudioGraphCompiler
 {
     static readonly string[] ReviewedCharmTargets =
         { "sign", "player_built_piece", "item_stand", "dedicated_charm" };
-    static readonly HashSet<string> Events = new(StringComparer.Ordinal) { "chat_sent", "item_dropped", "character_healed", "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written", "timer_elapsed" };
+    static readonly HashSet<string> Events = new(
+        CreatorSignalCatalog.All.Select(signal => signal.EventName).Concat(
+            new[] { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written" }),
+        StringComparer.Ordinal);
     static readonly HashSet<string> Actions = new(StringComparer.Ordinal) { "message", "timer_start", "timer_cancel", "grant_item", "spawn", "clear_spawned" };
 
     public static StudioCertificationResult Compile(StudioProjectDocument project)
@@ -513,6 +632,10 @@ internal static class StudioGraphCompiler
                 if (route.Event == "piece_placed" && route.ActorRole != "listen_host") Add("piece_placed_listen_host_required", path + ".actor_role", "Placement is currently a listen-host event.");
                 if (route.Event is "kill" or "piece_damaged" or "sign_written" or "timer_elapsed" && !string.IsNullOrWhiteSpace(route.ActorRole)) Add("actor_role_not_supported", path + ".actor_role", "This event does not accept an actor role.");
                 if (route.Event == "timer_elapsed" && !SafeId(route.TimerId)) Add("timer_id_required", path + ".timer_id", "Timer events require a stable timer ID.");
+                if (route.RepeatCount is < 1 or > 16) Add("repeat_count_invalid", path + ".repeat_count", "Fast-lane repeats must be 1..16.");
+                if (route.Event == "timer_elapsed" && route.RepeatCount != 1) Add("timer_repeat_unsupported", path + ".repeat_count", "Wait beats run once per started timer.");
+                if (route.WithinSeconds.HasValue && (route.RepeatCount == 1 || route.WithinSeconds is < 1 or > 86400))
+                    Add("repeat_window_invalid", path + ".within_seconds", "A time window requires a repeated beat and must be 1..86400 seconds.");
                 var terminal = route.Outcome is "complete" or "fail";
                 if ((!string.IsNullOrWhiteSpace(route.DestinationNodeId) ? 1 : 0) + (terminal ? 1 : 0) != 1) Add("route_destination_invalid", path, "Choose exactly one next node or terminal outcome.");
                 if (!string.IsNullOrWhiteSpace(route.DestinationNodeId) && !nodeIds.Contains(route.DestinationNodeId)) Add("route_destination_missing", path + ".destination_node_id", "The destination node does not exist.");
@@ -528,10 +651,14 @@ internal static class StudioGraphCompiler
                 var where = new Dictionary<string, string>();
                 if (!string.IsNullOrWhiteSpace(route.ActorRole)) where["actor_role"] = route.ActorRole;
                 if (!string.IsNullOrWhiteSpace(route.TimerId)) where["timer_id"] = route.TimerId;
+                var eventTrigger = new TriggerExpression { Op = "EVENT", Event = route.Event, Target = NullIfWhite(route.Target), Where = where.Count == 0 ? null : where };
+                var trigger = route.RepeatCount > 1
+                    ? new TriggerExpression { Op = "COUNT", Count = route.RepeatCount, WithinSeconds = route.WithinSeconds, Children = new() { eventTrigger } }
+                    : eventTrigger;
                 transitions.Add(new ExperienceTransition
                 {
                     Id = route.Id, Priority = route.Priority,
-                    When = new TriggerExpression { Op = "EVENT", Event = route.Event, Target = NullIfWhite(route.Target), Where = where.Count == 0 ? null : where },
+                    When = trigger,
                     Actions = compiledActions, NextStage = NullIfWhite(route.DestinationNodeId), Outcome = terminal ? route.Outcome : null
                 });
             }
@@ -630,8 +757,17 @@ internal static class StudioRehearsal
             var stage = document.Stages.FirstOrDefault(value => value.Id == stageId);
             if (stage is null) return;
             history.Add(evt);
-            var transition = (stage.Transitions ?? new()).OrderByDescending(value => value.Priority).ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault(value => TriggerEvaluator.Matches(value.When, history));
-            if (transition is null) { trace.Add(new(trace.Count + 1, evt.Name, evt.Target, stageId, null, Array.Empty<string>(), stageId, null, "no_match")); return; }
+            var ordered = (stage.Transitions ?? new()).OrderByDescending(value => value.Priority).ThenBy(value => value.Id, StringComparer.Ordinal).ToArray();
+            var transition = ordered.FirstOrDefault(value => TriggerEvaluator.Matches(value.When, history));
+            if (transition is null)
+            {
+                var candidate = ordered.FirstOrDefault();
+                var partial = TriggerEvaluator.Measure(candidate?.When, history);
+                trace.Add(new(trace.Count + 1, evt.Name, evt.Target, stageId, null, Array.Empty<string>(), stageId, null,
+                    "ignored", partial.Current, partial.Required, Describe(candidate?.When)));
+                return;
+            }
+            var progress = TriggerEvaluator.Measure(transition.When, history);
             var effects = new List<string>();
             foreach (var action in transition.Actions ?? new())
             {
@@ -651,8 +787,19 @@ internal static class StudioRehearsal
             if (!string.IsNullOrWhiteSpace(transition.NextStage)) stageId = transition.NextStage;
             outcome = string.IsNullOrWhiteSpace(transition.Outcome) ? null : transition.Outcome;
             history.Clear();
-            trace.Add(new(trace.Count + 1, evt.Name, evt.Target, from, transition.Id, effects, stageId, outcome, "matched"));
+            trace.Add(new(trace.Count + 1, evt.Name, evt.Target, from, transition.Id, effects, stageId, outcome,
+                "matched", progress.Current, progress.Required, outcome is null ? Describe(document.Stages.FirstOrDefault(value => value.Id == stageId)?.Transitions?.OrderByDescending(value => value.Priority).FirstOrDefault()?.When) : null));
         }
+    }
+
+    static string? Describe(TriggerExpression? trigger)
+    {
+        var leaf = string.Equals(trigger?.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
+            ? trigger?.Children?.FirstOrDefault()
+            : trigger;
+        return leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal)
+            ? signal.Instruction
+            : null;
     }
 }
 
@@ -689,6 +836,8 @@ public sealed class StudioRoute
     public string? Target { get; set; }
     public string? ActorRole { get; set; }
     public string? TimerId { get; set; }
+    public int RepeatCount { get; set; } = 1;
+    public int? WithinSeconds { get; set; }
     public string? DestinationNodeId { get; set; }
     public string? Outcome { get; set; }
     public List<StudioAction> Actions { get; set; } = new();
@@ -749,13 +898,19 @@ public sealed class StudioRehearsalInput
     public int Seconds { get; set; }
 }
 
-public sealed record StudioRehearsalTrace(int Step, string EventName, string? Target, string FromNodeId, string? RouteId, IReadOnlyList<string> Effects, string CurrentNodeId, string? Outcome, string Status);
+public sealed record StudioRehearsalTrace(int Step, string EventName, string? Target, string FromNodeId, string? RouteId, IReadOnlyList<string> Effects, string CurrentNodeId, string? Outcome, string Status, int CurrentCount, int RequiredCount, string? NextInstruction);
 public sealed record StudioRehearsalResult(int SchemaVersion, bool Ok, string? Error, string ProofLevel, string Disclaimer, string? CurrentNodeId, string? Outcome, IReadOnlyList<StudioRehearsalTrace> Trace, IReadOnlyList<string> Transcript, IReadOnlyDictionary<string,int> Inventory, IReadOnlyDictionary<string,int> Spawns, IReadOnlyDictionary<string,int> Timers)
 {
     public static StudioRehearsalResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) => new(2, false, error, "rehearsal", "Browser rehearsal only; this does not prove a Valheim adapter or live mutation.", null, null, Array.Empty<StudioRehearsalTrace>(), Array.Empty<string>(), new Dictionary<string,int>(), new Dictionary<string,int>(), new Dictionary<string,int>());
 }
 
-public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, string Phase, string NextInstruction, string? ContentHash, string? PackageSha256, ComfyQuestContracts.ActiveSet? ActiveSet, IReadOnlyList<RuntimeReceipt> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics)
+public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, string Phase, string NextInstruction,
+    string? ContentHash, string? PackageSha256, ComfyQuestContracts.ActiveSet? ActiveSet,
+    string? CurrentStageId, int? CurrentCount, int? RequiredCount,
+    IReadOnlyList<RuntimeReceipt> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics)
 {
-    public static StudioRuntimeStatus Unavailable(string phase, IReadOnlyList<ContractDiagnostic>? diagnostics = null) => new(2, false, phase, phase == "draft_invalid" ? "Resolve the graph diagnostics before publishing." : "Runtime state is unavailable on this machine.", null, null, null, Array.Empty<RuntimeReceipt>(), diagnostics ?? Array.Empty<ContractDiagnostic>());
+    public static StudioRuntimeStatus Unavailable(string phase, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
+        new(2, false, phase,
+            phase == "draft_invalid" ? "Resolve the graph diagnostics before publishing." : "Runtime state is unavailable on this machine.",
+            null, null, null, null, null, null, Array.Empty<RuntimeReceipt>(), diagnostics ?? Array.Empty<ContractDiagnostic>());
 }

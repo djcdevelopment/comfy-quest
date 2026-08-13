@@ -62,6 +62,9 @@ public static class CooperativeEventContract {
 public static class EasyEventContract {
   public const string ChatSentEvent = "chat_sent";
   public const string ItemDroppedEvent = "item_dropped";
+  public const string ItemPickedUpEvent = "item_picked_up";
+  public const string ItemEquippedEvent = "item_equipped";
+  public const string ItemConsumedEvent = "item_consumed";
   public const string CharacterHealedEvent = "character_healed";
 
   public static RuntimeEvent ChatSent(string chatMode, string message, DateTimeOffset at) {
@@ -73,13 +76,26 @@ public static class EasyEventContract {
 
   public static RuntimeEvent ItemDropped(string prefab, int quantity, DateTimeOffset at) {
     if (quantity <= 0) return null;
-    var target = NormalizePrefab(prefab);
-    return target == null ? null : new RuntimeEvent { Name = ItemDroppedEvent, Target = target, At = at };
+    return Inventory(ItemDroppedEvent, prefab, at);
   }
+
+  public static RuntimeEvent ItemPickedUp(string prefab, DateTimeOffset at) =>
+    Inventory(ItemPickedUpEvent, prefab, at);
+
+  public static RuntimeEvent ItemEquipped(string prefab, DateTimeOffset at) =>
+    Inventory(ItemEquippedEvent, prefab, at);
+
+  public static RuntimeEvent ItemConsumed(string prefab, DateTimeOffset at) =>
+    Inventory(ItemConsumedEvent, prefab, at);
 
   public static RuntimeEvent CharacterHealed(float amount, DateTimeOffset at) => amount > 0f
     ? new RuntimeEvent { Name = CharacterHealedEvent, Target = "you", At = at }
     : null;
+
+  static RuntimeEvent Inventory(string eventName, string prefab, DateTimeOffset at) {
+    var target = NormalizePrefab(prefab);
+    return target == null ? null : new RuntimeEvent { Name = eventName, Target = target, At = at };
+  }
 
   static string NormalizeChatMode(string value) {
     var mode = (value ?? string.Empty).Trim().ToLowerInvariant();

@@ -8,7 +8,12 @@ namespace Comfy.Quest.Studio;
 
 public sealed class QuestStudioService
 {
-    static readonly string[] RuntimeEvents = { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written" };
+    static readonly string[] RuntimeEvents = CreatorSignalCatalog.All
+        .Where(signal => signal.EventName != ExperienceSchema.TimerElapsedEvent)
+        .Select(signal => signal.EventName)
+        .Concat(new[] { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written" })
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
     readonly object _lock = new();
     readonly string _projectPath;
     readonly string _historyPath;

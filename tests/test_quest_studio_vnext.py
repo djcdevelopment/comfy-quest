@@ -1,4 +1,5 @@
 import re
+import json
 import subprocess
 import tempfile
 import unittest
@@ -10,6 +11,10 @@ PAGE = ROOT / "src" / "Quest.Studio" / "QuestStudioPage.cs"
 WORKSPACE = ROOT / "src" / "Quest.Studio" / "QuestStudioWorkspace.cs"
 ENDPOINTS = ROOT / "src" / "Quest.Studio" / "QuestStudioEndpoints.cs"
 EASY_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeEasyEventPatches.cs"
+RUNTIME_PLUGIN = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "ComfyQuestRuntime.cs"
+SIGNAL_CATALOG = ROOT / "network" / "mod" / "ComfyQuestContracts" / "CreatorSignalCatalog.g.cs"
+CAPABILITY_RULES = ROOT / "tools" / "component-packets" / "quest-capability-rules.json"
+CAPABILITY_MANIFEST = ROOT / "tools" / "component-packets" / "samples" / "quest-capability-manifest.json"
 
 
 def raw_constant(name: str) -> str:
@@ -36,9 +41,8 @@ class QuestStudioVNextTests(unittest.TestCase):
         for expected in (
             "Quest projects",
             "Quest beats",
-            "Say something",
-            "Drop something",
-            "Regain health",
+            "Do this how many times?",
+            "Within seconds (optional)",
             "Advanced graph",
             "Browser rehearsal",
             "Runtime cockpit",
@@ -59,8 +63,33 @@ class QuestStudioVNextTests(unittest.TestCase):
         patches = EASY_PATCHES.read_text(encoding="utf-8")
         self.assertIn('typeof(Chat), "SendText"', patches)
         self.assertIn('typeof(Humanoid), "DropItem"', patches)
+        self.assertIn('typeof(Humanoid), "Pickup"', patches)
+        self.assertIn('typeof(Humanoid), "EquipItem"', patches)
+        self.assertIn('typeof(Player), "ConsumeItem"', patches)
         self.assertIn('typeof(Character), "Heal"', patches)
+        self.assertIn("__instance != Player.m_localPlayer", patches)
         self.assertNotIn("RPC_Heal", patches)
+        self.assertIn(
+            "harmony.PatchAll(typeof(RuntimeEasyEventPatches))",
+            RUNTIME_PLUGIN.read_text(encoding="utf-8"),
+        )
+
+    def test_generated_fast_signal_catalog_matches_the_reviewed_policy(self) -> None:
+        rules = json.loads(CAPABILITY_RULES.read_text(encoding="utf-8"))
+        manifest = json.loads(CAPABILITY_MANIFEST.read_text(encoding="utf-8"))
+        expected = [signal["Id"] for signal in rules["FastSignals"]]
+        generated = SIGNAL_CATALOG.read_text(encoding="utf-8")
+        actual = re.findall(r'new Definition\("([a-z]+)"', generated)
+        self.assertEqual(expected, actual)
+        self.assertEqual(
+            ["say", "shout", "drop", "pickup", "equip", "consume", "heal", "wait"],
+            actual,
+        )
+        self.assertEqual(expected, [signal["Id"] for signal in manifest["FastSignals"]])
+        for signal in manifest["FastSignals"]:
+            if signal["Id"] != "wait":
+                self.assertEqual("core", signal["LabProfile"])
+                self.assertEqual("primary", signal["LabRoute"])
 
     def test_v2_routes_keep_game_mutation_out_of_the_browser(self) -> None:
         routes = ENDPOINTS.read_text(encoding="utf-8")
@@ -85,6 +114,9 @@ class QuestStudioVNextTests(unittest.TestCase):
         actual = set(re.findall(r'"([a-z_]+)"', match.group(1)))
         self.assertEqual(expected, actual)
         self.assertIn("Browser rehearsal only; this does not prove", workspace)
+        self.assertIn('"signal-circuit" => SignalCircuitTemplate', workspace)
+        self.assertIn("RepeatCount = repeatCount", workspace)
+        self.assertIn("WithinSeconds = withinSeconds", workspace)
 
 
 if __name__ == "__main__":

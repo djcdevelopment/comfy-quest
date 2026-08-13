@@ -16,13 +16,34 @@ public sealed class RuntimeEvent {
   public IReadOnlyDictionary<string,string> Fields { get; set; }
 }
 
+public sealed class TriggerProgress {
+  public int Current { get; set; }
+  public int Required { get; set; }
+  public bool Complete { get { return Required > 0 && Current >= Required; } }
+}
+
 public static class TriggerEvaluator {
   public static bool Matches(TriggerExpression expression, IReadOnlyList<RuntimeEvent> history) {
+    if (expression == null) return false;
     history ??= Array.Empty<RuntimeEvent>();
     var bounded = expression.WithinSeconds.HasValue && history.Count > 0
       ? history.Where(x => x.At >= history[history.Count-1].At.AddSeconds(-expression.WithinSeconds.Value)).ToArray()
       : history.ToArray();
     return Eval(expression, bounded);
+  }
+  public static TriggerProgress Measure(TriggerExpression expression, IReadOnlyList<RuntimeEvent> history) {
+    history ??= Array.Empty<RuntimeEvent>();
+    if (expression == null) return new TriggerProgress { Current = 0, Required = 1 };
+    var bounded = expression.WithinSeconds.HasValue && history.Count > 0
+      ? history.Where(x => x.At >= history[history.Count - 1].At.AddSeconds(-expression.WithinSeconds.Value)).ToArray()
+      : history.ToArray();
+    if (string.Equals(expression.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
+        && expression.Children?.Count == 1) {
+      var required = Math.Max(1, expression.Count.GetValueOrDefault());
+      var current = bounded.Count(value => EventMatches(expression.Children[0], value));
+      return new TriggerProgress { Current = Math.Min(current, required), Required = required };
+    }
+    return new TriggerProgress { Current = Eval(expression, bounded) ? 1 : 0, Required = 1 };
   }
   static bool Eval(TriggerExpression x, IReadOnlyList<RuntimeEvent> h) {
     if (x == null) return false;

@@ -20,6 +20,7 @@ checkout.
 - NuGet publication runbook: docs/runbooks/NUGET-PUBLICATION.md
 - Split-proof release runbook: docs/runbooks/QUEST-RELEASE.md
 - OMEN Studio-to-Runtime acceptance: docs/runbooks/I2-QUESTPACK-OMEN.md
+- R&D opportunity matrix: docs/quest-rd-opportunity-matrix.md
 - Repository boundary: BOUNDARY.md
 - Extraction record: PROVENANCE.md
 
@@ -41,8 +42,9 @@ Workbench may still occupy 8080):
     tools/quest-studio/Start-QuestStudio.ps1
 
 Then open `http://127.0.0.1:8085/quest-studio`. Studio defaults to an ordered list of
-low-friction quest beats: say, shout, drop something, regain health, or wait. It lowers
-those beats into bounded acyclic Runtime graphs, certifies them against
+low-friction quest beats: say, shout, drop, pick up, equip, consume, regain health,
+or wait. A beat can repeat up to 16 times, optionally inside a time window. Studio
+lowers those beats into bounded acyclic Runtime graphs, certifies them against
 the shared contract, and publishes immutable `.questpack` files to the local Runtime
 inbox. Targets, actor roles, route IDs, and Charm surface details stay hidden in this
 fast lane. Existing branched quests and the full graph editor remain under Advanced.
@@ -56,6 +58,12 @@ Valheim adapter or mutation. The normal lap is **Studio -> rehearse -> publish -
 F11 -> F9/backtick CHECK/CAST -> one live event -> inspect receipts**. Reuse captured
 multiplayer scenarios for quest-content changes; run i5 only when the multiplayer event
 adapter itself changes.
+
+The **R&D Signal Circuit** template is the current batch probe: normal chat, a durable
+wait, shout, two drops inside 30 seconds, pickup, equip, consume, heal, and a small
+reward. Its browser rehearsal exercises the same trigger evaluator as Runtime. Live
+receipts now report the exact stage and partial count so the next OMEN batch lap can
+test the new adapter edges without turning every authoring change into a game session.
 
 The interim packages-local feed exists only until the first public 0.1.0 NuGet
 publication and exact consumer repin.

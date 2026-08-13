@@ -22,7 +22,12 @@ public sealed class RuntimeReceipt {
   [JsonProperty("action_id")] public string ActionId { get; set; }
   [JsonProperty("binding_zdo")] public string BindingZdo { get; set; }
   [JsonProperty("event_name", NullValueHandling=NullValueHandling.Ignore)] public string EventName { get; set; }
+  [JsonProperty("event_target", NullValueHandling=NullValueHandling.Ignore)] public string EventTarget { get; set; }
   [JsonProperty("actor_role", NullValueHandling=NullValueHandling.Ignore)] public string ActorRole { get; set; }
+  [JsonProperty("current_stage_id", NullValueHandling=NullValueHandling.Ignore)] public string CurrentStageId { get; set; }
+  [JsonProperty("next_stage_id", NullValueHandling=NullValueHandling.Ignore)] public string NextStageId { get; set; }
+  [JsonProperty("current_count", NullValueHandling=NullValueHandling.Ignore)] public int? CurrentCount { get; set; }
+  [JsonProperty("required_count", NullValueHandling=NullValueHandling.Ignore)] public int? RequiredCount { get; set; }
   [JsonProperty("diagnostics")] public IReadOnlyList<ContractDiagnostic> Diagnostics { get; set; }
 }
 

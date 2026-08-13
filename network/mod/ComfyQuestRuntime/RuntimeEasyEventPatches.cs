@@ -21,6 +21,31 @@ static class RuntimeEasyEventPatches {
     Emit(EasyEventContract.ItemDropped(prefab, __2, DateTimeOffset.UtcNow));
   }
 
+  [HarmonyPatch(typeof(Humanoid), "Pickup", typeof(UnityEngine.GameObject), typeof(bool), typeof(bool))]
+  [HarmonyPostfix]
+  static void ItemPickedUp(Humanoid __instance, UnityEngine.GameObject __0, bool __result) {
+    if (!__result || __instance == null || __instance != Player.m_localPlayer) return;
+    var item = __0 == null ? null : __0.GetComponent<ItemDrop>()?.m_itemData;
+    var prefab = item?.m_dropPrefab == null ? __0?.name : item.m_dropPrefab.name;
+    Emit(EasyEventContract.ItemPickedUp(prefab, DateTimeOffset.UtcNow));
+  }
+
+  [HarmonyPatch(typeof(Humanoid), "EquipItem", typeof(ItemDrop.ItemData), typeof(bool))]
+  [HarmonyPostfix]
+  static void ItemEquipped(Humanoid __instance, ItemDrop.ItemData __0, bool __result) {
+    if (!__result || __instance == null || __instance != Player.m_localPlayer) return;
+    var prefab = __0?.m_dropPrefab == null ? null : __0.m_dropPrefab.name;
+    Emit(EasyEventContract.ItemEquipped(prefab, DateTimeOffset.UtcNow));
+  }
+
+  [HarmonyPatch(typeof(Player), "ConsumeItem", typeof(Inventory), typeof(ItemDrop.ItemData), typeof(bool))]
+  [HarmonyPostfix]
+  static void ItemConsumed(Player __instance, ItemDrop.ItemData __1, bool __result) {
+    if (!__result || __instance == null || __instance != Player.m_localPlayer) return;
+    var prefab = __1?.m_dropPrefab == null ? null : __1.m_dropPrefab.name;
+    Emit(EasyEventContract.ItemConsumed(prefab, DateTimeOffset.UtcNow));
+  }
+
   [HarmonyPatch(typeof(Character), "Heal", typeof(float), typeof(bool))]
   [HarmonyPostfix]
   static void CharacterHealed(Character __instance, float __0) {
