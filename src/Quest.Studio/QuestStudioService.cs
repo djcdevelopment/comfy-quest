@@ -14,6 +14,7 @@ public sealed class QuestStudioService
     readonly string _historyPath;
     readonly QuestPackPublisher _publisher;
     readonly IQuestStudioHost _host;
+    readonly QuestStudioWorkspace _workspace;
 
     public QuestStudioService(IQuestStudioHost host, QuestPackPublisher publisher)
     {
@@ -23,7 +24,22 @@ public sealed class QuestStudioService
         _historyPath = Path.Combine(root, "history");
         _publisher = publisher;
         _host = host;
+        _workspace = new QuestStudioWorkspace(host, publisher);
     }
+
+    public object WorkspaceCatalog() => _workspace.Catalog();
+    public IReadOnlyList<StudioProjectSummary> ListProjects() => _workspace.ListProjects();
+    public StudioProjectDocument? ReadProject(string projectId) => _workspace.ReadProject(projectId);
+    public StudioProjectDocument CreateProject(string? templateId) => _workspace.CreateProject(templateId);
+    public StudioProjectDocument? DuplicateProject(string projectId) => _workspace.Duplicate(projectId);
+    public StudioSaveResult SaveDraft(string projectId, StudioSaveRequest? request) => _workspace.SaveDraft(projectId, request);
+    public StudioSaveResult BumpPatch(string projectId, int expectedRevision) => _workspace.BumpPatch(projectId, expectedRevision);
+    public StudioCertificationResult ValidateGraph(string projectId) => _workspace.Validate(projectId);
+    public StudioCertificationResult CertifyGraph(string projectId) => _workspace.Certify(projectId);
+    public Task<StudioPublishResult> PublishGraphAsync(string projectId, CancellationToken cancellationToken) => _workspace.PublishAsync(projectId, cancellationToken);
+    public StudioRehearsalResult Rehearse(string projectId, StudioRehearsalRequest? request) => _workspace.Rehearse(projectId, request);
+    public StudioRuntimeStatus RuntimeStatus(string projectId) => _workspace.RuntimeStatus(projectId);
+    public object ProjectHistory(string projectId) => _workspace.History(projectId);
 
     public QuestStudioProject Read()
     {

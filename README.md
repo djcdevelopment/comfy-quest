@@ -40,10 +40,19 @@ Workbench may still occupy 8080):
 
     tools/quest-studio/Start-QuestStudio.ps1
 
-Then open `http://127.0.0.1:8085/quest-studio`. Studio authors linear multi-stage
+Then open `http://127.0.0.1:8085/quest-studio`. Studio authors bounded acyclic multi-stage
 graphs from the Runtime event adapters that actually exist, certifies them against
 the shared contract, and publishes immutable `.questpack` files to the local Runtime
 inbox. Runtime still requires explicit F10 Check and F11 Load.
+
+The v2 workspace is the fast R&D loop: a local project library, guided acyclic node
+canvas, proven action editors, autosaved drafts, read-only certified JSON, deterministic
+browser rehearsal, and a Runtime cockpit that turns local receipts into the next manual
+instruction. Browser rehearsal previews logic and effects; it never claims to prove a
+Valheim adapter or mutation. The normal lap is **Studio -> rehearse -> publish -> F10 ->
+F11 -> F9/backtick CHECK/CAST -> one live event -> inspect receipts**. Reuse captured
+multiplayer scenarios for quest-content changes; run i5 only when the multiplayer event
+adapter itself changes.
 
 The interim packages-local feed exists only until the first public 0.1.0 NuGet
 publication and exact consumer repin.
