@@ -10,7 +10,7 @@ internal sealed class QuestStudioWorkspace
 {
     const int MaxDraftBytes = 1024 * 1024;
     static readonly string[] SupportedEvents =
-        { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written", "timer_elapsed" };
+        { "chat_sent", "item_dropped", "character_healed", "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written", "timer_elapsed" };
     static readonly string[] SupportedActions =
         { "message", "timer_start", "timer_cancel", "grant_item", "spawn", "clear_spawned" };
 
@@ -39,6 +39,9 @@ internal sealed class QuestStudioWorkspace
         schema_version = 2,
         events = new object[]
         {
+            new { id = "chat_sent", label = "Say something", targets = new[] { "normal", "shout" }, actor_roles = Array.Empty<string>(), note = "Local chat mode only; message text is never persisted." },
+            new { id = "item_dropped", label = "Drop something", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "Any item dropped by the local player." },
+            new { id = "character_healed", label = "Regain health", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "Any positive local-player healing tick." },
             new { id = "chat_received", label = "Chat received", targets = new[] { "shout", "normal" }, actor_roles = new[] { "peer", "listen_host" }, note = "Listen-host observation; message text is never persisted." },
             new { id = "kill", label = "Creature killed", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "A creature killed by the local authoritative player." },
             new { id = "piece_damaged", label = "Bound piece damaged", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "Local-player damage to the exact bound piece." },
@@ -61,8 +64,20 @@ internal sealed class QuestStudioWorkspace
             new { id = "cooperative-ritual", label = "Two Voices, One Rune", note = "Captured 1.6 peer Shout then listen-host sign placement." },
             new { id = "reward-cleanup", label = "Reward, spawn, and cleanup", note = "Proven 1.5 grant, marked spawn, timer, and cleanup." }
         },
-        scenarios = Scenarios()
+        scenarios = Scenarios(),
+        simple_triggers = new object[]
+        {
+            new { id = "say", label = "Say something in chat", event_name = "chat_sent", target = "normal" },
+            new { id = "shout", label = "Shout in chat", event_name = "chat_sent", target = "shout" },
+            new { id = "drop", label = "Drop something", event_name = "item_dropped", target = (string?)null },
+            new { id = "heal", label = "Regain health", event_name = "character_healed", target = (string?)null },
+            new { id = "wait", label = "Wait", event_name = "timer_elapsed", target = (string?)null }
+        },
+        charm_target_kinds = AllCharmTargetKinds
     };
+
+    static readonly string[] AllCharmTargetKinds =
+        { "sign", "player_built_piece", "item_stand", "dedicated_charm" };
 
     public IReadOnlyList<StudioProjectSummary> ListProjects()
     {
@@ -332,12 +347,12 @@ internal sealed class QuestStudioWorkspace
     {
         ProjectId = projectId, Revision = 1, UpdatedUtc = DateTimeOffset.UtcNow,
         PackId = "quest-" + suffix, Version = "1.0.0", ExperienceId = "quest-" + suffix,
-        Title = "New Quest", BindingTargetKind = "sign", EntryNodeId = "start",
+        Title = "New Quest", BindingTargetKind = null, BindingTargetKinds = AllCharmTargetKinds.ToList(), EntryNodeId = "start",
         Nodes = new()
         {
             new StudioNode { Id = "start", Label = "First step", X = 120, Y = 160, Routes = new()
             {
-                new StudioRoute { Id = "finish", Priority = 100, Event = "sign_written", Target = "sign", Outcome = "complete",
+                new StudioRoute { Id = "finish", Priority = 100, Event = "chat_sent", Target = "normal", Outcome = "complete",
                     Actions = new() { new StudioAction { Id = "message-finish", Type = "message", Text = "The Charm answers." } } }
             } }
         }
@@ -346,14 +361,17 @@ internal sealed class QuestStudioWorkspace
     static StudioProjectDocument CooperativeTemplate(string projectId, string suffix)
     {
         var legacy = QuestStudioProject.Starter() with { PackId = "two-voices-" + suffix, ExperienceId = "two-voices-" + suffix };
-        return FromLegacy(projectId, legacy);
+        var project = FromLegacy(projectId, legacy);
+        project.BindingTargetKind = null;
+        project.BindingTargetKinds = AllCharmTargetKinds.ToList();
+        return project;
     }
 
     static StudioProjectDocument RewardTemplate(string projectId, string suffix) => new()
     {
         ProjectId = projectId, Revision = 1, UpdatedUtc = DateTimeOffset.UtcNow,
         PackId = "reward-cleanup-" + suffix, Version = "1.0.0", ExperienceId = "reward-cleanup-" + suffix,
-        Title = "Reward and Marked Spawn", BindingTargetKind = "sign", EntryNodeId = "ready",
+        Title = "Reward and Marked Spawn", BindingTargetKind = null, BindingTargetKinds = AllCharmTargetKinds.ToList(), EntryNodeId = "ready",
         Nodes = new()
         {
             new StudioNode { Id = "ready", Label = "Cast the reward", X = 100, Y = 150, Routes = new()
@@ -457,7 +475,9 @@ internal sealed class QuestStudioWorkspace
 
 internal static class StudioGraphCompiler
 {
-    static readonly HashSet<string> Events = new(StringComparer.Ordinal) { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written", "timer_elapsed" };
+    static readonly string[] ReviewedCharmTargets =
+        { "sign", "player_built_piece", "item_stand", "dedicated_charm" };
+    static readonly HashSet<string> Events = new(StringComparer.Ordinal) { "chat_sent", "item_dropped", "character_healed", "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written", "timer_elapsed" };
     static readonly HashSet<string> Actions = new(StringComparer.Ordinal) { "message", "timer_start", "timer_cancel", "grant_item", "spawn", "clear_spawned" };
 
     public static StudioCertificationResult Compile(StudioProjectDocument project)
@@ -466,7 +486,8 @@ internal static class StudioGraphCompiler
         if (!SafeId(project.PackId) || !SafeId(project.ExperienceId)) Add("stable_id_invalid", "$", "Pack and experience IDs must be stable identifiers.");
         if (!SemanticVersion.TryParse(project.Version, out _)) Add("version_invalid", "$.version", "Version must be major.minor.patch.");
         if (string.IsNullOrWhiteSpace(project.Title) || project.Title.Length > 120) Add("title_invalid", "$.title", "Title is required and limited to 120 characters.");
-        if (project.BindingTargetKind is not ("sign" or "player_built_piece" or "item_stand" or "dedicated_charm")) Add("binding_target_kind_invalid", "$.binding_target_kind", "Choose a supported Charm target.");
+        var targetKinds = EffectiveTargetKinds(project);
+        if (targetKinds.Count == 0 || targetKinds.Any(value => !ReviewedCharmTargets.Contains(value, StringComparer.Ordinal))) Add("binding_target_kind_invalid", "$.binding_target_kinds", "Choose only supported Charm targets.");
         var nodes = project.Nodes ?? new();
         if (nodes.Count is < 1 or > ExperienceSchema.MaxStages) Add("node_count_invalid", "$.nodes", "A quest needs 1..64 nodes.");
         var nodeIds = new HashSet<string>(StringComparer.Ordinal);
@@ -519,7 +540,7 @@ internal static class StudioGraphCompiler
         var document = new ExperienceDocument
         {
             Schema = ExperienceSchema.Id, Id = project.ExperienceId, Title = project.Title, EntryStage = project.EntryNodeId,
-            Stages = stages, Bindings = new() { new ExperienceBinding { Id = "default", ExperienceId = project.ExperienceId, TargetKinds = new() { project.BindingTargetKind } } }
+            Stages = stages, Bindings = new() { new ExperienceBinding { Id = "default", ExperienceId = project.ExperienceId, TargetKinds = EffectiveTargetKinds(project) } }
         };
         var json = JsonConvert.SerializeObject(document, Formatting.Indented);
         var contract = ExperienceCompiler.CompileJson(json, CanonicalEventCatalog.CreateSet());
@@ -530,6 +551,11 @@ internal static class StudioGraphCompiler
 
         void Add(string code, string path, string message) => diagnostics.Add(new(code, path, message));
     }
+
+    static List<string> EffectiveTargetKinds(StudioProjectDocument project) =>
+        !string.IsNullOrWhiteSpace(project.BindingTargetKind)
+            ? new() { project.BindingTargetKind }
+            : (project.BindingTargetKinds ?? new()).Distinct(StringComparer.Ordinal).ToList();
 
     public static byte[] BuildPack(StudioProjectDocument project, string experienceJson, string contentHash)
     {
@@ -640,7 +666,8 @@ public sealed class StudioProjectDocument
     public string Version { get; set; } = "1.0.0";
     public string ExperienceId { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
-    public string BindingTargetKind { get; set; } = "sign";
+    public string? BindingTargetKind { get; set; }
+    public List<string> BindingTargetKinds { get; set; } = new();
     public string EntryNodeId { get; set; } = string.Empty;
     public List<StudioNode> Nodes { get; set; } = new();
 }

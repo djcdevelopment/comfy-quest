@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / "src" / "Quest.Studio" / "QuestStudioPage.cs"
 WORKSPACE = ROOT / "src" / "Quest.Studio" / "QuestStudioWorkspace.cs"
 ENDPOINTS = ROOT / "src" / "Quest.Studio" / "QuestStudioEndpoints.cs"
+EASY_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeEasyEventPatches.cs"
 
 
 def raw_constant(name: str) -> str:
@@ -34,9 +35,11 @@ class QuestStudioVNextTests(unittest.TestCase):
         html = raw_constant("Html")
         for expected in (
             "Quest projects",
-            "Guided graph",
-            "Add next",
-            "Add branch",
+            "Quest beats",
+            "Say something",
+            "Drop something",
+            "Regain health",
+            "Advanced graph",
             "Browser rehearsal",
             "Runtime cockpit",
             "F10 Check",
@@ -44,6 +47,20 @@ class QuestStudioVNextTests(unittest.TestCase):
             "Publish to Runtime inbox",
         ):
             self.assertIn(expected, html)
+
+    def test_simple_lane_hides_implementation_plumbing(self) -> None:
+        html = raw_constant("Html")
+        simple = html[html.index('id="simple-builder"'):html.index('id="advanced-builder"')]
+        for hidden_concern in ("ZDO", "Route ID", "Priority", "Actor role", "Charm target"):
+            self.assertNotIn(hidden_concern, simple)
+        self.assertIn("Studio handles routes, IDs, targets, and Charm compatibility", simple)
+
+    def test_runtime_easy_adapters_are_local_and_privacy_minimal(self) -> None:
+        patches = EASY_PATCHES.read_text(encoding="utf-8")
+        self.assertIn('typeof(Chat), "SendText"', patches)
+        self.assertIn('typeof(Humanoid), "DropItem"', patches)
+        self.assertIn('typeof(Character), "Heal"', patches)
+        self.assertNotIn("RPC_Heal", patches)
 
     def test_v2_routes_keep_game_mutation_out_of_the_browser(self) -> None:
         routes = ENDPOINTS.read_text(encoding="utf-8")

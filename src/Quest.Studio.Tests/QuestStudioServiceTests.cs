@@ -156,6 +156,30 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
+    public void New_simple_projects_accept_every_reviewed_charm_surface()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        Assert.Null(project.BindingTargetKind);
+        Assert.Equal(new[] { "sign", "player_built_piece", "item_stand", "dedicated_charm" }, project.BindingTargetKinds);
+        var result = service.CertifyGraph(project.ProjectId);
+        Assert.True(result.Ok, string.Join("; ", result.Diagnostics.Select(x => x.Code)));
+        Assert.Equal(project.BindingTargetKinds, Assert.Single(result.Document!.Bindings).TargetKinds);
+    }
+
+    [Fact]
+    public void Legacy_single_charm_binding_takes_precedence()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        project.BindingTargetKind = "sign";
+        project.BindingTargetKinds = new() { "sign", "player_built_piece" };
+        Assert.True(service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project)).Ok);
+        var result = service.CertifyGraph(project.ProjectId);
+        Assert.Equal(new[] { "sign" }, Assert.Single(result.Document!.Bindings).TargetKinds);
+    }
+
+    [Fact]
     public void Guided_branch_compiles_to_prioritized_acyclic_routes()
     {
         var service = CreateService();
@@ -202,6 +226,52 @@ public sealed class QuestStudioServiceTests : IDisposable
             first => Assert.Contains(first.Effects, effect => effect.Contains("spawn 1 wood_floor")),
             second => Assert.Contains(second.Effects, effect => effect.Contains("clear 1 from raise-floor")));
     }
+
+    [Fact]
+    public void Easy_beat_sequence_rehearses_chat_wait_drop_heal_and_reward()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        project.Nodes = new()
+        {
+            Beat("beat-1", "chat_sent", "normal", "beat-2", actions: new()
+            {
+                new() { Id = "message-1", Type = "message", Text = "The ritual begins." },
+                new() { Id = "start-wait-2", Type = "timer_start", TimerId = "wait-2", Seconds = 5 }
+            }),
+            Beat("beat-2", "timer_elapsed", null, "beat-3", timerId: "wait-2"),
+            Beat("beat-3", "chat_sent", "shout", "beat-4"),
+            Beat("beat-4", "item_dropped", null, "beat-5"),
+            Beat("beat-5", "character_healed", null, null, actions: new()
+            {
+                new() { Id = "reward-5", Type = "grant_item", Item = "Wood", Quantity = 2 }
+            })
+        };
+        project.EntryNodeId = "beat-1";
+        Assert.True(service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project)).Ok);
+        var result = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Steps = new()
+        {
+            new() { Kind = "event", EventName = "chat_sent", Target = "normal" },
+            new() { Kind = "advance", Seconds = 5 },
+            new() { Kind = "event", EventName = "chat_sent", Target = "shout" },
+            new() { Kind = "event", EventName = "item_dropped", Target = "Stone" },
+            new() { Kind = "event", EventName = "character_healed", Target = "you" }
+        }});
+        Assert.True(result.Ok, result.Error);
+        Assert.Equal("complete", result.Outcome);
+        Assert.Equal(2, result.Inventory["Wood"]);
+        Assert.Equal(5, result.Trace.Count);
+    }
+
+    static StudioNode Beat(string id, string eventName, string? target, string? next,
+        string? timerId = null, List<StudioAction>? actions = null) => new()
+    {
+        Id = id, Label = id, X = 100, Y = 100,
+        Routes = new() { new StudioRoute { Id = "advance-" + id, Priority = 100,
+            Event = eventName, Target = target, TimerId = timerId,
+            DestinationNodeId = next, Outcome = next is null ? "complete" : null,
+            Actions = actions ?? new() } }
+    };
 
     [Fact]
     public void Captured_multiplayer_scenario_is_labeled_as_fixture_not_live_proof()

@@ -58,6 +58,42 @@ public static class CooperativeEventContract {
   }
 }
 
+/// <summary>Privacy-minimal, one-player signals used by the fast Quest Studio loop.</summary>
+public static class EasyEventContract {
+  public const string ChatSentEvent = "chat_sent";
+  public const string ItemDroppedEvent = "item_dropped";
+  public const string CharacterHealedEvent = "character_healed";
+
+  public static RuntimeEvent ChatSent(string chatMode, string message, DateTimeOffset at) {
+    if (string.IsNullOrWhiteSpace(message)) return null;
+    var mode = NormalizeChatMode(chatMode);
+    if (mode == null) return null;
+    return new RuntimeEvent { Name = ChatSentEvent, Target = mode, At = at };
+  }
+
+  public static RuntimeEvent ItemDropped(string prefab, int quantity, DateTimeOffset at) {
+    if (quantity <= 0) return null;
+    var target = NormalizePrefab(prefab);
+    return target == null ? null : new RuntimeEvent { Name = ItemDroppedEvent, Target = target, At = at };
+  }
+
+  public static RuntimeEvent CharacterHealed(float amount, DateTimeOffset at) => amount > 0f
+    ? new RuntimeEvent { Name = CharacterHealedEvent, Target = "you", At = at }
+    : null;
+
+  static string NormalizeChatMode(string value) {
+    var mode = (value ?? string.Empty).Trim().ToLowerInvariant();
+    return mode == "shout" ? "shout" : mode == "normal" ? "normal" : null;
+  }
+
+  static string NormalizePrefab(string value) {
+    var result = (value ?? string.Empty).Trim();
+    if (result.EndsWith("(Clone)", StringComparison.OrdinalIgnoreCase))
+      result = result.Substring(0, result.Length - "(Clone)".Length).Trim();
+    return result.Length == 0 ? null : result;
+  }
+}
+
 /// <summary>
 /// Coalesces the nested Shout callbacks without persisting sender IDs, names, or message text.
 /// A repeated witness is a new message; its alternate witness joins the same short-lived action.
