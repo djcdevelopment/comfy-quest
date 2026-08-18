@@ -80,7 +80,7 @@ rules, and creator authoring metadata. One run produces the 91-row/90-signature 
 projection, all 34 creator-safe meanings, the exact 57 creator-safe witness signatures,
 the eight quick presets, and a separate fail-closed Runtime production registry.
 
-The production registry currently contains twenty-six canonical events and forty-five exact witnesses.
+The production registry currently contains thirty-four canonical events and fifty-seven exact witnesses.
 Local/RPC routes for healing, piece removal, and piece repair remain separate witnesses of one
 action, while the container transfer is emitted only after its granted response proves the
 container is empty. Its

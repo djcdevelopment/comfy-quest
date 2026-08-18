@@ -32,8 +32,8 @@ public sealed class QuestStudioV3ContractTests : IDisposable
         Assert.Equal(34, creatorEvents.Length);
         Assert.Equal(28, creatorEvents.Count(value => value.GetProperty("profile").GetString() == "core"));
         Assert.Equal(6, creatorEvents.Count(value => value.GetProperty("profile").GetString() == "extended"));
-        Assert.Equal(26, creatorEvents.Count(value => value.GetProperty("production_available").GetBoolean()));
-        Assert.Equal(8, creatorEvents.Count(value => !value.GetProperty("production_available").GetBoolean()));
+        Assert.Equal(34, creatorEvents.Count(value => value.GetProperty("production_available").GetBoolean()));
+        Assert.DoesNotContain(creatorEvents, value => !value.GetProperty("production_available").GetBoolean());
         Assert.All(creatorEvents, value =>
             Assert.Equal(value.GetProperty("production_available").GetBoolean(), value.GetProperty("addable").GetBoolean()));
 
@@ -48,7 +48,7 @@ public sealed class QuestStudioV3ContractTests : IDisposable
         });
 
         Assert.Equal(34, CreatorEventCatalog.Count);
-        Assert.Equal(26, RuntimeProductionEventCatalog.Count);
+        Assert.Equal(34, RuntimeProductionEventCatalog.Count);
         Assert.Equal(2, RuntimeProductionEventCatalog.EngineEvents.Count);
         Assert.All(creatorEvents, value =>
         {
@@ -59,7 +59,7 @@ public sealed class QuestStudioV3ContractTests : IDisposable
         Assert.Equal("listen_host", placed.GetProperty("fixed_where").GetProperty("actor_role").GetString());
         var sent = Assert.Single(creatorEvents, value => value.GetProperty("name").GetString() == "chat_sent");
         Assert.Equal(new[] { "normal", "shout" }, sent.GetProperty("targets").EnumerateArray().Select(value => value.GetString()));
-        foreach (var name in new[] { "container_emptied", "item_unequipped", "piece_destroyed", "piece_removed", "piece_repaired", "player_teleported", "attack_blocked", "character_staggered", "damage_dealt", "resource_damaged", "resource_picked", "item_crafted", "station_fuel_added", "station_input_added", "station_output_collected", "station_output_produced" })
+        foreach (var name in new[] { "container_emptied", "item_unequipped", "piece_destroyed", "piece_removed", "piece_repaired", "player_teleported", "attack_blocked", "character_staggered", "damage_dealt", "resource_damaged", "resource_picked", "item_crafted", "station_fuel_added", "station_input_added", "station_output_collected", "station_output_produced", "global_key_removed", "global_key_set", "max_health_changed", "player_died", "skill_raised", "skills_lowered", "stamina_gained", "stamina_spent" })
         {
             var promoted = Assert.Single(creatorEvents, value => value.GetProperty("name").GetString() == name);
             Assert.True(promoted.GetProperty("production_available").GetBoolean());
@@ -94,7 +94,7 @@ public sealed class QuestStudioV3ContractTests : IDisposable
     }
 
     [Fact]
-    public void Compiler_accepts_production_events_and_rejects_research_only_meanings()
+    public void Compiler_accepts_creator_events_and_rejects_non_creator_meanings()
     {
         var service = CreateService();
         var project = service.CreateProject("blank");
@@ -110,16 +110,16 @@ public sealed class QuestStudioV3ContractTests : IDisposable
             .When.Where!["amount"]);
 
         route = Assert.Single(Assert.Single(project.Nodes).Routes);
-        route.Event = "max_health_changed";
-        route.Target = "health";
+        route.Event = "inventory_item_added";
+        route.Target = "Wood";
         route.Where.Clear();
         project = Save(service, project);
 
-        var researchOnly = service.CertifyGraph(project.ProjectId);
-        Assert.False(researchOnly.Ok);
-        Assert.Contains(researchOnly.Diagnostics, value => value.Code == "event_unknown");
-        Assert.True(CreatorEventCatalog.TryGet("max_health_changed", out _));
-        Assert.False(RuntimeProductionEventCatalog.Contains("max_health_changed"));
+        var unsupported = service.CertifyGraph(project.ProjectId);
+        Assert.False(unsupported.Ok);
+        Assert.Contains(unsupported.Diagnostics, value => value.Code == "event_unknown");
+        Assert.False(CreatorEventCatalog.TryGet("inventory_item_added", out _));
+        Assert.False(RuntimeProductionEventCatalog.Contains("inventory_item_added"));
     }
 
     [Theory]
@@ -139,6 +139,14 @@ public sealed class QuestStudioV3ContractTests : IDisposable
     [InlineData("station_input_added", "CopperOre")]
     [InlineData("station_output_collected", "cooking output")]
     [InlineData("station_output_produced", "Copper")]
+    [InlineData("global_key_removed", "defeated_eikthyr")]
+    [InlineData("global_key_set", "defeated_eikthyr")]
+    [InlineData("max_health_changed", "health")]
+    [InlineData("player_died", "you")]
+    [InlineData("skill_raised", "Axes")]
+    [InlineData("skills_lowered", "all skills")]
+    [InlineData("stamina_gained", "stamina")]
+    [InlineData("stamina_spent", "stamina")]
     public void Promoted_actions_compile_and_guided_rehearsal_uses_production_target_policy(
         string eventName, string? target)
     {
@@ -148,6 +156,9 @@ public sealed class QuestStudioV3ContractTests : IDisposable
         route.Event = eventName;
         route.Target = target;
         route.Where.Clear();
+        Assert.True(RuntimeProductionEventCatalog.TryGet(eventName, out var runtime));
+        foreach (var fixedWhere in runtime.FixedWhere)
+            route.Where[fixedWhere.Key] = fixedWhere.Value;
         project = Save(service, project);
 
         var certification = service.CertifyGraph(project.ProjectId);

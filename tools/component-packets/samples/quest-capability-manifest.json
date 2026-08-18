@@ -13,8 +13,8 @@
     "CreatorSafeSignatures": 57
   },
   "RuntimeCounts": {
-    "ProductionEvents": 26,
-    "ProductionWitnesses": 45,
+    "ProductionEvents": 34,
+    "ProductionWitnesses": 57,
     "EngineEvents": 2
   },
   "CreatorSafeEvents": [
@@ -196,9 +196,9 @@
       "Instruction": "Observe global key removed; optionally narrow it to the exact Valheim world flag removed.",
       "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
       "Availability": {
-        "ProductionAvailable": false,
-        "RuntimeAdapter": null,
-        "EvidenceState": "synthetic-only",
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeWorldStatePatches.RemoveString",
+        "EvidenceState": "automated-contract",
         "EvidenceRevision": null
       }
     },
@@ -216,9 +216,9 @@
       "Instruction": "Observe global key set; optionally narrow it to the exact Valheim world flag set.",
       "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
       "Availability": {
-        "ProductionAvailable": false,
-        "RuntimeAdapter": null,
-        "EvidenceState": "synthetic-only",
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeWorldStatePatches.SetString",
+        "EvidenceState": "automated-contract",
         "EvidenceRevision": null
       }
     },
@@ -391,9 +391,9 @@
       "Instruction": "Observe max health changed; optionally narrow it to the changed player attribute.",
       "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
       "Availability": {
-        "ProductionAvailable": false,
-        "RuntimeAdapter": null,
-        "EvidenceState": "synthetic-only",
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeProgressionPatches.MaxHealthChanged",
+        "EvidenceState": "automated-contract",
         "EvidenceRevision": null
       }
     },
@@ -511,9 +511,9 @@
       "Instruction": "Observe player died; optionally narrow it to the local player.",
       "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
       "Availability": {
-        "ProductionAvailable": false,
-        "RuntimeAdapter": null,
-        "EvidenceState": "synthetic-only",
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeProgressionPatches.PlayerDied",
+        "EvidenceState": "automated-contract",
         "EvidenceRevision": null
       }
     },
@@ -626,9 +626,9 @@
       "Instruction": "Observe skill raised; optionally narrow it to the exact Valheim skill name.",
       "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
       "Availability": {
-        "ProductionAvailable": false,
-        "RuntimeAdapter": null,
-        "EvidenceState": "synthetic-only",
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeProgressionPatches.SkillRaised",
+        "EvidenceState": "automated-contract",
         "EvidenceRevision": null
       }
     },
@@ -661,9 +661,9 @@
       "Instruction": "Observe skills lowered; optionally narrow it to the affected skill set.",
       "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
       "Availability": {
-        "ProductionAvailable": false,
-        "RuntimeAdapter": null,
-        "EvidenceState": "synthetic-only",
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeProgressionPatches.SkillsLowered",
+        "EvidenceState": "automated-contract",
         "EvidenceRevision": null
       }
     },
@@ -696,9 +696,9 @@
       "Instruction": "Observe stamina gained; optionally narrow it to the changed player attribute.",
       "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
       "Availability": {
-        "ProductionAvailable": false,
-        "RuntimeAdapter": null,
-        "EvidenceState": "synthetic-only",
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeProgressionPatches.StaminaGained",
+        "EvidenceState": "automated-contract",
         "EvidenceRevision": null
       }
     },
@@ -731,9 +731,9 @@
       "Instruction": "Observe stamina spent; optionally narrow it to the changed player attribute.",
       "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
       "Availability": {
-        "ProductionAvailable": false,
-        "RuntimeAdapter": null,
-        "EvidenceState": "synthetic-only",
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeProgressionPatches.StaminaSpent",
+        "EvidenceState": "automated-contract",
         "EvidenceRevision": null
       }
     },
@@ -1360,6 +1360,184 @@
         "Player.TeleportTo(Vector3, Quaternion, bool)"
       ],
       "AllowedWhereFields": []
+    },
+    {
+      "Event": "global_key_removed",
+      "RuntimeAdapter": "RuntimeWorldStatePatches.RemoveString",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "ZoneSystem.RemoveGlobalKey(GlobalKeys)",
+        "ZoneSystem.RemoveGlobalKey(string)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "global_key_set",
+      "RuntimeAdapter": "RuntimeWorldStatePatches.SetString",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "ZoneSystem.RPC_SetGlobalKey(long, string)",
+        "ZoneSystem.SetGlobalKey(GlobalKeys)",
+        "ZoneSystem.SetGlobalKey(GlobalKeys, float)",
+        "ZoneSystem.SetGlobalKey(string)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "max_health_changed",
+      "RuntimeAdapter": "RuntimeProgressionPatches.MaxHealthChanged",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "fixed-output",
+      "FixedTarget": "health",
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "subject",
+        "amount"
+      ],
+      "FixedWhere": {
+        "subject": "health"
+      },
+      "WitnessSignatures": [
+        "Player.SetMaxHealth(float, bool)"
+      ],
+      "AllowedWhereFields": [
+        "subject",
+        "amount"
+      ]
+    },
+    {
+      "Event": "player_died",
+      "RuntimeAdapter": "RuntimeProgressionPatches.PlayerDied",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "fixed-output",
+      "FixedTarget": "you",
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Player.OnDeath()"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "skill_raised",
+      "RuntimeAdapter": "RuntimeProgressionPatches.SkillRaised",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "subject",
+        "amount"
+      ],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Player.RaiseSkill(SkillType, float)"
+      ],
+      "AllowedWhereFields": [
+        "subject",
+        "amount"
+      ]
+    },
+    {
+      "Event": "skills_lowered",
+      "RuntimeAdapter": "RuntimeProgressionPatches.SkillsLowered",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "fixed-output",
+      "FixedTarget": "all skills",
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "subject",
+        "amount"
+      ],
+      "FixedWhere": {
+        "subject": "all"
+      },
+      "WitnessSignatures": [
+        "Skills.LowerAllSkills(float)"
+      ],
+      "AllowedWhereFields": [
+        "subject",
+        "amount"
+      ]
+    },
+    {
+      "Event": "stamina_gained",
+      "RuntimeAdapter": "RuntimeProgressionPatches.StaminaGained",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "fixed-output",
+      "FixedTarget": "stamina",
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "subject",
+        "amount"
+      ],
+      "FixedWhere": {
+        "subject": "stamina"
+      },
+      "WitnessSignatures": [
+        "Player.AddStamina(float)"
+      ],
+      "AllowedWhereFields": [
+        "subject",
+        "amount"
+      ]
+    },
+    {
+      "Event": "stamina_spent",
+      "RuntimeAdapter": "RuntimeProgressionPatches.StaminaSpent",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "fixed-output",
+      "FixedTarget": "stamina",
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "subject",
+        "amount"
+      ],
+      "FixedWhere": {
+        "subject": "stamina"
+      },
+      "WitnessSignatures": [
+        "Player.UseStamina(float)"
+      ],
+      "AllowedWhereFields": [
+        "subject",
+        "amount"
+      ]
     },
     {
       "Event": "resource_damaged",

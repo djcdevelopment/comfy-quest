@@ -64,11 +64,11 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
-    public void Studio_rejects_catalog_events_without_a_runtime_adapter()
+    public void Studio_rejects_non_creator_catalog_events()
     {
         var project = QuestStudioProject.Starter() with
         {
-            Stages = new[] { new QuestStudioStage("start", "max_health_changed", "health", null, "Health changed.") }
+            Stages = new[] { new QuestStudioStage("start", "inventory_item_added", "Wood", null, "Item added.") }
         };
         var result = CreateService().Certify(project);
         Assert.False(result.Ok);

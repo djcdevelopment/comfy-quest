@@ -627,8 +627,8 @@ def build_runtime_production(
         if row["EmitsProjectile"]:
             allowed.append("projectile")
         output.append({**row, "AllowedWhereFields": allowed})
-    if len(output) != 26:
-        raise CapabilityError(f"Runtime production boundary drift: expected 26, got {len(output)}")
+    if len(output) != 34:
+        raise CapabilityError(f"Runtime production boundary drift: expected 34, got {len(output)}")
 
     engine_output: list[dict] = []
     seen_engine: set[str] = set()

@@ -79,7 +79,7 @@ class QuestStudioE2ETests(unittest.TestCase):
         for expected in (
             'page.Locator("#event-search").PressAsync("ArrowDown")',
             'page.Keyboard.PressAsync("ArrowDown")',
-            'page.Locator("#event-preview .availability-badge.research")',
+            'page.Locator("#event-search").FillAsync("stamina")',
             'page.Locator("#usage-enabled").UncheckAsync()',
             "aggregateBeforeOptedOutOperation",
             "Assert.Equal(aggregateBeforeOptedOutOperation, File.ReadAllBytes(usagePath))",

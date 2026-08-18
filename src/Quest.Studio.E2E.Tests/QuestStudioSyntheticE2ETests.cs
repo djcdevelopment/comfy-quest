@@ -104,8 +104,8 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.Locator("#event-search").FillAsync("stamina");
             await WaitForTextAsync(page.Locator("#event-result-count"), "of 34", "filtered creator catalog");
             Assert.True(await page.Locator("#event-results .event-row").CountAsync() > 0);
-            Assert.True(await page.Locator("#event-preview .availability-badge.research").IsVisibleAsync());
-            Assert.True(await page.Locator("#event-preview [data-picker-choose]").IsDisabledAsync());
+            Assert.True(await page.Locator("#event-preview .availability-badge.production").IsVisibleAsync());
+            Assert.False(await page.Locator("#event-preview [data-picker-choose]").IsDisabledAsync());
             await page.Locator("#event-picker-close").ClickAsync();
 
             await page.Locator("#title").FillAsync("Synthetic Signal Circuit");

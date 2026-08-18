@@ -14,6 +14,8 @@ EASY_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeEasyEven
 CORE_ACTION_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeCoreActionPatches.cs"
 COMBAT_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeKillPatches.cs"
 HARVEST_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeHarvestPatches.cs"
+PROGRESSION_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeProgressionPatches.cs"
+WORLD_STATE_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeWorldStatePatches.cs"
 RUNTIME_PLUGIN = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "ComfyQuestRuntime.cs"
 SIGNAL_CATALOG = ROOT / "network" / "mod" / "ComfyQuestContracts" / "CreatorSignalCatalog.g.cs"
 CAPABILITY_RULES = ROOT / "tools" / "component-packets" / "quest-capability-rules.json"
@@ -405,6 +407,40 @@ class QuestStudioVNextTests(unittest.TestCase):
         self.assertIn("CombatHarvestProof.ResourcePicked", harvest)
         self.assertIn("after < state.Before", harvest)
         self.assertIn("RuntimeHarvestPatches.Apply(harmony)", RUNTIME_PLUGIN.read_text(encoding="utf-8"))
+
+    def test_runtime_progression_and_world_state_reject_no_op_witnesses(self) -> None:
+        progression = PROGRESSION_PATCHES.read_text(encoding="utf-8")
+        world = WORLD_STATE_PATCHES.read_text(encoding="utf-8")
+        for signature in (
+            "Player.AddStamina(float)",
+            "Player.OnDeath()",
+            "Player.RaiseSkill(SkillType, float)",
+            "Player.SetMaxHealth(float, bool)",
+            "Player.UseStamina(float)",
+            "Skills.LowerAllSkills(float)",
+        ):
+            self.assertIn(signature, progression)
+        for signature in (
+            "ZoneSystem.RPC_SetGlobalKey(long, string)",
+            "ZoneSystem.RemoveGlobalKey(GlobalKeys)",
+            "ZoneSystem.RemoveGlobalKey(string)",
+            "ZoneSystem.SetGlobalKey(GlobalKeys)",
+            "ZoneSystem.SetGlobalKey(GlobalKeys, float)",
+            "ZoneSystem.SetGlobalKey(string)",
+        ):
+            self.assertIn(signature, world)
+        self.assertIn("ProgressionProof.ValueChanged", progression)
+        self.assertIn("ProgressionProof.ValueIncreased", progression)
+        self.assertIn("ProgressionProof.ValueDecreased", progression)
+        self.assertIn("ProgressionProof.SkillRaised", progression)
+        self.assertIn("ProgressionProof.SkillsLowered", progression)
+        self.assertIn("ProgressionProof.PlayerDied", progression)
+        self.assertIn("ZNet.instance.IsServer()", world)
+        self.assertIn("WorldStateProof.GlobalKeySet", world)
+        self.assertIn("WorldStateProof.GlobalKeyRemoved", world)
+        plugin = RUNTIME_PLUGIN.read_text(encoding="utf-8")
+        self.assertIn("RuntimeProgressionPatches.Apply(harmony)", plugin)
+        self.assertIn("RuntimeWorldStatePatches.Apply(harmony)", plugin)
 
     def test_generated_fast_signal_catalog_matches_the_reviewed_policy(self) -> None:
         rules = json.loads(CAPABILITY_RULES.read_text(encoding="utf-8"))

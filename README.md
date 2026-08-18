@@ -46,9 +46,9 @@ Then open `http://127.0.0.1:8085/quest-studio`. Studio guides creators through
 to an ordered list of low-friction quest beats: say, shout, drop, pick up, equip,
 consume, regain health, or wait. A beat can repeat up to 16 times, optionally inside a
 time window. **Browse player actions** adds a searchable, school-filtered view of all 34
-creator-safe Grimoire meanings: the 26 events with current Runtime evidence are
-production-addable, while the other 8 remain visible as explicitly research-only
-metadata. The two engine events stay separate from that creator vocabulary. The 91
+creator-safe Grimoire meanings, all backed by fail-closed Runtime adapters and available
+for production authoring. The two engine events stay separate from that creator
+vocabulary. The 91
 low-level assembly seams never become authoring choices.
 
 Studio lowers production beats into bounded acyclic Runtime graphs, certifies them

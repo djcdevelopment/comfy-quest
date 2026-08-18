@@ -77,14 +77,14 @@ class QuestCapabilityManifestTests(unittest.TestCase):
     def test_creator_vocabulary_and_runtime_availability_are_separate(self) -> None:
         self.assertEqual(
             self.manifest["RuntimeCounts"],
-            {"ProductionEvents": 26, "ProductionWitnesses": 45, "EngineEvents": 2},
+            {"ProductionEvents": 34, "ProductionWitnesses": 57, "EngineEvents": 2},
         )
         creator = {row["Name"]: row for row in self.manifest["CreatorEvents"]}
         production = {
             row["Event"]: row for row in self.manifest["RuntimeProductionEvents"]
         }
         self.assertEqual(34, len(creator))
-        self.assertEqual(26, len(production))
+        self.assertEqual(34, len(production))
         self.assertEqual(
             {
                 "container_emptied",
@@ -103,6 +103,14 @@ class QuestCapabilityManifestTests(unittest.TestCase):
                 "station_input_added",
                 "station_output_collected",
                 "station_output_produced",
+                "global_key_removed",
+                "global_key_set",
+                "max_health_changed",
+                "player_died",
+                "skill_raised",
+                "skills_lowered",
+                "stamina_gained",
+                "stamina_spent",
             },
             set(production)
             - {
@@ -118,6 +126,7 @@ class QuestCapabilityManifestTests(unittest.TestCase):
                 "sign_written",
             },
         )
+        self.assertEqual(set(), set(creator) - set(production))
         self.assertEqual(
             {"timer_elapsed", "chat_received"},
             {row["Event"] for row in self.manifest["EngineEvents"]},
@@ -148,7 +157,7 @@ class QuestCapabilityManifestTests(unittest.TestCase):
                 declared.append(signature)
                 self.assertIn(signature, safe)
                 self.assertEqual(event["Event"], safe[signature]["CanonicalEvent"])
-        self.assertEqual(45, len(declared))
+        self.assertEqual(57, len(declared))
         self.assertEqual(len(declared), len(set(declared)))
 
     def test_shipping_runtime_consumes_the_generated_boundary(self) -> None:

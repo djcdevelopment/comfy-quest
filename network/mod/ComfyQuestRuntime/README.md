@@ -11,7 +11,7 @@ live-witnessed aim, inscription, message execution, duplicate suppression, expli
 version activation, and hash-verified atomic rollback.
 
 Runtime publication and inbox inspection now use the generated production registry rather than the
-larger research vocabulary. The current boundary is twenty-six canonical events plus the separately declared
+larger research vocabulary. The current boundary is all thirty-four creator-safe canonical events plus the separately declared
 timer/chat engine events. Each patch is registered against an exact generated signature and fails
 independently when a game build moves that overload. Local/RPC healing witnesses are correlated before
 workflow history. The Core local-actions cohort adds proven-result container emptying, item unequipping,
@@ -22,6 +22,12 @@ document are rejected before binding discovery or receipt writes. The active com
 short-lived binding index are cached; package timestamp/length changes invalidate that cache and force the
 full hash/certification path again. Catalog rows marked `automated-contract` are implementation evidence,
 not a new live-gameplay claim.
+
+Progression witnesses publish only proven local-player changes: maximum health and stamina use their
+observed deltas, skill events compare raw level/accumulator state, and death requires the living-to-dead
+ZDO transition. Global-key witnesses require server authority and compare exact before/after membership,
+so duplicate sets and missing-key removals remain no-ops. Nested overload and RPC routes are correlated by
+the shared action-deduplication boundary.
 
 The Combat + Harvest cohort adds successful local blocks, freshly attributed staggers, actual creature
 health loss, authoritative resource health mutation, and owner-side resource picking. Creature targets use
