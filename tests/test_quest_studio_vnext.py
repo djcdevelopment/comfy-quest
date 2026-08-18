@@ -55,10 +55,10 @@ class QuestStudioVNextTests(unittest.TestCase):
         for expected in (
             "Shape the quest one beat at a time",
             "Rehearse this quest",
-            "Publish this iteration",
-            "Runtime cockpit",
-            "F10 Check",
-            "F11 Load",
+            "Certify &amp; publish",
+            "Runtime receipts",
+            "F10 &mdash; Check",
+            "F11 &mdash; Load",
         ):
             self.assertIn(expected, html)
         self.assertIn("function showStage(name,moveFocus=true)", script)

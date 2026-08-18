@@ -128,13 +128,13 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "rehearsal repeat reset");
 
             await page.Locator("[data-stage='rehearse']").ClickAsync();
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Rehearse this quest", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Run guided rehearsal", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#rehearsal-badge"), "Complete", "completed rehearsal", 30_000);
             await WaitForTextAsync(page.Locator("#rehearsal-result"), "1/2", "partial rehearsal progress");
             await WaitForTextAsync(page.Locator("#rehearsal-result .disclaimer"), "does not prove a Valheim adapter", "rehearsal evidence disclaimer");
 
             await page.Locator("[data-stage='publish']").ClickAsync();
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish this iteration", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Certify & publish", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "first publish", 30_000);
             await RefreshRuntimeAsync(page);
             await WaitForExactTextAsync(page.Locator("#runtime-phase"), "published", "published Runtime phase");
@@ -193,7 +193,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Back to creator workflow", Exact = true }).ClickAsync();
 
             await page.Locator("[data-stage='publish']").ClickAsync();
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish this iteration", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Certify & publish", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Version already published", "immutable version collision", 30_000);
             await WaitForTextAsync(page.Locator("#status-detail"), "Start a new iteration", "collision recovery instruction");
 
@@ -203,7 +203,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForInputValueAsync(page.Locator("#version"), "1.0.1", "patch version bump");
             if (await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"))
                 await page.Locator("#library-close").ClickAsync();
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish this iteration", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Certify & publish", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "new iteration publish", 30_000);
             await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 2, "two immutable questpack versions");
 

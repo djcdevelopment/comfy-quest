@@ -44,6 +44,10 @@ $packageCacheKey = if (Test-Path -LiteralPath $contractsPackage) {
 $nugetPackages = Join-Path $repoRoot ("artifacts\quest-studio-e2e\nuget-cache\host-" + $packageCacheKey)
 $hostOutput = Join-Path $repoRoot ("artifacts\quest-studio-e2e\host\" + $packageCacheKey)
 $hostDll = Join-Path $hostOutput 'Comfy.Quest.Studio.Host.dll'
+# Build intermediates stay out of src\*\bin so a Studio host already running from the
+# tree (another session's dev server) never locks this publish. ArtifactsPath keeps
+# per-project subfolders, so Host and Studio do not collide with each other either.
+$hostBuildArtifacts = Join-Path $repoRoot ("artifacts\quest-studio-e2e\host-build\" + $packageCacheKey)
 
 $variables = @(
     'NUGET_PACKAGES',
@@ -69,7 +73,7 @@ try {
     [Environment]::SetEnvironmentVariable('COMFY_QUEST_E2E_KEEP_ARTIFACTS', $(if ($KeepArtifacts) { '1' } else { '0' }), 'Process')
 
     Write-Host 'Publishing the real Quest Studio host to an isolated E2E output...'
-    & $dotnetExe publish $hostProject --configuration Release --output $hostOutput
+    & $dotnetExe publish $hostProject --configuration Release --output $hostOutput "-p:ArtifactsPath=$hostBuildArtifacts"
     if ($LASTEXITCODE -ne 0) { throw "Quest Studio host build failed with exit code $LASTEXITCODE." }
 
     # Only the Studio host consumes the evolving interim package. Let the E2E

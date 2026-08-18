@@ -49,7 +49,7 @@ class QuestStudioE2ETests(unittest.TestCase):
             'page.Locator("#browse-events")',
             'page.Locator("#include-extended")',
             '"34 of 34"',
-            'Name = "Rehearse this quest"',
+            'Name = "Run guided rehearsal"',
             'page.Locator("#library-toggle")',
         ):
             self.assertIn(expected, source)
