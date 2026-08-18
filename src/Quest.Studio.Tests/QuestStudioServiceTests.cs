@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.IO.Compression;
+using System.Security.Cryptography;
 using Comfy.Quest.Studio;
 using ComfyQuestContracts;
 using Microsoft.AspNetCore.Http;
@@ -66,7 +68,7 @@ public sealed class QuestStudioServiceTests : IDisposable
     {
         var project = QuestStudioProject.Starter() with
         {
-            Stages = new[] { new QuestStudioStage("start", "station_fuel_added", "Wood", null, "Fuel added.") }
+            Stages = new[] { new QuestStudioStage("start", "max_health_changed", "health", null, "Health changed.") }
         };
         var result = CreateService().Certify(project);
         Assert.False(result.Ok);
@@ -391,15 +393,20 @@ public sealed class QuestStudioServiceTests : IDisposable
         var host = new FakeHost(_root, valheim);
         var service = new QuestStudioService(host, new QuestPackPublisher(host));
         var project = service.CreateProject("blank");
-        var published = await service.PublishGraphAsync(project.ProjectId, CancellationToken.None);
+        var published = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
         Assert.True(published.Ok, published.Error);
         Assert.Equal("published", service.RuntimeStatus(project.ProjectId).Phase);
 
         var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var candidate = new QuestPackStore(runtimeRoot).CheckInbox().Single(value => value.IsValid);
         new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt { Operation = "check", Status = "accepted", Diagnostics = Array.Empty<ContractDiagnostic>() });
+        Assert.Equal("published", service.RuntimeStatus(project.ProjectId).Phase);
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt { Operation = "check", Status = "accepted",
+            PackId = candidate.Manifest.PackId, Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash,
+            Diagnostics = Array.Empty<ContractDiagnostic>() });
         Assert.Equal("checked", service.RuntimeStatus(project.ProjectId).Phase);
 
-        var candidate = new QuestPackStore(runtimeRoot).LoadLatest();
+        candidate = new QuestPackStore(runtimeRoot).LoadLatest();
         new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt { Operation = "load", Status = "activated", PackId = candidate.Manifest.PackId, Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, Diagnostics = Array.Empty<ContractDiagnostic>() });
         Assert.Equal("active", service.RuntimeStatus(project.ProjectId).Phase);
     }
@@ -417,7 +424,7 @@ public sealed class QuestStudioServiceTests : IDisposable
         var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
         Assert.True(saved.Ok, saved.Error);
         project = saved.Project!;
-        var published = await service.PublishGraphAsync(project.ProjectId, CancellationToken.None);
+        var published = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
         Assert.True(published.Ok, published.Error);
 
         var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
@@ -445,19 +452,253 @@ public sealed class QuestStudioServiceTests : IDisposable
         var host = new FakeHost(_root, valheim);
         var service = new QuestStudioService(host, new QuestPackPublisher(host));
         var project = service.CreateProject("blank");
-        Assert.True((await service.PublishGraphAsync(project.ProjectId, CancellationToken.None)).Ok);
+        Assert.True((await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None)).Ok);
 
         project.Nodes[0].Routes[0].Actions[0].Text = "Changed immutable content.";
         var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
         Assert.True(saved.Ok, saved.Error);
-        var collision = await service.PublishGraphAsync(project.ProjectId, CancellationToken.None);
+        var collidingDownload = service.DownloadQuestpack(project.ProjectId);
+        Assert.False(collidingDownload.Ok);
+        Assert.Equal("same_version_hash_collision", collidingDownload.Error);
+        var collision = await service.PublishGraphAsync(project.ProjectId, saved.Project!.Revision, CancellationToken.None);
         Assert.False(collision.Ok);
         Assert.Equal("same_version_hash_collision", collision.Error);
 
         var bumped = service.BumpPatch(project.ProjectId, saved.Project!.Revision);
         Assert.True(bumped.Ok, bumped.Error);
         Assert.Equal("1.0.1", bumped.Project!.Version);
-        Assert.True((await service.PublishGraphAsync(project.ProjectId, CancellationToken.None)).Ok);
+        Assert.True((await service.PublishGraphAsync(project.ProjectId, bumped.Project!.Revision, CancellationToken.None)).Ok);
+    }
+
+    [Fact]
+    public async Task Publish_rejects_a_stale_expected_revision()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        project.Title = "A newer draft";
+        var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(saved.Ok, saved.Error);
+
+        var stale = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.False(stale.Ok);
+        Assert.True(stale.Conflict);
+        Assert.Equal("revision_conflict", stale.Error);
+        Assert.Equal(saved.Project!.Revision, stale.Project!.Revision);
+        var inbox = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime", "inbox");
+        Assert.False(Directory.Exists(inbox));
+    }
+
+    [Fact]
+    public void Project_bundle_is_deterministic_lossless_bounded_and_self_verifying()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        Assert.True(service.CertifyGraph(project.ProjectId).Ok);
+        var projectRoot = Path.Combine(_root, "quest-studio", "projects", project.ProjectId);
+        var exactDraft = File.ReadAllBytes(Path.Combine(projectRoot, "draft.json"));
+        var historyPath = Assert.Single(Directory.GetFiles(Path.Combine(projectRoot, "history"), "*.json"));
+        var exactHistory = File.ReadAllBytes(historyPath);
+
+        var first = service.ExportProject(project.ProjectId, new StudioExportRequest(false, false));
+        var second = service.ExportProject(project.ProjectId, new StudioExportRequest(false, false));
+        Assert.True(first.Ok, first.Error);
+        Assert.Equal(first.Bytes, second.Bytes);
+        Assert.Equal($"{project.PackId}-{project.Version}.queststudio.zip", first.Filename);
+        Assert.True(first.Bytes!.LongLength < 128L * 1024 * 1024);
+
+        using var archive = new ZipArchive(new MemoryStream(first.Bytes), ZipArchiveMode.Read);
+        Assert.InRange(archive.Entries.Count, 1, 512);
+        Assert.Equal(exactDraft, ReadEntry(archive, "project/draft.json"));
+        Assert.Equal(exactHistory, ReadEntry(archive, "project/history/" + Path.GetFileName(historyPath)));
+        Assert.NotNull(archive.GetEntry("compiled/experience.json"));
+        Assert.Null(archive.GetEntry("evidence/runtime-status.json"));
+        Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains('\\') || entry.FullName.Contains("../", StringComparison.Ordinal));
+
+        using var manifest = JsonDocument.Parse(ReadEntry(archive, "manifest.json"));
+        Assert.Equal("comfy-quest-studio-export/v1", manifest.RootElement.GetProperty("schema").GetString());
+        foreach (var item in manifest.RootElement.GetProperty("entries").EnumerateArray())
+        {
+            var entry = archive.GetEntry(item.GetProperty("path").GetString()!);
+            Assert.NotNull(entry);
+            var bytes = ReadEntry(archive, entry!.FullName);
+            Assert.Equal(bytes.LongLength, item.GetProperty("byte_count").GetInt64());
+            Assert.Equal(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(), item.GetProperty("sha256").GetString());
+        }
+        Assert.DoesNotContain(_root, System.Text.Encoding.UTF8.GetString(first.Bytes), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Bundle_includes_only_requested_matching_published_and_live_evidence()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var published = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(published.Ok, published.Error);
+        var inboxPath = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime", "inbox", published.Receipt!.Filename!);
+        var bumped = service.BumpPatch(project.ProjectId, project.Revision);
+        Assert.True(bumped.Ok, bumped.Error);
+        project = bumped.Project!;
+        var nextPublished = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(nextPublished.Ok, nextPublished.Error);
+        var nextInboxPath = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime", "inbox", nextPublished.Receipt!.Filename!);
+
+        var privateBundle = service.ExportProject(project.ProjectId, new StudioExportRequest(false, false));
+        using (var archive = new ZipArchive(new MemoryStream(privateBundle.Bytes!), ZipArchiveMode.Read))
+        {
+            Assert.DoesNotContain(archive.Entries, entry => entry.FullName.StartsWith("packages/", StringComparison.Ordinal));
+            Assert.Null(archive.GetEntry("evidence/runtime-status.json"));
+        }
+
+        var evidenceBundle = service.ExportProject(project.ProjectId, new StudioExportRequest(true, true));
+        using var evidenceArchive = new ZipArchive(new MemoryStream(evidenceBundle.Bytes!), ZipArchiveMode.Read);
+        Assert.Equal(File.ReadAllBytes(inboxPath), ReadEntry(evidenceArchive, "packages/published/" + published.Receipt.Filename));
+        Assert.Equal(File.ReadAllBytes(nextInboxPath), ReadEntry(evidenceArchive, "packages/published/" + nextPublished.Receipt.Filename));
+        var evidence = System.Text.Encoding.UTF8.GetString(ReadEntry(evidenceArchive, "evidence/runtime-status.json"));
+        Assert.Contains("privacy_notice", evidence);
+        Assert.DoesNotContain(inboxPath, evidence, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Questpack_download_is_ephemeral_and_certification_gated()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        var download = service.DownloadQuestpack(project.ProjectId);
+        var repeated = service.DownloadQuestpack(project.ProjectId);
+        Assert.True(download.Ok, download.Error);
+        Assert.True(repeated.Ok, repeated.Error);
+        Assert.Equal(download.Bytes, repeated.Bytes);
+        Assert.Equal(download.Sha256, repeated.Sha256);
+        Assert.EndsWith(".questpack", download.Filename);
+        using (var archive = new ZipArchive(new MemoryStream(download.Bytes!), ZipArchiveMode.Read))
+        {
+            Assert.NotNull(archive.GetEntry("manifest.json"));
+            Assert.NotNull(archive.GetEntry("experiences/" + project.ExperienceId + ".json"));
+        }
+        Assert.DoesNotContain(Directory.GetFiles(Path.Combine(_root, "quest-studio"), "*", SearchOption.AllDirectories),
+            path => path.EndsWith(".questpack", StringComparison.OrdinalIgnoreCase));
+
+        project.Nodes[0].Id = string.Empty;
+        Assert.True(service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project)).Ok);
+        var invalid = service.DownloadQuestpack(project.ProjectId);
+        Assert.False(invalid.Ok);
+        Assert.Null(invalid.Bytes);
+    }
+
+    [Fact]
+    public void Local_usage_is_allowlisted_bucketed_disableable_and_reset_requires_confirmation()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        project.Title = "DO-NOT-COLLECT-TITLE";
+        project.Nodes[0].Routes[0].Target = "DO-NOT-COLLECT-TARGET";
+        project.Nodes[0].Routes[0].RepeatCount = 13;
+        project.Nodes[0].Routes[0].WithinSeconds = 137;
+        project.Nodes[0].Routes[0].Actions.Add(new StudioAction
+            { Id = "secret-action-id", Type = "grant_item", Item = "SecretItem", Quantity = 37 });
+        Assert.True(service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project)).Ok);
+
+        var report = service.UsageReport();
+        Assert.True(report.Enabled);
+        Assert.Equal("local_only", report.Storage);
+        Assert.Equal(13, report.RetentionWeeks);
+        var week = Assert.Single(report.Weeks).Value;
+        Assert.True(week.Events.ContainsKey("chat_sent"));
+        Assert.True(week.Actions.ContainsKey("grant_item"));
+        Assert.True(week.Distributions.ContainsKey("repeat_count.9-16"));
+        Assert.True(week.Distributions.ContainsKey("window_seconds.61-300"));
+        Assert.True(week.Distributions.ContainsKey("quantity.26-50"));
+        var json = JsonSerializer.Serialize(report);
+        Assert.DoesNotContain("DO-NOT-COLLECT", json);
+        Assert.DoesNotContain("SecretItem", json);
+        Assert.DoesNotContain("secret-action-id", json);
+
+        var beforeDisable = JsonSerializer.Serialize(report.Weeks);
+        Assert.False(service.SetUsageEnabled(false).Enabled);
+        service.CreateProject("signal-circuit");
+        Assert.Equal(beforeDisable, JsonSerializer.Serialize(service.UsageReport().Weeks));
+        Assert.False(service.ResetUsage(false).Ok);
+        Assert.NotEmpty(service.UsageReport().Weeks);
+        var reset = service.ResetUsage(true);
+        Assert.True(reset.Ok);
+        Assert.Empty(reset.Report.Weeks);
+        Assert.False(reset.Report.Enabled);
+    }
+
+    [Fact]
+    public void Corrupt_usage_state_is_fail_soft_and_defaults_to_enabled()
+    {
+        var usageRoot = Path.Combine(_root, "quest-studio", "usage");
+        Directory.CreateDirectory(usageRoot);
+        File.WriteAllText(Path.Combine(usageRoot, "settings.json"), "not json");
+        File.WriteAllText(Path.Combine(usageRoot, "aggregate.json"), "not json");
+        var service = CreateService();
+        Assert.True(service.UsageReport().Enabled);
+        Assert.False(service.UsageReport().Available);
+        service.CreateProject("blank");
+        Assert.Empty(service.UsageReport().Weeks);
+        Assert.False(service.ExportUsage().Ok);
+        Assert.False(service.SetUsageEnabled(false).Available);
+        var reset = service.ResetUsage(true);
+        Assert.True(reset.Ok);
+        Assert.True(reset.Report.Available);
+        Assert.False(reset.Report.Enabled);
+        Assert.Empty(reset.Report.Weeks);
+    }
+
+    [Theory]
+    [InlineData("1.0.0", true)]
+    [InlineData("0.12.345", true)]
+    [InlineData("+1.0.0", false)]
+    [InlineData(" 1.0.0", false)]
+    [InlineData("1.0.0 ", false)]
+    [InlineData("01.0.0", false)]
+    [InlineData("1.-1.0", false)]
+    public void Semantic_versions_are_canonical_and_filename_safe(string value, bool expected)
+    {
+        Assert.Equal(expected, SemanticVersion.TryParse(value, out _));
+    }
+
+    [Fact]
+    public void History_preserves_same_content_versions_and_reuses_matching_legacy_snapshot()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        var first = service.CertifyGraph(project.ProjectId);
+        Assert.True(first.Ok, first.Error);
+        var historyRoot = Path.Combine(_root, "quest-studio", "projects", project.ProjectId, "history");
+        var identityPath = Assert.Single(Directory.GetFiles(historyRoot, "*.json"));
+        var legacyPath = Path.Combine(historyRoot, first.ContentHash + ".json");
+        File.Move(identityPath, legacyPath);
+
+        Assert.True(service.CertifyGraph(project.ProjectId).Ok);
+        Assert.Equal(legacyPath, Assert.Single(Directory.GetFiles(historyRoot, "*.json")));
+
+        var bumped = service.BumpPatch(project.ProjectId, project.Revision);
+        Assert.True(bumped.Ok, bumped.Error);
+        var second = service.CertifyGraph(project.ProjectId);
+        Assert.True(second.Ok, second.Error);
+        Assert.Equal(first.ContentHash, second.ContentHash);
+        Assert.Equal(2, Directory.GetFiles(historyRoot, "*.json").Length);
+
+        var bundle = service.ExportProject(project.ProjectId, new StudioExportRequest(false, false));
+        Assert.True(bundle.Ok, bundle.Error);
+        using var archive = new ZipArchive(new MemoryStream(bundle.Bytes!), ZipArchiveMode.Read);
+        Assert.Equal(2, archive.Entries.Count(entry => entry.FullName.StartsWith("project/history/", StringComparison.Ordinal)));
+    }
+
+    static byte[] ReadEntry(ZipArchive archive, string name)
+    {
+        using var input = Assert.IsType<ZipArchiveEntry>(archive.GetEntry(name)).Open();
+        using var output = new MemoryStream();
+        input.CopyTo(output);
+        return output.ToArray();
     }
 
     QuestStudioService CreateService()

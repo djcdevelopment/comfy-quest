@@ -8,11 +8,11 @@ namespace Comfy.Quest.Studio;
 
 public sealed class QuestStudioService
 {
-    static readonly string[] RuntimeEvents = CreatorSignalCatalog.All
-        .Where(signal => signal.EventName != ExperienceSchema.TimerElapsedEvent)
-        .Select(signal => signal.EventName)
-        .Concat(new[] { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written" })
-        .Distinct(StringComparer.Ordinal)
+    static readonly string[] RuntimeEvents = RuntimeProductionEventCatalog.All
+        .Select(definition => definition.Name)
+        .Concat(RuntimeProductionEventCatalog.EngineEvents.Select(definition => definition.Name))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.Ordinal)
         .ToArray();
     readonly object _lock = new();
     readonly string _projectPath;
@@ -20,6 +20,8 @@ public sealed class QuestStudioService
     readonly QuestPackPublisher _publisher;
     readonly IQuestStudioHost _host;
     readonly QuestStudioWorkspace _workspace;
+    readonly QuestStudioDataExport _dataExport;
+    readonly QuestStudioUsageInsights _usage;
 
     public QuestStudioService(IQuestStudioHost host, QuestPackPublisher publisher)
     {
@@ -30,21 +32,103 @@ public sealed class QuestStudioService
         _publisher = publisher;
         _host = host;
         _workspace = new QuestStudioWorkspace(host, publisher);
+        _dataExport = new QuestStudioDataExport(host);
+        _usage = new QuestStudioUsageInsights(host);
     }
 
     public object WorkspaceCatalog() => _workspace.Catalog();
     public IReadOnlyList<StudioProjectSummary> ListProjects() => _workspace.ListProjects();
     public StudioProjectDocument? ReadProject(string projectId) => _workspace.ReadProject(projectId);
-    public StudioProjectDocument CreateProject(string? templateId) => _workspace.CreateProject(templateId);
-    public StudioProjectDocument? DuplicateProject(string projectId) => _workspace.Duplicate(projectId);
-    public StudioSaveResult SaveDraft(string projectId, StudioSaveRequest? request) => _workspace.SaveDraft(projectId, request);
-    public StudioSaveResult BumpPatch(string projectId, int expectedRevision) => _workspace.BumpPatch(projectId, expectedRevision);
-    public StudioCertificationResult ValidateGraph(string projectId) => _workspace.Validate(projectId);
-    public StudioCertificationResult CertifyGraph(string projectId) => _workspace.Certify(projectId);
-    public Task<StudioPublishResult> PublishGraphAsync(string projectId, CancellationToken cancellationToken) => _workspace.PublishAsync(projectId, cancellationToken);
-    public StudioRehearsalResult Rehearse(string projectId, StudioRehearsalRequest? request) => _workspace.Rehearse(projectId, request);
+    public StudioProjectDocument CreateProject(string? templateId)
+    {
+        var project = _workspace.CreateProject(templateId);
+        var effectiveTemplate = templateId is "signal-circuit" or "cooperative-ritual" or "reward-cleanup" ? templateId : "blank";
+        _usage.RecordProject("create", "accepted", project, effectiveTemplate);
+        return project;
+    }
+    public StudioProjectDocument? DuplicateProject(string projectId)
+    {
+        var project = _workspace.Duplicate(projectId);
+        _usage.RecordProject("duplicate", project is null ? "missing" : "accepted", project);
+        return project;
+    }
+    public StudioSaveResult SaveDraft(string projectId, StudioSaveRequest? request)
+    {
+        var before = _workspace.ReadProject(projectId);
+        var result = _workspace.SaveDraft(projectId, request);
+        _usage.RecordSave(UsageOutcome(result.Ok, result.Conflict, result.Error), before, result.Project);
+        return result;
+    }
+    public StudioSaveResult BumpPatch(string projectId, int expectedRevision)
+    {
+        var result = _workspace.BumpPatch(projectId, expectedRevision);
+        _usage.RecordOutcome("bump_patch", UsageOutcome(result.Ok, result.Conflict, result.Error));
+        return result;
+    }
+    public StudioCertificationResult ValidateGraph(string projectId)
+    {
+        var result = _workspace.Validate(projectId);
+        _usage.RecordOutcome("validate", UsageOutcome(result.Ok, false, result.Error));
+        return result;
+    }
+    public StudioCertificationResult CertifyGraph(string projectId)
+    {
+        var result = _workspace.Certify(projectId);
+        _usage.RecordOutcome("certify", UsageOutcome(result.Ok, false, result.Error));
+        return result;
+    }
+    public async Task<StudioPublishResult> PublishGraphAsync(string projectId, int expectedRevision, CancellationToken cancellationToken)
+    {
+        var result = await _workspace.PublishAsync(projectId, expectedRevision, cancellationToken);
+        _usage.RecordCheckpoint("publish", UsageOutcome(result.Ok, result.Conflict, result.Error), result.Ok ? result.Project : null);
+        return result;
+    }
+    public StudioRehearsalResult Rehearse(string projectId, StudioRehearsalRequest? request)
+    {
+        var result = _workspace.Rehearse(projectId, request);
+        _usage.RecordCheckpoint("rehearse", UsageOutcome(result.Ok, false, result.Error), result.Ok ? _workspace.ReadProject(projectId) : null);
+        return result;
+    }
     public StudioRuntimeStatus RuntimeStatus(string projectId) => _workspace.RuntimeStatus(projectId);
+    public StudioRuntimeStatusView RuntimeStatusView(string projectId)
+    {
+        var status = _workspace.RuntimeStatus(projectId);
+        return new StudioRuntimeStatusView(status.SchemaVersion, status.Available, status.Phase, status.NextInstruction,
+            status.ContentHash, status.PackageSha256, status.CurrentStageId, status.CurrentCount, status.RequiredCount,
+            status.Receipts.Select(receipt => new StudioRuntimeReceiptSummary(
+                receipt.Operation, receipt.Status,
+                receipt.NextStageId ?? receipt.CurrentStageId ?? receipt.StageId,
+                receipt.EventName, receipt.CurrentCount, receipt.RequiredCount, receipt.AtUtc)).ToArray(),
+            status.Diagnostics);
+    }
     public object ProjectHistory(string projectId) => _workspace.History(projectId);
+
+    public StudioDownloadResult ExportProject(string projectId, StudioExportRequest? request)
+    {
+        var project = _workspace.ReadProject(projectId);
+        var compiled = project is null ? StudioCertificationResult.Fail("project_missing") : _workspace.Validate(projectId);
+        var live = request?.IncludeLiveEvidence == true && project is not null ? _workspace.RuntimeStatus(projectId) : null;
+        var result = _dataExport.BuildBundle(project, compiled, live, request);
+        _usage.RecordOutcome("bundle_export", UsageOutcome(result.Ok, false, result.Error));
+        return result;
+    }
+
+    public StudioDownloadResult DownloadQuestpack(string projectId)
+    {
+        var project = _workspace.ReadProject(projectId);
+        var compiled = project is null ? StudioCertificationResult.Fail("project_missing") : _workspace.Validate(projectId);
+        var result = _dataExport.BuildQuestpack(project, compiled);
+        _usage.RecordOutcome("questpack_download", UsageOutcome(result.Ok, false, result.Error));
+        return result;
+    }
+
+    public StudioUsageReport UsageReport() => _usage.Report();
+    public StudioUsageReport SetUsageEnabled(bool enabled) => _usage.SetEnabled(enabled);
+    public StudioDownloadResult ExportUsage() => _usage.Export();
+    public StudioUsageResetResult ResetUsage(bool confirmed) => _usage.Reset(confirmed);
+
+    static string UsageOutcome(bool ok, bool conflict, string? error) => ok ? "accepted" : conflict ? "conflict"
+        : error is "project_missing" ? "missing" : "rejected";
 
     public QuestStudioProject Read()
     {
@@ -138,7 +222,7 @@ public sealed class QuestStudioService
         var validation = ValidateProject(project);
         if (validation is not null) return QuestStudioResult.Fail(validation);
         var json = BuildExperienceJson(project!);
-        var compiled = ExperienceCompiler.CompileJson(json, CanonicalEventCatalog.CreateSet());
+        var compiled = ExperienceCompiler.CompileProductionJson(json);
         return compiled.IsValid
             ? QuestStudioResult.Success("certified", json, QuestPackContent.ComputeHash(new[] { new KeyValuePair<string, byte[]>($"experiences/{project!.ExperienceId}.json", Encoding.UTF8.GetBytes(json)) }))
             : QuestStudioResult.Fail("experience_invalid", compiled.Diagnostics);
@@ -257,7 +341,13 @@ public sealed class QuestStudioService
         return output.ToArray();
     }
 
-    static void Write(ZipArchive archive, string name, string content) { using var writer = new StreamWriter(archive.CreateEntry(name, CompressionLevel.Optimal).Open(), new UTF8Encoding(false)); writer.Write(content); }
+    static void Write(ZipArchive archive, string name, string content)
+    {
+        var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
+        entry.LastWriteTime = new DateTimeOffset(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+        writer.Write(content);
+    }
 }
 
 public sealed record QuestStudioProject(

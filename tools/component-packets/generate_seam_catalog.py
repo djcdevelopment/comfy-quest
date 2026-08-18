@@ -16,7 +16,10 @@ Reads:
 Writes:
   tools/component-packets/samples/quest-capability-manifest.json
   network/mod/ComfyQuestLab/Core/LabSeamCatalog.g.cs
+  network/mod/ComfyQuestContracts/CreatorEventCatalog.g.cs
   network/mod/ComfyQuestContracts/CreatorSignalCatalog.g.cs
+  network/mod/ComfyQuestContracts/RuntimeProductionEventCatalog.g.cs
+  network/mod/ComfyQuestContracts/RuntimeWitnessCatalog.g.cs
   network/mod/ComfyQuestContracts/ModGlue/QuestEventCatalog.g.cs
 """
 
@@ -51,6 +54,27 @@ SIGNAL_CATALOG = (
     / "mod"
     / "ComfyQuestContracts"
     / "CreatorSignalCatalog.g.cs"
+)
+CREATOR_EVENT_CATALOG = (
+    REPO
+    / "network"
+    / "mod"
+    / "ComfyQuestContracts"
+    / "CreatorEventCatalog.g.cs"
+)
+PRODUCTION_EVENT_CATALOG = (
+    REPO
+    / "network"
+    / "mod"
+    / "ComfyQuestContracts"
+    / "RuntimeProductionEventCatalog.g.cs"
+)
+RUNTIME_WITNESS_CATALOG = (
+    REPO
+    / "network"
+    / "mod"
+    / "ComfyQuestContracts"
+    / "RuntimeWitnessCatalog.g.cs"
 )
 
 CATEGORY_ORDER = (
@@ -104,6 +128,17 @@ RULE_FIELDS = {
     "Actor",
     "Reason",
 }
+RUNTIME_EVENT_FIELDS = {
+    "Event", "RuntimeAdapter", "EvidenceState", "EvidenceRevision", "TargetPolicy",
+    "FixedTarget", "AllowedTargets",
+    "EmitsWeaponSkill", "EmitsProjectile", "EmittedFields", "FixedWhere",
+    "WitnessSignatures",
+}
+ENGINE_EVENT_FIELDS = {
+    "Event", "Label", "Instruction", "RuntimeAdapter", "RequiredWhereFields",
+    "AllowedWhereFields", "TargetPolicy", "FixedTarget", "AllowedTargets", "Privacy",
+}
+UNIVERSAL_WHERE_FIELDS = {"weapon_skill", "projectile", "actor_role"}
 
 
 class CapabilityError(ValueError):
@@ -323,6 +358,10 @@ def build_manifest(atlas: dict, rules_document: dict, signatures: list[dict]) ->
             ),
         }
     authoring = build_authoring(safe_events)
+    production, engine_events = build_runtime_production(
+        rules_document, signatures, authoring
+    )
+    creator_events = enrich_creator_events(authoring, signatures, production)
     fast_signals = build_fast_signals(rules_document, signatures)
     return {
         "Schema": "comfy-quest-capabilities/v1",
@@ -338,9 +377,18 @@ def build_manifest(atlas: dict, rules_document: dict, signatures: list[dict]) ->
             "CreatorSafeEvents": len(safe_events),
             "CreatorSafeSignatures": sum(bool(entry["CreatorSafe"]) for entry in signatures),
         },
+        "RuntimeCounts": {
+            "ProductionEvents": len(production),
+            "ProductionWitnesses": sum(
+                len(entry["WitnessSignatures"]) for entry in production
+            ),
+            "EngineEvents": len(engine_events),
+        },
         "CreatorSafeEvents": safe_events,
-        "CreatorEvents": authoring,
+        "CreatorEvents": creator_events,
         "FastSignals": fast_signals,
+        "RuntimeProductionEvents": production,
+        "EngineEvents": engine_events,
         "TriggerAliases": rules_document.get("TriggerAliases", {}),
         "CategoryCounts": category_counts,
         "Signatures": signatures,
@@ -483,6 +531,200 @@ def build_authoring(safe_events: list[str]) -> list[dict]:
             f"creator authoring drift: missing={sorted(missing)}, extra={sorted(extra)}"
         )
     return [by_name[name] for name in safe_events]
+
+
+def build_runtime_production(
+    rules_document: dict, signatures: list[dict], authoring: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    """Validate the shipping Runtime boundary separately from creator vocabulary."""
+    document = rules_document.get("RuntimeProduction")
+    if not isinstance(document, dict) or set(document) != {
+        "EvidencePolicy", "Events", "EngineEvents"
+    }:
+        raise CapabilityError(
+            "RuntimeProduction must contain EvidencePolicy, Events, and EngineEvents"
+        )
+    if not isinstance(document["EvidencePolicy"], str) or not document["EvidencePolicy"].strip():
+        raise CapabilityError("RuntimeProduction EvidencePolicy must be non-empty")
+
+    safe_by_signature = {
+        row["SignatureId"]: row for row in signatures if row["CreatorSafe"]
+    }
+    authoring_by_name = {row["Name"]: row for row in authoring}
+    output: list[dict] = []
+    seen_events: set[str] = set()
+    seen_witnesses: set[str] = set()
+    for index, row in enumerate(document["Events"], start=1):
+        if not isinstance(row, dict) or set(row) != RUNTIME_EVENT_FIELDS:
+            raise CapabilityError(
+                f"runtime production event {index} must contain exactly "
+                f"{sorted(RUNTIME_EVENT_FIELDS)}"
+            )
+        event = row["Event"]
+        if event not in authoring_by_name or event in seen_events:
+            raise CapabilityError(f"runtime production event is unknown or duplicate: {event!r}")
+        seen_events.add(event)
+        for field in ("RuntimeAdapter", "EvidenceState"):
+            if not isinstance(row[field], str) or not row[field].strip():
+                raise CapabilityError(f"{event}: {field} must be non-empty")
+        revision = row["EvidenceRevision"]
+        if revision is not None and (
+            not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision)
+        ):
+            raise CapabilityError(f"{event}: EvidenceRevision must be null or a commit SHA")
+        if row["EvidenceState"] == "verified-live" and revision is None:
+            raise CapabilityError(f"{event}: verified-live requires EvidenceRevision")
+        if row["TargetPolicy"] not in {"optional", "closed", "fixed-output", "none"}:
+            raise CapabilityError(f"{event}: invalid TargetPolicy")
+        fixed_target = row["FixedTarget"]
+        allowed_targets = row["AllowedTargets"]
+        if fixed_target is not None and (
+            not isinstance(fixed_target, str) or not fixed_target.strip()
+        ):
+            raise CapabilityError(f"{event}: FixedTarget must be null or non-empty")
+        if (not isinstance(allowed_targets, list)
+                or len(allowed_targets) != len(set(allowed_targets))
+                or any(not isinstance(value, str) or not value.strip()
+                       for value in allowed_targets)):
+            raise CapabilityError(f"{event}: AllowedTargets must be unique non-empty strings")
+        if row["TargetPolicy"] == "fixed-output" and fixed_target is None:
+            raise CapabilityError(f"{event}: fixed-output requires FixedTarget")
+        if row["TargetPolicy"] == "closed" and not allowed_targets:
+            raise CapabilityError(f"{event}: closed target policy requires AllowedTargets")
+        if row["TargetPolicy"] in {"optional", "none"} and (
+            fixed_target is not None or allowed_targets
+        ):
+            raise CapabilityError(f"{event}: {row['TargetPolicy']} cannot constrain targets")
+        for field in ("EmitsWeaponSkill", "EmitsProjectile"):
+            if not isinstance(row[field], bool):
+                raise CapabilityError(f"{event}: {field} must be boolean")
+        emitted = row["EmittedFields"]
+        known_fields = {field["Name"] for field in authoring_by_name[event]["Fields"]}
+        if (not isinstance(emitted, list) or len(emitted) != len(set(emitted))
+                or any(not FIELD_NAME.fullmatch(value or "") for value in emitted)):
+            raise CapabilityError(f"{event}: EmittedFields must be unique field names")
+        unknown_fields = set(emitted) - known_fields - UNIVERSAL_WHERE_FIELDS
+        if unknown_fields:
+            raise CapabilityError(f"{event}: unknown emitted fields {sorted(unknown_fields)}")
+        fixed = row["FixedWhere"]
+        if (not isinstance(fixed, dict)
+                or any(key not in emitted or not isinstance(value, str) or not value.strip()
+                       for key, value in fixed.items())):
+            raise CapabilityError(f"{event}: FixedWhere must constrain emitted fields")
+        witnesses = row["WitnessSignatures"]
+        if not isinstance(witnesses, list) or not witnesses:
+            raise CapabilityError(f"{event}: WitnessSignatures must be non-empty")
+        for witness in witnesses:
+            capability = safe_by_signature.get(witness)
+            if capability is None or capability["CanonicalEvent"] != event:
+                raise CapabilityError(f"{event}: invalid production witness {witness!r}")
+            if witness in seen_witnesses:
+                raise CapabilityError(f"production witness reused: {witness}")
+            seen_witnesses.add(witness)
+        allowed = list(emitted)
+        if row["EmitsWeaponSkill"]:
+            allowed.append("weapon_skill")
+        if row["EmitsProjectile"]:
+            allowed.append("projectile")
+        output.append({**row, "AllowedWhereFields": allowed})
+    if len(output) != 26:
+        raise CapabilityError(f"Runtime production boundary drift: expected 26, got {len(output)}")
+
+    engine_output: list[dict] = []
+    seen_engine: set[str] = set()
+    for index, row in enumerate(document["EngineEvents"], start=1):
+        if not isinstance(row, dict) or set(row) != ENGINE_EVENT_FIELDS:
+            raise CapabilityError(
+                f"engine event {index} must contain exactly {sorted(ENGINE_EVENT_FIELDS)}"
+            )
+        event = row["Event"]
+        if not isinstance(event, str) or not EVENT_NAME.fullmatch(event) or event in seen_engine:
+            raise CapabilityError(f"invalid or duplicate engine event: {event!r}")
+        seen_engine.add(event)
+        for field in ("Label", "Instruction", "RuntimeAdapter", "Privacy"):
+            if not isinstance(row[field], str) or not row[field].strip():
+                raise CapabilityError(f"{event}: {field} must be non-empty")
+        target_policy = row["TargetPolicy"]
+        fixed_target = row["FixedTarget"]
+        allowed_targets = row["AllowedTargets"]
+        if target_policy not in {"closed", "fixed-output", "none"}:
+            raise CapabilityError(f"{event}: invalid engine TargetPolicy")
+        if fixed_target is not None and (
+            not isinstance(fixed_target, str) or not fixed_target.strip()
+        ):
+            raise CapabilityError(f"{event}: invalid engine FixedTarget")
+        if (not isinstance(allowed_targets, list)
+                or len(allowed_targets) != len(set(allowed_targets))
+                or any(not isinstance(value, str) or not value.strip()
+                       for value in allowed_targets)):
+            raise CapabilityError(f"{event}: invalid engine AllowedTargets")
+        if target_policy == "closed" and not allowed_targets:
+            raise CapabilityError(f"{event}: closed engine target needs allowed values")
+        if target_policy == "fixed-output" and fixed_target is None:
+            raise CapabilityError(f"{event}: fixed-output engine target needs FixedTarget")
+        if target_policy == "none" and (fixed_target is not None or allowed_targets):
+            raise CapabilityError(f"{event}: target-less engine event has target constraints")
+        allowed = row["AllowedWhereFields"]
+        required = row["RequiredWhereFields"]
+        if (not isinstance(allowed, list) or len(allowed) != len(set(allowed))
+                or not isinstance(required, list) or not set(required).issubset(allowed)):
+            raise CapabilityError(f"{event}: invalid engine where-field policy")
+        engine_output.append(row)
+    if seen_engine != {"timer_elapsed", "chat_received"}:
+        raise CapabilityError(f"engine event registry drift: {sorted(seen_engine)}")
+    return output, engine_output
+
+
+def human_label(name: str) -> str:
+    return name.replace("_", " ").capitalize()
+
+
+def enrich_creator_events(
+    authoring: list[dict], signatures: list[dict], production: list[dict]
+) -> list[dict]:
+    event_policy: dict[str, dict] = {}
+    for signature in signatures:
+        if not signature["CreatorSafe"]:
+            continue
+        event = signature["CanonicalEvent"]
+        value = {
+            "Category": signature["CanonicalCategory"],
+            "Profile": signature["Profile"],
+        }
+        if event in event_policy and event_policy[event] != value:
+            raise CapabilityError(f"inconsistent creator policy for {event}")
+        event_policy[event] = value
+    production_by_name = {row["Event"]: row for row in production}
+    output = []
+    for row in authoring:
+        event = row["Name"]
+        runtime = production_by_name.get(event)
+        fields = [
+            {**field, "Label": human_label(field["Name"])} for field in row["Fields"]
+        ]
+        privacy = (
+            "Message text is redacted; only the normalized chat mode is retained."
+            if event == "chat_sent"
+            else "Sign text is redacted; only the normalized sign target is retained."
+            if event == "sign_written"
+            else "Only the normalized target and catalog-approved scalar fields are retained."
+        )
+        label = human_label(event)
+        output.append({
+            **row,
+            **event_policy[event],
+            "Label": label,
+            "Instruction": f"Observe {label.lower()}; optionally narrow it to {row['TargetDescription']}.",
+            "Privacy": privacy,
+            "Fields": fields,
+            "Availability": {
+                "ProductionAvailable": runtime is not None,
+                "RuntimeAdapter": None if runtime is None else runtime["RuntimeAdapter"],
+                "EvidenceState": "synthetic-only" if runtime is None else runtime["EvidenceState"],
+                "EvidenceRevision": None if runtime is None else runtime["EvidenceRevision"],
+            },
+        })
+    return output
 
 
 def cs(value: str) -> str:
@@ -899,6 +1141,216 @@ def render_signal_catalog(signals: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def render_creator_event_catalog(events: list[dict]) -> str:
+    lines = [
+        "// <auto-generated>",
+        "//   Generated by tools/component-packets/generate_seam_catalog.py. Do not edit.",
+        "// </auto-generated>",
+        "",
+        "namespace ComfyQuestContracts;",
+        "",
+        "using System;",
+        "using System.Collections.Generic;",
+        "",
+        "/// <summary>All 34 creator-safe meanings, independent of shipping availability.</summary>",
+        "public static class CreatorEventCatalog {",
+        "  public readonly struct FieldDefinition {",
+        "    public string Name { get; } public string Label { get; }",
+        "    public string Description { get; } public string Example { get; }",
+        "    public bool DraftByDefault { get; }",
+        "    public FieldDefinition(string name, string label, string description, string example, bool draftByDefault) {",
+        "      Name=name; Label=label; Description=description; Example=example; DraftByDefault=draftByDefault;",
+        "    }",
+        "  }",
+        "  public readonly struct Definition {",
+        "    public string Name { get; } public string Label { get; } public string Instruction { get; }",
+        "    public string Category { get; } public string Profile { get; }",
+        "    public string TargetKind { get; } public string TargetDescription { get; } public string ExampleTarget { get; }",
+        "    public bool SupportsWeaponSkill { get; } public bool SupportsProjectile { get; }",
+        "    public IReadOnlyList<FieldDefinition> Fields { get; } public string Privacy { get; }",
+        "    public bool ProductionAvailable { get; } public string RuntimeAdapter { get; }",
+        "    public string EvidenceState { get; } public string EvidenceRevision { get; }",
+        "    public Definition(string name,string label,string instruction,string category,string profile,",
+        "        string targetKind,string targetDescription,string exampleTarget,bool supportsWeaponSkill,",
+        "        bool supportsProjectile,FieldDefinition[] fields,string privacy,bool productionAvailable,",
+        "        string runtimeAdapter,string evidenceState,string evidenceRevision) {",
+        "      Name=name; Label=label; Instruction=instruction; Category=category; Profile=profile;",
+        "      TargetKind=targetKind; TargetDescription=targetDescription; ExampleTarget=exampleTarget;",
+        "      SupportsWeaponSkill=supportsWeaponSkill; SupportsProjectile=supportsProjectile;",
+        "      Fields=fields??new FieldDefinition[0]; Privacy=privacy; ProductionAvailable=productionAvailable;",
+        "      RuntimeAdapter=runtimeAdapter; EvidenceState=evidenceState; EvidenceRevision=evidenceRevision;",
+        "    }",
+        "  }",
+        "  static readonly Definition[] _all = new[] {",
+    ]
+    for event in events:
+        fields = "new FieldDefinition[0]"
+        if event["Fields"]:
+            fields = "new[] { " + ", ".join(
+                "new FieldDefinition(" + ", ".join([
+                    cs(field["Name"]), cs(field["Label"]), cs(field["Description"]),
+                    cs(field["Example"]), str(field["DraftByDefault"]).lower(),
+                ]) + ")" for field in event["Fields"]
+            ) + " }"
+        availability = event["Availability"]
+        lines.append(
+            "    new Definition(" + ", ".join([
+                cs(event["Name"]), cs(event["Label"]), cs(event["Instruction"]),
+                cs(event["Category"]), cs(event["Profile"]), cs(event["TargetKind"]),
+                cs(event["TargetDescription"]), cs(event["ExampleTarget"]),
+                str(event["SupportsWeaponSkill"]).lower(),
+                str(event["SupportsProjectile"]).lower(), fields, cs(event["Privacy"]),
+                str(availability["ProductionAvailable"]).lower(),
+                cs(availability["RuntimeAdapter"]), cs(availability["EvidenceState"]),
+                cs(availability["EvidenceRevision"]),
+            ]) + "),"
+        )
+    lines += [
+        "  };",
+        "  static readonly Dictionary<string, Definition> _byName = Build();",
+        "  static Dictionary<string, Definition> Build() { var result=new Dictionary<string, Definition>(StringComparer.OrdinalIgnoreCase); foreach(var item in _all) result[item.Name]=item; return result; }",
+        "  public static IReadOnlyList<Definition> All { get { return _all; } }",
+        "  public static int Count { get { return _all.Length; } }",
+        "  public static bool TryGet(string name,out Definition definition) { if(!string.IsNullOrWhiteSpace(name)&&_byName.TryGetValue(name,out definition))return true;definition=default(Definition);return false; }",
+        "}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def render_production_event_catalog(events: list[dict], engine_events: list[dict]) -> str:
+    lines = [
+        "// <auto-generated>",
+        "//   Generated by tools/component-packets/generate_seam_catalog.py. Do not edit.",
+        "// </auto-generated>",
+        "",
+        "namespace ComfyQuestContracts;",
+        "",
+        "using System;",
+        "using System.Collections.Generic;",
+        "",
+        "/// <summary>Fail-closed Runtime event registry; synthetic-only creator meanings are absent.</summary>",
+        "public static class RuntimeProductionEventCatalog {",
+        "  public readonly struct Definition {",
+        "    public string Name { get; } public string RuntimeAdapter { get; }",
+        "    public string EvidenceState { get; } public string EvidenceRevision { get; }",
+        "    public string TargetPolicy { get; } public string FixedTarget { get; } public IReadOnlyList<string> AllowedTargets { get; } public bool EmitsWeaponSkill { get; } public bool EmitsProjectile { get; }",
+        "    public IReadOnlyList<string> AllowedWhereFields { get; } public IReadOnlyDictionary<string,string> FixedWhere { get; } public IReadOnlyList<string> WitnessSignatures { get; }",
+        "    public Definition(string name,string runtimeAdapter,string evidenceState,string evidenceRevision,string targetPolicy,string fixedTarget,string[] allowedTargets,",
+        "        bool emitsWeaponSkill,bool emitsProjectile,string[] allowedWhereFields,Dictionary<string,string> fixedWhere,string[] witnessSignatures) {",
+        "      Name=name; RuntimeAdapter=runtimeAdapter; EvidenceState=evidenceState; EvidenceRevision=evidenceRevision;",
+        "      TargetPolicy=targetPolicy; FixedTarget=fixedTarget; AllowedTargets=allowedTargets??new string[0]; EmitsWeaponSkill=emitsWeaponSkill; EmitsProjectile=emitsProjectile;",
+        "      AllowedWhereFields=allowedWhereFields??new string[0]; FixedWhere=fixedWhere??new Dictionary<string,string>(); WitnessSignatures=witnessSignatures??new string[0];",
+        "    }",
+        "  }",
+        "  public readonly struct EngineDefinition {",
+        "    public string Name { get; } public string Label { get; } public string Instruction { get; }",
+        "    public string RuntimeAdapter { get; } public string TargetPolicy { get; } public string FixedTarget { get; } public IReadOnlyList<string> AllowedTargets { get; } public IReadOnlyList<string> RequiredWhereFields { get; }",
+        "    public IReadOnlyList<string> AllowedWhereFields { get; } public string Privacy { get; }",
+        "    public EngineDefinition(string name,string label,string instruction,string runtimeAdapter,string targetPolicy,string fixedTarget,string[] allowedTargets,string[] required,string[] allowed,string privacy) {",
+        "      Name=name; Label=label; Instruction=instruction; RuntimeAdapter=runtimeAdapter; TargetPolicy=targetPolicy; FixedTarget=fixedTarget; AllowedTargets=allowedTargets??new string[0]; RequiredWhereFields=required; AllowedWhereFields=allowed; Privacy=privacy;",
+        "    }",
+        "  }",
+        "  static readonly Definition[] _all = new[] {",
+    ]
+    for event in events:
+        allowed = "new[] { " + ", ".join(cs(value) for value in event["AllowedWhereFields"]) + " }" if event["AllowedWhereFields"] else "new string[0]"
+        allowed_targets = "new[] { " + ", ".join(cs(value) for value in event["AllowedTargets"]) + " }" if event["AllowedTargets"] else "new string[0]"
+        fixed = "new Dictionary<string,string> { " + ", ".join(
+            "{ " + cs(key) + ", " + cs(value) + " }"
+            for key, value in event["FixedWhere"].items()
+        ) + " }" if event["FixedWhere"] else "new Dictionary<string,string>()"
+        witnesses = "new[] { " + ", ".join(cs(value) for value in event["WitnessSignatures"]) + " }"
+        lines.append("    new Definition(" + ", ".join([
+            cs(event["Event"]), cs(event["RuntimeAdapter"]), cs(event["EvidenceState"]),
+            cs(event["EvidenceRevision"]), cs(event["TargetPolicy"]),
+            cs(event["FixedTarget"]), allowed_targets,
+            str(event["EmitsWeaponSkill"]).lower(), str(event["EmitsProjectile"]).lower(),
+            allowed, fixed, witnesses,
+        ]) + "),")
+    lines += ["  };", "  static readonly EngineDefinition[] _engine = new[] {"]
+    for event in engine_events:
+        required = "new[] { " + ", ".join(cs(value) for value in event["RequiredWhereFields"]) + " }" if event["RequiredWhereFields"] else "new string[0]"
+        allowed = "new[] { " + ", ".join(cs(value) for value in event["AllowedWhereFields"]) + " }" if event["AllowedWhereFields"] else "new string[0]"
+        allowed_targets = "new[] { " + ", ".join(cs(value) for value in event["AllowedTargets"]) + " }" if event["AllowedTargets"] else "new string[0]"
+        lines.append("    new EngineDefinition(" + ", ".join([
+            cs(event["Event"]), cs(event["Label"]), cs(event["Instruction"]),
+            cs(event["RuntimeAdapter"]), cs(event["TargetPolicy"]),
+            cs(event["FixedTarget"]), allowed_targets, required, allowed,
+            cs(event["Privacy"]),
+        ]) + "),")
+    lines += [
+        "  };",
+        "  static readonly Dictionary<string, Definition> _byName=Build();",
+        "  static readonly Dictionary<string, EngineDefinition> _engineByName=BuildEngine();",
+        "  static Dictionary<string, Definition> Build(){var value=new Dictionary<string, Definition>(StringComparer.OrdinalIgnoreCase);foreach(var item in _all)value[item.Name]=item;return value;}",
+        "  static Dictionary<string, EngineDefinition> BuildEngine(){var value=new Dictionary<string, EngineDefinition>(StringComparer.OrdinalIgnoreCase);foreach(var item in _engine)value[item.Name]=item;return value;}",
+        "  public static IReadOnlyList<Definition> All { get { return _all; } }",
+        "  public static IReadOnlyList<EngineDefinition> EngineEvents { get { return _engine; } }",
+        "  public static int Count { get { return _all.Length; } }",
+        "  public static bool Contains(string name){return !string.IsNullOrWhiteSpace(name)&&_byName.ContainsKey(name);}",
+        "  public static bool IsEngineEvent(string name){return !string.IsNullOrWhiteSpace(name)&&_engineByName.ContainsKey(name);}",
+        "  public static bool TryGet(string name,out Definition definition){if(!string.IsNullOrWhiteSpace(name)&&_byName.TryGetValue(name,out definition))return true;definition=default(Definition);return false;}",
+        "  public static bool TryGetEngine(string name,out EngineDefinition definition){if(!string.IsNullOrWhiteSpace(name)&&_engineByName.TryGetValue(name,out definition))return true;definition=default(EngineDefinition);return false;}",
+        "  public static ISet<string> CreateSet(){return new HashSet<string>(_byName.Keys,StringComparer.OrdinalIgnoreCase);}",
+        "  public static bool IsAllowedWhere(string eventName,string field){",
+        "    if(string.IsNullOrWhiteSpace(field))return false;",
+        "    if(TryGet(eventName,out var definition)){foreach(var allowed in definition.AllowedWhereFields)if(string.Equals(allowed,field,StringComparison.OrdinalIgnoreCase))return true;return false;}",
+        "    if(TryGetEngine(eventName,out var engine)){foreach(var allowed in engine.AllowedWhereFields)if(string.Equals(allowed,field,StringComparison.OrdinalIgnoreCase))return true;}",
+        "    return false;",
+        "  }",
+        "}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def render_runtime_witness_catalog(signatures: list[dict], production: list[dict]) -> str:
+    safe = [entry for entry in signatures if entry["CreatorSafe"]]
+    production_witnesses = {
+        value for event in production for value in event["WitnessSignatures"]
+    }
+    lines = [
+        "// <auto-generated>",
+        "//   Generated by tools/component-packets/generate_seam_catalog.py. Do not edit.",
+        "// </auto-generated>",
+        "",
+        "namespace ComfyQuestContracts;",
+        "",
+        "using System;",
+        "using System.Collections.Generic;",
+        "",
+        "/// <summary>Exact creator-safe assembly witnesses; availability is explicit per signature.</summary>",
+        "public static class RuntimeWitnessCatalog {",
+        "  public readonly struct Definition {",
+        "    public string SignatureId { get; } public string MethodId { get; } public string EventName { get; }",
+        "    public string Route { get; } public string Profile { get; } public string DedupeGroup { get; } public string ActorScope { get; }",
+        "    public bool ProductionAvailable { get; }",
+        "    public Definition(string signatureId,string methodId,string eventName,string route,string profile,string dedupeGroup,string actorScope,bool productionAvailable){",
+        "      SignatureId=signatureId;MethodId=methodId;EventName=eventName;Route=route;Profile=profile;DedupeGroup=dedupeGroup;ActorScope=actorScope;ProductionAvailable=productionAvailable;",
+        "    }",
+        "  }",
+        "  static readonly Definition[] _all=new[] {",
+    ]
+    for entry in sorted(safe, key=lambda value: value["SignatureId"]):
+        lines.append("    new Definition(" + ", ".join([
+            cs(entry["SignatureId"]), cs(entry["MethodId"]), cs(entry["CanonicalEvent"]),
+            cs(entry["Route"]), cs(entry["Profile"]), cs(entry["DedupeGroup"]),
+            cs(entry["ActorScope"]), str(entry["SignatureId"] in production_witnesses).lower(),
+        ]) + "),")
+    lines += [
+        "  };",
+        "  static readonly Dictionary<string,Definition> _bySignature=Build();",
+        "  static Dictionary<string,Definition> Build(){var result=new Dictionary<string,Definition>(StringComparer.Ordinal);foreach(var item in _all)result[item.SignatureId]=item;return result;}",
+        "  public static IReadOnlyList<Definition> All { get { return _all; } }",
+        "  public static int Count { get { return _all.Length; } }",
+        "  public static bool TryGet(string signatureId,out Definition definition){if(signatureId!=null&&_bySignature.TryGetValue(signatureId,out definition))return true;definition=default(Definition);return false;}",
+        "}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def render_outputs() -> dict[Path, str]:
     atlas, rules_document, method_rules, signatures = build_model()
     manifest = build_manifest(atlas, rules_document, signatures)
@@ -906,6 +1358,13 @@ def render_outputs() -> dict[Path, str]:
         MANIFEST: json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
         CSHARP: render_csharp(atlas, signatures),
         SIGNAL_CATALOG: render_signal_catalog(manifest["FastSignals"]),
+        CREATOR_EVENT_CATALOG: render_creator_event_catalog(manifest["CreatorEvents"]),
+        PRODUCTION_EVENT_CATALOG: render_production_event_catalog(
+            manifest["RuntimeProductionEvents"], manifest["EngineEvents"]
+        ),
+        RUNTIME_WITNESS_CATALOG: render_runtime_witness_catalog(
+            signatures, manifest["RuntimeProductionEvents"]
+        ),
         EVENT_CATALOG: render_event_catalog(
             signatures, rules_document.get("TriggerAliases", {}), manifest["CreatorEvents"]
         ),

@@ -10,6 +10,24 @@ world/player/ZDO/content/stage/transition/action claim to suppress duplicates an
 live-witnessed aim, inscription, message execution, duplicate suppression, explicit hot loading, selected
 version activation, and hash-verified atomic rollback.
 
+Runtime publication and inbox inspection now use the generated production registry rather than the
+larger research vocabulary. The current boundary is twenty-six canonical events plus the separately declared
+timer/chat engine events. Each patch is registered against an exact generated signature and fails
+independently when a game build moves that overload. Local/RPC healing witnesses are correlated before
+workflow history. The Core local-actions cohort adds proven-result container emptying, item unequipping,
+piece destruction/removal/repair, and successful local teleport; request, access, full-health, stale,
+partial-transfer, and other no-op paths do not advance a quest. Unknown fields are stripped at the privacy
+boundary, and events absent from the active
+document are rejected before binding discovery or receipt writes. The active compiled document and a
+short-lived binding index are cached; package timestamp/length changes invalidate that cache and force the
+full hash/certification path again. Catalog rows marked `automated-contract` are implementation evidence,
+not a new live-gameplay claim.
+
+The Combat + Harvest cohort adds successful local blocks, freshly attributed staggers, actual creature
+health loss, authoritative resource health mutation, and owner-side resource picking. Creature targets use
+the matchable localization token; resources use clone-free prefab names. Only weapon skill and projectile
+classification cross the event boundary, and rejected/no-op damage or pick requests never advance a quest.
+
 Durable multi-stage progress is keyed by world, character, binding ZDO, and content hash. Transitions remain
 pending across reloads until their exactly-once actions are processed; the drawer reports current
 stage/outcome. Two-stage sign editing and restart-safe engine-owned timers are automated and live-proven.

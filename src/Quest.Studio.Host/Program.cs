@@ -38,10 +38,15 @@ app.MapGet("/health", () => Results.Json(new
     service = "comfy-quest-studio",
     binding = $"127.0.0.1:{port}"
 }, json));
-app.MapGet("/api/v1/workbench/security", (HttpRequest request) =>
-    host.IsLoopbackRequest(request)
+app.MapGet("/api/v1/workbench/security", (HttpRequest request, HttpResponse response) =>
+{
+    response.Headers.CacheControl = "no-store";
+    response.Headers.Pragma = "no-cache";
+    response.Headers["X-Content-Type-Options"] = "nosniff";
+    return host.IsLoopbackRequest(request)
         ? Results.Json(new { browser_token = host.BrowserToken }, json)
-        : Results.StatusCode(StatusCodes.Status403Forbidden));
+        : Results.StatusCode(StatusCodes.Status403Forbidden);
+});
 QuestStudioEndpoints.Map(app, host);
 app.Run();
 

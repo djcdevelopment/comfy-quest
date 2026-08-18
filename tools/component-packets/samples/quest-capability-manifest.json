@@ -12,6 +12,11 @@
     "CreatorSafeEvents": 34,
     "CreatorSafeSignatures": 57
   },
+  "RuntimeCounts": {
+    "ProductionEvents": 26,
+    "ProductionWitnesses": 45,
+    "EngineEvents": 2
+  },
   "CreatorSafeEvents": [
     "attack_blocked",
     "character_healed",
@@ -56,7 +61,18 @@
       "ExampleTarget": "$enemy_greyling",
       "SupportsWeaponSkill": true,
       "SupportsProjectile": true,
-      "Fields": []
+      "Fields": [],
+      "Category": "combat",
+      "Profile": "core",
+      "Label": "Attack blocked",
+      "Instruction": "Observe attack blocked; optionally narrow it to the attacker name seen by the matcher.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeKillPatches.AttackBlocked",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "character_healed",
@@ -70,9 +86,21 @@
           "Name": "amount",
           "Description": "health restored by this action",
           "Example": "25",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Amount"
         }
-      ]
+      ],
+      "Category": "combat",
+      "Profile": "core",
+      "Label": "Character healed",
+      "Instruction": "Observe character healed; optionally narrow it to the healed character; the current safe route emits the local player as you.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeEasyEventPatches.CharacterHealed",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "character_staggered",
@@ -81,7 +109,18 @@
       "ExampleTarget": "$enemy_greyling",
       "SupportsWeaponSkill": true,
       "SupportsProjectile": true,
-      "Fields": []
+      "Fields": [],
+      "Category": "combat",
+      "Profile": "core",
+      "Label": "Character staggered",
+      "Instruction": "Observe character staggered; optionally narrow it to the staggered creature name seen by the matcher.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeKillPatches.CharacterStaggered",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "chat_sent",
@@ -90,7 +129,18 @@
       "ExampleTarget": "Normal",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "social",
+      "Profile": "core",
+      "Label": "Chat sent",
+      "Instruction": "Observe chat sent; optionally narrow it to the Valheim chat mode, not the redacted message text.",
+      "Privacy": "Message text is redacted; only the normalized chat mode is retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeEasyEventPatches.ChatSent",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "container_emptied",
@@ -99,7 +149,18 @@
       "ExampleTarget": "piece_chest_wood",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "inventory",
+      "Profile": "core",
+      "Label": "Container emptied",
+      "Instruction": "Observe container emptied; optionally narrow it to the emptied container prefab.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCoreActionPatches.ContainerEmptied",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "damage_dealt",
@@ -108,7 +169,18 @@
       "ExampleTarget": "$enemy_greyling",
       "SupportsWeaponSkill": true,
       "SupportsProjectile": true,
-      "Fields": []
+      "Fields": [],
+      "Category": "combat",
+      "Profile": "extended",
+      "Label": "Damage dealt",
+      "Instruction": "Observe damage dealt; optionally narrow it to the damaged creature name seen by the matcher.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeKillPatches.DamageDealt",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "global_key_removed",
@@ -117,7 +189,18 @@
       "ExampleTarget": "defeated_eikthyr",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "world",
+      "Profile": "core",
+      "Label": "Global key removed",
+      "Instruction": "Observe global key removed; optionally narrow it to the exact Valheim world flag removed.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": false,
+        "RuntimeAdapter": null,
+        "EvidenceState": "synthetic-only",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "global_key_set",
@@ -126,7 +209,18 @@
       "ExampleTarget": "defeated_eikthyr",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "world",
+      "Profile": "core",
+      "Label": "Global key set",
+      "Instruction": "Observe global key set; optionally narrow it to the exact Valheim world flag set.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": false,
+        "RuntimeAdapter": null,
+        "EvidenceState": "synthetic-only",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "item_consumed",
@@ -135,16 +229,38 @@
       "ExampleTarget": "CookedMeat",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "inventory",
+      "Profile": "core",
+      "Label": "Item consumed",
+      "Instruction": "Observe item consumed; optionally narrow it to the consumed item's stable prefab name.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeEasyEventPatches.ItemConsumed",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "item_crafted",
       "TargetKind": "station",
-      "TargetDescription": "the current producer's crafting subject; it does not yet expose the crafted item",
-      "ExampleTarget": "crafting bench",
+      "TargetDescription": "the current crafting station prefab, or handcrafting when no station is used; the crafted item is not exposed",
+      "ExampleTarget": "piece_workbench",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "crafting",
+      "Profile": "core",
+      "Label": "Item crafted",
+      "Instruction": "Observe item crafted; optionally narrow it to the current crafting station prefab, or handcrafting when no station is used; the crafted item is not exposed.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCraftingPatches.ItemCrafted",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "item_dropped",
@@ -153,7 +269,18 @@
       "ExampleTarget": "Wood",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "inventory",
+      "Profile": "core",
+      "Label": "Item dropped",
+      "Instruction": "Observe item dropped; optionally narrow it to the dropped item's stable prefab name.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeEasyEventPatches.ItemDropped",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "item_equipped",
@@ -162,7 +289,18 @@
       "ExampleTarget": "AxeBronze",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "inventory",
+      "Profile": "core",
+      "Label": "Item equipped",
+      "Instruction": "Observe item equipped; optionally narrow it to the equipped item's stable prefab name.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeEasyEventPatches.ItemEquipped",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "item_picked_up",
@@ -171,7 +309,18 @@
       "ExampleTarget": "Wood",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "inventory",
+      "Profile": "core",
+      "Label": "Item picked up",
+      "Instruction": "Observe item picked up; optionally narrow it to the picked-up object's stable prefab name.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeEasyEventPatches.ItemPickedUp",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "item_unequipped",
@@ -180,7 +329,18 @@
       "ExampleTarget": "AxeBronze",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "inventory",
+      "Profile": "core",
+      "Label": "Item unequipped",
+      "Instruction": "Observe item unequipped; optionally narrow it to the unequipped item's stable prefab name.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCoreActionPatches.ItemUnequipped",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "kill",
@@ -189,7 +349,18 @@
       "ExampleTarget": "$enemy_greyling",
       "SupportsWeaponSkill": true,
       "SupportsProjectile": true,
-      "Fields": []
+      "Fields": [],
+      "Category": "combat",
+      "Profile": "core",
+      "Label": "Kill",
+      "Instruction": "Observe kill; optionally narrow it to the killed creature name seen by the matcher.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeKillPatches.Death",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "max_health_changed",
@@ -203,15 +374,28 @@
           "Name": "subject",
           "Description": "the changed attribute",
           "Example": "health",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Subject"
         },
         {
           "Name": "amount",
           "Description": "the resulting maximum health",
           "Example": "100",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Amount"
         }
-      ]
+      ],
+      "Category": "progression",
+      "Profile": "extended",
+      "Label": "Max health changed",
+      "Instruction": "Observe max health changed; optionally narrow it to the changed player attribute.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": false,
+        "RuntimeAdapter": null,
+        "EvidenceState": "synthetic-only",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "piece_damaged",
@@ -220,7 +404,18 @@
       "ExampleTarget": "wood_wall",
       "SupportsWeaponSkill": true,
       "SupportsProjectile": true,
-      "Fields": []
+      "Fields": [],
+      "Category": "building",
+      "Profile": "extended",
+      "Label": "Piece damaged",
+      "Instruction": "Observe piece damaged; optionally narrow it to the damaged structure prefab.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeKillPatches.PieceDamage",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "piece_destroyed",
@@ -229,7 +424,18 @@
       "ExampleTarget": "wood_wall",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "building",
+      "Profile": "core",
+      "Label": "Piece destroyed",
+      "Instruction": "Observe piece destroyed; optionally narrow it to the destroyed structure prefab.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCoreActionPatches.PieceDestroyed",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "piece_placed",
@@ -238,7 +444,18 @@
       "ExampleTarget": "wood_wall",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "building",
+      "Profile": "core",
+      "Label": "Piece placed",
+      "Instruction": "Observe piece placed; optionally narrow it to the placed structure prefab.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCooperativePatches.PlacePiece",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "piece_removed",
@@ -247,7 +464,18 @@
       "ExampleTarget": "piece",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "building",
+      "Profile": "core",
+      "Label": "Piece removed",
+      "Instruction": "Observe piece removed; optionally narrow it to the removed subject; the attributed player route currently emits the generic value piece.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCoreActionPatches.PieceRemoved",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "piece_repaired",
@@ -256,7 +484,18 @@
       "ExampleTarget": "wood_wall",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "building",
+      "Profile": "core",
+      "Label": "Piece repaired",
+      "Instruction": "Observe piece repaired; optionally narrow it to the repaired structure prefab.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCoreActionPatches.PieceRepaired",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "player_died",
@@ -265,16 +504,38 @@
       "ExampleTarget": "you",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "progression",
+      "Profile": "core",
+      "Label": "Player died",
+      "Instruction": "Observe player died; optionally narrow it to the local player.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": false,
+        "RuntimeAdapter": null,
+        "EvidenceState": "synthetic-only",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "player_teleported",
       "TargetKind": "travel",
-      "TargetDescription": "the teleport mechanism; the current route emits portal",
+      "TargetDescription": "a successful local-player teleport; the production route does not infer its mechanism",
       "ExampleTarget": "portal",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "world",
+      "Profile": "core",
+      "Label": "Player teleported",
+      "Instruction": "Observe player teleported; optionally narrow it to a successful local-player teleport; the production route does not infer its mechanism.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCoreActionPatches.PlayerTeleported",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "resource_damaged",
@@ -283,7 +544,18 @@
       "ExampleTarget": "Beech1",
       "SupportsWeaponSkill": true,
       "SupportsProjectile": true,
-      "Fields": []
+      "Fields": [],
+      "Category": "harvest",
+      "Profile": "extended",
+      "Label": "Resource damaged",
+      "Instruction": "Observe resource damaged; optionally narrow it to the damaged tree, log, rock, bush, or destructible prefab.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeHarvestPatches.ResourceDamaged",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "resource_picked",
@@ -292,7 +564,18 @@
       "ExampleTarget": "RaspberryBush",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "harvest",
+      "Profile": "core",
+      "Label": "Resource picked",
+      "Instruction": "Observe resource picked; optionally narrow it to the picked resource prefab.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeHarvestPatches.ResourcePicked",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "sign_written",
@@ -301,7 +584,18 @@
       "ExampleTarget": "sign",
       "SupportsWeaponSkill": false,
       "SupportsProjectile": false,
-      "Fields": []
+      "Fields": [],
+      "Category": "social",
+      "Profile": "core",
+      "Label": "Sign written",
+      "Instruction": "Observe sign written; optionally narrow it to the edited sign prefab; message text is deliberately redacted and is not a filter.",
+      "Privacy": "Sign text is redacted; only the normalized sign target is retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeKillPatches.SignWritten",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "skill_raised",
@@ -315,15 +609,28 @@
           "Name": "subject",
           "Description": "the exact skill name",
           "Example": "Axes",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Subject"
         },
         {
           "Name": "amount",
           "Description": "skill progress added by this action",
           "Example": "1",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Amount"
         }
-      ]
+      ],
+      "Category": "progression",
+      "Profile": "core",
+      "Label": "Skill raised",
+      "Instruction": "Observe skill raised; optionally narrow it to the exact Valheim skill name.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": false,
+        "RuntimeAdapter": null,
+        "EvidenceState": "synthetic-only",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "skills_lowered",
@@ -337,15 +644,28 @@
           "Name": "subject",
           "Description": "the affected skill set",
           "Example": "all",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Subject"
         },
         {
           "Name": "amount",
           "Description": "the applied loss fraction",
           "Example": "0.05",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Amount"
         }
-      ]
+      ],
+      "Category": "progression",
+      "Profile": "core",
+      "Label": "Skills lowered",
+      "Instruction": "Observe skills lowered; optionally narrow it to the affected skill set.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": false,
+        "RuntimeAdapter": null,
+        "EvidenceState": "synthetic-only",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "stamina_gained",
@@ -359,15 +679,28 @@
           "Name": "subject",
           "Description": "the changed attribute",
           "Example": "stamina",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Subject"
         },
         {
           "Name": "amount",
           "Description": "stamina restored by this action",
           "Example": "10",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Amount"
         }
-      ]
+      ],
+      "Category": "progression",
+      "Profile": "extended",
+      "Label": "Stamina gained",
+      "Instruction": "Observe stamina gained; optionally narrow it to the changed player attribute.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": false,
+        "RuntimeAdapter": null,
+        "EvidenceState": "synthetic-only",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "stamina_spent",
@@ -381,15 +714,28 @@
           "Name": "subject",
           "Description": "the changed attribute",
           "Example": "stamina",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Subject"
         },
         {
           "Name": "amount",
           "Description": "stamina spent by this action",
           "Example": "10",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Amount"
         }
-      ]
+      ],
+      "Category": "progression",
+      "Profile": "extended",
+      "Label": "Stamina spent",
+      "Instruction": "Observe stamina spent; optionally narrow it to the changed player attribute.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": false,
+        "RuntimeAdapter": null,
+        "EvidenceState": "synthetic-only",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "station_fuel_added",
@@ -403,21 +749,35 @@
           "Name": "station",
           "Description": "the receiving station prefab",
           "Example": "smelter",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Station"
         },
         {
           "Name": "item",
           "Description": "the inserted fuel item",
           "Example": "Coal",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Item"
         },
         {
           "Name": "quantity",
           "Description": "items inserted by this action",
           "Example": "1",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Quantity"
         }
-      ]
+      ],
+      "Category": "crafting",
+      "Profile": "core",
+      "Label": "Station fuel added",
+      "Instruction": "Observe station fuel added; optionally narrow it to the fuel item or the stable value fuel.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCraftingPatches.StationFuelAdded",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "station_input_added",
@@ -431,21 +791,35 @@
           "Name": "station",
           "Description": "the receiving station prefab",
           "Example": "smelter",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Station"
         },
         {
           "Name": "item",
           "Description": "the inserted input item",
           "Example": "CopperOre",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Item"
         },
         {
           "Name": "quantity",
           "Description": "items inserted by this action",
           "Example": "1",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Quantity"
         }
-      ]
+      ],
+      "Category": "crafting",
+      "Profile": "core",
+      "Label": "Station input added",
+      "Instruction": "Observe station input added; optionally narrow it to the ore, food, or fermentable item inserted.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCraftingPatches.StationInputAdded",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "station_output_collected",
@@ -459,21 +833,35 @@
           "Name": "station",
           "Description": "the station prefab",
           "Example": "piece_cookingstation",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Station"
         },
         {
           "Name": "item",
           "Description": "the collected output description",
           "Example": "cooking output",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Item"
         },
         {
           "Name": "quantity",
           "Description": "the collected slot or quantity",
           "Example": "1",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Quantity"
         }
-      ]
+      ],
+      "Category": "crafting",
+      "Profile": "core",
+      "Label": "Station output collected",
+      "Instruction": "Observe station output collected; optionally narrow it to the collected station output; cooking currently emits cooking output.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCraftingPatches.StationOutputCollected",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     },
     {
       "Name": "station_output_produced",
@@ -487,21 +875,35 @@
           "Name": "station",
           "Description": "the producing station prefab",
           "Example": "smelter",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Station"
         },
         {
           "Name": "item",
           "Description": "the produced output item",
           "Example": "Copper",
-          "DraftByDefault": true
+          "DraftByDefault": true,
+          "Label": "Item"
         },
         {
           "Name": "quantity",
           "Description": "items produced by this action",
           "Example": "1",
-          "DraftByDefault": false
+          "DraftByDefault": false,
+          "Label": "Quantity"
         }
-      ]
+      ],
+      "Category": "crafting",
+      "Profile": "core",
+      "Label": "Station output produced",
+      "Instruction": "Observe station output produced; optionally narrow it to the output item produced by the station.",
+      "Privacy": "Only the normalized target and catalog-approved scalar fields are retained.",
+      "Availability": {
+        "ProductionAvailable": true,
+        "RuntimeAdapter": "RuntimeCraftingPatches.StationOutputProduced",
+        "EvidenceState": "automated-contract",
+        "EvidenceRevision": null
+      }
     }
   ],
   "FastSignals": [
@@ -584,7 +986,7 @@
       "Instruction": "Regain any amount of health.",
       "Target": null,
       "TargetPolicy": "wildcard",
-      "Privacy": "The healing amount is not persisted.",
+      "Privacy": "Only the bounded healing amount is retained; no player identity is captured.",
       "RuntimeAdapter": "RuntimeEasyEventPatches.CharacterHealed",
       "LabProfile": "core",
       "LabRoute": "primary"
@@ -600,6 +1002,569 @@
       "RuntimeAdapter": "DurableTimerStore",
       "LabProfile": "engine",
       "LabRoute": "engine"
+    }
+  ],
+  "RuntimeProductionEvents": [
+    {
+      "Event": "attack_blocked",
+      "RuntimeAdapter": "RuntimeKillPatches.AttackBlocked",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": true,
+      "EmitsProjectile": true,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Humanoid.BlockAttack(HitData, Character)"
+      ],
+      "AllowedWhereFields": [
+        "weapon_skill",
+        "projectile"
+      ]
+    },
+    {
+      "Event": "chat_sent",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ChatSent",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "closed",
+      "FixedTarget": null,
+      "AllowedTargets": [
+        "normal",
+        "shout"
+      ],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Chat.SendText(Type, string)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "container_emptied",
+      "RuntimeAdapter": "RuntimeCoreActionPatches.ContainerEmptied",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Container.TakeAll(Humanoid)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "item_crafted",
+      "RuntimeAdapter": "RuntimeCraftingPatches.ItemCrafted",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "InventoryGui.DoCrafting(Player)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "item_dropped",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ItemDropped",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Humanoid.DropItem(Inventory, ItemData, int)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "item_picked_up",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ItemPickedUp",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Humanoid.Pickup(GameObject, bool, bool)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "item_equipped",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ItemEquipped",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Humanoid.EquipItem(ItemData, bool)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "item_unequipped",
+      "RuntimeAdapter": "RuntimeCoreActionPatches.ItemUnequipped",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Humanoid.UnequipItem(ItemData, bool)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "item_consumed",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.ItemConsumed",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Player.ConsumeItem(Inventory, ItemData, bool)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "character_healed",
+      "RuntimeAdapter": "RuntimeEasyEventPatches.CharacterHealed",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "fixed-output",
+      "FixedTarget": "you",
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "amount"
+      ],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Character.Heal(float, bool)",
+        "Character.RPC_Heal(long, float, bool)"
+      ],
+      "AllowedWhereFields": [
+        "amount"
+      ]
+    },
+    {
+      "Event": "character_staggered",
+      "RuntimeAdapter": "RuntimeKillPatches.CharacterStaggered",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": true,
+      "EmitsProjectile": true,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Character.RPC_Stagger(long, Vector3)",
+        "Character.Stagger(Vector3)"
+      ],
+      "AllowedWhereFields": [
+        "weapon_skill",
+        "projectile"
+      ]
+    },
+    {
+      "Event": "damage_dealt",
+      "RuntimeAdapter": "RuntimeKillPatches.DamageDealt",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": true,
+      "EmitsProjectile": true,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Character.Damage(HitData)",
+        "Character.RPC_Damage(long, HitData)"
+      ],
+      "AllowedWhereFields": [
+        "weapon_skill",
+        "projectile"
+      ]
+    },
+    {
+      "Event": "kill",
+      "RuntimeAdapter": "RuntimeKillPatches.Death",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": true,
+      "EmitsProjectile": true,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Character.OnDeath()"
+      ],
+      "AllowedWhereFields": [
+        "weapon_skill",
+        "projectile"
+      ]
+    },
+    {
+      "Event": "piece_damaged",
+      "RuntimeAdapter": "RuntimeKillPatches.PieceDamage",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": true,
+      "EmitsProjectile": true,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "WearNTear.ApplyDamage(float, HitData)"
+      ],
+      "AllowedWhereFields": [
+        "weapon_skill",
+        "projectile"
+      ]
+    },
+    {
+      "Event": "piece_destroyed",
+      "RuntimeAdapter": "RuntimeCoreActionPatches.PieceDestroyed",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "WearNTear.Destroy(HitData, bool)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "piece_placed",
+      "RuntimeAdapter": "RuntimeCooperativePatches.PlacePiece",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "actor_role"
+      ],
+      "FixedWhere": {
+        "actor_role": "listen_host"
+      },
+      "WitnessSignatures": [
+        "Player.PlacePiece(Piece, Vector3, Quaternion, bool)"
+      ],
+      "AllowedWhereFields": [
+        "actor_role"
+      ]
+    },
+    {
+      "Event": "piece_removed",
+      "RuntimeAdapter": "RuntimeCoreActionPatches.PieceRemoved",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "fixed-output",
+      "FixedTarget": "piece",
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Player.RemovePiece()",
+        "WearNTear.RPC_Remove(long, bool)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "piece_repaired",
+      "RuntimeAdapter": "RuntimeCoreActionPatches.PieceRepaired",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Player.Repair(ItemData, Piece)",
+        "WearNTear.RPC_Repair(long)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "player_teleported",
+      "RuntimeAdapter": "RuntimeCoreActionPatches.PlayerTeleported",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "none",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Player.TeleportTo(Vector3, Quaternion, bool)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "resource_damaged",
+      "RuntimeAdapter": "RuntimeHarvestPatches.ResourceDamaged",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": true,
+      "EmitsProjectile": true,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Destructible.Damage(HitData)",
+        "Destructible.RPC_Damage(long, HitData)",
+        "MineRock.Damage(HitData)",
+        "MineRock5.Damage(HitData)",
+        "MineRock5.RPC_Damage(long, HitData, int)",
+        "TreeBase.Damage(HitData)",
+        "TreeBase.RPC_Damage(long, HitData)",
+        "TreeLog.Damage(HitData)",
+        "TreeLog.RPC_Damage(long, HitData)"
+      ],
+      "AllowedWhereFields": [
+        "weapon_skill",
+        "projectile"
+      ]
+    },
+    {
+      "Event": "resource_picked",
+      "RuntimeAdapter": "RuntimeHarvestPatches.ResourcePicked",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Pickable.Interact(Humanoid, bool, bool)",
+        "Pickable.RPC_Pick(long, int)"
+      ],
+      "AllowedWhereFields": []
+    },
+    {
+      "Event": "station_fuel_added",
+      "RuntimeAdapter": "RuntimeCraftingPatches.StationFuelAdded",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "station",
+        "item",
+        "quantity"
+      ],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "CookingStation.RPC_AddFuel(long)",
+        "Smelter.OnAddFuel(Switch, Humanoid, ItemData)",
+        "Smelter.RPC_AddFuel(long)"
+      ],
+      "AllowedWhereFields": [
+        "station",
+        "item",
+        "quantity"
+      ]
+    },
+    {
+      "Event": "station_input_added",
+      "RuntimeAdapter": "RuntimeCraftingPatches.StationInputAdded",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "station",
+        "item",
+        "quantity"
+      ],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "CookingStation.RPC_AddItem(long, string)",
+        "Fermenter.RPC_AddItem(long, string)",
+        "Smelter.OnAddOre(Switch, Humanoid, ItemData)",
+        "Smelter.RPC_AddOre(long, string)"
+      ],
+      "AllowedWhereFields": [
+        "station",
+        "item",
+        "quantity"
+      ]
+    },
+    {
+      "Event": "station_output_collected",
+      "RuntimeAdapter": "RuntimeCraftingPatches.StationOutputCollected",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "station",
+        "item",
+        "quantity"
+      ],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "CookingStation.RPC_RemoveDoneItem(long, Vector3, int)"
+      ],
+      "AllowedWhereFields": [
+        "station",
+        "item",
+        "quantity"
+      ]
+    },
+    {
+      "Event": "station_output_produced",
+      "RuntimeAdapter": "RuntimeCraftingPatches.StationOutputProduced",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [
+        "station",
+        "item",
+        "quantity"
+      ],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Smelter.Spawn(string, int)"
+      ],
+      "AllowedWhereFields": [
+        "station",
+        "item",
+        "quantity"
+      ]
+    },
+    {
+      "Event": "sign_written",
+      "RuntimeAdapter": "RuntimeKillPatches.SignWritten",
+      "EvidenceState": "automated-contract",
+      "EvidenceRevision": null,
+      "TargetPolicy": "optional",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "EmitsWeaponSkill": false,
+      "EmitsProjectile": false,
+      "EmittedFields": [],
+      "FixedWhere": {},
+      "WitnessSignatures": [
+        "Sign.SetText(string)"
+      ],
+      "AllowedWhereFields": []
+    }
+  ],
+  "EngineEvents": [
+    {
+      "Event": "timer_elapsed",
+      "Label": "Timer elapsed",
+      "Instruction": "Wait for a named quest timer.",
+      "RuntimeAdapter": "DurableTimerStore",
+      "TargetPolicy": "none",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "RequiredWhereFields": [
+        "timer_id"
+      ],
+      "AllowedWhereFields": [
+        "timer_id"
+      ],
+      "Privacy": "Only the quest-owned timer identifier is retained."
+    },
+    {
+      "Event": "chat_received",
+      "Label": "Receive chat",
+      "Instruction": "Receive a non-empty normal or shout message from a selected actor role.",
+      "RuntimeAdapter": "RuntimeCooperativePatches.EmitChat",
+      "TargetPolicy": "closed",
+      "FixedTarget": null,
+      "AllowedTargets": [
+        "normal",
+        "shout"
+      ],
+      "RequiredWhereFields": [
+        "actor_role"
+      ],
+      "AllowedWhereFields": [
+        "actor_role"
+      ],
+      "Privacy": "Message text, sender identity, and player name are never persisted."
     }
   ],
   "TriggerAliases": {

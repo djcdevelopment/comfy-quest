@@ -17,7 +17,16 @@ sealed class RuntimeExperienceEngine {
   readonly WorkflowStateStore workflows;
   readonly DurableTimerStore timers;
   readonly Func<bool> privateConfirmed;
+  readonly Dictionary<string, DateTimeOffset> recentEventKeys =
+      new(StringComparer.Ordinal);
   DateTimeOffset nextTimerPoll;
+  Active cachedActive;
+  DateTime cachedActiveWriteUtc;
+  DateTime cachedPackageWriteUtc;
+  long cachedPackageLength;
+  WearNTear[] cachedBindings = Array.Empty<WearNTear>();
+  string cachedBindingContentHash;
+  double nextBindingRefresh;
 
   public RuntimeExperienceEngine(
       string runtimeRoot,
@@ -52,20 +61,23 @@ sealed class RuntimeExperienceEngine {
   }
 
   public void OnEvent(RuntimeEvent evt) {
+    evt = RuntimeEventPolicy.Normalize(evt);
     if (evt == null) return;
     try {
+      if (!TryLoad(out var active, out var diagnostic)) {
+        Write("transition", diagnostic, null, null, null);
+        return;
+      }
+      // The high-frequency lane stops here: no scene walk, receipt, or workflow write.
+      if (!active.Subscriptions.Contains(evt.Name) || IsDuplicate(evt)) return;
       var authority = CharmPolicy.CanMutate(World());
       if (!authority.Allowed) {
         Write("transition", authority.Diagnostic, null, null, null);
         return;
       }
-      if (!TryLoad(out var active, out var diagnostic)) {
-        Write("transition", diagnostic, null, null, null);
-        return;
-      }
 
       var foundBinding = false;
-      foreach (var wear in WearNTear.GetAllInstances().ToArray()) {
+      foreach (var wear in Bindings(active)) {
         if (wear == null) continue;
         var view = wear.GetComponent<ZNetView>();
         var zdo = view == null ? null : view.GetZDO();
@@ -142,6 +154,31 @@ sealed class RuntimeExperienceEngine {
     } catch (Exception e) {
       Write("action", "runtime_event_failed", null, null, e.Message);
     }
+  }
+
+  bool IsDuplicate(RuntimeEvent evt) {
+    if (string.IsNullOrWhiteSpace(evt.DedupeKey)) return false;
+    var now = evt.At == default ? DateTimeOffset.UtcNow : evt.At;
+    if (recentEventKeys.TryGetValue(evt.DedupeKey, out var prior)
+        && now >= prior && now - prior < TimeSpan.FromSeconds(1)) return true;
+    if (recentEventKeys.Count >= 512) {
+      foreach (var key in recentEventKeys.OrderBy(value => value.Value)
+          .Take(recentEventKeys.Count - 256).Select(value => value.Key).ToArray())
+        recentEventKeys.Remove(key);
+    }
+    recentEventKeys[evt.DedupeKey] = now;
+    return false;
+  }
+
+  IReadOnlyList<WearNTear> Bindings(Active active) {
+    var now = UnityEngine.Time.realtimeSinceStartup;
+    if (!string.Equals(cachedBindingContentHash, active.ContentHash, StringComparison.Ordinal)
+        || now >= nextBindingRefresh) {
+      cachedBindings = WearNTear.GetAllInstances().Where(value => value != null).ToArray();
+      cachedBindingContentHash = active.ContentHash;
+      nextBindingRefresh = now + 1.0;
+    }
+    return cachedBindings;
   }
 
   static RuntimeReceipt EventReceipt(
@@ -397,9 +434,21 @@ sealed class RuntimeExperienceEngine {
     error = "active_set_missing";
     try {
       var activePath = Path.Combine(root, "active", "active-set.json");
-      if (!File.Exists(activePath)) return false;
+      if (!File.Exists(activePath)) { InvalidateActive(); return false; }
+      var activeWrite = File.GetLastWriteTimeUtc(activePath);
+      if (cachedActive != null && activeWrite == cachedActiveWriteUtc
+          && File.Exists(cachedActive.PackagePath)) {
+        var currentPackage = new FileInfo(cachedActive.PackagePath);
+        if (currentPackage.LastWriteTimeUtc == cachedPackageWriteUtc
+            && currentPackage.Length == cachedPackageLength) {
+          active = cachedActive;
+          error = null;
+          return true;
+        }
+      }
       var set = JsonConvert.DeserializeObject<ActiveSet>(File.ReadAllText(activePath));
       if (set == null || set.Source != Path.GetFileName(set.Source)) {
+        InvalidateActive();
         error = "active_source_invalid";
         return false;
       }
@@ -409,6 +458,7 @@ sealed class RuntimeExperienceEngine {
           || inspected.ContentHash != set.ContentHash
           || inspected.Manifest.PackId != set.PackId
           || inspected.Manifest.Version != set.Version) {
+        InvalidateActive();
         error = "active_content_mismatch";
         return false;
       }
@@ -417,28 +467,44 @@ sealed class RuntimeExperienceEngine {
           value.FullName.StartsWith("experiences/", StringComparison.Ordinal)
           && value.FullName.EndsWith(".json", StringComparison.Ordinal)).ToArray();
       if (entries.Length != 1) {
+        InvalidateActive();
         error = "active_experience_ambiguous";
         return false;
       }
       using var reader = new StreamReader(entries[0].Open());
-      var compiled = ExperienceCompiler.CompileJson(
-          reader.ReadToEnd(), CanonicalEventCatalog.CreateSet());
+      var compiled = ExperienceCompiler.CompileProductionJson(reader.ReadToEnd());
       if (!compiled.IsValid) {
+        InvalidateActive();
         error = "active_experience_invalid";
         return false;
       }
-      active = new Active {
+      var packageInfo = new FileInfo(package);
+      cachedActive = new Active {
         PackId = set.PackId,
         Version = set.Version,
         ContentHash = set.ContentHash,
         Document = compiled.Document,
+        Subscriptions = RuntimeSubscriptionIndex.Create(compiled.Document),
+        PackagePath = package,
       };
+      cachedActiveWriteUtc = activeWrite;
+      cachedPackageWriteUtc = packageInfo.LastWriteTimeUtc;
+      cachedPackageLength = packageInfo.Length;
+      active = cachedActive;
       error = null;
       return true;
     } catch {
+      InvalidateActive();
       error = "active_set_unreadable";
       return false;
     }
+  }
+
+  void InvalidateActive() {
+    cachedActive = null;
+    cachedBindings = Array.Empty<WearNTear>();
+    cachedBindingContentHash = null;
+    recentEventKeys.Clear();
   }
 
   WorldAuthority World() {
@@ -480,5 +546,7 @@ sealed class RuntimeExperienceEngine {
     public string Version;
     public string ContentHash;
     public ExperienceDocument Document;
+    public RuntimeSubscriptionIndex Subscriptions;
+    public string PackagePath;
   }
 }

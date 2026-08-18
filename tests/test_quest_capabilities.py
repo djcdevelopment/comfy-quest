@@ -32,6 +32,7 @@ TOME_GENERATOR = REPO / "tools" / "component-packets" / "render_quest_lab.py"
 JOURNAL_SOURCE = REPO / "tools" / "component-packets" / "journal-pages.json"
 JOURNAL_OUTPUT = REPO / "network" / "mod" / "ComfyQuestLab" / "Ui" / "LabJournal.g.cs"
 TOME_OUTPUT = REPO / "docs" / "generated" / "questlab.html"
+RUNTIME = REPO / "network" / "mod" / "ComfyQuestRuntime"
 
 SPEC = importlib.util.spec_from_file_location("quest_capability_generator", GENERATOR)
 CAPABILITY_GENERATOR = importlib.util.module_from_spec(SPEC)
@@ -72,6 +73,124 @@ class QuestCapabilityManifestTests(unittest.TestCase):
         self.assertEqual(set(death["AtlasCategories"]), {"combat", "progression"})
         self.assertEqual(death["CanonicalCategory"], "progression")
         self.assertEqual(death["CanonicalEvent"], "player_died")
+
+    def test_creator_vocabulary_and_runtime_availability_are_separate(self) -> None:
+        self.assertEqual(
+            self.manifest["RuntimeCounts"],
+            {"ProductionEvents": 26, "ProductionWitnesses": 45, "EngineEvents": 2},
+        )
+        creator = {row["Name"]: row for row in self.manifest["CreatorEvents"]}
+        production = {
+            row["Event"]: row for row in self.manifest["RuntimeProductionEvents"]
+        }
+        self.assertEqual(34, len(creator))
+        self.assertEqual(26, len(production))
+        self.assertEqual(
+            {
+                "container_emptied",
+                "item_unequipped",
+                "piece_destroyed",
+                "piece_removed",
+                "piece_repaired",
+                "player_teleported",
+                "attack_blocked",
+                "character_staggered",
+                "damage_dealt",
+                "resource_damaged",
+                "resource_picked",
+                "item_crafted",
+                "station_fuel_added",
+                "station_input_added",
+                "station_output_collected",
+                "station_output_produced",
+            },
+            set(production)
+            - {
+                "chat_sent",
+                "item_dropped",
+                "item_picked_up",
+                "item_equipped",
+                "item_consumed",
+                "character_healed",
+                "kill",
+                "piece_damaged",
+                "piece_placed",
+                "sign_written",
+            },
+        )
+        self.assertEqual(
+            {"timer_elapsed", "chat_received"},
+            {row["Event"] for row in self.manifest["EngineEvents"]},
+        )
+        for name, row in creator.items():
+            with self.subTest(event=name):
+                self.assertTrue(row["Label"])
+                self.assertTrue(row["Instruction"])
+                self.assertTrue(row["Privacy"])
+                self.assertEqual(
+                    name in production,
+                    row["Availability"]["ProductionAvailable"],
+                )
+                if name not in production:
+                    self.assertEqual("synthetic-only", row["Availability"]["EvidenceState"])
+
+    def test_runtime_witnesses_are_exact_and_evidence_honest(self) -> None:
+        safe = {
+            row["SignatureId"]: row
+            for row in self.signatures
+            if row["CreatorSafe"]
+        }
+        declared = []
+        for event in self.manifest["RuntimeProductionEvents"]:
+            self.assertEqual("automated-contract", event["EvidenceState"])
+            self.assertIsNone(event["EvidenceRevision"])
+            for signature in event["WitnessSignatures"]:
+                declared.append(signature)
+                self.assertIn(signature, safe)
+                self.assertEqual(event["Event"], safe[signature]["CanonicalEvent"])
+        self.assertEqual(45, len(declared))
+        self.assertEqual(len(declared), len(set(declared)))
+
+    def test_shipping_runtime_consumes_the_generated_boundary(self) -> None:
+        runtime_source = "\n".join(
+            path.read_text(encoding="utf-8") for path in RUNTIME.glob("*.cs")
+        )
+        for event in self.manifest["RuntimeProductionEvents"]:
+            for signature in event["WitnessSignatures"]:
+                with self.subTest(signature=signature):
+                    self.assertIn(signature, runtime_source)
+        self.assertNotIn("ComfyQuestLab", runtime_source)
+        self.assertIn('"Character.RPC_Heal(long, float, bool)"', runtime_source)
+        self.assertIn("RuntimePatching.TryPatch", runtime_source)
+
+        engine = (RUNTIME / "RuntimeExperienceEngine.cs").read_text(encoding="utf-8")
+        reject = engine.index("!active.Subscriptions.Contains(evt.Name)")
+        bindings = engine.index("foreach (var wear in Bindings(active))")
+        self.assertLess(reject, bindings)
+        self.assertIn("ExperienceCompiler.CompileProductionJson", engine)
+        self.assertIn("cachedActive", engine)
+
+        contract = (
+            REPO / "network" / "mod" / "ComfyQuestContracts" / "RuntimeContract.cs"
+        ).read_text(encoding="utf-8")
+        self.assertIn("RuntimeProductionEventCatalog.CreateSet()", contract)
+
+    def test_each_production_witness_has_one_runtime_registration(self) -> None:
+        apply_bodies = []
+        for path in RUNTIME.glob("*.cs"):
+            source = path.read_text(encoding="utf-8")
+            apply_bodies.extend(
+                re.findall(
+                    r"public static void Apply\(Harmony harmony\) \{(.*?)\n  \}",
+                    source,
+                    re.DOTALL,
+                )
+            )
+        registrations = "\n".join(apply_bodies)
+        for event in self.manifest["RuntimeProductionEvents"]:
+            for signature in event["WitnessSignatures"]:
+                with self.subTest(event=event["Event"], signature=signature):
+                    self.assertEqual(1, registrations.count(f'"{signature}"'))
 
     def test_overloads_keep_exact_signature_identity(self) -> None:
         self.assertEqual(len(self.by_method["Inventory.AddItem"]), 7)

@@ -38,7 +38,7 @@ public static class CreatorSignalCatalog {
     new Definition("pickup", "item_picked_up", "Pick something up", "Pick up any item from the ground.", null, "wildcard", "Only the stable item prefab is retained.", "core", "primary", "RuntimeEasyEventPatches.ItemPickedUp"),
     new Definition("equip", "item_equipped", "Equip something", "Equip any tool, weapon, shield, or armor item.", null, "wildcard", "Only the stable item prefab is retained.", "core", "primary", "RuntimeEasyEventPatches.ItemEquipped"),
     new Definition("consume", "item_consumed", "Consume something", "Consume any food, mead, or usable item.", null, "wildcard", "Only the stable item prefab is retained.", "core", "primary", "RuntimeEasyEventPatches.ItemConsumed"),
-    new Definition("heal", "character_healed", "Regain health", "Regain any amount of health.", null, "wildcard", "The healing amount is not persisted.", "core", "primary", "RuntimeEasyEventPatches.CharacterHealed"),
+    new Definition("heal", "character_healed", "Regain health", "Regain any amount of health.", null, "wildcard", "Only the bounded healing amount is retained; no player identity is captured.", "core", "primary", "RuntimeEasyEventPatches.CharacterHealed"),
     new Definition("wait", "timer_elapsed", "Wait", "Wait for the quest timer.", null, "engine", "No player payload is captured.", "engine", "engine", "DurableTimerStore"),
   };
 

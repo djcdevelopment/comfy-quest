@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using ComfyQuestContracts;
 using Newtonsoft.Json;
@@ -9,13 +11,6 @@ namespace Comfy.Quest.Studio;
 internal sealed class QuestStudioWorkspace
 {
     const int MaxDraftBytes = 1024 * 1024;
-    static readonly HashSet<string> SupportedEvents = new(
-        CreatorSignalCatalog.All.Select(signal => signal.EventName).Concat(
-            new[] { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written" }),
-        StringComparer.Ordinal);
-    static readonly string[] SupportedActions =
-        { "message", "timer_start", "timer_cancel", "grant_item", "spawn", "clear_spawned" };
-
     readonly object _gate = new();
     readonly string _root;
     readonly string _projectsRoot;
@@ -36,19 +31,119 @@ internal sealed class QuestStudioWorkspace
         EnsureLegacyMigration();
     }
 
-    public object Catalog() => new
+    public object Catalog()
     {
-        schema_version = 2,
-        events = CatalogEvents(),
-        actions = new object[]
+        var effects = CatalogEffects();
+        return new
         {
-            new { id = "message", label = "Show message" },
-            new { id = "timer_start", label = "Start timer", seconds_min = 1, seconds_max = 86400 },
-            new { id = "timer_cancel", label = "Cancel timer" },
-            new { id = "grant_item", label = "Grant item", items = new Dictionary<string,int> { ["Wood"] = 50, ["Stone"] = 50, ["Resin"] = 50, ["Coins"] = 100 } },
-            new { id = "spawn", label = "Spawn", prefabs = new Dictionary<string,string[]> { ["creature"] = new[] { "Greyling", "Boar" }, ["item"] = new[] { "Wood", "Stone", "Resin" }, ["piece"] = new[] { "sign", "wood_floor" } } },
-            new { id = "clear_spawned", label = "Clear a prior spawn" }
-        },
+        schema_version = 3,
+        quick_presets = CreatorSignalCatalog.All.Select(signal => new
+        {
+            id = signal.Id,
+            label = signal.Label,
+            instruction = signal.Instruction,
+            event_name = signal.EventName,
+            target = signal.Target,
+            target_policy = signal.TargetPolicy,
+            privacy = signal.Privacy,
+            runtime_adapter = signal.RuntimeAdapter
+        }).ToArray(),
+        creator_events = CreatorEventCatalog.All.Select(definition =>
+        {
+            var production = RuntimeProductionEventCatalog.TryGet(definition.Name, out var runtime);
+            var authorFields = definition.Fields
+                .Where(field => !production || RuntimeProductionEventCatalog.IsAllowedWhere(definition.Name, field.Name))
+                .Select(field => new
+                {
+                    name = field.Name,
+                    label = field.Label,
+                    description = field.Description,
+                    example = field.Example,
+                    draft_by_default = field.DraftByDefault,
+                    production_emitted = production && RuntimeProductionEventCatalog.IsAllowedWhere(definition.Name, field.Name)
+                }).ToArray();
+            return new
+            {
+                id = definition.Name,
+                name = definition.Name,
+                event_name = definition.Name,
+                label = definition.Label,
+                instruction = definition.Instruction,
+                category = definition.Category,
+                school = definition.Category,
+                profile = definition.Profile,
+                target = new { kind = definition.TargetKind, description = definition.TargetDescription, example = definition.ExampleTarget },
+                target_kind = definition.TargetKind,
+                target_description = definition.TargetDescription,
+                example_target = definition.ExampleTarget,
+                target_policy = production ? runtime.TargetPolicy : "research-only",
+                fixed_target = production ? runtime.FixedTarget : null,
+                targets = production && runtime.AllowedTargets.Count > 0
+                    ? runtime.AllowedTargets.ToArray()
+                    : CreatorSignalCatalog.All
+                        .Where(signal => signal.EventName == definition.Name && signal.Target is not null)
+                        .Select(signal => signal.Target!)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray(),
+                actor_roles = production && runtime.FixedWhere.TryGetValue("actor_role", out var actorRole)
+                    ? new[] { actorRole }
+                    : Array.Empty<string>(),
+                fixed_where = production
+                    ? runtime.FixedWhere.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                        .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
+                    : new Dictionary<string, string>(StringComparer.Ordinal),
+                supports_weapon_skill = production && runtime.EmitsWeaponSkill,
+                supports_projectile = production && runtime.EmitsProjectile,
+                research_supports_weapon_skill = definition.SupportsWeaponSkill,
+                research_supports_projectile = definition.SupportsProjectile,
+                where_fields = authorFields,
+                research_where_fields = definition.Fields.Select(field => new
+                {
+                    name = field.Name, label = field.Label, description = field.Description,
+                    example = field.Example, draft_by_default = field.DraftByDefault
+                }).ToArray(),
+                privacy = definition.Privacy,
+                production_available = production,
+                addable = production,
+                availability = new
+                {
+                    production_available = production,
+                    runtime_adapter = production ? runtime.RuntimeAdapter : null,
+                    evidence_state = production ? runtime.EvidenceState : definition.EvidenceState,
+                    evidence_revision = production ? runtime.EvidenceRevision : definition.EvidenceRevision
+                }
+            };
+        }).ToArray(),
+        engine_events = RuntimeProductionEventCatalog.EngineEvents.Select(definition => new
+        {
+            id = definition.Name,
+            name = definition.Name,
+            event_name = definition.Name,
+            label = definition.Label,
+            instruction = definition.Instruction,
+            production_available = true,
+            addable = true,
+            runtime_adapter = definition.RuntimeAdapter,
+            target_policy = definition.TargetPolicy,
+            fixed_target = definition.FixedTarget,
+            targets = definition.AllowedTargets,
+            actor_roles = definition.Name == "chat_received" ? new[] { "peer", "listen_host" } : Array.Empty<string>(),
+            fixed_where = new Dictionary<string, string>(StringComparer.Ordinal),
+            required_where_fields = definition.RequiredWhereFields,
+            where_fields = definition.AllowedWhereFields.Select(field => new
+            {
+                name = field,
+                label = Humanize(field),
+                description = field == "timer_id" ? "The exact quest-owned timer identifier." : "The observed actor role.",
+                example = field == "timer_id" ? "timer-1" : "peer",
+                draft_by_default = true,
+                production_emitted = true
+            }).ToArray(),
+            privacy = definition.Privacy
+        }).ToArray(),
+        effects,
+        events = CatalogEvents(),
+        actions = effects,
         templates = new object[]
         {
             new { id = "blank", label = "Blank local quest", note = "One low-friction local beat." },
@@ -71,28 +166,41 @@ internal sealed class QuestStudioWorkspace
             runtime_adapter = signal.RuntimeAdapter
         }).ToArray(),
         charm_target_kinds = AllCharmTargetKinds
+        };
+    }
+
+    static object[] CatalogEffects() => new object[]
+    {
+        new { id = "message", label = "Show message" },
+        new { id = "timer_start", label = "Start timer", seconds_min = 1, seconds_max = 86400 },
+        new { id = "timer_cancel", label = "Cancel timer" },
+        new { id = "grant_item", label = "Grant item", items = new Dictionary<string,int> { ["Wood"] = 50, ["Stone"] = 50, ["Resin"] = 50, ["Coins"] = 100 } },
+        new { id = "spawn", label = "Spawn", count_min = 1, count_max = 16, radius_min = 0, radius_max = 30,
+            prefabs = new Dictionary<string,string[]> { ["creature"] = new[] { "Greyling", "Boar" }, ["item"] = new[] { "Wood", "Stone", "Resin" }, ["piece"] = new[] { "sign", "wood_floor" } } },
+        new { id = "clear_spawned", label = "Clear a prior spawn" }
     };
 
     static object[] CatalogEvents()
     {
-        var fast = CreatorSignalCatalog.All
-            .GroupBy(signal => signal.EventName, StringComparer.Ordinal)
-            .Select(group => (object)new
+        var creator = CreatorEventCatalog.All
+            .Where(definition => RuntimeProductionEventCatalog.Contains(definition.Name))
+            .Select(definition => (object)new
             {
-                id = group.Key,
-                label = group.First().Label,
-                targets = group.Where(signal => signal.Target is not null).Select(signal => signal.Target!).ToArray(),
-                actor_roles = Array.Empty<string>(),
-                note = string.Join(" ", group.Select(signal => signal.Privacy).Distinct(StringComparer.Ordinal))
+                id = definition.Name,
+                label = definition.Label,
+                targets = CreatorSignalCatalog.All.Where(signal => signal.EventName == definition.Name && signal.Target is not null).Select(signal => signal.Target!).ToArray(),
+                actor_roles = definition.Name == "piece_placed" ? new[] { "listen_host" } : Array.Empty<string>(),
+                note = definition.Privacy
             });
-        return fast.Concat(new object[]
+        var engine = RuntimeProductionEventCatalog.EngineEvents.Select(definition => (object)new
         {
-            new { id = "chat_received", label = "Chat received", targets = new[] { "shout", "normal" }, actor_roles = new[] { "peer", "listen_host" }, note = "Listen-host observation; message text is never persisted." },
-            new { id = "kill", label = "Creature killed", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "A creature killed by the local authoritative player." },
-            new { id = "piece_damaged", label = "Bound piece damaged", targets = Array.Empty<string>(), actor_roles = Array.Empty<string>(), note = "Local-player damage to the exact bound piece." },
-            new { id = "piece_placed", label = "Piece placed", targets = new[] { "sign", "wood_floor" }, actor_roles = new[] { "listen_host" }, note = "A piece placed by the listen host." },
-            new { id = "sign_written", label = "Sign written", targets = new[] { "sign" }, actor_roles = Array.Empty<string>(), note = "A local sign edit; text remains private." }
-        }).ToArray();
+            id = definition.Name,
+            label = definition.Label,
+            targets = definition.Name == "chat_received" ? new[] { "shout", "normal" } : Array.Empty<string>(),
+            actor_roles = definition.Name == "chat_received" ? new[] { "peer", "listen_host" } : Array.Empty<string>(),
+            note = definition.Privacy
+        });
+        return creator.Concat(engine).ToArray();
     }
 
     static readonly string[] AllCharmTargetKinds =
@@ -159,6 +267,7 @@ internal sealed class QuestStudioWorkspace
     {
         if (!SafeLocalId(projectId) || request?.Project is null || request.Project.ProjectId != projectId)
             return StudioSaveResult.Fail("project_identity_invalid");
+        if (!NormalizeDocument(request.Project)) return StudioSaveResult.Fail("project_schema_or_where_invalid");
         var envelopeError = ValidateDraftEnvelope(request.Project);
         if (envelopeError is not null) return StudioSaveResult.Fail(envelopeError);
         lock (_gate)
@@ -204,10 +313,15 @@ internal sealed class QuestStudioWorkspace
         return compiled;
     }
 
-    public async Task<StudioPublishResult> PublishAsync(string projectId, CancellationToken cancellationToken)
+    public async Task<StudioPublishResult> PublishAsync(string projectId, int expectedRevision, CancellationToken cancellationToken)
     {
-        var project = ReadProject(projectId);
-        if (project is null) return StudioPublishResult.Fail("project_missing");
+        StudioProjectDocument project;
+        lock (_gate)
+        {
+            project = ReadDocument(DraftPath(projectId))!;
+            if (project is null) return StudioPublishResult.Fail("project_missing");
+            if (project.Revision != expectedRevision) return StudioPublishResult.RevisionConflict(project);
+        }
         var compiled = StudioGraphCompiler.Compile(project);
         if (!compiled.Ok) return StudioPublishResult.Fail(compiled.Error!, compiled.Diagnostics);
         StoreSnapshot(project, compiled.ContentHash!);
@@ -215,21 +329,21 @@ internal sealed class QuestStudioWorkspace
         await using var stream = new MemoryStream(bytes, writable: false);
         var receipt = await _publisher.PublishAsync(stream, $"{project.PackId}-{project.Version}.questpack", cancellationToken);
         return receipt.Ok
-            ? new(true, receipt.Status, null, receipt, compiled.Diagnostics)
+            ? StudioPublishResult.Success(receipt.Status, receipt, project, compiled.Diagnostics)
             : StudioPublishResult.Fail(receipt.Error!, receipt.Diagnostics ?? Array.Empty<ContractDiagnostic>(), receipt);
     }
 
     public object History(string projectId)
     {
-        if (!SafeLocalId(projectId)) return new { schema_version = 2, versions = Array.Empty<StudioProjectSnapshot>() };
+        if (!SafeLocalId(projectId)) return new { schema_version = 3, versions = Array.Empty<StudioProjectSnapshot>() };
         lock (_gate)
         {
             var root = HistoryPath(projectId);
-            if (!Directory.Exists(root)) return new { schema_version = 2, versions = Array.Empty<StudioProjectSnapshot>() };
+            if (!Directory.Exists(root)) return new { schema_version = 3, versions = Array.Empty<StudioProjectSnapshot>() };
             var values = Directory.GetFiles(root, "*.json")
                 .Select(ReadSnapshot).Where(value => value is not null).Cast<StudioProjectSnapshot>()
                 .OrderByDescending(value => value.SavedUtc).Take(100).ToArray();
-            return new { schema_version = 2, versions = values };
+            return new { schema_version = 3, versions = values };
         }
     }
 
@@ -252,15 +366,16 @@ internal sealed class QuestStudioWorkspace
         if (valheim is null) return StudioRuntimeStatus.Unavailable("valheim_not_found");
         var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
         var store = new QuestPackStore(runtimeRoot);
-        var published = store.CheckInbox().FirstOrDefault(candidate => candidate.IsValid
+        var published = store.CheckInbox(RuntimeProductionEventCatalog.CreateSet()).FirstOrDefault(candidate => candidate.IsValid
             && candidate.Manifest.PackId == project.PackId && candidate.Manifest.Version == project.Version
             && string.Equals(candidate.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase));
-        var publishedAt = published is null ? DateTimeOffset.MaxValue : File.GetLastWriteTimeUtc(published.Path);
         ComfyQuestContracts.ActiveSet? active = null;
         try
         {
             var activePath = Path.Combine(runtimeRoot, "active", "active-set.json");
-            if (File.Exists(activePath)) active = JsonConvert.DeserializeObject<ComfyQuestContracts.ActiveSet>(File.ReadAllText(activePath));
+            var activeInfo = new FileInfo(activePath);
+            if (activeInfo.Exists && activeInfo.Length is >= 0 and <= 128 * 1024)
+                active = JsonConvert.DeserializeObject<ComfyQuestContracts.ActiveSet>(File.ReadAllText(activePath));
         }
         catch { /* surfaced as not active */ }
         var receipts = new List<RuntimeReceipt>();
@@ -268,11 +383,13 @@ internal sealed class QuestStudioWorkspace
         {
             try
             {
+                var receiptInfo = new FileInfo(path);
+                if (!receiptInfo.Exists || receiptInfo.Length is < 0 or > 128 * 1024) continue;
                 var receipt = JsonConvert.DeserializeObject<RuntimeReceipt>(File.ReadAllText(path));
                 var matchesProject = receipt is not null && receipt.PackId == project.PackId && receipt.Version == project.Version
-                    && (string.IsNullOrWhiteSpace(receipt.ContentHash) || string.Equals(receipt.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase));
-                var isPostPublishCheck = receipt is not null && published is not null && receipt.Operation == "check" && receipt.AtUtc >= publishedAt;
-                if (matchesProject || isPostPublishCheck)
+                    && !string.IsNullOrWhiteSpace(receipt.ContentHash)
+                    && string.Equals(receipt.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase);
+                if (matchesProject)
                     receipts.Add(receipt!);
             }
             catch { }
@@ -326,6 +443,10 @@ internal sealed class QuestStudioWorkspace
             : trigger;
         if (leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal))
             return signal.Instruction;
+        if (leaf is not null && CreatorEventCatalog.TryGet(leaf.Event, out var definition))
+            return definition.Instruction;
+        if (leaf is not null && RuntimeProductionEventCatalog.TryGetEngine(leaf.Event, out var engine))
+            return engine.Instruction;
         return string.IsNullOrWhiteSpace(leaf?.Event)
             ? "Perform the current quest beat."
             : "Perform: " + leaf.Event.Replace('_', ' ');
@@ -532,6 +653,7 @@ internal sealed class QuestStudioWorkspace
         if (project.Nodes is null || project.Nodes.Count > ExperienceSchema.MaxStages) return "draft_node_bounds";
         if (project.Nodes.Any(node => node is null || node.Id?.Length > 64 || node.Label?.Length > 120 || !double.IsFinite(node.X) || !double.IsFinite(node.Y)
             || node.Routes is null || node.Routes.Count > 64 || node.Routes.Any(route => route is null || route.Id?.Length > 64 || route.Target?.Length > 120
+                || route.Where is null || route.Where.Count > 16 || route.Where.Any(pair => pair.Key.Length > 64 || pair.Value?.Length is null or > 120)
                 || route.Actions is null || route.Actions.Count > 64 || route.Actions.Any(action => action is null || action.Id?.Length > 64 || action.Text?.Length > 500))))
             return "draft_field_bounds";
         return null;
@@ -543,22 +665,74 @@ internal sealed class QuestStudioWorkspace
         {
             var root = HistoryPath(project.ProjectId);
             Directory.CreateDirectory(root);
-            var target = Path.Combine(root, contentHash + ".json");
+            foreach (var existingPath in Directory.GetFiles(root, "*.json"))
+            {
+                var existing = ReadSnapshot(existingPath);
+                if (existing is not null
+                    && existing.Project.ProjectId == project.ProjectId
+                    && existing.Project.PackId == project.PackId
+                    && existing.Project.Version == project.Version
+                    && string.Equals(existing.ContentHash, contentHash, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+            var identityBytes = Encoding.UTF8.GetBytes($"{project.ProjectId}\n{project.PackId}\n{project.Version}\n{contentHash}");
+            var identityHash = Convert.ToHexString(SHA256.HashData(identityBytes)).ToLowerInvariant();
+            var target = Path.Combine(root, $"{identityHash}-{contentHash}.json");
             if (File.Exists(target)) return;
-            AtomicWrite(target, System.Text.Json.JsonSerializer.Serialize(new StudioProjectSnapshot(2, contentHash, savedUtc ?? DateTimeOffset.UtcNow, project), _host.Json), create: true);
+            AtomicWrite(target, System.Text.Json.JsonSerializer.Serialize(new StudioProjectSnapshot(3, contentHash, savedUtc ?? DateTimeOffset.UtcNow, project), _host.Json), create: true);
         }
     }
 
     StudioProjectSnapshot? ReadSnapshot(string path)
     {
-        try { return new FileInfo(path).Length <= MaxDraftBytes ? System.Text.Json.JsonSerializer.Deserialize<StudioProjectSnapshot>(File.ReadAllText(path), _host.Json) : null; }
+        try
+        {
+            if (new FileInfo(path).Length > MaxDraftBytes) return null;
+            var snapshot = System.Text.Json.JsonSerializer.Deserialize<StudioProjectSnapshot>(File.ReadAllText(path), _host.Json);
+            return snapshot is not null && NormalizeDocument(snapshot.Project) ? snapshot : null;
+        }
         catch { return null; }
     }
 
     StudioProjectDocument? ReadDocument(string path)
     {
-        try { return File.Exists(path) && new FileInfo(path).Length <= MaxDraftBytes ? System.Text.Json.JsonSerializer.Deserialize<StudioProjectDocument>(File.ReadAllText(path), _host.Json) : null; }
+        try
+        {
+            if (!File.Exists(path) || new FileInfo(path).Length > MaxDraftBytes) return null;
+            var project = System.Text.Json.JsonSerializer.Deserialize<StudioProjectDocument>(File.ReadAllText(path), _host.Json);
+            return project is not null && NormalizeDocument(project) ? project : null;
+        }
         catch { return null; }
+    }
+
+    internal static bool NormalizeDocument(StudioProjectDocument project)
+    {
+        if (project.SchemaVersion is < 2 or > StudioProjectDocument.CurrentSchemaVersion) return false;
+        foreach (var route in (project.Nodes ?? new()).SelectMany(node => node?.Routes ?? new()))
+        {
+            route.Where ??= new Dictionary<string, string>(StringComparer.Ordinal);
+            if (!MergeLegacy("actor_role", route.LegacyActorRole) || !MergeLegacy("timer_id", route.LegacyTimerId)) return false;
+            var normalized = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var pair in route.Where.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                var key = pair.Key?.Trim().ToLowerInvariant();
+                var value = pair.Value?.Trim();
+                if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value) || !normalized.TryAdd(key, value)) return false;
+            }
+            route.Where = normalized;
+            route.LegacyActorRole = null;
+            route.LegacyTimerId = null;
+
+            bool MergeLegacy(string key, string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return true;
+                if (route.Where.TryGetValue(key, out var current)) return string.Equals(current, value, StringComparison.Ordinal);
+                route.Where[key] = value;
+                return true;
+            }
+        }
+        project.SchemaVersion = StudioProjectDocument.CurrentSchemaVersion;
+        return true;
     }
 
     void WriteProject(StudioProjectDocument project, bool create)
@@ -594,9 +768,9 @@ internal static class StudioGraphCompiler
     static readonly string[] ReviewedCharmTargets =
         { "sign", "player_built_piece", "item_stand", "dedicated_charm" };
     static readonly HashSet<string> Events = new(
-        CreatorSignalCatalog.All.Select(signal => signal.EventName).Concat(
-            new[] { "chat_received", "kill", "piece_damaged", "piece_placed", "sign_written" }),
-        StringComparer.Ordinal);
+        RuntimeProductionEventCatalog.All.Select(definition => definition.Name)
+            .Concat(RuntimeProductionEventCatalog.EngineEvents.Select(definition => definition.Name)),
+        StringComparer.OrdinalIgnoreCase);
     static readonly HashSet<string> Actions = new(StringComparer.Ordinal) { "message", "timer_start", "timer_cancel", "grant_item", "spawn", "clear_spawned" };
 
     public static StudioCertificationResult Compile(StudioProjectDocument project)
@@ -626,12 +800,14 @@ internal static class StudioGraphCompiler
             {
                 var path = $"$.nodes.{node.Id}.routes.{route.Id}";
                 if (!SafeId(route.Id) || !globalIds.Add(route.Id ?? string.Empty)) Add("route_id_invalid", path, "Route IDs must be globally unique stable identifiers.");
-                if (!Events.Contains(route.Event ?? string.Empty)) Add("event_unknown", path + ".event", "The selected event has no Runtime adapter.");
+                if (!Events.Contains(route.Event ?? string.Empty)) Add("event_unknown", path + ".event", "The selected event is not in the evidence-gated Runtime production catalog.");
                 if (route.Priority is < -10000 or > 10000) Add("priority_invalid", path + ".priority", "Priority must be -10000..10000.");
                 if (route.Event == "chat_received" && route.ActorRole is not ("peer" or "listen_host")) Add("chat_actor_role_required", path + ".actor_role", "Chat requires peer or listen_host.");
                 if (route.Event == "piece_placed" && route.ActorRole != "listen_host") Add("piece_placed_listen_host_required", path + ".actor_role", "Placement is currently a listen-host event.");
-                if (route.Event is "kill" or "piece_damaged" or "sign_written" or "timer_elapsed" && !string.IsNullOrWhiteSpace(route.ActorRole)) Add("actor_role_not_supported", path + ".actor_role", "This event does not accept an actor role.");
                 if (route.Event == "timer_elapsed" && !SafeId(route.TimerId)) Add("timer_id_required", path + ".timer_id", "Timer events require a stable timer ID.");
+                if (string.Equals(route.Target?.Trim(), "any", StringComparison.OrdinalIgnoreCase))
+                    Add("target_any_literal", path + ".target", "Leave the target empty for a wildcard; the literal value 'any' is an exact target.");
+                var where = NormalizeWhere(route, path, Add);
                 if (route.RepeatCount is < 1 or > 16) Add("repeat_count_invalid", path + ".repeat_count", "Fast-lane repeats must be 1..16.");
                 if (route.Event == "timer_elapsed" && route.RepeatCount != 1) Add("timer_repeat_unsupported", path + ".repeat_count", "Wait beats run once per started timer.");
                 if (route.WithinSeconds.HasValue && (route.RepeatCount == 1 || route.WithinSeconds is < 1 or > 86400))
@@ -648,9 +824,6 @@ internal static class StudioGraphCompiler
                     if (action.Type == "clear_spawned" && (!SafeId(action.ActionId) || !spawnIds.Contains(action.ActionId ?? string.Empty))) Add("clear_spawn_reference_invalid", actionPath + ".action_id", "Cleanup must reference a spawn action in this quest.");
                     compiledActions.Add(ToContract(action));
                 }
-                var where = new Dictionary<string, string>();
-                if (!string.IsNullOrWhiteSpace(route.ActorRole)) where["actor_role"] = route.ActorRole;
-                if (!string.IsNullOrWhiteSpace(route.TimerId)) where["timer_id"] = route.TimerId;
                 var eventTrigger = new TriggerExpression { Op = "EVENT", Event = route.Event, Target = NullIfWhite(route.Target), Where = where.Count == 0 ? null : where };
                 var trigger = route.RepeatCount > 1
                     ? new TriggerExpression { Op = "COUNT", Count = route.RepeatCount, WithinSeconds = route.WithinSeconds, Children = new() { eventTrigger } }
@@ -670,13 +843,102 @@ internal static class StudioGraphCompiler
             Stages = stages, Bindings = new() { new ExperienceBinding { Id = "default", ExperienceId = project.ExperienceId, TargetKinds = EffectiveTargetKinds(project) } }
         };
         var json = JsonConvert.SerializeObject(document, Formatting.Indented);
-        var contract = ExperienceCompiler.CompileJson(json, CanonicalEventCatalog.CreateSet());
+        var contract = ExperienceCompiler.CompileProductionJson(json);
         diagnostics.AddRange(contract.Diagnostics);
         if (diagnostics.Count > 0) return StudioCertificationResult.Fail("graph_invalid", diagnostics);
         var hash = QuestPackContent.ComputeHash(new[] { new KeyValuePair<string, byte[]>($"experiences/{project.ExperienceId}.json", Encoding.UTF8.GetBytes(json)) });
         return StudioCertificationResult.Success(json, hash, document);
 
         void Add(string code, string path, string message) => diagnostics.Add(new(code, path, message));
+    }
+
+    static Dictionary<string, string> NormalizeWhere(StudioRoute route, string path, Action<string, string, string> add)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var pair in (route.Where ?? new()).OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            var key = pair.Key?.Trim().ToLowerInvariant();
+            var value = pair.Value?.Trim();
+            var fieldPath = path + ".where." + (key ?? "field");
+            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value) || value.Length > 120)
+            {
+                add("where_value_invalid", fieldPath, "Event filters require a non-empty value no longer than 120 characters.");
+                continue;
+            }
+            if (!RuntimeProductionEventCatalog.IsAllowedWhere(route.Event, key))
+            {
+                add("where_field_unsupported", fieldPath, "This Runtime adapter does not emit that filter field.");
+                continue;
+            }
+            if (string.Equals(value, "any", StringComparison.OrdinalIgnoreCase))
+            {
+                add("where_any_literal", fieldPath, "Remove this filter to match any value; 'any' is not a wildcard token.");
+                continue;
+            }
+            value = NormalizeFieldValue(key, value, fieldPath, add);
+            if (!string.IsNullOrWhiteSpace(value) && !result.TryAdd(key, value))
+                add("where_field_duplicate", fieldPath, "Each event filter may appear only once.");
+        }
+        if (RuntimeProductionEventCatalog.TryGetEngine(route.Event, out var engine))
+        {
+            foreach (var required in engine.RequiredWhereFields)
+                if (!result.ContainsKey(required)) add("where_field_required", path + ".where." + required, "This engine event requires the filter.");
+        }
+        if (RuntimeProductionEventCatalog.TryGet(route.Event, out var runtime))
+        {
+            foreach (var fixedField in runtime.FixedWhere)
+            {
+                if (!result.TryGetValue(fixedField.Key, out var actual))
+                    add("where_field_required", path + ".where." + fixedField.Key, "This Runtime adapter emits one required fixed filter value.");
+                else if (!string.Equals(actual, fixedField.Value, StringComparison.Ordinal))
+                    add("where_field_fixed", path + ".where." + fixedField.Key, "This Runtime adapter emits one fixed value for this filter.");
+            }
+        }
+        return result;
+    }
+
+    static string? NormalizeFieldValue(string key, string value, string path, Action<string, string, string> add)
+    {
+        switch (key)
+        {
+            case "actor_role":
+                if (value is not ("peer" or "listen_host"))
+                {
+                    add("actor_role_invalid", path, "Actor role must be peer or listen_host.");
+                    return null;
+                }
+                return value;
+            case "timer_id":
+                if (!SafeId(value))
+                {
+                    add("timer_id_invalid", path, "Timer IDs must be stable identifiers.");
+                    return null;
+                }
+                return value;
+            case "projectile":
+                if (!string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    add("projectile_filter_invalid", path, "Projectile filtering is opt-in; use true or remove the filter.");
+                    return null;
+                }
+                return "true";
+            case "quantity":
+                if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var quantity) || quantity is < 1 or > 1_000_000)
+                {
+                    add("quantity_filter_invalid", path, "Exact event quantity must be an integer from 1 to 1000000.");
+                    return null;
+                }
+                return quantity.ToString(CultureInfo.InvariantCulture);
+            case "amount":
+                if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var amount) || !double.IsFinite(amount))
+                {
+                    add("amount_filter_invalid", path, "Exact event amount must be a finite invariant number.");
+                    return null;
+                }
+                return amount.ToString("R", CultureInfo.InvariantCulture);
+            default:
+                return value;
+        }
     }
 
     static List<string> EffectiveTargetKinds(StudioProjectDocument project) =>
@@ -710,7 +972,13 @@ internal static class StudioGraphCompiler
         return new ExperienceAction { Id = action.Id, Type = action.Type, Parameters = values };
     }
 
-    static void Write(ZipArchive archive, string name, string content) { using var writer = new StreamWriter(archive.CreateEntry(name, CompressionLevel.Optimal).Open(), new UTF8Encoding(false)); writer.Write(content); }
+    static void Write(ZipArchive archive, string name, string content)
+    {
+        var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
+        entry.LastWriteTime = new DateTimeOffset(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+        writer.Write(content);
+    }
     static bool SafeId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 64 && value.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '$');
     static string? NullIfWhite(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }
@@ -728,7 +996,19 @@ internal static class StudioRehearsal
         var spawns = new Dictionary<string, int>(StringComparer.Ordinal);
         var transcript = new List<string>();
         var trace = new List<StudioRehearsalTrace>();
-        foreach (var input in request.Steps ?? new())
+        var guided = string.Equals(request.Mode, "guided", StringComparison.OrdinalIgnoreCase)
+            || (string.IsNullOrWhiteSpace(request.Mode) && (request.Steps?.Count ?? 0) == 0);
+        List<string> limitations;
+        List<string> availablePaths;
+        List<StudioRehearsalInput> steps;
+        if (guided) steps = BuildGuidedSteps(project, document, out limitations, out availablePaths);
+        else
+        {
+            steps = request.Steps ?? new List<StudioRehearsalInput>();
+            limitations = new List<string>();
+            availablePaths = new List<string>();
+        }
+        foreach (var input in steps)
         {
             if (outcome is not null) break;
             if (input.Kind == "advance")
@@ -743,13 +1023,37 @@ internal static class StudioRehearsal
                 }
                 continue;
             }
-            var fields = new Dictionary<string, string>();
-            if (!string.IsNullOrWhiteSpace(input.ActorRole)) fields["actor_role"] = input.ActorRole;
-            if (!string.IsNullOrWhiteSpace(input.TimerId)) fields["timer_id"] = input.TimerId;
+            var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var pair in (input.Fields ?? new()).OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                var key = pair.Key?.Trim().ToLowerInvariant();
+                var value = pair.Value?.Trim();
+                if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value) || !fields.TryAdd(key, value))
+                    return StudioRehearsalResult.Fail("rehearsal_fields_invalid");
+            }
+            if (!MergeLegacy("actor_role", input.ActorRole) || !MergeLegacy("timer_id", input.TimerId))
+                return StudioRehearsalResult.Fail("rehearsal_fields_conflict");
             Emit(new RuntimeEvent { Name = input.EventName, Target = input.Target, At = now, Fields = fields });
+
+            bool MergeLegacy(string key, string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return true;
+                if (fields.TryGetValue(key, out var current)) return string.Equals(current, value, StringComparison.Ordinal);
+                fields[key] = value;
+                return true;
+            }
         }
-        var proofLevel = request.ScenarioId == "captured-1.6" ? "captured_contract_fixture" : "rehearsal";
-        return new(2, true, null, proofLevel, "Browser rehearsal only; this does not prove a Valheim adapter or live mutation.", stageId, outcome, trace, transcript, inventory, spawns, timers.ToDictionary(pair => pair.Key, pair => (int)Math.Max(0, (pair.Value - now).TotalSeconds)));
+        var proofLevel = !guided && request.ScenarioId == "captured-1.6" && IsCapturedContractFixture(steps)
+            ? "captured_contract_fixture"
+            : "rehearsal";
+        return new(3, true, null, proofLevel, "Synthetic rehearsal only; this does not prove a Valheim adapter or live mutation.", stageId, outcome, trace, transcript, inventory, spawns,
+            timers.ToDictionary(pair => pair.Key, pair => (int)Math.Max(0, (pair.Value - now).TotalSeconds)), guided ? steps : Array.Empty<StudioRehearsalInput>(), limitations, availablePaths);
+
+        static bool IsCapturedContractFixture(IReadOnlyList<StudioRehearsalInput> values) => values.Count == 2
+            && values[0].Kind == "event" && values[0].EventName == "chat_received" && values[0].Target == "shout"
+            && (values[0].Fields?.GetValueOrDefault("actor_role") ?? values[0].ActorRole) == "peer"
+            && values[1].Kind == "event" && values[1].EventName == "piece_placed" && values[1].Target == "sign"
+            && (values[1].Fields?.GetValueOrDefault("actor_role") ?? values[1].ActorRole) == "listen_host";
 
         void Emit(RuntimeEvent evt)
         {
@@ -792,20 +1096,106 @@ internal static class StudioRehearsal
         }
     }
 
+    static List<StudioRehearsalInput> BuildGuidedSteps(StudioProjectDocument project, ExperienceDocument document,
+        out List<string> limitations, out List<string> availablePaths)
+    {
+        var steps = new List<StudioRehearsalInput>();
+        limitations = new List<string>();
+        availablePaths = new List<string>();
+        var nodes = (project.Nodes ?? new()).Where(node => node is not null).ToDictionary(node => node.Id, StringComparer.Ordinal);
+        var timerSeconds = new Dictionary<string, int>(StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var nodeId = document.EntryStage;
+        while (!string.IsNullOrWhiteSpace(nodeId) && nodes.TryGetValue(nodeId, out var node) && visited.Add(nodeId))
+        {
+            var routes = (node.Routes ?? new()).OrderByDescending(route => route.Priority).ThenBy(route => route.Id, StringComparer.Ordinal).ToArray();
+            if (routes.Length == 0) break;
+            var route = routes[0];
+            if (routes.Length > 1)
+            {
+                availablePaths.AddRange(routes.Select(candidate => node.Id + ":" + candidate.Id));
+                limitations.Add($"Stage {node.Id} has {routes.Length} routes; this run followed highest priority route {route.Id}.");
+            }
+            if (string.Equals(route.Event, ExperienceSchema.TimerElapsedEvent, StringComparison.Ordinal))
+            {
+                if (!timerSeconds.TryGetValue(route.TimerId ?? string.Empty, out var seconds))
+                {
+                    seconds = 1;
+                    limitations.Add($"Timer {route.TimerId} was not started on the selected path, so no timer event was injected.");
+                }
+                steps.Add(new StudioRehearsalInput { Kind = "advance", Seconds = seconds });
+            }
+            else
+            {
+                var target = string.IsNullOrWhiteSpace(route.Target) ? ExampleTarget(route.Event) : route.Target;
+                for (var count = 0; count < Math.Max(1, route.RepeatCount); count++)
+                {
+                    steps.Add(new StudioRehearsalInput
+                    {
+                        Kind = "event", EventName = route.Event, Target = target,
+                        Fields = SyntheticFields(route)
+                    });
+                }
+            }
+            foreach (var action in route.Actions ?? new())
+            {
+                if (action.Type == "timer_start" && !string.IsNullOrWhiteSpace(action.TimerId))
+                    timerSeconds[action.TimerId] = Math.Clamp(action.Seconds, 1, 86400);
+                else if (action.Type == "timer_cancel" && !string.IsNullOrWhiteSpace(action.TimerId))
+                    timerSeconds.Remove(action.TimerId);
+            }
+            nodeId = route.DestinationNodeId;
+            if (route.Outcome is "complete" or "fail") break;
+        }
+        if (!string.IsNullOrWhiteSpace(nodeId) && !visited.Add(nodeId))
+            limitations.Add("The selected route revisited a stage; guided rehearsal stopped at the cycle boundary.");
+        return steps;
+    }
+
+    static Dictionary<string, string> SyntheticFields(StudioRoute route)
+    {
+        var fields = new Dictionary<string, string>(route.Where ?? new(), StringComparer.Ordinal);
+        if (!CreatorEventCatalog.TryGet(route.Event, out var definition)) return fields;
+        foreach (var field in definition.Fields)
+            if (RuntimeProductionEventCatalog.IsAllowedWhere(route.Event, field.Name) && !fields.ContainsKey(field.Name))
+                fields[field.Name] = field.Example;
+        if (RuntimeProductionEventCatalog.TryGet(route.Event, out var runtime))
+        {
+            if (runtime.EmitsWeaponSkill && !fields.ContainsKey("weapon_skill")) fields["weapon_skill"] = "Axes";
+            if (runtime.EmitsProjectile && !fields.ContainsKey("projectile")) fields["projectile"] = "true";
+        }
+        return fields;
+    }
+
+    static string? ExampleTarget(string? eventName)
+    {
+        if (RuntimeProductionEventCatalog.TryGet(eventName, out var runtime))
+        {
+            if (string.Equals(runtime.TargetPolicy, "none", StringComparison.Ordinal)) return null;
+            if (string.Equals(runtime.TargetPolicy, "fixed-output", StringComparison.Ordinal)) return runtime.FixedTarget;
+        }
+        if (string.Equals(eventName, "chat_sent", StringComparison.OrdinalIgnoreCase)) return "normal";
+        if (string.Equals(eventName, "chat_received", StringComparison.OrdinalIgnoreCase)) return "shout";
+        return CreatorEventCatalog.TryGet(eventName, out var definition) && !string.Equals(definition.ExampleTarget, "any", StringComparison.OrdinalIgnoreCase)
+            ? definition.ExampleTarget
+            : null;
+    }
+
     static string? Describe(TriggerExpression? trigger)
     {
         var leaf = string.Equals(trigger?.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
             ? trigger?.Children?.FirstOrDefault()
             : trigger;
-        return leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal)
-            ? signal.Instruction
-            : null;
+        if (leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal)) return signal.Instruction;
+        if (leaf is not null && CreatorEventCatalog.TryGet(leaf.Event, out var definition)) return definition.Instruction;
+        return leaf is not null && RuntimeProductionEventCatalog.TryGetEngine(leaf.Event, out var engine) ? engine.Instruction : null;
     }
 }
 
 public sealed class StudioProjectDocument
 {
-    public int SchemaVersion { get; set; } = 2;
+    public const int CurrentSchemaVersion = 3;
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string ProjectId { get; set; } = string.Empty;
     public int Revision { get; set; }
     public DateTimeOffset UpdatedUtc { get; set; }
@@ -834,13 +1224,35 @@ public sealed class StudioRoute
     public int Priority { get; set; } = 100;
     public string Event { get; set; } = "sign_written";
     public string? Target { get; set; }
-    public string? ActorRole { get; set; }
-    public string? TimerId { get; set; }
+    public Dictionary<string, string> Where { get; set; } = new(StringComparer.Ordinal);
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ActorRole
+    {
+        get => Where is not null && Where.TryGetValue("actor_role", out var value) ? value : LegacyActorRole;
+        set => SetWhere("actor_role", value);
+    }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? TimerId
+    {
+        get => Where is not null && Where.TryGetValue("timer_id", out var value) ? value : LegacyTimerId;
+        set => SetWhere("timer_id", value);
+    }
+    [System.Text.Json.Serialization.JsonPropertyName("actor_role"), System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyActorRole { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("timer_id"), System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyTimerId { get; set; }
     public int RepeatCount { get; set; } = 1;
     public int? WithinSeconds { get; set; }
     public string? DestinationNodeId { get; set; }
     public string? Outcome { get; set; }
     public List<StudioAction> Actions { get; set; } = new();
+
+    void SetWhere(string key, string? value)
+    {
+        Where ??= new Dictionary<string, string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(value)) Where.Remove(key);
+        else Where[key] = value;
+    }
 }
 
 public sealed class StudioAction
@@ -864,6 +1276,7 @@ public sealed record StudioProjectSnapshot(int SchemaVersion, string ContentHash
 public sealed record StudioSaveRequest(int ExpectedRevision, StudioProjectDocument Project);
 public sealed record StudioCreateRequest(string? TemplateId);
 public sealed record StudioBumpRequest(int ExpectedRevision);
+public sealed record StudioPublishRequest(int ExpectedRevision);
 public sealed record StudioSaveResult(bool Ok, bool Conflict, string? Error, StudioProjectDocument? Project)
 {
     public static StudioSaveResult Success(StudioProjectDocument project) => new(true, false, null, project);
@@ -877,13 +1290,19 @@ public sealed record StudioCertificationResult(bool Ok, string Status, string? E
     public static StudioCertificationResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) => new(false, "rejected", error, null, null, null, diagnostics ?? Array.Empty<ContractDiagnostic>());
 }
 
-public sealed record StudioPublishResult(bool Ok, string Status, string? Error, QuestPackPublishReceipt? Receipt, IReadOnlyList<ContractDiagnostic> Diagnostics)
+public sealed record StudioPublishResult(bool Ok, bool Conflict, string Status, string? Error, QuestPackPublishReceipt? Receipt, StudioProjectDocument? Project, IReadOnlyList<ContractDiagnostic> Diagnostics)
 {
-    public static StudioPublishResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null, QuestPackPublishReceipt? receipt = null) => new(false, "rejected", error, receipt, diagnostics ?? Array.Empty<ContractDiagnostic>());
+    public static StudioPublishResult Success(string status, QuestPackPublishReceipt receipt, StudioProjectDocument project, IReadOnlyList<ContractDiagnostic> diagnostics) =>
+        new(true, false, status, null, receipt, project, diagnostics);
+    public static StudioPublishResult RevisionConflict(StudioProjectDocument project) =>
+        new(false, true, "conflict", "revision_conflict", null, project, Array.Empty<ContractDiagnostic>());
+    public static StudioPublishResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null, QuestPackPublishReceipt? receipt = null) =>
+        new(false, false, "rejected", error, receipt, null, diagnostics ?? Array.Empty<ContractDiagnostic>());
 }
 
 public sealed class StudioRehearsalRequest
 {
+    public string? Mode { get; set; }
     public string? ScenarioId { get; set; }
     public List<StudioRehearsalInput> Steps { get; set; } = new();
 }
@@ -895,13 +1314,15 @@ public sealed class StudioRehearsalInput
     public string? Target { get; set; }
     public string? ActorRole { get; set; }
     public string? TimerId { get; set; }
+    public Dictionary<string, string> Fields { get; set; } = new(StringComparer.Ordinal);
     public int Seconds { get; set; }
 }
 
 public sealed record StudioRehearsalTrace(int Step, string EventName, string? Target, string FromNodeId, string? RouteId, IReadOnlyList<string> Effects, string CurrentNodeId, string? Outcome, string Status, int CurrentCount, int RequiredCount, string? NextInstruction);
-public sealed record StudioRehearsalResult(int SchemaVersion, bool Ok, string? Error, string ProofLevel, string Disclaimer, string? CurrentNodeId, string? Outcome, IReadOnlyList<StudioRehearsalTrace> Trace, IReadOnlyList<string> Transcript, IReadOnlyDictionary<string,int> Inventory, IReadOnlyDictionary<string,int> Spawns, IReadOnlyDictionary<string,int> Timers)
+public sealed record StudioRehearsalResult(int SchemaVersion, bool Ok, string? Error, string ProofLevel, string Disclaimer, string? CurrentNodeId, string? Outcome, IReadOnlyList<StudioRehearsalTrace> Trace, IReadOnlyList<string> Transcript, IReadOnlyDictionary<string,int> Inventory, IReadOnlyDictionary<string,int> Spawns, IReadOnlyDictionary<string,int> Timers,
+    IReadOnlyList<StudioRehearsalInput> GeneratedSteps, IReadOnlyList<string> Limitations, IReadOnlyList<string> AvailablePaths)
 {
-    public static StudioRehearsalResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) => new(2, false, error, "rehearsal", "Browser rehearsal only; this does not prove a Valheim adapter or live mutation.", null, null, Array.Empty<StudioRehearsalTrace>(), Array.Empty<string>(), new Dictionary<string,int>(), new Dictionary<string,int>(), new Dictionary<string,int>());
+    public static StudioRehearsalResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) => new(3, false, error, "rehearsal", "Synthetic rehearsal only; this does not prove a Valheim adapter or live mutation.", null, null, Array.Empty<StudioRehearsalTrace>(), Array.Empty<string>(), new Dictionary<string,int>(), new Dictionary<string,int>(), new Dictionary<string,int>(), Array.Empty<StudioRehearsalInput>(), Array.Empty<string>(), Array.Empty<string>());
 }
 
 public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, string Phase, string NextInstruction,
@@ -914,3 +1335,11 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
             phase == "draft_invalid" ? "Resolve the graph diagnostics before publishing." : "Runtime state is unavailable on this machine.",
             null, null, null, null, null, null, Array.Empty<RuntimeReceipt>(), diagnostics ?? Array.Empty<ContractDiagnostic>());
 }
+
+public sealed record StudioRuntimeReceiptSummary(
+    string? Operation, string? Status, string? StageId, string? EventName,
+    int? CurrentCount, int? RequiredCount, DateTimeOffset AtUtc);
+
+public sealed record StudioRuntimeStatusView(int SchemaVersion, bool Available, string Phase, string NextInstruction,
+    string? ContentHash, string? PackageSha256, string? CurrentStageId, int? CurrentCount, int? RequiredCount,
+    IReadOnlyList<StudioRuntimeReceiptSummary> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics);
