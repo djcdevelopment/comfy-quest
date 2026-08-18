@@ -127,7 +127,12 @@ public sealed class QuestStudioSyntheticE2ETests
             await FillAndBlurAsync(page.Locator("#beat-repeat"), "2");
             await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "rehearsal repeat reset");
 
+            await page.Locator(".workspace").EvaluateAsync("element => element.scrollTop = element.scrollHeight");
+            Assert.True(await page.Locator(".workspace").EvaluateAsync<double>("element => element.scrollTop") > 0);
             await page.Locator("[data-stage='rehearse']").ClickAsync();
+            await WaitUntilAsync(
+                async () => await page.Locator(".workspace").EvaluateAsync<double>("element => element.scrollTop") == 0,
+                "stage navigation resets workspace scroll");
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Run guided rehearsal", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#rehearsal-badge"), "Complete", "completed rehearsal", 30_000);
             await WaitForTextAsync(page.Locator("#rehearsal-result"), "1/2", "partial rehearsal progress");

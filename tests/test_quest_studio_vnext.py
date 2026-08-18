@@ -62,8 +62,31 @@ class QuestStudioVNextTests(unittest.TestCase):
         ):
             self.assertIn(expected, html)
         self.assertIn("function showStage(name,moveFocus=true)", script)
+        self.assertIn("workspace.scrollTop=0", script)
+        self.assertIn("workspace.scrollLeft=0", script)
         self.assertIn("currentStage='author'", script)
         self.assertNotIn('data-tab="', html)
+
+    def test_secondary_text_meets_normal_text_contrast_on_work_surfaces(self) -> None:
+        css = raw_constant("Css")
+        colors = dict(re.findall(r"--([a-z-]+):(#[0-9a-f]{6})", css))
+
+        def luminance(color: str) -> float:
+            channels = [int(color[index:index + 2], 16) / 255 for index in (1, 3, 5)]
+            linear = [
+                value / 12.92 if value <= 0.04045
+                else ((value + 0.055) / 1.055) ** 2.4
+                for value in channels
+            ]
+            return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+        def contrast(left: str, right: str) -> float:
+            high, low = sorted((luminance(left), luminance(right)), reverse=True)
+            return (high + 0.05) / (low + 0.05)
+
+        for surface in ("bg", "panel", "panel-raised"):
+            self.assertGreaterEqual(contrast(colors["dim"], colors[surface]), 4.5)
+        self.assertIn(".preview-keys{margin-top:22px;font-size:11.5px;color:var(--dim)}", css)
 
     def test_creator_lane_hides_implementation_plumbing(self) -> None:
         html = raw_constant("Html")
