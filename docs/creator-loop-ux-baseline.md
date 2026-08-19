@@ -10,6 +10,10 @@ success condition:
 > The creator can spend an hour iterating on an Event without restarting Valheim, manually
 > moving files, remembering hotkeys, or wondering which revision is running.
 
+The visual language built on this baseline is canonical at
+`docs/design/creator-loop.dc.html` (the vendored Claude Design system) with its
+renderer-translation spec at `docs/design/creator-loop-tokens.md`.
+
 ## Three altitudes, one vocabulary
 
 The source intents never reconciled their role words (doc 01 *author*, doc 03 *creator*,

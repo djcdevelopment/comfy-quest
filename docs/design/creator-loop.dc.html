@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Grenze:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#050810;color:#E9E4D8;font-family:'Source Sans 3',sans-serif;}
+a{color:#7FA8CC;text-decoration:none;} a:hover{color:#A9C8E4;}
+</style>
+</helmet>
+<div style="padding:56px 64px 80px;max-width:1760px;display:flex;flex-direction:column;gap:64px">
+
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:900px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;letter-spacing:0.18em;color:#E9A83F">COMFY QUEST</div>
+    <div style="font-family:'Grenze',serif;font-weight:600;font-size:44px;line-height:1.05;color:#F1EBDE">Creator Loop — one language for both surfaces</div>
+    <div style="font-size:15px;line-height:1.5;color:#9AA3B5;text-wrap:pretty">Quest Studio (web) and the F9 creator drawer (Unity IMGUI) share every token below. Meaning rides on weight, size, spacing, and flat color — nothing here needs a gradient or shadow to survive.</div>
+  </div>
+
+  <!-- 01 COMPOSITION -->
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#7FA8CC">01 · ONE SCREEN — DRAWER ASSEMBLED, BANNER ALONE</div>
+      <div style="flex:1;height:1px;background:#141E32"></div>
+    </div>
+    <div style="display:flex;gap:32px;align-items:stretch;flex-wrap:wrap">
+      <div style="width:560px;background:#070C16;border:1px solid #1D2A40;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;color:#5D6779;font-size:11px;font-weight:700;letter-spacing:0.12em;padding:0 4px">
+          <span>CREATOR DRAWER</span>
+          <span style="font-family:'JetBrains Mono',monospace;border:1px solid #22304A;border-radius:5px;padding:2px 7px;font-size:11px">F9</span>
+        </div>
+        <!-- status card, interactive details -->
+        <div style="background:#0B1120;border:1px solid #1D2A40;border-radius:12px;overflow:hidden">
+          <div style="padding:18px 20px 14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+              <div style="font-family:'Grenze',serif;font-weight:600;font-size:30px;line-height:1.1;color:#EFE9DC">The Woodbound Signal</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#B9C2D4;background:#0E1526;border:1px solid #2A3854;border-radius:6px;padding:3px 8px">1.2.0</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <div style="width:9px;height:9px;border-radius:50%;background:#7EC482"></div>
+              <div style="font-size:15px;font-weight:600;color:#9BD49F">Now playing</div>
+            </div>
+          </div>
+          <div onClick="{{ toggleDetails }}" style="display:flex;justify-content:space-between;align-items:center;padding:9px 20px;border-top:1px solid #16233A;color:#6B7488;font-size:11px;font-weight:700;letter-spacing:0.08em;cursor:pointer" style-hover="color:#9AA3B5">
+            <span>{{ detailsLabel }}</span><span>{{ chev }}</span>
+          </div>
+          <sc-if value="{{ detailsOpen }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:1.2fr 1fr 1.3fr;gap:16px;padding:12px 20px 16px;background:#080D18;border-top:1px solid #10192B">
+              <div><div style="font-size:10.5px;font-weight:700;letter-spacing:0.1em;color:#4E5870;margin-bottom:4px">PACK</div><div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#8E99AF">comfy.woodbound</div></div>
+              <div><div style="font-size:10.5px;font-weight:700;letter-spacing:0.1em;color:#4E5870;margin-bottom:4px">HASH</div><div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#8E99AF">3F9A1C2E</div></div>
+              <div><div style="font-size:10.5px;font-weight:700;letter-spacing:0.1em;color:#4E5870;margin-bottom:4px">ACTIVATED</div><div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#8E99AF">14:32 · F11 confirm</div></div>
+            </div>
+          </sc-if>
+        </div>
+        <!-- ladder: update validated, load is current -->
+        <div style="background:#0B1120;border:1px solid #1D2A40;border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:flex-start">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#12291A;border:1px solid #3E6B47;color:#7EC482;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-sizing:border-box">✓</div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6FA874">LOOK</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#3E6B47"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#12291A;border:1px solid #3E6B47;color:#7EC482;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-sizing:border-box">✓</div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6FA874">VALIDATE</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#3E6B47"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#E9A83F;border:1px solid #F4C061;box-sizing:border-box"></div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#F4C061">LOAD</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#22304A"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:transparent;border:1px solid #2A3854;box-sizing:border-box"></div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#5D6779">CONFIRM</div></div>
+          </div>
+          <div style="display:flex;justify-content:center;align-items:center;gap:9px;padding:11px 16px;border-radius:8px;background:#E9A83F;border:1px solid #F4C061;color:#191006;font-size:14.5px;font-weight:700;cursor:pointer" style-hover="background:#F4C061">
+            <span>Load validated update</span><span style="opacity:0.55">·</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;border:1px solid #8A6420;border-radius:5px;padding:2px 7px;background:rgba(0,0,0,0.10)">F11</span>
+          </div>
+        </div>
+        <!-- evidence feed -->
+        <div style="background:#0B1120;border:1px solid #1D2A40;border-radius:12px;padding:8px;display:flex;flex-direction:column">
+          <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:28:11</span><span style="width:14px;flex:none;text-align:center;color:#4E5870;font-size:11px">·</span><span style="font-size:13px;color:#6B7488">Overlay reloaded in 0.4 s</span></div>
+          <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:29:03</span><span style="width:14px;flex:none;text-align:center;color:#E9A83F;font-size:11px">◆</span><span style="font-size:14px;font-weight:600;color:#E4DECF">Matched drop wood — 2/2; gathering → sealed.</span></div>
+          <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-radius:6px;background:{{ castBg }}"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:29:41</span><span style="width:14px;flex:none;text-align:center;color:#A15CFF;font-size:12px">✦</span><span style="font-size:14px;font-weight:600;color:#CFA9FF">CAST signal charm — it holds.</span></div>
+          <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:30:17</span><span style="width:14px;flex:none;text-align:center;color:#E9A83F;font-size:11px">▲</span><span style="font-size:14px;color:#E8C27A">3 charms belong to an earlier telling. Re-CAST them or roll back.</span></div>
+          <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:30:52</span><span style="width:14px;flex:none;text-align:center;color:#4E5870;font-size:11px">·</span><span style="font-size:13px;color:#6B7488">Snapshot saved · 1.2.0</span></div>
+        </div>
+      </div>
+      <!-- HUD field with lone banner -->
+      <div style="flex:1;min-width:560px;min-height:360px;box-sizing:border-box;background:#04070F;border:1px solid #131C2E;border-radius:14px;position:relative;display:flex;flex-direction:column;align-items:center;padding:26px 24px">
+        <div style="{{ bannerStyle }}">
+          <div style="width:8px;height:8px;border-radius:50%;background:{{ bannerDot }}"></div>
+          <div style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">{{ bannerText }}</div>
+        </div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#1D2A40;font-size:18px">+</div>
+        <div style="position:absolute;bottom:16px;left:0;right:0;text-align:center;font-size:11.5px;color:#4E5870">Mid-combat HUD — the banner is the only chrome on screen. Drawer closed.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 STATUS CARD -->
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#7FA8CC">02 · QUEST STATUS CARD — STATES</div>
+      <div style="flex:1;height:1px;background:#141E32"></div>
+    </div>
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="width:560px;background:#0B1120;border:1px solid #1D2A40;border-radius:12px;overflow:hidden;box-sizing:border-box">
+          <div style="padding:18px 20px 14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:baseline;gap:12px"><div style="font-family:'Grenze',serif;font-weight:600;font-size:30px;line-height:1.1;color:#EFE9DC">The Woodbound Signal</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#B9C2D4;background:#0E1526;border:1px solid #2A3854;border-radius:6px;padding:3px 8px">1.2.0</div></div>
+            <div style="display:flex;align-items:center;gap:9px"><div style="width:9px;height:9px;border-radius:50%;background:#7EC482"></div><div style="font-size:15px;font-weight:600;color:#9BD49F">Now playing</div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 20px;border-top:1px solid #16233A;color:#6B7488;font-size:11px;font-weight:700;letter-spacing:0.08em"><span>Hide details</span><span>▴</span></div>
+          <div style="display:grid;grid-template-columns:1.2fr 1fr 1.3fr;gap:16px;padding:12px 20px 16px;background:#080D18;border-top:1px solid #10192B">
+            <div><div style="font-size:10.5px;font-weight:700;letter-spacing:0.1em;color:#4E5870;margin-bottom:4px">PACK</div><div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#8E99AF">comfy.woodbound</div></div>
+            <div><div style="font-size:10.5px;font-weight:700;letter-spacing:0.1em;color:#4E5870;margin-bottom:4px">HASH</div><div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#8E99AF">3F9A1C2E</div></div>
+            <div><div style="font-size:10.5px;font-weight:700;letter-spacing:0.1em;color:#4E5870;margin-bottom:4px">ACTIVATED</div><div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#8E99AF">14:32 · F11 confirm</div></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#5D6779">Live — details expanded on demand; identity never outranks the title.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="width:560px;background:#0B1120;border:1px solid #1D2A40;border-radius:12px;overflow:hidden;box-sizing:border-box">
+          <div style="padding:18px 20px 14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:baseline;gap:12px"><div style="font-family:'Grenze',serif;font-weight:600;font-size:30px;line-height:1.1;color:#EFE9DC">The Woodbound Signal</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#B9C2D4;background:#0E1526;border:1px solid #2A3854;border-radius:6px;padding:3px 8px">1.2.0</div></div>
+            <div style="display:flex;align-items:center;gap:9px"><div style="width:9px;height:9px;border-radius:50%;background:#E9A83F"></div><div style="font-size:15px;font-weight:600;color:#F4C061">1.2.0 is ready — play it</div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 20px;border-top:1px solid #16233A;color:#6B7488;font-size:11px;font-weight:700;letter-spacing:0.08em"><span>Details</span><span>▾</span></div>
+        </div>
+        <div style="font-size:12px;color:#5D6779">Ready — amber asks for one action. Check language is always “ready”.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="width:560px;background:#0B1120;border:1px solid #1D2A40;border-radius:12px;overflow:hidden;box-sizing:border-box">
+          <div style="padding:18px 20px 14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:baseline;gap:12px"><div style="font-family:'Grenze',serif;font-weight:600;font-size:30px;line-height:1.1;color:#EFE9DC">The Woodbound Signal</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#B9C2D4;background:#0E1526;border:1px solid #2A3854;border-radius:6px;padding:3px 8px">1.2.0</div></div>
+            <div style="display:flex;align-items:center;gap:9px"><div style="width:9px;height:9px;border-radius:50%;background:#7FA8CC"></div><div style="font-size:15px;font-weight:600;color:#9FC3E2">2 quests ready — choose</div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 20px;border-top:1px solid #16233A;color:#6B7488;font-size:11px;font-weight:700;letter-spacing:0.08em"><span>Details</span><span>▾</span></div>
+        </div>
+        <div style="font-size:12px;color:#5D6779">Choice — steel blue is informational; nothing flashes until the player decides.</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="width:1148px;max-width:100%;background:#0B1120;border:1px solid #1D2A40;border-radius:12px;padding:18px 24px;display:flex;align-items:center;gap:24px;box-sizing:border-box">
+        <div style="display:flex;align-items:baseline;gap:14px;flex:1"><div style="font-family:'Grenze',serif;font-weight:600;font-size:34px;line-height:1.1;color:#EFE9DC">The Woodbound Signal</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#B9C2D4;background:#0E1526;border:1px solid #2A3854;border-radius:6px;padding:3px 8px">1.2.0</div></div>
+        <div style="display:flex;align-items:center;gap:9px"><div style="width:9px;height:9px;border-radius:50%;background:#7EC482"></div><div style="font-size:15px;font-weight:600;color:#9BD49F">Now playing</div></div>
+        <div style="color:#6B7488;font-size:11px;font-weight:700;letter-spacing:0.08em">Details ▾</div>
+      </div>
+      <div style="font-size:12px;color:#5D6779">Quest Studio (desktop) — the same card stretched to the Studio grid; identical tokens, wider layout.</div>
+    </div>
+  </div>
+
+  <!-- 03 UPDATE LADDER -->
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#7FA8CC">03 · UPDATE LADDER — STATES</div>
+      <div style="flex:1;height:1px;background:#141E32"></div>
+    </div>
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="width:560px;background:#0B1120;border:1px solid #1D2A40;border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box">
+          <div style="display:flex;align-items:flex-start">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#E9A83F;border:1px solid #F4C061;box-sizing:border-box"></div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#F4C061">LOOK</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#22304A"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;border:1px solid #2A3854;box-sizing:border-box"></div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#5D6779">VALIDATE</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#22304A"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;border:1px solid #2A3854;box-sizing:border-box"></div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#5D6779">LOAD</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#22304A"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;border:1px solid #2A3854;box-sizing:border-box"></div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#5D6779">CONFIRM</div></div>
+          </div>
+          <div style="display:flex;justify-content:center;align-items:center;gap:9px;padding:11px 16px;border-radius:8px;background:#16283C;border:1px solid #35516E;color:#A9C8E4;font-size:14.5px;font-weight:700;cursor:pointer" style-hover="background:#1C3450">
+            <span>Check for updates</span><span style="opacity:0.55">·</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;border:1px solid #3E5A78;border-radius:5px;padding:2px 7px;background:rgba(0,0,0,0.25)">F10</span>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#5D6779">Idle — steel blue action: informational, safe, repeatable.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="width:560px;background:#0B1120;border:1px solid #1D2A40;border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box">
+          <div style="display:flex;align-items:flex-start">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#12291A;border:1px solid #3E6B47;color:#7EC482;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-sizing:border-box">✓</div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6FA874">LOOK</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#3E6B47"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#12291A;border:1px solid #3E6B47;color:#7EC482;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-sizing:border-box">✓</div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6FA874">VALIDATE</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#3E6B47"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#E9A83F;border:1px solid #F4C061;box-sizing:border-box"></div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#F4C061">LOAD</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#22304A"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:transparent;border:1px solid #2A3854;box-sizing:border-box"></div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#5D6779">CONFIRM</div></div>
+          </div>
+          <div style="display:flex;justify-content:center;align-items:center;gap:9px;padding:11px 16px;border-radius:8px;background:#E9A83F;border:1px solid #F4C061;color:#191006;font-size:14.5px;font-weight:700;cursor:pointer" style-hover="background:#F4C061">
+            <span>Load validated update</span><span style="opacity:0.55">·</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;border:1px solid #8A6420;border-radius:5px;padding:2px 7px;background:rgba(0,0,0,0.10)">F11</span>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#5D6779">Validated — amber is the one action that changes what’s running.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="width:560px;background:#0B1120;border:1px solid #1D2A40;border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box">
+          <div style="display:flex;align-items:flex-start">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#12291A;border:1px solid #3E6B47;color:#7EC482;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-sizing:border-box">✓</div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6FA874">LOOK</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#3E6B47"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#12291A;border:1px solid #3E6B47;color:#7EC482;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-sizing:border-box">✓</div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6FA874">VALIDATE</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#3E6B47"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#12291A;border:1px solid #3E6B47;color:#7EC482;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-sizing:border-box">✓</div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6FA874">LOAD</div></div>
+            <div style="flex:1;height:2px;margin-top:10px;background:#3E6B47"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><div style="width:22px;height:22px;border-radius:50%;background:#12291A;border:1px solid #3E6B47;color:#7EC482;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-sizing:border-box">✓</div><div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6FA874">CONFIRM</div></div>
+          </div>
+          <div style="display:flex;justify-content:center;align-items:center;gap:9px;padding:11px 16px;border-radius:8px;background:transparent;border:1px solid #22304A;color:#5D6779;font-size:14.5px;font-weight:700;cursor:default">
+            <span>Up to date</span><span style="opacity:0.55">·</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600">1.2.0</span>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#5D6779">Confirmed — the button rests; version stays visible so “which revision?” never needs a click.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 DEADLINE BANNER -->
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#7FA8CC">04 · DEADLINE BANNER — CALM / URGENT</div>
+      <div style="flex:1;height:1px;background:#141E32"></div>
+    </div>
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+        <div style="display:inline-flex;align-items:center;gap:10px;padding:9px 18px;border-radius:999px;background:#0A0F1C;border:1px solid #6E5322">
+          <div style="width:8px;height:8px;border-radius:50%;background:#E9A83F"></div>
+          <div style="font-size:16px;font-weight:700;color:#F4C061;font-variant-numeric:tabular-nums">1/2, 6 seconds remaining</div>
+        </div>
+        <div style="font-size:12px;color:#5D6779">Calm — amber on near-black. Count and seconds only; no identity, no chrome.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+        <div style="display:inline-flex;align-items:center;gap:10px;padding:9px 18px;border-radius:999px;background:#8F1616;border:1px solid #C24040">
+          <div style="width:8px;height:8px;border-radius:50%;background:#FFFFFF"></div>
+          <div style="font-size:16px;font-weight:700;color:#FFFFFF;font-variant-numeric:tabular-nums">1/2, 4 seconds remaining</div>
+        </div>
+        <div style="font-size:12px;color:#5D6779">Urgent (≤ 5 s) — white on deep red. Same size, same position; only the fill changes.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 EVIDENCE FEED -->
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#7FA8CC">05 · EVIDENCE FEED — ROW TAXONOMY</div>
+      <div style="flex:1;height:1px;background:#141E32"></div>
+    </div>
+    <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+      <div style="width:560px;background:#0B1120;border:1px solid #1D2A40;border-radius:12px;padding:8px;box-sizing:border-box">
+        <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:28:11</span><span style="width:14px;flex:none;text-align:center;color:#4E5870;font-size:11px">·</span><span style="font-size:13px;color:#6B7488">Overlay reloaded in 0.4 s</span></div>
+        <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:29:03</span><span style="width:14px;flex:none;text-align:center;color:#E9A83F;font-size:11px">◆</span><span style="font-size:14px;font-weight:600;color:#E4DECF">Matched drop wood — 2/2; gathering → sealed.</span></div>
+        <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-radius:6px;background:{{ castBg }}"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:29:41</span><span style="width:14px;flex:none;text-align:center;color:#A15CFF;font-size:12px">✦</span><span style="font-size:14px;font-weight:600;color:#CFA9FF">CAST signal charm — it holds.</span></div>
+        <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:30:17</span><span style="width:14px;flex:none;text-align:center;color:#E9A83F;font-size:11px">▲</span><span style="font-size:14px;color:#E8C27A">3 charms belong to an earlier telling. Re-CAST them or roll back.</span></div>
+        <div style="display:flex;gap:10px;align-items:baseline;padding:8px 12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4E5870;width:56px;flex:none">14:30:52</span><span style="width:14px;flex:none;text-align:center;color:#4E5870;font-size:11px">·</span><span style="font-size:13px;color:#6B7488">Snapshot saved · 1.2.0</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:420px;padding-top:6px">
+        <div style="display:flex;gap:10px;align-items:baseline"><span style="width:14px;text-align:center;color:#E9A83F;font-size:11px;flex:none">◆</span><span style="font-size:13px;color:#9AA3B5"><span style="color:#E4DECF;font-weight:600">Story</span> — advances the telling. Ivory, semibold, full size.</span></div>
+        <div style="display:flex;gap:10px;align-items:baseline"><span style="width:14px;text-align:center;color:#A15CFF;font-size:12px;flex:none">✦</span><span style="font-size:13px;color:#9AA3B5"><span style="color:#CFA9FF;font-weight:600">CAST</span> — the signature moment. Bright purple, the only tinted row. In-game it flares; here color alone carries it.</span></div>
+        <div style="display:flex;gap:10px;align-items:baseline"><span style="width:14px;text-align:center;color:#E9A83F;font-size:11px;flex:none">▲</span><span style="font-size:13px;color:#9AA3B5"><span style="color:#E8C27A;font-weight:600">Warning</span> — needs a decision. Amber text, regular weight, always says what to do next.</span></div>
+        <div style="display:flex;gap:10px;align-items:baseline"><span style="width:14px;text-align:center;color:#4E5870;font-size:11px;flex:none">·</span><span style="font-size:13px;color:#9AA3B5"><span style="color:#6B7488;font-weight:600">Plumbing</span> — machinery talking to itself. Smaller, dim, never bolded.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 FOUNDATIONS -->
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#7FA8CC">06 · FOUNDATIONS — SURVIVES BOTH RENDERERS</div>
+      <div style="flex:1;height:1px;background:#141E32"></div>
+    </div>
+    <div style="display:flex;gap:48px;flex-wrap:wrap;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:18px;min-width:420px">
+        <div><div style="font-family:'Grenze',serif;font-weight:600;font-size:30px;color:#EFE9DC">The Woodbound Signal</div><div style="font-size:12px;color:#5D6779;margin-top:2px">Display — Grenze 600. Quest titles only; nothing else earns it.</div></div>
+        <div><div style="font-size:15px;font-weight:600;color:#E9E4D8">Load validated update — states, actions, feed</div><div style="font-size:12px;color:#5D6779;margin-top:2px">UI — Source Sans 3, 400/600/700. All copy, both surfaces.</div></div>
+        <div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#8E99AF">3F9A1C2E · 14:29:41 · F11</div><div style="font-size:12px;color:#5D6779;margin-top:2px">Data — JetBrains Mono. Hashes, timestamps, hotkeys, versions.</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:5px"><div style="width:92px;height:44px;border-radius:7px;background:#050810;border:1px solid #1D2A40"></div><div style="font-size:11.5px;color:#9AA3B5">Ground <span style="font-family:'JetBrains Mono',monospace;color:#5D6779">#050810</span></div></div>
+          <div style="display:flex;flex-direction:column;gap:5px"><div style="width:92px;height:44px;border-radius:7px;background:#0B1120;border:1px solid #1D2A40"></div><div style="font-size:11.5px;color:#9AA3B5">Panel <span style="font-family:'JetBrains Mono',monospace;color:#5D6779">#0B1120</span></div></div>
+          <div style="display:flex;flex-direction:column;gap:5px"><div style="width:92px;height:44px;border-radius:7px;background:#E9E4D8"></div><div style="font-size:11.5px;color:#9AA3B5">Ivory <span style="font-family:'JetBrains Mono',monospace;color:#5D6779">#E9E4D8</span></div></div>
+          <div style="display:flex;flex-direction:column;gap:5px"><div style="width:92px;height:44px;border-radius:7px;background:#E9A83F"></div><div style="font-size:11.5px;color:#9AA3B5">Amber <span style="font-family:'JetBrains Mono',monospace;color:#5D6779">#E9A83F</span></div></div>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:5px"><div style="width:92px;height:44px;border-radius:7px;background:#7EC482"></div><div style="font-size:11.5px;color:#9AA3B5">Ready <span style="font-family:'JetBrains Mono',monospace;color:#5D6779">#7EC482</span></div></div>
+          <div style="display:flex;flex-direction:column;gap:5px"><div style="width:92px;height:44px;border-radius:7px;background:#7FA8CC"></div><div style="font-size:11.5px;color:#9AA3B5">Steel <span style="font-family:'JetBrains Mono',monospace;color:#5D6779">#7FA8CC</span></div></div>
+          <div style="display:flex;flex-direction:column;gap:5px"><div style="width:92px;height:44px;border-radius:7px;background:#A15CFF"></div><div style="font-size:11.5px;color:#9AA3B5">CAST <span style="font-family:'JetBrains Mono',monospace;color:#5D6779">#A15CFF</span></div></div>
+          <div style="display:flex;flex-direction:column;gap:5px"><div style="width:92px;height:44px;border-radius:7px;background:#8F1616"></div><div style="font-size:11.5px;color:#9AA3B5">Urgent <span style="font-family:'JetBrains Mono',monospace;color:#5D6779">#8F1616</span></div></div>
+        </div>
+        <div style="font-size:12.5px;color:#5D6779;max-width:460px;text-wrap:pretty">Every state above reads with flat fills, 1 px borders, and type weight alone — the full set renders identically in Unity IMGUI. No gradient or shadow ever carries meaning.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;bannerSeconds&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:6,&quot;min&quot;:1,&quot;max&quot;:12,&quot;step&quot;:1,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Deadline banner&quot;},&quot;castGlow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Evidence feed&quot;}}">
+class Component extends DCLogic {
+  state = { detailsOpen: true };
+  renderVals() {
+    const secs = this.props.bannerSeconds ?? 6;
+    const urgent = secs <= 5;
+    const glow = this.props.castGlow ?? true;
+    return {
+      detailsOpen: this.state.detailsOpen,
+      toggleDetails: () => this.setState(s => ({ detailsOpen: !s.detailsOpen })),
+      detailsLabel: this.state.detailsOpen ? 'Hide details' : 'Details',
+      chev: this.state.detailsOpen ? '▴' : '▾',
+      bannerText: '1/2, ' + secs + ' seconds remaining',
+      bannerStyle: urgent
+        ? { display:'inline-flex', alignItems:'center', gap:'10px', padding:'9px 18px', borderRadius:'999px', background:'#8F1616', border:'1px solid #C24040', color:'#FFFFFF' }
+        : { display:'inline-flex', alignItems:'center', gap:'10px', padding:'9px 18px', borderRadius:'999px', background:'#0A0F1C', border:'1px solid #6E5322', color:'#F4C061' },
+      bannerDot: urgent ? '#FFFFFF' : '#E9A83F',
+      castBg: glow ? 'rgba(161,92,255,0.10)' : 'transparent'
+    };
+  }
+}
+</script>
+</body>
+</html>
