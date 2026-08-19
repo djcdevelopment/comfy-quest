@@ -181,6 +181,24 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.Locator("#tools-menu summary").ClickAsync();
             await page.Locator("[data-tool='graph']").ClickAsync();
             await WaitForCountAsync(page.Locator("#nodes .graph-node"), 8, "eight preserved graph nodes");
+            var graphWorkspaceWidth = await page.Locator("#tool-graph").EvaluateAsync<double>("element => element.getBoundingClientRect().width");
+            Assert.True(graphWorkspaceWidth > 1450, $"Expected the desktop graph workspace to use the viewport; got {graphWorkspaceWidth}px.");
+            var graphResizer = page.Locator("#graph-resizer");
+            var initialInspectorWidth = int.Parse((await graphResizer.GetAttributeAsync("aria-valuenow"))!);
+            var resizerBox = await graphResizer.BoundingBoxAsync();
+            Assert.NotNull(resizerBox);
+            await page.Mouse.MoveAsync(resizerBox.X + resizerBox.Width / 2, resizerBox.Y + 80);
+            await page.Mouse.DownAsync();
+            await page.Mouse.MoveAsync(resizerBox.X - 80, resizerBox.Y + 80);
+            await page.Mouse.UpAsync();
+            await WaitUntilAsync(
+                async () => int.Parse((await graphResizer.GetAttributeAsync("aria-valuenow"))!) > initialInspectorWidth,
+                "drag-resized graph inspector");
+            var draggedInspectorWidth = int.Parse((await graphResizer.GetAttributeAsync("aria-valuenow"))!);
+            await graphResizer.PressAsync("ArrowRight");
+            Assert.True(int.Parse((await graphResizer.GetAttributeAsync("aria-valuenow"))!) < draggedInspectorWidth);
+            await graphResizer.DblClickAsync();
+            Assert.Equal("420", await graphResizer.GetAttributeAsync("aria-valuenow"));
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Add branch", Exact = true }).ClickAsync();
             await WaitForCountAsync(page.Locator("#nodes .graph-node"), 9, "new branch node");
             await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "advanced graph autosave");

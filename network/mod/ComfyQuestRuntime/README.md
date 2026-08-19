@@ -43,6 +43,14 @@ surface: opaque dark hierarchy, section headers, readable status rows and hashes
 Escape close, and distinct Active Content, Charm, and Experience sections. Multiple OMEN usability passes
 established the final two-press backquote CHECK/CAST workflow and bounded outcome log.
 
+Opening F9 also enables client-local **Arcane Sight**. Every valid Runtime Charm binding in the
+currently loaded scene receives a temporary glow and an on-screen label with its experience,
+version, active/older-content state, local/remote ownership, and player distance. Closing F9
+restores the prior renderer property blocks and removes the temporary lights; Arcane Sight never
+writes a ZDO or changes event routing. CHECK's fallback aim ray is bounded to 10 metres. Ambient
+quest events have no fixed metre radius: Runtime currently considers every matching, locally
+owned binding present in the loaded `WearNTear` instance set, and the drawer says so explicitly.
+
 The second visual candidate prioritizes the normal operator path: a green READY/INSCRIBE affordance first,
 then a numbered Look/Validate/Load/Confirm update workflow driven by one context-sensitive button. Loading
 still requires its own explicit click. Version selection and rollback are collapsed into maintenance at the

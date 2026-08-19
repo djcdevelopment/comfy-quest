@@ -54,11 +54,11 @@ low-level assembly seams never become authoring choices.
 Studio lowers production beats into bounded acyclic Runtime graphs, certifies them
 against the shared contract, and publishes immutable `.questpack` files to the local
 Runtime inbox. Contextual targets and event fields appear only when useful. Route IDs,
-Charm surface details, the graph editor, and certified JSON stay under **Advanced
-tools**. **Data & history** provides a lossless project/history bundle, the current
-questpack, compiled JSON, and a privacy-explicit local usage aggregate without placing
-export in the normal creator lap. Existing branched quests open without conversion or
-data loss. Runtime still requires explicit F10 Check and F11 Load.
+the full-width graph editor, and certified JSON stay under **Advanced tools**. Runtime
+identity and the older single-surface Charm override sit with **Data & history**, next
+to the lossless project/history bundle, current questpack, compiled JSON, and
+privacy-explicit local usage aggregate. Existing branched quests open without
+conversion or data loss. Runtime still requires explicit F10 Check and F11 Load.
 
 The Studio workspace is the fast R&D loop: an on-demand local quest library, beat-first
 authoring, autosaved drafts, server-generated guided rehearsal, and a compact Publish &
@@ -72,6 +72,11 @@ timestamps, or uploads. The normal lap is
 **Author -> Rehearse -> Publish & Play -> F10 -> F11 -> F9/backtick CHECK/CAST -> one
 live event -> inspect receipts**. Reuse captured multiplayer scenarios for quest-content
 changes; run i5 only when the multiplayer event adapter itself changes.
+
+While the F9 Runtime drawer is open, Arcane Sight highlights and labels every valid
+Charm binding in the loaded scene. It is a client-local inspection layer only: the
+current ambient-event scope is the locally owned loaded binding set, not a fixed
+distance radius.
 
 The **R&D Signal Circuit** template is the current batch probe: normal chat, a durable
 wait, shout, two drops inside 30 seconds, pickup, equip, consume, heal, and a small

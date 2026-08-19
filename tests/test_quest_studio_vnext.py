@@ -98,23 +98,39 @@ class QuestStudioVNextTests(unittest.TestCase):
         self.assertIn("Studio handles the Runtime plumbing", simple)
         self.assertIn("Open graph editor", simple)
 
-    def test_advanced_graph_settings_and_json_live_behind_one_tools_surface(self) -> None:
+    def test_advanced_graph_identity_and_json_live_behind_one_tools_surface(self) -> None:
         html = raw_constant("Html")
         script = raw_constant("Js")
         advanced = html[html.index('id="advanced-tools"'):]
         for expected in (
             "Advanced tools",
-            "Project settings",
             "Graph editor",
             "Certified JSON",
             "Data &amp; history",
+            "Runtime identity",
+            "Package compatibility",
+            "Charm surface override",
             "Route ID",
             "Priority",
-            "Legacy Charm target",
         ):
             self.assertIn(expected, advanced)
+        self.assertNotIn('data-tool-tab="settings"', advanced)
         self.assertIn("function showTool(name)", script)
         self.assertIn("function closeTools()", script)
+
+    def test_graph_editor_uses_the_desktop_width_and_has_an_accessible_splitter(self) -> None:
+        html = raw_constant("Html")
+        css = raw_constant("Css")
+        script = raw_constant("Js")
+        self.assertIn('id="graph-resizer"', html)
+        self.assertIn('role="separator"', html)
+        self.assertIn('aria-label="Resize graph inspector"', html)
+        self.assertIn(".advanced-workspace.graph-active{max-width:none}", css)
+        self.assertIn("grid-template-columns:minmax(560px,1fr) 10px", css)
+        self.assertIn("cursor:col-resize", css)
+        self.assertIn("GRAPH_INSPECTOR_WIDTH_KEY", script)
+        self.assertIn("function bindGraphResizer()", script)
+        self.assertIn("e.key==='ArrowLeft'", script)
 
     def test_grimoire_picker_scales_the_creator_catalog_without_exposing_seams(self) -> None:
         html = raw_constant("Html")
