@@ -64,6 +64,12 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         self.assertIn("do not repeat the player action", source)
         self.assertLess(source.index("if (-not $ActionObserved)"), source.index("Start-Sleep -Milliseconds 250"))
 
+    def test_preflight_gate_output_cannot_pollute_the_json_receipt(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("$gateOutput = @(& $Command 2>&1)", source)
+        self.assertIn("$gateOutput | Out-Host", source)
+        self.assertIn("$result | ConvertTo-Json -Depth 20", source)
+
     def test_restore_surface_has_observed_need_tests(self) -> None:
         source = SELF_TEST.read_text(encoding="utf-8")
         for expected in (

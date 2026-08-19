@@ -424,8 +424,10 @@ function Find-Expectation([string] $Name, [object] $Context, [object[]] $Rows) {
 
 function Invoke-CommandGate([string] $Name, [scriptblock] $Command) {
     Write-Host "=== $Name ==="
-    & $Command
-    if ($LASTEXITCODE -ne 0) { throw "$Name failed with exit code $LASTEXITCODE." }
+    $gateOutput = @(& $Command 2>&1)
+    $gateExit = $LASTEXITCODE
+    $gateOutput | Out-Host
+    if ($gateExit -ne 0) { throw "$Name failed with exit code $gateExit." }
 }
 
 function Get-DotNet9Executable {
