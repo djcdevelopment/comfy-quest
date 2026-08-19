@@ -37,6 +37,16 @@ internal sealed class QuestStudioWorkspace
         return new
         {
         schema_version = 3,
+        adaptive_measures = AdaptiveMeasureCatalog.All.Select(measure => new
+        {
+            name = measure.Name,
+            label = measure.Label,
+            unit = measure.Unit,
+            minimum = measure.Minimum,
+            maximum = measure.Maximum,
+            palette = measure.Palette,
+            comparison = "gte"
+        }).ToArray(),
         quick_presets = CreatorSignalCatalog.All.Select(signal => new
         {
             id = signal.Id,
@@ -501,6 +511,10 @@ internal sealed class QuestStudioWorkspace
     {
         if (trigger is null) return "Perform the current quest beat.";
         var op = (trigger.Op ?? string.Empty).ToUpperInvariant();
+        if (op == "THRESHOLD")
+            return trigger.Measure == "time_since_stage_entered"
+                ? $"Wait until this stage has lasted {trigger.Value.GetValueOrDefault()} seconds."
+                : $"Wait until {trigger.Value.GetValueOrDefault()} seconds have passed without quest progress.";
         if (op == "COUNT" && trigger.Children?.FirstOrDefault() is { } counted)
             return DescribeLiveTrigger(counted);
         if (op is "ANY" or "ALL" or "SEQUENCE" && trigger.Children?.Count > 0)
@@ -920,9 +934,29 @@ internal static class StudioGraphCompiler
                     compiledActions.Add(ToContract(action));
                 }
                 var eventTrigger = new TriggerExpression { Op = "EVENT", Event = route.Event, Target = NullIfWhite(route.Target), Where = where.Count == 0 ? null : where };
-                var trigger = route.RepeatCount > 1
-                    ? new TriggerExpression { Op = "COUNT", Count = route.RepeatCount, WithinSeconds = route.WithinSeconds, Children = new() { eventTrigger } }
+                var eventClause = route.RepeatCount > 1
+                    ? new TriggerExpression { Op = "COUNT", Count = route.RepeatCount, WithinSeconds = (route.AdaptiveConditions?.Count ?? 0) == 0 ? route.WithinSeconds : null, Children = new() { eventTrigger } }
                     : eventTrigger;
+                var adaptive = new List<TriggerExpression>();
+                var seenMeasures = new HashSet<string>(StringComparer.Ordinal);
+                var conditionIndex = 0;
+                foreach (var condition in route.AdaptiveConditions ?? new())
+                {
+                    var conditionPath = path + ".adaptive_conditions." + conditionIndex++;
+                    if (condition is null)
+                    {
+                        Add("adaptive_condition_required", conditionPath, "Adaptive conditions cannot be null.");
+                        continue;
+                    }
+                    if (!AdaptiveMeasureCatalog.TryGet(condition.Measure, out var measure)) Add("adaptive_measure_invalid", conditionPath + ".measure", "Choose a measure from the advanced adaptive registry.");
+                    else if (!seenMeasures.Add(condition.Measure)) Add("adaptive_measure_duplicate", conditionPath + ".measure", "Each adaptive measure may appear once per route.");
+                    if (!string.Equals(condition.Comparison, "gte", StringComparison.Ordinal)) Add("adaptive_comparison_invalid", conditionPath + ".comparison", "Only at least (gte) is currently supported.");
+                    if (condition.Value < (measure?.Minimum ?? 1) || condition.Value > (measure?.Maximum ?? 86400)) Add("adaptive_value_invalid", conditionPath + ".value", "Adaptive value is outside the measure's reviewed bounds.");
+                    adaptive.Add(new TriggerExpression { Op = "THRESHOLD", Measure = condition.Measure, Comparison = condition.Comparison, Value = condition.Value });
+                }
+                var trigger = adaptive.Count == 0
+                    ? eventClause
+                    : new TriggerExpression { Op = "ALL", WithinSeconds = route.WithinSeconds, Children = new List<TriggerExpression> { eventClause }.Concat(adaptive).ToList() };
                 transitions.Add(new ExperienceTransition
                 {
                     Id = route.Id, Priority = route.Priority,
@@ -1084,6 +1118,8 @@ internal static class StudioRehearsal
     {
         var now = DateTimeOffset.UnixEpoch;
         var stageId = document.EntryStage;
+        var stageEnteredUtc = now;
+        var lastProgressUtc = now;
         string? outcome = null;
         var history = new List<RuntimeEvent>();
         var timers = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
@@ -1155,18 +1191,22 @@ internal static class StudioRehearsal
             if (string.IsNullOrWhiteSpace(evt.Name) || outcome is not null) return;
             var stage = document.Stages.FirstOrDefault(value => value.Id == stageId);
             if (stage is null) return;
-            history.Add(evt);
             var ordered = (stage.Transitions ?? new()).OrderByDescending(value => value.Priority).ThenBy(value => value.Id, StringComparer.Ordinal).ToArray();
-            var transition = ordered.FirstOrDefault(value => TriggerEvaluator.Matches(value.When, history));
+            var context = new TriggerEvaluationContext { At = evt.At, StageEnteredUtc = stageEnteredUtc, LastProgressUtc = lastProgressUtc };
+            var progressBefore = ordered.Sum(value => TriggerEvaluator.EventProgress(value.When, history));
+            history.Add(evt);
+            var madeProgress = ordered.Sum(value => TriggerEvaluator.EventProgress(value.When, history)) > progressBefore;
+            var transition = ordered.FirstOrDefault(value => TriggerEvaluator.Matches(value.When, history, context));
             if (transition is null)
             {
+                if (madeProgress) lastProgressUtc = evt.At;
                 var candidate = ordered.FirstOrDefault();
-                var partial = TriggerEvaluator.Measure(candidate?.When, history);
+                var partial = TriggerEvaluator.Measure(candidate?.When, history, context);
                 trace.Add(new(trace.Count + 1, evt.Name, evt.Target, stageId, null, Array.Empty<string>(), stageId, null,
                     "ignored", partial.Current, partial.Required, Describe(candidate?.When)));
                 return;
             }
-            var progress = TriggerEvaluator.Measure(transition.When, history);
+            var progress = TriggerEvaluator.Measure(transition.When, history, context);
             var effects = new List<string>();
             foreach (var action in transition.Actions ?? new())
             {
@@ -1183,7 +1223,13 @@ internal static class StudioRehearsal
                 }
             }
             var from = stageId;
-            if (!string.IsNullOrWhiteSpace(transition.NextStage)) stageId = transition.NextStage;
+            if (!string.IsNullOrWhiteSpace(transition.NextStage))
+            {
+                stageId = transition.NextStage;
+                stageEnteredUtc = evt.At;
+                lastProgressUtc = evt.At;
+            }
+            else if (madeProgress) lastProgressUtc = evt.At;
             outcome = string.IsNullOrWhiteSpace(transition.Outcome) ? null : transition.Outcome;
             history.Clear();
             trace.Add(new(trace.Count + 1, evt.Name, evt.Target, from, transition.Id, effects, stageId, outcome,
@@ -1206,6 +1252,9 @@ internal static class StudioRehearsal
             var routes = (node.Routes ?? new()).OrderByDescending(route => route.Priority).ThenBy(route => route.Id, StringComparer.Ordinal).ToArray();
             if (routes.Length == 0) break;
             var route = routes[0];
+            var adaptive = (route.AdaptiveConditions ?? new()).Where(value => value is not null).ToArray();
+            var adaptiveSeconds = adaptive.Select(value => value.Value).DefaultIfEmpty(0).Max();
+            var noProgressSeconds = adaptive.Where(value => value.Measure == "time_since_progress").Select(value => value.Value).DefaultIfEmpty(0).Max();
             if (routes.Length > 1)
             {
                 availablePaths.AddRange(routes.Select(candidate => node.Id + ":" + candidate.Id));
@@ -1218,12 +1267,26 @@ internal static class StudioRehearsal
                     seconds = 1;
                     limitations.Add($"Timer {route.TimerId} was not started on the selected path, so no timer event was injected.");
                 }
-                steps.Add(new StudioRehearsalInput { Kind = "advance", Seconds = seconds });
+                steps.Add(new StudioRehearsalInput { Kind = "advance", Seconds = Math.Max(seconds, adaptiveSeconds) });
             }
             else
             {
                 var target = string.IsNullOrWhiteSpace(route.Target) ? ExampleTarget(route.Event) : route.Target;
-                for (var count = 0; count < Math.Max(1, route.RepeatCount); count++)
+                var repeats = Math.Max(1, route.RepeatCount);
+                var beforeWait = noProgressSeconds > 0 ? Math.Max(0, repeats - 1) : 0;
+                for (var count = 0; count < beforeWait; count++)
+                {
+                    steps.Add(new StudioRehearsalInput
+                    {
+                        Kind = "event", EventName = route.Event, Target = target,
+                        Fields = SyntheticFields(route)
+                    });
+                }
+                if (adaptiveSeconds > 0) steps.Add(new StudioRehearsalInput { Kind = "advance", Seconds = adaptiveSeconds });
+                var afterWait = noProgressSeconds > 0 && route.WithinSeconds.HasValue && route.WithinSeconds.Value < adaptiveSeconds
+                    ? repeats
+                    : repeats - beforeWait;
+                for (var count = 0; count < afterWait; count++)
                 {
                     steps.Add(new StudioRehearsalInput
                     {
@@ -1278,12 +1341,28 @@ internal static class StudioRehearsal
 
     static string? Describe(TriggerExpression? trigger)
     {
-        var leaf = string.Equals(trigger?.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
-            ? trigger?.Children?.FirstOrDefault()
-            : trigger;
-        if (leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal)) return signal.Instruction;
-        if (leaf is not null && CreatorEventCatalog.TryGet(leaf.Event, out var definition)) return definition.Instruction;
-        return leaf is not null && RuntimeProductionEventCatalog.TryGetEngine(leaf.Event, out var engine) ? engine.Instruction : null;
+        var leaf = EventLeaf(trigger);
+        var instruction = leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal) ? signal.Instruction
+            : leaf is not null && CreatorEventCatalog.TryGet(leaf.Event, out var definition) ? definition.Instruction
+            : leaf is not null && RuntimeProductionEventCatalog.TryGetEngine(leaf.Event, out var engine) ? engine.Instruction : null;
+        var conditions = Thresholds(trigger).Select(value => value.Measure == "time_since_stage_entered"
+            ? $"after {value.Value.GetValueOrDefault()} seconds in this stage"
+            : $"after {value.Value.GetValueOrDefault()} seconds without quest progress").ToArray();
+        return instruction is null || conditions.Length == 0 ? instruction : instruction.TrimEnd('.') + ", " + string.Join(" and ", conditions) + ".";
+    }
+
+    static TriggerExpression? EventLeaf(TriggerExpression? trigger)
+    {
+        if (trigger is null) return null;
+        if (string.Equals(trigger.Op, "EVENT", StringComparison.OrdinalIgnoreCase)) return trigger;
+        return (trigger.Children ?? new()).Select(EventLeaf).FirstOrDefault(value => value is not null);
+    }
+
+    static IEnumerable<TriggerExpression> Thresholds(TriggerExpression? trigger)
+    {
+        if (trigger is null) yield break;
+        if (string.Equals(trigger.Op, "THRESHOLD", StringComparison.OrdinalIgnoreCase)) yield return trigger;
+        foreach (var child in trigger.Children ?? new()) foreach (var threshold in Thresholds(child)) yield return threshold;
     }
 }
 
@@ -1341,6 +1420,7 @@ public sealed class StudioRoute
     public string? DestinationNodeId { get; set; }
     public string? Outcome { get; set; }
     public List<StudioAction> Actions { get; set; } = new();
+    public List<StudioAdaptiveCondition> AdaptiveConditions { get; set; } = new();
 
     void SetWhere(string key, string? value)
     {
@@ -1348,6 +1428,13 @@ public sealed class StudioRoute
         if (string.IsNullOrWhiteSpace(value)) Where.Remove(key);
         else Where[key] = value;
     }
+}
+
+public sealed class StudioAdaptiveCondition
+{
+    public string Measure { get; set; } = "time_since_stage_entered";
+    public string Comparison { get; set; } = "gte";
+    public int Value { get; set; } = 30;
 }
 
 public sealed class StudioAction

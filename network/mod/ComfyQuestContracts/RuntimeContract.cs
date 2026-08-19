@@ -25,6 +25,13 @@ public sealed class TriggerProgress {
   public bool Complete { get { return Required > 0 && Current >= Required; } }
 }
 
+public sealed class TriggerEvaluationContext {
+  public DateTimeOffset? At { get; set; }
+  public DateTimeOffset? StageEnteredUtc { get; set; }
+  public DateTimeOffset? LastProgressUtc { get; set; }
+  public bool TryMeasure(string name,out double value){value=0;if(!At.HasValue)return false;DateTimeOffset? origin=null;if(string.Equals(name,"time_since_stage_entered",StringComparison.Ordinal))origin=StageEnteredUtc;else if(string.Equals(name,"time_since_progress",StringComparison.Ordinal))origin=LastProgressUtc;else return false;if(!origin.HasValue)return false;value=(At.Value-origin.Value).TotalSeconds;return true;}
+}
+
 public sealed class TriggerWhereTrace {
   [JsonProperty("field")] public string Field { get; set; }
   [JsonProperty("expected")] public string Expected { get; set; }
@@ -62,12 +69,18 @@ public static class TriggerEvaluator {
       : history.ToArray();
     return Eval(expression, bounded);
   }
+  public static bool Matches(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,TriggerEvaluationContext context) {
+    if(expression==null)return false;history??=Array.Empty<RuntimeEvent>();var bounded=Bound(expression,history);return Eval(expression,bounded,context);
+  }
   public static TriggerClauseTrace Explain(TriggerExpression expression, IReadOnlyList<RuntimeEvent> history) {
     history ??= Array.Empty<RuntimeEvent>();
     var bounded = expression?.WithinSeconds.HasValue == true && history.Count > 0
       ? history.Where(x => x.At >= history[history.Count - 1].At.AddSeconds(-expression.WithinSeconds.Value)).ToArray()
       : history.ToArray();
     return BuildBoundedTrace(expression, bounded);
+  }
+  public static TriggerClauseTrace Explain(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,TriggerEvaluationContext context) {
+    history??=Array.Empty<RuntimeEvent>();return BuildBoundedTrace(expression,Bound(expression,history),context);
   }
   public static TriggerProgress Measure(TriggerExpression expression, IReadOnlyList<RuntimeEvent> history) {
     history ??= Array.Empty<RuntimeEvent>();
@@ -83,6 +96,10 @@ public static class TriggerEvaluator {
     }
     return new TriggerProgress { Current = Eval(expression, bounded) ? 1 : 0, Required = 1 };
   }
+  public static TriggerProgress Measure(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,TriggerEvaluationContext context) {
+    history??=Array.Empty<RuntimeEvent>();if(expression==null)return new TriggerProgress{Current=0,Required=1};var bounded=Bound(expression,history);if(string.Equals(expression.Op,"COUNT",StringComparison.OrdinalIgnoreCase)&&expression.Children?.Count==1){var required=Math.Max(1,expression.Count.GetValueOrDefault());var current=bounded.Count(value=>EventMatches(expression.Children[0],value));return new TriggerProgress{Current=Math.Min(current,required),Required=required};}if(string.Equals(expression.Op,"THRESHOLD",StringComparison.OrdinalIgnoreCase)){var required=Math.Max(1,expression.Value.GetValueOrDefault());return new TriggerProgress{Current=ThresholdCurrent(expression,context,required),Required=required};}return new TriggerProgress{Current=Eval(expression,bounded,context)?1:0,Required=1};
+  }
+  public static int EventProgress(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history){history??=Array.Empty<RuntimeEvent>();return EventProgressNode(expression,Bound(expression,history));}
   static bool Eval(TriggerExpression x, IReadOnlyList<RuntimeEvent> h) {
     if (x == null) return false;
     var op=(x.Op??"").ToUpperInvariant();
@@ -94,16 +111,17 @@ public static class TriggerEvaluator {
     if(op=="SEQUENCE") { int i=0; foreach(var v in h) if(i<c.Count&&EventMatches(c[i],v)) i++; return i==c.Count; }
     return false;
   }
-  static TriggerClauseTrace BuildBoundedTrace(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history) {
+  static bool Eval(TriggerExpression x,IReadOnlyList<RuntimeEvent> h,TriggerEvaluationContext context){if(x==null)return false;var op=(x.Op??"").ToUpperInvariant();if(op=="THRESHOLD")return ThresholdSatisfied(x,context);if(op=="EVENT")return h.Any(v=>EventMatches(x,v));var c=x.Children??new();if(op=="ANY")return c.Any(v=>Eval(v,h,context));if(op=="ALL")return c.All(v=>Eval(v,h,context));if(op=="COUNT")return c.Count==1&&h.Count(v=>EventMatches(c[0],v))>=x.Count.GetValueOrDefault();if(op=="SEQUENCE"){int i=0;foreach(var v in h)if(i<c.Count&&EventMatches(c[i],v))i++;return i==c.Count;}return false;}
+  static TriggerClauseTrace BuildBoundedTrace(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,TriggerEvaluationContext context=null) {
     var nodeCount=CountNodes(expression);
-    var full=BuildTrace(expression,history,nodeCount,128,out _);
+    var full=BuildTrace(expression,history,context,nodeCount,128,out _);
     if(TraceBytes(full)<=MaxTraceSerializedBytes)return full;
     TriggerClauseTrace best=null;var bestNodes=0;var bestCharacters=0;
     for(var maxCharacters=128;maxCharacters>=8;maxCharacters/=2) {
       var low=1;var high=nodeCount;TriggerClauseTrace fit=null;var fitNodes=0;
       while(low<=high) {
         var budget=low+(high-low)/2;
-        var candidate=BuildTrace(expression,history,budget,maxCharacters,out var used);
+        var candidate=BuildTrace(expression,history,context,budget,maxCharacters,out var used);
         candidate.Truncated=true;
         if(TraceBytes(candidate)<=MaxTraceSerializedBytes){fit=candidate;fitNodes=used;low=budget+1;}else high=budget-1;
       }
@@ -111,15 +129,15 @@ public static class TriggerEvaluator {
     }
     return best??new TriggerClauseTrace{Op="",Satisfied=false,Current=0,Required=1,Truncated=true};
   }
-  static TriggerClauseTrace BuildTrace(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,int nodeBudget,int maxCharacters,out int used) {
-    var remaining=Math.Max(1,nodeBudget);var trace=ExplainNode(expression,history,true,ref remaining,maxCharacters);used=Math.Max(1,nodeBudget)-remaining;return trace;
+  static TriggerClauseTrace BuildTrace(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,TriggerEvaluationContext context,int nodeBudget,int maxCharacters,out int used) {
+    var remaining=Math.Max(1,nodeBudget);var trace=ExplainNode(expression,history,context,true,ref remaining,maxCharacters);used=Math.Max(1,nodeBudget)-remaining;return trace;
   }
-  static TriggerClauseTrace ExplainNode(TriggerExpression x,IReadOnlyList<RuntimeEvent> h,bool isRoot,ref int remaining,int maxCharacters) {
+  static TriggerClauseTrace ExplainNode(TriggerExpression x,IReadOnlyList<RuntimeEvent> h,TriggerEvaluationContext context,bool isRoot,ref int remaining,int maxCharacters) {
     remaining--;
     if(x==null)return new(){Satisfied=false,Current=0,Required=1};
     var op=(x.Op??"").ToUpperInvariant();
     var children=x.Children??new();var stringsTruncated=false;
-    var trace=new TriggerClauseTrace{Op=Trim(op,maxCharacters,ref stringsTruncated),Event=Trim(x.Event,maxCharacters,ref stringsTruncated),Target=Trim(x.Target,maxCharacters,ref stringsTruncated),Satisfied=Eval(x,h),WithinSeconds=isRoot?x.WithinSeconds:null};
+    var trace=new TriggerClauseTrace{Op=Trim(op,maxCharacters,ref stringsTruncated),Event=Trim(x.Event,maxCharacters,ref stringsTruncated),Target=Trim(x.Target,maxCharacters,ref stringsTruncated),Satisfied=context==null?Eval(x,h):Eval(x,h,context),WithinSeconds=isRoot?x.WithinSeconds:null};
     if(op=="EVENT") {
       // Actuals may only come from an event the clause could have considered: same name and,
       // when the clause names a target, the same target. A name-only fallback would harvest
@@ -136,12 +154,18 @@ public static class TriggerEvaluator {
       if(where.Length>MaxTraceWhereEntries)trace.Truncated=true;
       trace.Current=trace.Satisfied?1:0;trace.Required=1;if(stringsTruncated)trace.Truncated=true;return trace;
     }
+    if(op=="THRESHOLD") {
+      var required=Math.Max(1,x.Value.GetValueOrDefault());double actual=0;var found=context!=null&&context.TryMeasure(x.Measure,out actual);var actualText=found?FormatSeconds(actual):null;
+      trace.Current=ThresholdCurrent(x,context,required);trace.Required=required;
+      trace.Where.Add(new TriggerWhereTrace{Field=Trim(x.Measure,maxCharacters,ref stringsTruncated),Expected=Trim(">= "+required.ToString(CultureInfo.InvariantCulture)+" seconds",maxCharacters,ref stringsTruncated),Actual=Trim(actualText,maxCharacters,ref stringsTruncated),Satisfied=trace.Satisfied});
+      if(stringsTruncated)trace.Truncated=true;return trace;
+    }
     foreach(var child in children) {
       if(remaining<=0){trace.Truncated=true;break;}
-      trace.Children.Add(ExplainNode(child,h,false,ref remaining,maxCharacters));
+      trace.Children.Add(ExplainNode(child,h,context,false,ref remaining,maxCharacters));
     }
-    if(op=="ANY") {trace.Current=children.Count(v=>Eval(v,h));trace.Required=1;}
-    else if(op=="ALL") {trace.Current=children.Count(v=>Eval(v,h));trace.Required=children.Count;}
+    if(op=="ANY") {trace.Current=children.Count(v=>context==null?Eval(v,h):Eval(v,h,context));trace.Required=1;}
+    else if(op=="ALL") {trace.Current=children.Count(v=>context==null?Eval(v,h):Eval(v,h,context));trace.Required=children.Count;}
     else if(op=="COUNT") {
       var required=Math.Max(1,x.Count.GetValueOrDefault());
       var current=children.Count==1?h.Count(v=>EventMatches(children[0],v)):0;
@@ -156,6 +180,11 @@ public static class TriggerEvaluator {
     if(stringsTruncated)trace.Truncated=true;return trace;
   }
   static int CountNodes(TriggerExpression expression)=>expression==null?1:1+(expression.Children??new()).Sum(CountNodes);
+  static IReadOnlyList<RuntimeEvent> Bound(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history)=>expression?.WithinSeconds.HasValue==true&&history.Count>0?history.Where(x=>x.At>=history[history.Count-1].At.AddSeconds(-expression.WithinSeconds.Value)).ToArray():history.ToArray();
+  static bool ThresholdSatisfied(TriggerExpression expression,TriggerEvaluationContext context)=>expression?.Value>0&&string.Equals(expression.Comparison,"gte",StringComparison.Ordinal)&&context!=null&&context.TryMeasure(expression.Measure,out var actual)&&actual>=0&&actual>=expression.Value.Value;
+  static int ThresholdCurrent(TriggerExpression expression,TriggerEvaluationContext context,int required){if(context==null||!context.TryMeasure(expression.Measure,out var actual)||actual<=0)return 0;if(actual>=required)return required;return (int)Math.Floor(actual);}
+  static string FormatSeconds(double value)=>value.ToString(value==Math.Truncate(value)?"0":"0.###",CultureInfo.InvariantCulture)+" seconds";
+  static int EventProgressNode(TriggerExpression x,IReadOnlyList<RuntimeEvent> h){if(x==null)return 0;var op=(x.Op??"").ToUpperInvariant();if(op=="THRESHOLD")return 0;if(op=="EVENT")return h.Any(v=>EventMatches(x,v))?1:0;var c=x.Children??new();if(op=="COUNT")return c.Count==1?Math.Min(h.Count(v=>EventMatches(c[0],v)),Math.Max(1,x.Count.GetValueOrDefault())):0;if(op=="SEQUENCE"){int i=0;foreach(var v in h)if(i<c.Count&&EventMatches(c[i],v))i++;return i;}return c.Sum(v=>EventProgressNode(v,h));}
   static int TraceBytes(TriggerClauseTrace trace)=>Encoding.UTF8.GetByteCount(JsonConvert.SerializeObject(trace,Formatting.Indented));
   static string Trim(string value,int max,ref bool truncated){if(value==null||value.Length<=max)return value;truncated=true;return value.Substring(0,max);}
   static bool EventMatches(TriggerExpression x,RuntimeEvent v){if(x==null||!string.Equals(x.Op,"EVENT",StringComparison.OrdinalIgnoreCase)||!string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase))return false;if(!string.IsNullOrWhiteSpace(x.Target)&&!string.Equals(x.Target,v.Target,StringComparison.OrdinalIgnoreCase))return false;foreach(var p in x.Where??new()){if(v.Fields==null||!v.Fields.TryGetValue(p.Key,out var value)||!string.Equals(value,p.Value,StringComparison.OrdinalIgnoreCase))return false;}return true;}

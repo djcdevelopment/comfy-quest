@@ -1,7 +1,7 @@
 # Interim local packages
 
-This directory holds the Phase-2 0.3.0-local NuGet rehearsal packages so the
+This directory holds the Phase-3 0.4.0-local NuGet rehearsal packages so the
 extracted repository can restore without reaching into the Baseline checkout.
 
-It is deleted when the public Comfy.Quest.Contracts and Comfy.Quest.Studio 0.3.0
-packages are published and every consumer is repinned to exact `[0.3.0]`.
+It is deleted when the public Comfy.Quest.Contracts and Comfy.Quest.Studio 0.4.0
+packages are published and every consumer is repinned to exact `[0.4.0]`.

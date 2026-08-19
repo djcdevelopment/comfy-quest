@@ -856,6 +856,56 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
+    public void Advanced_temporal_conditions_compile_rehearse_and_stay_extended()
+    {
+        var service = CreateService();
+        using var catalog = JsonDocument.Parse(JsonSerializer.Serialize(service.WorkspaceCatalog()));
+        var measures = catalog.RootElement.GetProperty("adaptive_measures").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "time_since_progress", "time_since_stage_entered" },
+            measures.Select(value => value.GetProperty("name").GetString()).OrderBy(value => value, StringComparer.Ordinal));
+        Assert.All(measures, value => Assert.Equal("extended", value.GetProperty("palette").GetString()));
+
+        var project = service.CreateProject("blank");
+        project.Nodes[0].Routes[0].RepeatCount = 2;
+        project.Nodes[0].Routes[0].WithinSeconds = 30;
+        project.Nodes[0].Routes[0].AdaptiveConditions.Add(new StudioAdaptiveCondition
+        {
+            Measure = "time_since_stage_entered",
+            Comparison = "gte",
+            Value = 30
+        });
+        project.Nodes[0].Routes[0].AdaptiveConditions.Add(new StudioAdaptiveCondition
+        {
+            Measure = "time_since_progress",
+            Comparison = "gte",
+            Value = 10
+        });
+        var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(saved.Ok, saved.Error);
+
+        var certified = service.CertifyGraph(project.ProjectId);
+        Assert.True(certified.Ok, certified.Error);
+        using (var document = JsonDocument.Parse(certified.ExperienceJson!))
+        {
+            var when = document.RootElement.GetProperty("stages")[0].GetProperty("transitions")[0].GetProperty("when");
+            Assert.Equal("ALL", when.GetProperty("op").GetString());
+            Assert.Equal(30, when.GetProperty("within_seconds").GetInt32());
+            var count = Assert.Single(when.GetProperty("children").EnumerateArray(), value => value.GetProperty("op").GetString() == "COUNT");
+            Assert.Equal(JsonValueKind.Null, count.GetProperty("within_seconds").ValueKind);
+            var thresholds = when.GetProperty("children").EnumerateArray().Where(value => value.GetProperty("op").GetString() == "THRESHOLD").ToArray();
+            Assert.Equal(2, thresholds.Length);
+            Assert.Contains(thresholds, value => value.GetProperty("measure").GetString() == "time_since_stage_entered" && value.GetProperty("value").GetInt32() == 30);
+            Assert.Contains(thresholds, value => value.GetProperty("measure").GetString() == "time_since_progress" && value.GetProperty("value").GetInt32() == 10);
+        }
+
+        var rehearsal = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(rehearsal.Ok, rehearsal.Error);
+        Assert.Equal(new[] { "event", "advance", "event" }, rehearsal.GeneratedSteps.Select(value => value.Kind));
+        Assert.Equal(30, rehearsal.GeneratedSteps[1].Seconds);
+        Assert.Equal("complete", rehearsal.Outcome);
+    }
+
+    [Fact]
     public async Task Bundle_includes_only_requested_matching_published_and_live_evidence()
     {
         var valheim = Path.Combine(_root, "Valheim");

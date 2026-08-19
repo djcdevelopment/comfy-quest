@@ -40,7 +40,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             "const int MaxRecentEvidence = 8;",
             '"evt-" + Guid.NewGuid().ToString("N").Substring(0, 12)',
             "CorrelationId = correlationId",
-            "TriggerEvaluator.Explain(decision.Transition.When, currentState?.History)",
+            "TriggerEvaluator.Explain(decision.Transition.When, currentState?.History, decision.EvaluationContext)",
             "var evidence = decision.IsPendingReplay",
             "Evidence = evidence",
             "RejectedEvidence = rejectedEvidence",

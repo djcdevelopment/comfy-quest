@@ -55,7 +55,10 @@ Studio lowers production beats into bounded acyclic Runtime graphs and certifies
 against the shared contract. **Play this revision** writes an isolated dev artifact;
 an explicitly armed Runtime session pulls, validates, activates, and rebinds it.
 **Publish immutable version** remains an independent production action. Contextual targets and event fields appear only when useful. Route IDs,
-the full-width graph editor, and certified JSON stay under **Advanced tools**. Runtime
+the full-width graph editor, certified JSON, and event-time adaptive conditions stay
+under **Advanced tools**. Adaptive conditions currently expose only persisted time in
+the stage and time since structural quest progress; they remain out of the beginner
+palette. Runtime
 identity and the older single-surface Charm override sit with **Data & history**, next
 to the lossless project/history bundle, current questpack, compiled JSON, and
 privacy-explicit local usage aggregate. Existing branched quests open without
@@ -107,7 +110,7 @@ This is local-only synthetic E2E evidence. It does not prove Unity, BepInEx, Har
 patches, hotkeys, or genuine Valheim events; the OMEN acceptance run remains the live
 proof for those adapters.
 
-The interim packages-local feed exists only until the first public 0.3.0 NuGet
+The interim packages-local feed exists only until the first public 0.4.0 NuGet
 publication and exact consumer repin.
 
 Publication readiness is checked without publishing:

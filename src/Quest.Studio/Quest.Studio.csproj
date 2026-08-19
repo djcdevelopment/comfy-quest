@@ -9,7 +9,7 @@
     <RootNamespace>Comfy.Quest.Studio</RootNamespace>
     <!-- The workflow overrides this only after the matching Contracts package has
          been downloaded back from NuGet.org and inspected. -->
-    <QuestContractsVersion Condition="'$(QuestContractsVersion)' == ''">[0.3.0-local]</QuestContractsVersion>
+    <QuestContractsVersion Condition="'$(QuestContractsVersion)' == ''">[0.4.0-local]</QuestContractsVersion>
   </PropertyGroup>
   <ItemGroup>
     <!-- Quest Studio maps ASP.NET Core minimal-API endpoints (WebApplication/HttpRequest/Results)
@@ -34,7 +34,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Comfy.Quest.Studio</PackageId>
-    <Version>0.3.0-local</Version>
+    <Version>0.4.0-local</Version>
     <Title>Comfy Quest Studio</Title>
     <Authors>djcdevelopment</Authors>
     <PackageProjectUrl>https://github.com/djcdevelopment/comfy-quest</PackageProjectUrl>

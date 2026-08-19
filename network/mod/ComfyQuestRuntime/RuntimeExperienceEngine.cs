@@ -103,13 +103,19 @@ sealed class RuntimeExperienceEngine {
 
         foundBinding = true;
         var identity = Identity(zdo, active);
+        var before = workflows.Get(identity);
+        var evaluationContext = new TriggerEvaluationContext {
+          At = evt.At,
+          StageEnteredUtc = before?.StageEnteredUtc ?? (before == null ? evt.At : (DateTimeOffset?)null),
+          LastProgressUtc = before?.LastProgressUtc ?? (before == null ? evt.At : (DateTimeOffset?)null),
+        };
         var decision = workflows.Begin(identity, active.Document, evt);
         if (decision == null) {
           var state = workflows.Get(identity);
           var stage = active.Document.Stages.FirstOrDefault(value => value.Id == state?.StageId);
           var route = stage?.Transitions?.OrderByDescending(value => value.Priority)
               .ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault();
-          var progress = TriggerEvaluator.Measure(route?.When, state?.History);
+          var progress = TriggerEvaluator.Measure(route?.When, state?.History, evaluationContext);
           WriteReceipt(EventReceipt(
               "ignored", active, zdo.m_uid.ToString(), evt, state?.StageId,
               state?.StageId, progress, correlationId));
@@ -119,11 +125,11 @@ sealed class RuntimeExperienceEngine {
         var currentStage = active.Document.Stages.FirstOrDefault(value => value.Id == decision.StageId);
         if (currentStage == null) continue;
         var currentState = workflows.Get(identity);
-        var matchedProgress = TriggerEvaluator.Measure(decision.Transition.When, currentState?.History);
+        var matchedProgress = TriggerEvaluator.Measure(decision.Transition.When, currentState?.History, decision.EvaluationContext);
         var evidence = decision.IsPendingReplay
-            ? null : TriggerEvaluator.Explain(decision.Transition.When, currentState?.History);
+            ? null : TriggerEvaluator.Explain(decision.Transition.When, currentState?.History, decision.EvaluationContext);
         var rejectedEvidence = decision.IsPendingReplay
-            ? null : ExplainRejected(currentStage, decision.Transition, currentState?.History);
+            ? null : ExplainRejected(currentStage, decision.Transition, currentState?.History, decision.EvaluationContext);
         WriteReceipt(EventReceipt(
             "matched", active, zdo.m_uid.ToString(), evt, currentStage.Id,
             decision.Transition.NextStage, matchedProgress, correlationId,
@@ -240,13 +246,14 @@ sealed class RuntimeExperienceEngine {
   static IReadOnlyList<RejectedTransitionEvidence> ExplainRejected(
       ExperienceStage stage,
       ExperienceTransition selected,
-      IReadOnlyList<RuntimeEvent> history) {
+      IReadOnlyList<RuntimeEvent> history,
+      TriggerEvaluationContext context) {
     var rejected = new List<RejectedTransitionEvidence>();
     foreach (var candidate in (stage?.Transitions ?? new())
         .Where(value => value != null && value.Priority > selected.Priority)
         .OrderByDescending(value => value.Priority)
         .ThenBy(value => value.Id, StringComparer.Ordinal)) {
-      var trace = TriggerEvaluator.Explain(candidate.When, history);
+      var trace = TriggerEvaluator.Explain(candidate.When, history, context);
       if (trace.Satisfied) continue;
       rejected.Add(new RejectedTransitionEvidence {
         TransitionId = candidate.Id,
@@ -500,7 +507,11 @@ sealed class RuntimeExperienceEngine {
         var stage = active.Document.Stages.FirstOrDefault(value => value.Id == progress.StageId);
         var transition = stage?.Transitions?.OrderByDescending(value => value.Priority)
             .ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault();
-        var measured = TriggerEvaluator.Measure(transition?.When, progress.History);
+        var measured = TriggerEvaluator.Measure(transition?.When, progress.History, new TriggerEvaluationContext {
+          At = progress.LastEventUtc,
+          StageEnteredUtc = progress.StageEnteredUtc,
+          LastProgressUtc = progress.LastProgressUtc,
+        });
         var count = measured.Required > 1
             ? " - " + measured.Current + "/" + measured.Required : "";
         return active.Document.Title + ": " + progress.StageId + " - "
@@ -527,13 +538,37 @@ sealed class RuntimeExperienceEngine {
   }
 
   static string Describe(TriggerExpression trigger) {
-    var leaf = string.Equals(trigger?.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
-        ? trigger?.Children?.FirstOrDefault()
-        : trigger;
+    var leaf = EventLeaf(trigger);
     if (leaf != null
         && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal))
-      return signal.Instruction;
-    return (leaf?.Event ?? "perform the current beat").Replace('_', ' ');
+      return signal.Instruction + ThresholdSuffix(trigger);
+    return (leaf?.Event ?? "perform the current beat").Replace('_', ' ') + ThresholdSuffix(trigger);
+  }
+
+  static TriggerExpression EventLeaf(TriggerExpression trigger) {
+    if (trigger == null) return null;
+    if (string.Equals(trigger.Op, "EVENT", StringComparison.OrdinalIgnoreCase)) return trigger;
+    foreach (var child in trigger.Children ?? new List<TriggerExpression>()) {
+      var found = EventLeaf(child);
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  static string ThresholdSuffix(TriggerExpression trigger) {
+    var thresholds = Thresholds(trigger).Select(value => {
+      if (value.Measure == "time_since_stage_entered")
+        return "after " + value.Value.GetValueOrDefault() + "s in this stage";
+      return "after " + value.Value.GetValueOrDefault() + "s without quest progress";
+    }).ToArray();
+    return thresholds.Length == 0 ? "" : " " + string.Join(" and ", thresholds);
+  }
+
+  static IEnumerable<TriggerExpression> Thresholds(TriggerExpression trigger) {
+    if (trigger == null) yield break;
+    if (string.Equals(trigger.Op, "THRESHOLD", StringComparison.OrdinalIgnoreCase)) yield return trigger;
+    foreach (var child in trigger.Children ?? new List<TriggerExpression>())
+      foreach (var found in Thresholds(child)) yield return found;
   }
 
   static string DescribeStageElapsed(DateTimeOffset? entered) {
