@@ -58,6 +58,48 @@ take the player as their subject, so a player-relative area would be circular.
   spawned positions are live facts, not history); the persisted event history keeps
   the original witness positions.
 
+## Admitted encounter facts
+
+| Measure | Authoritative source | Meaning | Missing-data behavior |
+| --- | --- | --- | --- |
+| `player_deaths_in_stage` | `WorkflowProgress.deaths_in_stage`, incremented when a normalized `player_died` event is appended to trigger history | Times the local player fell since the current stage was entered | Fails closed; state written before this measure existed deserializes as null |
+| `spawned_enemies_remaining` | Spawn-ledger rows for one authored spawn action that still resolve to a live ZDO with matching identity marks | How many of that wave's staged objects are still present | Fails closed |
+| `spawned_enemies_cleared` | That action's total ledger rows minus the rows that still resolve | How many of that wave's staged objects are gone | Fails closed |
+
+Both spawn measures name their wave: the `THRESHOLD` carries an `action_id` referring to
+an authored `spawn` action in the same document, rejected at compile time if it does not
+exist. Total and live come from one ledger read, so a ledger that cannot be read supplies
+no tally rather than an empty one, and an absent ledger reports zero staged — which fails
+every `>= 1` predicate closed rather than reporting a wave triumphantly cleared.
+
+The death counter is persisted because trigger history clears on every transition. It is
+the minimum fact that must survive that clearing; it resets when the stage advances and
+deliberately not when a same-stage transition completes.
+
+Adding these measures added no new witness: `player_died` and `kill` were already in the
+closed production catalog. Because a compiled document may count deaths without naming
+the event in any clause, activation subscribes a measure's declared source event, or the
+engine would drop it before evaluation.
+
+### Interpretation limits, stated deliberately
+
+- "No longer resolves" means the object was destroyed, **not** that the player walked
+  away. This holds only because evaluation runs exclusively on the world authority
+  (`CharmPolicy.CanMutate` admits solo and listen-host private worlds and denies
+  dedicated servers and peer clients), and that process holds every ZDO whether or not
+  its zone is loaded. If evaluation ever moves to a peer client, these two measures must
+  be re-derived or withdrawn.
+- A `kill` event carries no spawned-object identity, so no fact claims *who* removed a
+  staged object. `spawned_enemies_cleared` counts absence, and says so.
+- The `clear_spawned` action removes ledger rows, lowering staged and remaining together.
+  An authored despawn is therefore not counted as a player victory.
+- An event that arrives while a transition is still pending is discarded before it
+  reaches history; the death counter inherits that behavior from every other event.
+- Wave-clear *time* is not a measure. A route driven by the clearing event wins its race
+  against a lower-priority timer route, and the elapsed time is reported on the receipt
+  from `stage_entered_utc` and the deciding event time. No fact claims to know the moment
+  the last object fell, because nothing observes it.
+
 ## Deferred facts
 
 ### Continuous combat duration
@@ -74,11 +116,18 @@ for a specified duration. Admit this measure only after a dedicated observation
 module supplies a named, testable combat-state fact with explicit start, end, and
 reload semantics.
 
-### Performance facts
+### Per-wave elapsed time
 
-Wave-clear time, deaths, and remaining-enemy counts stay deferred to Phase 3.3. They
-require their own authoritative observation seams and do not borrow meaning from the
-temporal or spatial predicates above.
+`time_since_spawned` — seconds since one authored spawn action last staged its objects —
+is deliberately not admitted. Every Phase 3.3 branch is expressible from stage-entry time
+plus the counted facts above, and the measure would cost a persisted per-action timestamp
+written from the engine. Admit it when a validation lap needs a wave that begins partway
+through a stage, or several waves inside one stage, and not before.
+
+### Cross-stage death totals
+
+Only deaths in the current stage are admitted. A whole-quest total is a different fact
+with a different reset rule; it waits for an authored quest that needs it.
 
 ### Positions of other players and unspawned creatures
 

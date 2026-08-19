@@ -42,8 +42,11 @@ internal sealed class QuestStudioWorkspace
             name = measure.Name,
             label = measure.Label,
             unit = measure.Unit,
+            unit_singular = measure.UnitSingular,
             minimum = measure.Minimum,
             maximum = measure.Maximum,
+            default_value = measure.DefaultValue,
+            requires_spawn_action = measure.RequiresSpawnAction,
             palette = measure.Palette,
             comparison = "gte"
         }).ToArray(),
@@ -525,10 +528,7 @@ internal sealed class QuestStudioWorkspace
     {
         if (trigger is null) return "Perform the current quest beat.";
         var op = (trigger.Op ?? string.Empty).ToUpperInvariant();
-        if (op == "THRESHOLD")
-            return trigger.Measure == "time_since_stage_entered"
-                ? $"Wait until this stage has lasted {trigger.Value.GetValueOrDefault()} seconds."
-                : $"Wait until {trigger.Value.GetValueOrDefault()} seconds have passed without quest progress.";
+        if (op == "THRESHOLD") return StudioRehearsal.AdaptiveLiveInstruction(trigger);
         if (op == "SPATIAL") return StudioRehearsal.SpatialLiveInstruction(trigger);
         if (op == "COUNT" && trigger.Children?.FirstOrDefault() is { } counted)
             return DescribeLiveTrigger(counted);
@@ -967,7 +967,10 @@ internal static class StudioGraphCompiler
                     else if (!seenMeasures.Add(condition.Measure)) Add("adaptive_measure_duplicate", conditionPath + ".measure", "Each adaptive measure may appear once per route.");
                     if (!string.Equals(condition.Comparison, "gte", StringComparison.Ordinal)) Add("adaptive_comparison_invalid", conditionPath + ".comparison", "Only at least (gte) is currently supported.");
                     if (condition.Value < (measure?.Minimum ?? 1) || condition.Value > (measure?.Maximum ?? 86400)) Add("adaptive_value_invalid", conditionPath + ".value", "Adaptive value is outside the measure's reviewed bounds.");
-                    adaptive.Add(new TriggerExpression { Op = "THRESHOLD", Measure = condition.Measure, Comparison = condition.Comparison, Value = condition.Value });
+                    var countsSpawn = measure?.RequiresSpawnAction == true;
+                    if (countsSpawn && !spawnIds.Contains(condition.ActionId ?? string.Empty)) Add("adaptive_action_invalid", conditionPath + ".action_id", "Name a spawn effect from this quest so the count means one staged wave.");
+                    if (!countsSpawn && measure is not null && !string.IsNullOrWhiteSpace(condition.ActionId)) Add("adaptive_action_unsupported", conditionPath + ".action_id", "This measure does not count a staged wave.");
+                    adaptive.Add(new TriggerExpression { Op = "THRESHOLD", Measure = condition.Measure, Comparison = condition.Comparison, Value = condition.Value, ActionId = countsSpawn ? NullIfWhite(condition.ActionId) : null });
                 }
                 var spatial = new List<TriggerExpression>();
                 var seenPredicates = new HashSet<string>(StringComparer.Ordinal);
@@ -1170,6 +1173,9 @@ internal static class StudioRehearsal
         var timers = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
         var inventory = new Dictionary<string, int>(StringComparer.Ordinal);
         var spawns = new Dictionary<string, int>(StringComparer.Ordinal);
+        // Rehearsal has no ZDOs, so "gone" is whatever the transcript asked to remove.
+        var despawned = new Dictionary<string, int>(StringComparer.Ordinal);
+        var deathsInStage = 0;
         var transcript = new List<string>();
         var trace = new List<StudioRehearsalTrace>();
         var guided = string.Equals(request.Mode, "guided", StringComparison.OrdinalIgnoreCase)
@@ -1199,6 +1205,13 @@ internal static class StudioRehearsal
                 }
                 continue;
             }
+            if (input.Kind == "despawn")
+            {
+                var target = input.ActionId ?? string.Empty;
+                if (!spawns.ContainsKey(target)) return StudioRehearsalResult.Fail("rehearsal_despawn_unknown");
+                despawned[target] = Math.Min(spawns[target], despawned.GetValueOrDefault(target) + Math.Max(1, input.Count));
+                continue;
+            }
             var fields = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var pair in (input.Fields ?? new()).OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
@@ -1225,6 +1238,8 @@ internal static class StudioRehearsal
         return new(3, true, null, proofLevel, "Synthetic rehearsal only; this does not prove a Valheim adapter or live mutation.", stageId, outcome, trace, transcript, inventory, spawns,
             timers.ToDictionary(pair => pair.Key, pair => (int)Math.Max(0, (pair.Value - now).TotalSeconds)), guided ? steps : Array.Empty<StudioRehearsalInput>(), limitations, availablePaths);
 
+        int Live(string action) => Math.Max(0, spawns.GetValueOrDefault(action) - despawned.GetValueOrDefault(action));
+
         static bool IsCapturedContractFixture(IReadOnlyList<StudioRehearsalInput> values) => values.Count == 2
             && values[0].Kind == "event" && values[0].EventName == "chat_received" && values[0].Target == "shout"
             && (values[0].Fields?.GetValueOrDefault("actor_role") ?? values[0].ActorRole) == "peer"
@@ -1239,12 +1254,15 @@ internal static class StudioRehearsal
             var ordered = (stage.Transitions ?? new()).OrderByDescending(value => value.Priority).ThenBy(value => value.Id, StringComparer.Ordinal).ToArray();
             // The synthetic binding rehearses at the origin; this path's spawned objects rehearse
             // beside it so area predicates can be exercised without a live scene.
+            if (string.Equals(evt.Name, ExperienceSchema.PlayerDiedEvent, StringComparison.OrdinalIgnoreCase)) deathsInStage++;
             var context = new TriggerEvaluationContext
             {
                 At = evt.At, StageEnteredUtc = stageEnteredUtc, LastProgressUtc = lastProgressUtc,
                 BindingPosition = new SpatialPoint(0, 0, 0),
-                SpawnedPositions = spawns.Values.SelectMany(count => Enumerable.Repeat(new SpatialPoint(0, 0, 0), Math.Max(0, count))).ToArray(),
-                AuthoredAnchors = SpatialEvaluator.AnchorMap(document)
+                SpawnedPositions = spawns.Keys.SelectMany(action => Enumerable.Repeat(new SpatialPoint(0, 0, 0), Live(action))).ToArray(),
+                AuthoredAnchors = SpatialEvaluator.AnchorMap(document),
+                DeathsInStage = deathsInStage,
+                SpawnsByAction = spawns.ToDictionary(pair => pair.Key, pair => new SpawnTally(pair.Value, Live(pair.Key)), StringComparer.Ordinal)
             };
             var progressBefore = ordered.Sum(value => TriggerEvaluator.EventProgress(value.When, history));
             history.Add(evt);
@@ -1272,7 +1290,7 @@ internal static class StudioRehearsal
                     case "timer_cancel": timers.Remove(P("timer_id")); effects.Add("cancel timer " + P("timer_id")); break;
                     case "grant_item": inventory[P("item")] = inventory.GetValueOrDefault(P("item")) + I("quantity"); effects.Add($"grant {I("quantity")} {P("item")}"); break;
                     case "spawn": spawns[action.Id] = spawns.GetValueOrDefault(action.Id) + I("count"); effects.Add($"spawn {I("count")} {P("prefab")}"); break;
-                    case "clear_spawned": var removed = spawns.GetValueOrDefault(P("action_id")); spawns.Remove(P("action_id")); effects.Add($"clear {removed} from {P("action_id")}"); break;
+                    case "clear_spawned": var removed = spawns.GetValueOrDefault(P("action_id")); spawns.Remove(P("action_id")); despawned.Remove(P("action_id")); effects.Add($"clear {removed} from {P("action_id")}"); break;
                 }
             }
             var from = stageId;
@@ -1281,6 +1299,7 @@ internal static class StudioRehearsal
                 stageId = transition.NextStage;
                 stageEnteredUtc = evt.At;
                 lastProgressUtc = evt.At;
+                deathsInStage = 0;
             }
             else if (madeProgress) lastProgressUtc = evt.At;
             outcome = string.IsNullOrWhiteSpace(transition.Outcome) ? null : transition.Outcome;
@@ -1298,6 +1317,7 @@ internal static class StudioRehearsal
         availablePaths = new List<string>();
         var nodes = (project.Nodes ?? new()).Where(node => node is not null).ToDictionary(node => node.Id, StringComparer.Ordinal);
         var timerSeconds = new Dictionary<string, int>(StringComparer.Ordinal);
+        var spawnedCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var visited = new HashSet<string>(StringComparer.Ordinal);
         var nodeId = document.EntryStage;
         while (!string.IsNullOrWhiteSpace(nodeId) && nodes.TryGetValue(nodeId, out var node) && visited.Add(nodeId))
@@ -1306,8 +1326,11 @@ internal static class StudioRehearsal
             if (routes.Length == 0) break;
             var route = routes[0];
             var adaptive = (route.AdaptiveConditions ?? new()).Where(value => value is not null).ToArray();
-            var adaptiveSeconds = adaptive.Select(value => value.Value).DefaultIfEmpty(0).Max();
+            // Only measures counted in seconds may set the synthetic wait; a count would poison it.
+            var adaptiveSeconds = adaptive.Where(value => AdaptiveMeasureCatalog.TryGet(value.Measure, out var measure) && measure.Unit == "seconds")
+                .Select(value => value.Value).DefaultIfEmpty(0).Max();
             var noProgressSeconds = adaptive.Where(value => value.Measure == "time_since_progress").Select(value => value.Value).DefaultIfEmpty(0).Max();
+            var deathsRequired = adaptive.Where(value => value.Measure == AdaptiveMeasureCatalog.DeathsMeasure).Select(value => value.Value).DefaultIfEmpty(0).Max();
             var spatialConditions = (route.SpatialConditions ?? new()).Where(value => value is not null).ToArray();
             var remainedSeconds = spatialConditions.Where(value => value.Predicate == "remained").Select(value => value.Value ?? 0).DefaultIfEmpty(0).Max();
             var positioned = spatialConditions.Length > 0;
@@ -1325,6 +1348,24 @@ internal static class StudioRehearsal
                 availablePaths.AddRange(routes.Select(candidate => node.Id + ":" + candidate.Id));
                 limitations.Add($"Stage {node.Id} has {routes.Length} routes; this run followed highest priority route {route.Id}.");
             }
+            foreach (var condition in adaptive.Where(value => AdaptiveMeasureCatalog.TryGet(value.Measure, out var measure) && measure.RequiresSpawnAction))
+            {
+                var staged = spawnedCounts.GetValueOrDefault(condition.ActionId ?? string.Empty);
+                if (staged == 0)
+                {
+                    limitations.Add($"Route {route.Id} counts staged objects from {condition.ActionId}, which this path never spawned, so that condition was not satisfied.");
+                    continue;
+                }
+                if (condition.Measure == AdaptiveMeasureCatalog.ClearedMeasure)
+                {
+                    steps.Add(new StudioRehearsalInput { Kind = "despawn", ActionId = condition.ActionId, Count = condition.Value });
+                    limitations.Add($"Route {route.Id} waits for staged objects to be cleared; rehearsal removes {condition.Value} of them on request, while play removes one when the object itself is gone.");
+                }
+                else if (staged < condition.Value)
+                    limitations.Add($"Route {route.Id} needs {condition.Value} staged objects still standing from {condition.ActionId}, but this path staged only {staged}.");
+            }
+            for (var count = 0; count < Math.Max(0, deathsRequired - (string.Equals(route.Event, ExperienceSchema.PlayerDiedEvent, StringComparison.Ordinal) ? 1 : 0)); count++)
+                steps.Add(new StudioRehearsalInput { Kind = "event", EventName = ExperienceSchema.PlayerDiedEvent, Target = "you" });
             if (string.Equals(route.Event, ExperienceSchema.TimerElapsedEvent, StringComparison.Ordinal))
             {
                 if (!timerSeconds.TryGetValue(route.TimerId ?? string.Empty, out var seconds))
@@ -1364,6 +1405,10 @@ internal static class StudioRehearsal
                     timerSeconds[action.TimerId] = Math.Clamp(action.Seconds, 1, 86400);
                 else if (action.Type == "timer_cancel" && !string.IsNullOrWhiteSpace(action.TimerId))
                     timerSeconds.Remove(action.TimerId);
+                else if (action.Type == "spawn" && !string.IsNullOrWhiteSpace(action.Id))
+                    spawnedCounts[action.Id] = spawnedCounts.GetValueOrDefault(action.Id) + Math.Max(0, action.Count);
+                else if (action.Type == "clear_spawned" && !string.IsNullOrWhiteSpace(action.ActionId))
+                    spawnedCounts.Remove(action.ActionId);
             }
             nodeId = route.DestinationNodeId;
             if (route.Outcome is "complete" or "fail") break;
@@ -1408,9 +1453,7 @@ internal static class StudioRehearsal
         var instruction = leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal) ? signal.Instruction
             : leaf is not null && CreatorEventCatalog.TryGet(leaf.Event, out var definition) ? definition.Instruction
             : leaf is not null && RuntimeProductionEventCatalog.TryGetEngine(leaf.Event, out var engine) ? engine.Instruction : null;
-        var conditions = Thresholds(trigger).Select(value => value.Measure == "time_since_stage_entered"
-            ? $"after {value.Value.GetValueOrDefault()} seconds in this stage"
-            : $"after {value.Value.GetValueOrDefault()} seconds without quest progress")
+        var conditions = Thresholds(trigger).Select(AdaptiveConditionPhrase)
             .Concat(SpatialNodes(trigger).Select(SpatialConditionPhrase)).ToArray();
         return instruction is null || conditions.Length == 0 ? instruction : instruction.TrimEnd('.') + ", " + string.Join(" and ", conditions) + ".";
     }
@@ -1434,6 +1477,38 @@ internal static class StudioRehearsal
         if (trigger is null) yield break;
         if (string.Equals(trigger.Op, "SPATIAL", StringComparison.OrdinalIgnoreCase)) yield return trigger;
         foreach (var child in trigger.Children ?? new()) foreach (var node in SpatialNodes(child)) yield return node;
+    }
+
+    internal static string AdaptiveLiveInstruction(TriggerExpression trigger)
+    {
+        var amount = trigger.Value.GetValueOrDefault();
+        AdaptiveMeasureCatalog.TryGet(trigger.Measure, out var measure);
+        var unit = measure is null ? string.Empty : measure.UnitFor(amount);
+        return trigger.Measure switch
+        {
+            "time_since_stage_entered" => $"Wait until this stage has lasted {amount} seconds.",
+            "time_since_progress" => $"Wait until {amount} seconds have passed without quest progress.",
+            AdaptiveMeasureCatalog.DeathsMeasure => $"Fall in this stage {amount} {unit}.",
+            AdaptiveMeasureCatalog.ClearedMeasure => $"Clear {amount} staged {unit}.",
+            AdaptiveMeasureCatalog.RemainingMeasure => $"Leave {amount} staged {unit} still standing.",
+            _ => $"Wait until {measure?.Label ?? trigger.Measure} reaches {amount}."
+        };
+    }
+
+    static string AdaptiveConditionPhrase(TriggerExpression trigger)
+    {
+        var amount = trigger.Value.GetValueOrDefault();
+        AdaptiveMeasureCatalog.TryGet(trigger.Measure, out var measure);
+        var unit = measure is null ? string.Empty : measure.UnitFor(amount);
+        return trigger.Measure switch
+        {
+            "time_since_stage_entered" => $"after {amount} seconds in this stage",
+            "time_since_progress" => $"after {amount} seconds without quest progress",
+            AdaptiveMeasureCatalog.DeathsMeasure => $"after {amount} {unit} in this stage",
+            AdaptiveMeasureCatalog.ClearedMeasure => $"once {amount} staged {unit} are cleared",
+            AdaptiveMeasureCatalog.RemainingMeasure => $"with {amount} staged {unit} still standing",
+            _ => $"once {measure?.Label ?? trigger.Measure} reaches {amount}"
+        };
     }
 
     internal static string SpatialLiveInstruction(TriggerExpression trigger)
@@ -1535,6 +1610,8 @@ public sealed class StudioAdaptiveCondition
     public string Measure { get; set; } = "time_since_stage_entered";
     public string Comparison { get; set; } = "gte";
     public int Value { get; set; } = 30;
+    /// <summary>The spawn effect whose staged objects this measure counts, when it counts one.</summary>
+    public string? ActionId { get; set; }
 }
 
 public sealed class StudioSpatialCondition
@@ -1612,6 +1689,9 @@ public sealed class StudioRehearsalInput
     public double? X { get; set; }
     public double? Y { get; set; }
     public double? Z { get; set; }
+    /// <summary>Spawn effect a "despawn" step removes staged objects from.</summary>
+    public string? ActionId { get; set; }
+    public int Count { get; set; }
 }
 
 public sealed record StudioRehearsalTrace(int Step, string EventName, string? Target, string FromNodeId, string? RouteId, IReadOnlyList<string> Effects, string CurrentNodeId, string? Outcome, string Status, int CurrentCount, int RequiredCount, string? NextInstruction);

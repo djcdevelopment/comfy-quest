@@ -14,10 +14,13 @@ public sealed class SpawnExecutionStore {
   public IReadOnlyList<SpawnedObject> ForAction(string actionKey){lock(gate){return Read().Objects.Where(x=>string.Equals(x.ActionKey,actionKey,StringComparison.Ordinal)).ToArray();}}
   public IReadOnlyList<SpawnedObject> ForOwnerAction(string ownerKey,string actionId){lock(gate){var prefix=(ownerKey??"")+"|";return Read().Objects.Where(x=>x.ActionKey!=null&&x.ActionKey.StartsWith(prefix,StringComparison.Ordinal)&&string.Equals(x.ActionId,actionId,StringComparison.Ordinal)).ToArray();}}
   public IReadOnlyList<SpawnedObject> ForOwner(string ownerKey){lock(gate){var prefix=(ownerKey??"")+"|";return Read().Objects.Where(x=>x.ActionKey!=null&&x.ActionKey.StartsWith(prefix,StringComparison.Ordinal)).ToArray();}}
+  /// <summary>Owner rows plus whether the ledger could be read at all, so a damaged ledger reports
+  /// "unknown" instead of "no objects" to any fact derived from it.</summary>
+  public bool TryForOwner(string ownerKey,out IReadOnlyList<SpawnedObject> rows){lock(gate){var state=Read();var prefix=(ownerKey??"")+"|";rows=state.Unreadable?Array.Empty<SpawnedObject>():state.Objects.Where(x=>x.ActionKey!=null&&x.ActionKey.StartsWith(prefix,StringComparison.Ordinal)).ToArray();return !state.Unreadable;}}
   public void Remove(IEnumerable<SpawnedObject> values){lock(gate){var state=Read();var ids=new HashSet<string>((values??Array.Empty<SpawnedObject>()).Select(x=>x.UserId+":"+x.ObjectId),StringComparer.Ordinal);state.Objects.RemoveAll(x=>ids.Contains(x.UserId+":"+x.ObjectId));Write(state);}}
-  State Read(){if(!File.Exists(path))return new();try{return JsonConvert.DeserializeObject<State>(File.ReadAllText(path))??new();}catch{return new();}}
+  State Read(){if(!File.Exists(path))return new();try{var state=JsonConvert.DeserializeObject<State>(File.ReadAllText(path))??new();state.Objects??=new();return state;}catch{return new State{Unreadable=true};}}
   void Write(State state){Directory.CreateDirectory(Path.GetDirectoryName(path));var temp=path+".tmp";File.WriteAllText(temp,JsonConvert.SerializeObject(state,Formatting.Indented));if(File.Exists(path))File.Replace(temp,path,path+".previous");else File.Move(temp,path);}
-  sealed class State{[JsonProperty("schema")]public string Schema{get;set;}="comfy-quest-spawn-ledger/v1";[JsonProperty("objects")]public List<SpawnedObject> Objects{get;set;}=new();}
+  sealed class State{[JsonProperty("schema")]public string Schema{get;set;}="comfy-quest-spawn-ledger/v1";[JsonProperty("objects")]public List<SpawnedObject> Objects{get;set;}=new();[JsonIgnore]public bool Unreadable{get;set;}}
 }
 
 public sealed class SpawnedObject {

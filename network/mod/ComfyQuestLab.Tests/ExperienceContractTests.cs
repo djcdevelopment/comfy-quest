@@ -20,6 +20,8 @@ public sealed class ExperienceContractTests {
   [Fact] public void CraftingEventsExposeOnlyNormalizedStationItemAndQuantity(){var at=DateTimeOffset.UnixEpoch;Assert.Equal("piece_workbench",CraftingEventContract.ItemCrafted("piece_workbench(Clone)",at).Target);Assert.Equal("handcrafting",CraftingEventContract.ItemCrafted(null,at).Target);var input=CraftingEventContract.StationInputAdded("smelter(Clone)","CopperOre(Clone)",at);Assert.Equal("CopperOre",input.Target);Assert.Equal("smelter",input.Fields["station"]);Assert.Equal("1",input.Fields["quantity"]);var output=CraftingEventContract.StationOutputProduced("smelter","Copper",3,at);Assert.Equal("3",output.Fields["quantity"]);Assert.Null(CraftingEventContract.StationOutputProduced("smelter","Copper",0,at));Assert.DoesNotContain("sender",JsonConvert.SerializeObject(input),StringComparison.OrdinalIgnoreCase);}
   [Fact] public void CraftingProofRejectsFailedRemoteFullAndZeroQuantityPaths(){Assert.True(CraftingProof.ItemCrafted(true,true,1,2));Assert.False(CraftingProof.ItemCrafted(true,false,1,2));Assert.False(CraftingProof.ItemCrafted(true,true,2,2));Assert.True(CraftingProof.StationValueIncreased(true,true,1,2));Assert.False(CraftingProof.StationValueIncreased(true,true,2,2));Assert.False(CraftingProof.StationValueIncreased(false,true,1,2));Assert.True(CraftingProof.StationSlotAdded(true,true,0,1));Assert.False(CraftingProof.StationSlotAdded(true,false,0,1));Assert.True(CraftingProof.StationOutputCollected(true,true,1,0,1));Assert.False(CraftingProof.StationOutputCollected(true,true,1,1,1));Assert.False(CraftingProof.StationOutputCollected(true,true,1,0,0));Assert.True(CraftingProof.StationOutputProduced(true,true,2));Assert.False(CraftingProof.StationOutputProduced(false,true,2));Assert.False(CraftingProof.StationOutputProduced(true,false,2));}
   const string Valid = """{"schema":"comfy-quest-experience/v1","id":"hello","entry_stage":"start","stages":[{"id":"start","transitions":[{"id":"done","priority":1,"when":{"op":"EVENT","event":"kill","target":"Troll"},"actions":[{"id":"say","type":"message","text":"Skal!"}],"outcome":"complete"}]}],"bindings":[{"id":"sign","experience_id":"hello"}]}""";
+  const string Defense = """{"schema":"comfy-quest-experience/v1","id":"defense","entry_stage":"hold","stages":[{"id":"hold","entry_actions":[{"id":"wave","type":"spawn","kind":"creature","prefab":"Greyling","count":8,"radius":10}],"transitions":[{"id":"held","priority":3,"when":{"op":"ALL","children":[{"op":"EVENT","event":"kill"},{"op":"THRESHOLD","measure":"spawned_enemies_cleared","comparison":"gte","value":8,"action_id":"wave"}]},"actions":[],"outcome":"complete"},{"id":"mercy","priority":2,"when":{"op":"ALL","children":[{"op":"EVENT","event":"player_died"},{"op":"THRESHOLD","measure":"player_deaths_in_stage","comparison":"gte","value":2}]},"actions":[],"outcome":"fail"}]}],"bindings":[{"id":"sign","experience_id":"defense"}]}""";
+  static HashSet<string> DefenseEvents => new(){"kill","player_died"};
   [Fact] public void CompilesMinimalExperience(){var c=ExperienceCompiler.CompileJson(Valid,new HashSet<string>{"kill"});Assert.True(c.IsValid,string.Join(";",c.Diagnostics));}
   [Fact] public void RejectsCycles(){var json=Valid.Replace("\"outcome\":\"complete\"","\"next_stage\":\"start\"");Assert.Contains(ExperienceCompiler.CompileJson(json,new HashSet<string>{"kill"}).Diagnostics,x=>x.Code=="graph.cycle");}
   [Fact] public void EvaluatesSequenceDeterministically(){var x=new TriggerExpression{Op="SEQUENCE",Children=new(){new(){Op="EVENT",Event="hit"},new(){Op="EVENT",Event="kill"}}};var h=new[]{new RuntimeEvent{Name="hit",At=DateTimeOffset.UnixEpoch},new RuntimeEvent{Name="kill",At=DateTimeOffset.UnixEpoch.AddSeconds(1)}};Assert.True(TriggerEvaluator.Matches(x,h));Assert.False(TriggerEvaluator.Matches(x,new[]{h[1],h[0]}));}
@@ -57,7 +59,7 @@ public sealed class ExperienceContractTests {
   [Fact] public void ExplainKeepsRelevantWhereActualsAndEnforcesEvidenceBounds(){var where=Enumerable.Range(0,12).ToDictionary(x=>$"field-{x:00}",x=>$"value-{x:00}",StringComparer.Ordinal);var expression=new TriggerExpression{Op="EVENT",Event="signal",Where=where};var history=new[]{new RuntimeEvent{Name="signal",At=DateTimeOffset.UnixEpoch,Fields=where}};var bounded=TriggerEvaluator.Explain(expression,history);Assert.True(bounded.Satisfied);Assert.Equal(TriggerEvaluator.MaxTraceWhereEntries,bounded.Where.Count);Assert.True(bounded.Truncated);var mismatchedFields=new Dictionary<string,string>(where,StringComparer.Ordinal);mismatchedFields["field-11"]="wrong";var cappedMismatch=TriggerEvaluator.Explain(expression,new[]{new RuntimeEvent{Name="signal",At=DateTimeOffset.UnixEpoch,Fields=mismatchedFields}});var failed=Assert.Single(cappedMismatch.Where,item=>!item.Satisfied);Assert.Equal("field-11",failed.Field);Assert.Equal("value-11",failed.Expected);Assert.Equal("wrong",failed.Actual);Assert.True(cappedMismatch.Truncated);var latest=TriggerEvaluator.Explain(new TriggerExpression{Op="EVENT",Event="signal",Where=new(){{"state","expected"}}},new[]{new RuntimeEvent{Name="signal",At=DateTimeOffset.UnixEpoch,Fields=new Dictionary<string,string>{{"state","old"}}},new RuntimeEvent{Name="signal",At=DateTimeOffset.UnixEpoch.AddSeconds(1),Fields=new Dictionary<string,string>{{"state","latest"}}}});Assert.Equal("latest",Assert.Single(latest.Where).Actual);var large=new TriggerExpression{Op="ALL",Children=Enumerable.Range(0,128).Select(x=>new TriggerExpression{Op="EVENT",Event=$"event-{x:000}",Target=new string('x',128),Where=Enumerable.Range(0,12).ToDictionary(y=>$"field-{y:00}",y=>new string('v',128),StringComparer.Ordinal)}).ToList()};var trace=TriggerEvaluator.Explain(large,Array.Empty<RuntimeEvent>());Assert.Equal(TriggerEvaluator.Matches(large,Array.Empty<RuntimeEvent>()),trace.Satisfied);Assert.True(trace.Truncated==true);Assert.All(TraceNodes(trace),node=>Assert.InRange(node.Where.Count,0,TriggerEvaluator.MaxTraceWhereEntries));Assert.True(Encoding.UTF8.GetByteCount(JsonConvert.SerializeObject(trace,Formatting.Indented))<=TriggerEvaluator.MaxTraceSerializedBytes);}
   [Fact]
   public void AdaptiveThresholdSchemaMovesAsOneClosedGate() {
-    Assert.Equal(new[]{"time_since_progress","time_since_stage_entered"},AdaptiveMeasureCatalog.All.Select(x=>x.Name).OrderBy(x=>x,StringComparer.Ordinal));
+    Assert.Equal(new[]{"player_deaths_in_stage","spawned_enemies_cleared","spawned_enemies_remaining","time_since_progress","time_since_stage_entered"},AdaptiveMeasureCatalog.All.Select(x=>x.Name).OrderBy(x=>x,StringComparer.Ordinal));
     Assert.All(AdaptiveMeasureCatalog.All,x=>Assert.Equal("extended",x.Palette));
     var adaptive=Valid.Replace("\"when\":{\"op\":\"EVENT\",\"event\":\"kill\",\"target\":\"Troll\"}","\"when\":{\"op\":\"ALL\",\"children\":[{\"op\":\"EVENT\",\"event\":\"kill\",\"target\":\"Troll\"},{\"op\":\"THRESHOLD\",\"measure\":\"time_since_stage_entered\",\"comparison\":\"gte\",\"value\":30}]}");
     Assert.True(ExperienceCompiler.CompileJson(adaptive,new HashSet<string>{"kill"}).IsValid);
@@ -68,6 +70,88 @@ public sealed class ExperienceContractTests {
     Assert.Contains(ExperienceCompiler.CompileJson(undriven,new HashSet<string>{"kill"}).Diagnostics,x=>x.Code=="trigger.event_driver");
     var child=adaptive.Replace("\"value\":30}","\"value\":30,\"children\":[{\"op\":\"EVENT\",\"event\":\"kill\"}]}");
     Assert.Contains(ExperienceCompiler.CompileJson(child,new HashSet<string>{"kill"}).Diagnostics,x=>x.Code=="threshold.children");
+  }
+  [Fact]
+  public void EncounterMeasureSchemaMovesAsOneClosedGate() {
+    Assert.True(ExperienceCompiler.CompileJson(Defense,DefenseEvents).IsValid);
+    Assert.All(AdaptiveMeasureCatalog.All.Where(x=>x.RequiresSpawnAction),x=>Assert.Equal("enemies",x.Unit));
+    Assert.Contains(ExperienceCompiler.CompileJson(Defense.Replace("spawned_enemies_cleared","spawned_enemies_vanquished"),DefenseEvents).Diagnostics,x=>x.Code=="threshold.measure");
+    Assert.Contains(ExperienceCompiler.CompileJson(Defense.Replace(",\"action_id\":\"wave\"",""),DefenseEvents).Diagnostics,x=>x.Code=="threshold.action_id");
+    Assert.Contains(ExperienceCompiler.CompileJson(Defense.Replace("\"action_id\":\"wave\"","\"action_id\":\"no-such-wave\""),DefenseEvents).Diagnostics,x=>x.Code=="threshold.action_id");
+    Assert.Contains(ExperienceCompiler.CompileJson(Defense.Replace("\"measure\":\"player_deaths_in_stage\",\"comparison\":\"gte\",\"value\":2","\"measure\":\"player_deaths_in_stage\",\"comparison\":\"gte\",\"value\":2,\"action_id\":\"wave\""),DefenseEvents).Diagnostics,x=>x.Code=="threshold.action_unsupported");
+    Assert.Contains(ExperienceCompiler.CompileJson(Defense.Replace("\"value\":8","\"value\":129"),DefenseEvents).Diagnostics,x=>x.Code=="threshold.value");
+    Assert.Contains(ExperienceCompiler.CompileJson(Defense.Replace("\"value\":2","\"value\":65"),DefenseEvents).Diagnostics,x=>x.Code=="threshold.value");
+    // A counted measure must reach Runtime even though no authored clause names its source event.
+    var compiled=ExperienceCompiler.CompileJson(Defense,DefenseEvents);
+    var subscriptions=RuntimeSubscriptionIndex.Create(compiled.Document);
+    Assert.True(subscriptions.Contains("player_died"));
+    var deathsOnly=ExperienceCompiler.CompileJson(Defense.Replace("{\"op\":\"EVENT\",\"event\":\"player_died\"},",""),DefenseEvents);
+    Assert.True(RuntimeSubscriptionIndex.Create(deathsOnly.Document).Contains("player_died"));
+  }
+  [Fact]
+  public void EncounterFactsExplainActualVersusExpectedAndFailClosedWithoutATally() {
+    var history=new[]{new RuntimeEvent{Name="kill",Target="Greyling",At=DateTimeOffset.UnixEpoch.AddSeconds(90)}};
+    var cleared=new TriggerExpression{Op="THRESHOLD",Measure="spawned_enemies_cleared",Comparison="gte",Value=8,ActionId="wave"};
+    var remaining=new TriggerExpression{Op="THRESHOLD",Measure="spawned_enemies_remaining",Comparison="gte",Value=1,ActionId="wave"};
+    var context=new TriggerEvaluationContext{At=history[0].At,SpawnsByAction=new Dictionary<string,SpawnTally>{{"wave",new SpawnTally(8,3)}}};
+    var partial=TriggerEvaluator.Explain(cleared,history,context);
+    Assert.False(partial.Satisfied);
+    Assert.Equal(5,partial.Current);
+    Assert.Equal(8,partial.Required);
+    var row=Assert.Single(partial.Where);
+    Assert.Equal("spawned_enemies_cleared",row.Field);
+    Assert.Equal(">= 8 enemies",row.Expected);
+    Assert.Equal("5 enemies",row.Actual);
+    Assert.Equal(JsonConvert.SerializeObject(partial),JsonConvert.SerializeObject(TriggerEvaluator.Explain(cleared,history,context)));
+    Assert.True(TriggerEvaluator.Matches(remaining,history,context));
+    Assert.Equal("3 enemies",Assert.Single(TriggerEvaluator.Explain(remaining,history,context).Where).Actual);
+    var last=new TriggerEvaluationContext{At=history[0].At,SpawnsByAction=new Dictionary<string,SpawnTally>{{"wave",new SpawnTally(8,7)}}};
+    Assert.Equal("1 enemy",Assert.Single(TriggerEvaluator.Explain(cleared,history,last).Where).Actual);
+    var done=new TriggerEvaluationContext{At=history[0].At,SpawnsByAction=new Dictionary<string,SpawnTally>{{"wave",new SpawnTally(8,0)}}};
+    Assert.True(TriggerEvaluator.Matches(cleared,history,done));
+    // An unreadable or absent ledger, an unstaged wave, and the context-free path all fail closed.
+    Assert.False(TriggerEvaluator.Matches(cleared,history));
+    Assert.False(TriggerEvaluator.Matches(cleared,history,new TriggerEvaluationContext{At=history[0].At}));
+    Assert.False(TriggerEvaluator.Matches(remaining,history,new TriggerEvaluationContext{At=history[0].At,SpawnsByAction=new Dictionary<string,SpawnTally>{{"other",new SpawnTally(8,8)}}}));
+    Assert.Null(Assert.Single(TriggerEvaluator.Explain(cleared,history,new TriggerEvaluationContext{At=history[0].At}).Where).Actual);
+    Assert.False(TriggerEvaluator.Matches(new TriggerExpression{Op="THRESHOLD",Measure="spawned_enemies_cleared",Comparison="gte",Value=8},history,context));
+  }
+  [Fact]
+  public void PlayerDeathsSurviveHistoryClearingAndResetOnlyWhenTheStageAdvances() {
+    var root=Path.Combine(Path.GetTempPath(),"comfy-workflow-"+Guid.NewGuid().ToString("N"));
+    try {
+      var doc=TwoStage();
+      doc.Stages[0].Transitions[0].When=new TriggerExpression{Op="ALL",Children=new(){new(){Op="EVENT",Event="player_died"},new(){Op="THRESHOLD",Measure="player_deaths_in_stage",Comparison="gte",Value=2}}};
+      doc.Stages[0].Transitions.Add(new(){Id="a-quiet-step",Priority=1,When=new(){Op="EVENT",Event="piece_damaged"},NextStage="first"});
+      var id=new WorkflowIdentity{WorldId="w",CharacterId="p",BindingZdo="z",ContentHash="h"};
+      var store=new WorkflowStateStore(root);
+      var at=DateTimeOffset.UnixEpoch;
+      Assert.Null(store.Begin(id,doc,new RuntimeEvent{Name="player_died",Target="you",At=at}));
+      Assert.Equal(1,store.Get(id).DeathsInStage);
+      // A same-stage transition clears history; the death count is exactly what must outlive it.
+      var quiet=store.Begin(id,doc,new RuntimeEvent{Name="piece_damaged",At=at.AddSeconds(5)});
+      Assert.Equal("a-quiet-step",quiet.Transition.Id);
+      Assert.True(store.Complete(quiet));
+      Assert.Empty(store.Get(id).History);
+      Assert.Equal(1,store.Get(id).DeathsInStage);
+      var second=store.Begin(id,doc,new RuntimeEvent{Name="player_died",Target="you",At=at.AddSeconds(9)});
+      Assert.Equal("first-hit",second.Transition.Id);
+      Assert.Equal(2,second.EvaluationContext.DeathsInStage);
+      Assert.True(store.Complete(second));
+      Assert.Equal("second",store.Get(id).StageId);
+      Assert.Equal(0,store.Get(id).DeathsInStage);
+      var replayed=new WorkflowStateStore(root).Get(id);
+      Assert.Equal(0,replayed.DeathsInStage);
+    } finally { Directory.Delete(root,true); }
+  }
+  [Fact]
+  public void OldWorkflowStateHasNoDeathCountAndFailsTheMeasureClosed() {
+    var context=new TriggerEvaluationContext{At=DateTimeOffset.UnixEpoch};
+    var threshold=new TriggerExpression{Op="THRESHOLD",Measure="player_deaths_in_stage",Comparison="gte",Value=1};
+    Assert.False(TriggerEvaluator.Matches(threshold,Array.Empty<RuntimeEvent>(),context));
+    var old=JsonConvert.DeserializeObject<WorkflowProgress>("""{"stage_id":"start","history":[]}""");
+    Assert.Null(old.DeathsInStage);
+    Assert.DoesNotContain("deaths_in_stage",JsonConvert.SerializeObject(old));
   }
   [Fact]
   public void AdaptiveThresholdUsesEventTimeAndExplainsActualVersusExpected() {

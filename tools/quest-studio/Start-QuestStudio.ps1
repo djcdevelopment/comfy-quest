@@ -13,7 +13,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 if ($LASTEXITCODE -ne 0) { throw 'Repository identity check failed.' }
 
 $project = Join-Path $repoRoot 'src\Quest.Studio.Host\Quest.Studio.Host.csproj'
-$contractsPackage = Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.5.0-local.nupkg'
+$contractsPackage = Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.6.0-local.nupkg'
 $packageCacheKey = if (Test-Path -LiteralPath $contractsPackage) {
     (Get-FileHash -LiteralPath $contractsPackage -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0, 16)
 } else {

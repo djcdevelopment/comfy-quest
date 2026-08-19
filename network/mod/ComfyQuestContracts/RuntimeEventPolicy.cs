@@ -161,6 +161,12 @@ public sealed class RuntimeSubscriptionIndex {
       if (!string.IsNullOrWhiteSpace(expression.Event)) names.Add(expression.Event);
       return;
     }
+    // A counted measure needs its source event delivered even when no clause names it.
+    if (string.Equals(expression.Op, "THRESHOLD", StringComparison.OrdinalIgnoreCase)) {
+      if (AdaptiveMeasureCatalog.TryGet(expression.Measure, out var measure)
+          && !string.IsNullOrWhiteSpace(measure.SourceEvent)) names.Add(measure.SourceEvent);
+      return;
+    }
     foreach (var child in expression.Children ?? new List<TriggerExpression>()) Add(child);
   }
 }

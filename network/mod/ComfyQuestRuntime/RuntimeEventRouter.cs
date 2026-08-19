@@ -18,7 +18,7 @@ static class RuntimeEventRouter {
       runtimeEvent.DedupeKey = Dedupe.Key(
           witness.DedupeGroup, subjectIdentity, fingerprint, signatureId,
           UnityEngine.Time.realtimeSinceStartup);
-      RuntimeSpatialObservation.StampLocalPlayer(runtimeEvent);
+      RuntimeObservation.StampLocalPlayer(runtimeEvent);
       Engine?.OnEvent(runtimeEvent);
     } catch {
       // Observation is never allowed to disrupt the underlying Valheim action.
@@ -33,7 +33,7 @@ static class RuntimeEventRouter {
       runtimeEvent.DedupeKey = Dedupe.Key(
           dedupeGroup, subjectIdentity, fingerprint, witness,
           UnityEngine.Time.realtimeSinceStartup);
-      RuntimeSpatialObservation.StampLocalPlayer(runtimeEvent);
+      RuntimeObservation.StampLocalPlayer(runtimeEvent);
       Engine?.OnEvent(runtimeEvent);
     } catch { }
   }

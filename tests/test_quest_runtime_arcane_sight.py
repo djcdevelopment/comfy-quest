@@ -177,8 +177,8 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("authored event predicates may evaluate", readme)
         self.assertIn("without ever filtering\nwhich bindings participate", readme)
 
-    def test_spatial_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
-        observation = (RUNTIME / "RuntimeSpatialObservation.cs").read_text(encoding="utf-8")
+    def test_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
+        observation = (RUNTIME / "RuntimeObservation.cs").read_text(encoding="utf-8")
         binding = BINDING.read_text(encoding="utf-8")
         engine = ENGINE.read_text(encoding="utf-8")
         router = (RUNTIME / "RuntimeEventRouter.cs").read_text(encoding="utf-8")
@@ -186,22 +186,33 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             "public static void StampLocalPlayer(RuntimeEvent runtimeEvent)",
             "player.transform.position",
             "binding.GetPosition()",
-            "facts.SpawnedPositions = positions;",
+            "facts.Spatial.SpawnedPositions = positions;",
+            # Encounter tallies are resolved in the same single pass, never elsewhere.
+            "facts.Encounter = new EncounterFacts { SpawnsByAction = tallies };",
+            "spawned.TryForOwner(ownerKey, out var records)",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, observation)
+        # The retired name must not linger anywhere in the shipping mod.
+        for name, text in (("engine", engine), ("router", router), ("binding", binding)):
+            with self.subTest(stale=name):
+                self.assertNotIn("RuntimeSpatialObservation", text)
+        self.assertFalse((RUNTIME / "RuntimeSpatialObservation.cs").exists())
         # Every routed witness and engine timer event carries the local witness position.
-        self.assertEqual(2, router.count("RuntimeSpatialObservation.StampLocalPlayer("))
-        self.assertIn("RuntimeSpatialObservation.StampLocalPlayer(elapsed)", engine)
-        self.assertIn("RuntimeSpatialObservation.Facts(", engine)
-        # Distance math lives only in the pure Contracts SpatialEvaluator: the observation
-        # seam, the engine, and the Charm binding surface never compute one, and the binding
-        # surface never learns about positions at all.
+        self.assertEqual(2, router.count("RuntimeObservation.StampLocalPlayer("))
+        self.assertIn("RuntimeObservation.StampLocalPlayer(elapsed)", engine)
+        self.assertIn("RuntimeObservation.Facts(", engine)
+        # Distance math lives only in the pure Contracts SpatialEvaluator and tally meaning only
+        # in AdaptiveEvaluator: the engine and the Charm binding surface resolve neither, and the
+        # binding surface never learns about positions or spawned objects at all.
         self.assertNotIn("Vector3.Distance", observation)
         self.assertNotIn("Vector3.Distance", engine)
-        self.assertNotIn("RuntimeSpatialObservation", binding)
-        self.assertNotIn("PosX", binding)
-        self.assertNotIn("GetPosition", binding)
+        # The engine still destroys objects for clear_spawned, but it never derives a fact tally.
+        self.assertNotIn("SpawnTally", engine)
+        self.assertNotIn("EncounterFacts {", engine)
+        for marker in ("RuntimeObservation", "PosX", "GetPosition", "SpawnedObject"):
+            with self.subTest(binding_marker=marker):
+                self.assertNotIn(marker, binding)
 
 
 if __name__ == "__main__":

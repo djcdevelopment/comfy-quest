@@ -861,7 +861,7 @@ public sealed class QuestStudioServiceTests : IDisposable
         var service = CreateService();
         using var catalog = JsonDocument.Parse(JsonSerializer.Serialize(service.WorkspaceCatalog()));
         var measures = catalog.RootElement.GetProperty("adaptive_measures").EnumerateArray().ToArray();
-        Assert.Equal(new[] { "time_since_progress", "time_since_stage_entered" },
+        Assert.Equal(new[] { "player_deaths_in_stage", "spawned_enemies_cleared", "spawned_enemies_remaining", "time_since_progress", "time_since_stage_entered" },
             measures.Select(value => value.GetProperty("name").GetString()).OrderBy(value => value, StringComparer.Ordinal));
         Assert.All(measures, value => Assert.Equal("extended", value.GetProperty("palette").GetString()));
 
@@ -997,6 +997,88 @@ public sealed class QuestStudioServiceTests : IDisposable
         var rejected = service.CertifyGraph(invalid.ProjectId);
         Assert.False(rejected.Ok);
         Assert.Contains(rejected.Diagnostics, value => value.Code == "spatial_anchor_player_invalid");
+    }
+
+    [Fact]
+    public void Advanced_encounter_conditions_compile_rehearse_and_stay_extended()
+    {
+        var service = CreateService();
+        using var catalog = JsonDocument.Parse(JsonSerializer.Serialize(service.WorkspaceCatalog()));
+        var counted = catalog.RootElement.GetProperty("adaptive_measures").EnumerateArray()
+            .Where(value => value.GetProperty("requires_spawn_action").GetBoolean()).ToArray();
+        Assert.Equal(new[] { "spawned_enemies_cleared", "spawned_enemies_remaining" },
+            counted.Select(value => value.GetProperty("name").GetString()).OrderBy(value => value, StringComparer.Ordinal));
+        Assert.All(counted, value => Assert.Equal("enemies", value.GetProperty("unit").GetString()));
+        Assert.All(counted, value => Assert.Equal("extended", value.GetProperty("palette").GetString()));
+
+        // The defense: stage a wave, then hold until it is cleared.
+        var defense = service.CreateProject("blank");
+        var opening = defense.Nodes[0].Routes[0];
+        opening.Actions.Add(new StudioAction { Id = "wave", Type = "spawn", Kind = "creature", Prefab = "Greyling", Count = 3, Radius = 5 });
+        defense.Nodes.Add(new StudioNode
+        {
+            Id = "hold", Label = "Hold the ground",
+            Routes = { new StudioRoute { Id = "held", Event = opening.Event, Target = opening.Target, Outcome = "complete",
+                AdaptiveConditions = { new StudioAdaptiveCondition { Measure = "spawned_enemies_cleared", Comparison = "gte", Value = 3, ActionId = "wave" } } } }
+        });
+        opening.DestinationNodeId = "hold";
+        opening.Outcome = null;
+        Assert.True(service.SaveDraft(defense.ProjectId, new StudioSaveRequest(defense.Revision, defense)).Ok);
+        var certified = service.CertifyGraph(defense.ProjectId);
+        Assert.True(certified.Ok, certified.Error);
+        using (var document = JsonDocument.Parse(certified.ExperienceJson!))
+        {
+            var hold = document.RootElement.GetProperty("stages").EnumerateArray().Single(value => value.GetProperty("id").GetString() == "hold");
+            var threshold = Assert.Single(hold.GetProperty("transitions")[0].GetProperty("when").GetProperty("children").EnumerateArray(),
+                value => value.GetProperty("op").GetString() == "THRESHOLD");
+            Assert.Equal("spawned_enemies_cleared", threshold.GetProperty("measure").GetString());
+            Assert.Equal("wave", threshold.GetProperty("action_id").GetString());
+        }
+        var held = service.Rehearse(defense.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(held.Ok, held.Error);
+        Assert.Equal("complete", held.Outcome);
+        Assert.Contains(held.GeneratedSteps, value => value.Kind == "despawn" && value.ActionId == "wave" && value.Count == 3);
+        Assert.Contains(held.Limitations, value => value.Contains("while play removes one when the object itself is gone"));
+
+        // The same wave, counted the other way: the route fires while enemies still stand.
+        var overrun = service.CreateProject("blank");
+        var start = overrun.Nodes[0].Routes[0];
+        start.Actions.Add(new StudioAction { Id = "wave", Type = "spawn", Kind = "creature", Prefab = "Greyling", Count = 3, Radius = 5 });
+        overrun.Nodes.Add(new StudioNode
+        {
+            Id = "besieged", Label = "Besieged",
+            Routes = { new StudioRoute { Id = "overrun", Event = start.Event, Target = start.Target, Outcome = "fail",
+                AdaptiveConditions = { new StudioAdaptiveCondition { Measure = "spawned_enemies_remaining", Comparison = "gte", Value = 2, ActionId = "wave" } } } }
+        });
+        start.DestinationNodeId = "besieged";
+        start.Outcome = null;
+        Assert.True(service.SaveDraft(overrun.ProjectId, new StudioSaveRequest(overrun.Revision, overrun)).Ok);
+        var besieged = service.Rehearse(overrun.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(besieged.Ok, besieged.Error);
+        Assert.Equal("fail", besieged.Outcome);
+        Assert.DoesNotContain(besieged.GeneratedSteps, value => value.Kind == "despawn");
+
+        // Falling twice is a persisted count, and guided rehearsal supplies the extra fall.
+        var mercy = service.CreateProject("blank");
+        mercy.Nodes[0].Routes[0].AdaptiveConditions.Add(new StudioAdaptiveCondition { Measure = "player_deaths_in_stage", Comparison = "gte", Value = 2 });
+        Assert.True(service.SaveDraft(mercy.ProjectId, new StudioSaveRequest(mercy.Revision, mercy)).Ok);
+        var shown = service.Rehearse(mercy.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(shown.Ok, shown.Error);
+        Assert.Equal("complete", shown.Outcome);
+        Assert.Equal(2, shown.GeneratedSteps.Count(value => value.EventName == "player_died"));
+        // A death count must never be read as a wait.
+        Assert.DoesNotContain(shown.GeneratedSteps, value => value.Kind == "advance");
+
+        // Naming no wave, or naming one for a measure that counts none, fails closed at compile time.
+        var unnamed = service.CreateProject("blank");
+        unnamed.Nodes[0].Routes[0].AdaptiveConditions.Add(new StudioAdaptiveCondition { Measure = "spawned_enemies_remaining", Comparison = "gte", Value = 1 });
+        Assert.True(service.SaveDraft(unnamed.ProjectId, new StudioSaveRequest(unnamed.Revision, unnamed)).Ok);
+        Assert.Contains(service.CertifyGraph(unnamed.ProjectId).Diagnostics, value => value.Code == "adaptive_action_invalid");
+
+        var misnamed = service.CreateProject("blank");
+        misnamed.Nodes[0].Routes[0].AdaptiveConditions.Add(new StudioAdaptiveCondition { Measure = "time_since_stage_entered", Comparison = "gte", Value = 30, ActionId = "wave" });
+        Assert.True(service.SaveDraft(misnamed.ProjectId, new StudioSaveRequest(misnamed.Revision, misnamed)).Ok);
+        Assert.Contains(service.CertifyGraph(misnamed.ProjectId).Diagnostics, value => value.Code == "adaptive_action_unsupported");
     }
 
     [Fact]

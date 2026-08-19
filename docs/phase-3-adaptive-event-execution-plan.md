@@ -1,8 +1,9 @@
 # Phase 3 adaptive event semantics — execution plan and status
 
-Status date: 2026-08-19 (updated after the Phase 3.2 spatial slice)
+Status date: 2026-08-19 (updated after the Phase 3.3 encounter slice)
 Temporal foundation landed in `665838a` (`Add adaptive temporal predicates`); the
-spatial substrate landed in the following `Add spatial anchors and predicates` commit.
+spatial substrate landed in `6ef6d62` (`Add spatial anchors and predicates`); the
+encounter facts landed in the following `Add encounter and performance facts` commit.
 
 This document records the working plan behind Phase 3, what the first implementation
 slice delivered, and what remains. It is subordinate to
@@ -255,24 +256,87 @@ secret scan.
   unadmitted; `count_in_area` counts only this workflow's tracked spawns.
 - Timer-driven routes rehearse without positions and say so in a limitation line.
 
+## Delivered — Phase 3.3 encounter and performance facts
+
+Phase 3.3 is complete. Quests can now respond to how a fight went: how many of a staged
+wave are gone, how many still stand, and how many times the player fell. Nothing entered
+the beginner palette, and no new game observation was added.
+
+### Facts
+
+`AdaptiveMeasureCatalog` gains three `extended` measures, all using the existing `gte`
+comparison: `player_deaths_in_stage` (1..64 deaths), `spawned_enemies_remaining` and
+`spawned_enemies_cleared` (1..128 enemies each). The two spawn measures name their wave
+through an additive `action_id` on `THRESHOLD`, validated against the document's authored
+`spawn` actions exactly as `clear_spawned` is. `docs/adaptive-event-fact-inventory.md`
+records each source, its failure behavior, and the interpretation limits.
+
+The slice added **no new normalized event**: `player_died` and `kill` were already in the
+closed 34-event catalog, so the generated seam catalogs and their count pins are
+untouched. Because a document can count deaths without naming the event in any clause,
+`RuntimeSubscriptionIndex` now subscribes a measure's declared `SourceEvent`; without
+that the engine would drop the event before evaluation and the condition would silently
+never fire.
+
+### Why they are honest
+
+The load-bearing question was whether `spawned_enemies_cleared` can fail open. It cannot:
+evaluation runs only where `CharmPolicy.CanMutate` allows (solo or listen-host private
+worlds, never a dedicated server or peer client), and that process holds every ZDO
+regardless of zone loading — so an unresolvable ledger row means the object was
+destroyed, not merely distant. Staged and live counts come from one ledger read, so an
+absent ledger reports zero staged and fails every predicate closed. `SpawnExecutionStore`
+now reports `Unreadable` the way `WorkflowStateStore` already did, keeping "unknown"
+distinct from "none".
+
+Wave-clear *time* is deliberately composed rather than predicated: a triumph route driven
+by the clearing event wins its race against a lower-priority timer route, and the elapsed
+time is reported from `stage_entered_utc` and the deciding event time. No fact claims to
+know the moment the last object fell, because nothing observes it. `time_since_spawned`
+joins combat duration on the deferred list with its admission rule written down.
+
+### Contracts, Runtime, and Studio
+
+`AdaptiveEvaluator.cs` is the new pure evaluator mirroring `SpatialEvaluator`; the
+`THRESHOLD` trace row's hardcoded `" seconds"` became a catalog-driven unit with singular
+forms (`">= 8 enemies"` / `"1 enemy"`), leaving the pinned temporal strings byte-identical.
+`WorkflowProgress` gains additive nullable `deaths_in_stage`, incremented on the append
+path only and reset when the stage advances, not when a same-stage transition clears
+history.
+
+`RuntimeSpatialObservation` was renamed `RuntimeObservation`: it now resolves positions
+and tallies in one ledger pass, and the invariant is "one observation seam," so the name
+should say so. The arcane-sight python pin was extended — not weakened — to cover the new
+name, to forbid the retired one, and to keep tally math out of the engine and the Charm
+binding surface.
+
+Studio's advanced adaptive editor gained a wave selector for the counting measures, a
+catalog-driven default (a seconds-flavored 30 would have seeded a nonsense death count),
+and bounds that re-clamp when the measure changes. The two hardcoded measure ternaries in
+Studio prose and the one in Runtime drawer prose became catalog-driven, so a future
+measure can never silently render as "without quest progress". Guided rehearsal filters
+its wait to seconds-unit measures, supplies the extra falls a death condition needs, and
+stages a wave then removes objects from it through a new `despawn` step — honest
+precisely because it is not dressed up as a `kill` event, and carrying a limitation line
+that says so.
+
+### Versions and verification
+
+`Comfy.Quest.Contracts` and `Comfy.Quest.Studio` moved to `0.6.0-local` with exact repins
+everywhere. The full gate set passed: licensed Lab and Runtime Release builds, 250
+Contracts/Lab xUnit tests, 270 Python pin/boundary/drift tests, 76 Studio xUnit tests,
+loopback browser Studio E2E, interim-package, no-reach-in, repo-identity, and
+generated-tome checks, and the full-history secret scan.
+
+### Deliberate scope holds
+
+- No `lte` comparison: every desperate-defense branch is expressible with `gte` plus
+  route priority. Admit it when a lap produces a condition that genuinely needs it.
+- No per-wave clock and no cross-stage death total; both have written admission rules.
+- `count_in_area` still counts only this workflow's tracked spawns, and authored anchors
+  still have no Studio editor (Phase 3.2 holds, unchanged).
+
 ## Remaining Phase 3 work
-
-### Phase 3.3 — encounter and performance facts
-
-After the spatial substrate is stable:
-
-1. Define named facts for wave-clear time, player deaths, and remaining authored
-   enemies.
-2. Source remaining-enemy facts from `SpawnExecutionStore` ownership records rather
-   than a broad scene scan.
-3. Specify lifecycle semantics for clear, despawn, reload, rollback, and orphaned
-   spawned objects.
-4. Persist only the minimum workflow facts that must survive history clearing.
-5. Add bounded threshold predicates and actual-versus-expected explanations through
-   the same contract/rehearsal/Studio path.
-
-Continuous combat duration remains outside this slice until its authoritative source
-exists.
 
 ### Phase 3.4 — complete the five-level presentation
 

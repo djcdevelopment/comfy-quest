@@ -63,7 +63,7 @@ sealed class RuntimeExperienceEngine {
         At = now,
         Fields = new Dictionary<string, string> { ["timer_id"] = timer.TimerId },
       };
-      RuntimeSpatialObservation.StampLocalPlayer(elapsed);
+      RuntimeObservation.StampLocalPlayer(elapsed);
       OnEvent(elapsed);
       timers.Acknowledge(timer.Key);
     }
@@ -105,18 +105,21 @@ sealed class RuntimeExperienceEngine {
 
         foundBinding = true;
         var identity = Identity(zdo, active);
-        var spatialFacts = RuntimeSpatialObservation.Facts(
+        var observed = RuntimeObservation.Facts(
             zdo, spawned, identity.Key, active.ContentHash);
         var before = workflows.Get(identity);
         var evaluationContext = new TriggerEvaluationContext {
           At = evt.At,
           StageEnteredUtc = before?.StageEnteredUtc ?? (before == null ? evt.At : (DateTimeOffset?)null),
           LastProgressUtc = before?.LastProgressUtc ?? (before == null ? evt.At : (DateTimeOffset?)null),
-          BindingPosition = spatialFacts.BindingPosition,
-          SpawnedPositions = spatialFacts.SpawnedPositions,
+          BindingPosition = observed.Spatial.BindingPosition,
+          SpawnedPositions = observed.Spatial.SpawnedPositions,
           AuthoredAnchors = SpatialEvaluator.AnchorMap(active.Document),
+          DeathsInStage = before?.DeathsInStage,
+          SpawnsByAction = observed.Encounter?.SpawnsByAction,
         };
-        var decision = workflows.Begin(identity, active.Document, evt, spatialFacts);
+        var decision = workflows.Begin(
+            identity, active.Document, evt, observed.Spatial, observed.Encounter);
         if (decision == null) {
           var state = workflows.Get(identity);
           var stage = active.Document.Stages.FirstOrDefault(value => value.Id == state?.StageId);
@@ -515,15 +518,17 @@ sealed class RuntimeExperienceEngine {
         var stage = active.Document.Stages.FirstOrDefault(value => value.Id == progress.StageId);
         var transition = stage?.Transitions?.OrderByDescending(value => value.Priority)
             .ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault();
-        var spatialFacts = RuntimeSpatialObservation.Facts(
+        var observed = RuntimeObservation.Facts(
             zdo, spawned, identity.Key, active.ContentHash);
         var measured = TriggerEvaluator.Measure(transition?.When, progress.History, new TriggerEvaluationContext {
           At = progress.LastEventUtc,
           StageEnteredUtc = progress.StageEnteredUtc,
           LastProgressUtc = progress.LastProgressUtc,
-          BindingPosition = spatialFacts.BindingPosition,
-          SpawnedPositions = spatialFacts.SpawnedPositions,
+          BindingPosition = observed.Spatial.BindingPosition,
+          SpawnedPositions = observed.Spatial.SpawnedPositions,
           AuthoredAnchors = SpatialEvaluator.AnchorMap(active.Document),
+          DeathsInStage = progress.DeathsInStage,
+          SpawnsByAction = observed.Encounter?.SpawnsByAction,
         });
         var count = measured.Required > 1
             ? " - " + measured.Current + "/" + measured.Required : "";
@@ -571,9 +576,16 @@ sealed class RuntimeExperienceEngine {
 
   static string ThresholdSuffix(TriggerExpression trigger) {
     var thresholds = Thresholds(trigger).Select(value => {
-      if (value.Measure == "time_since_stage_entered")
-        return "after " + value.Value.GetValueOrDefault() + "s in this stage";
-      return "after " + value.Value.GetValueOrDefault() + "s without quest progress";
+      var amount = value.Value.GetValueOrDefault();
+      AdaptiveMeasureCatalog.TryGet(value.Measure, out var measure);
+      var unit = measure == null ? "" : " " + measure.UnitFor(amount);
+      if (value.Measure == "time_since_stage_entered") return "after " + amount + "s in this stage";
+      if (value.Measure == "time_since_progress") return "after " + amount + "s without quest progress";
+      if (value.Measure == AdaptiveMeasureCatalog.DeathsMeasure) return "after " + amount + unit;
+      if (value.Measure == AdaptiveMeasureCatalog.ClearedMeasure) return "after clearing " + amount + unit;
+      if (value.Measure == AdaptiveMeasureCatalog.RemainingMeasure)
+        return "with " + amount + " or more still standing";
+      return "when " + (measure?.Label ?? value.Measure) + " reaches " + amount;
     }).ToArray();
     return thresholds.Length == 0 ? "" : " " + string.Join(" and ", thresholds);
   }

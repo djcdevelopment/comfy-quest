@@ -37,7 +37,10 @@ public sealed class TriggerEvaluationContext {
   public SpatialPoint? BindingPosition { get; set; }
   public IReadOnlyList<SpatialPoint> SpawnedPositions { get; set; }
   public IReadOnlyDictionary<string,SpatialPoint> AuthoredAnchors { get; set; }
-  public bool TryMeasure(string name,out double value){value=0;if(!At.HasValue)return false;DateTimeOffset? origin=null;if(string.Equals(name,"time_since_stage_entered",StringComparison.Ordinal))origin=StageEnteredUtc;else if(string.Equals(name,"time_since_progress",StringComparison.Ordinal))origin=LastProgressUtc;else return false;if(!origin.HasValue)return false;value=(At.Value-origin.Value).TotalSeconds;return true;}
+  public int? DeathsInStage { get; set; }
+  public IReadOnlyDictionary<string,SpawnTally> SpawnsByAction { get; set; }
+  public bool TryMeasure(string name,out double value)=>TryMeasure(name,null,out value);
+  public bool TryMeasure(string name,string actionId,out double value){value=0;if(string.Equals(name,AdaptiveMeasureCatalog.DeathsMeasure,StringComparison.Ordinal)){if(!DeathsInStage.HasValue)return false;value=DeathsInStage.Value;return true;}var remaining=string.Equals(name,AdaptiveMeasureCatalog.RemainingMeasure,StringComparison.Ordinal);if(remaining||string.Equals(name,AdaptiveMeasureCatalog.ClearedMeasure,StringComparison.Ordinal)){if(string.IsNullOrWhiteSpace(actionId)||SpawnsByAction==null||!SpawnsByAction.TryGetValue(actionId,out var tally)||tally==null)return false;value=remaining?tally.Live:tally.Cleared;return true;}if(!At.HasValue)return false;DateTimeOffset? origin=null;if(string.Equals(name,"time_since_stage_entered",StringComparison.Ordinal))origin=StageEnteredUtc;else if(string.Equals(name,"time_since_progress",StringComparison.Ordinal))origin=LastProgressUtc;else return false;if(!origin.HasValue)return false;value=(At.Value-origin.Value).TotalSeconds;return true;}
   public bool TryResolveAnchor(AreaAnchor anchor,RuntimeEvent trigger,out SpatialPoint point){point=default;var kind=anchor?.Kind??"";if(string.Equals(kind,"coordinates",StringComparison.Ordinal)){if(!(anchor.X.HasValue&&anchor.Y.HasValue&&anchor.Z.HasValue))return false;point=new SpatialPoint(anchor.X.Value,anchor.Y.Value,anchor.Z.Value);return true;}if(string.Equals(kind,"authored",StringComparison.Ordinal))return anchor.AnchorId!=null&&AuthoredAnchors!=null&&AuthoredAnchors.TryGetValue(anchor.AnchorId,out point);if(string.Equals(kind,"binding",StringComparison.Ordinal)){if(!BindingPosition.HasValue)return false;point=BindingPosition.Value;return true;}if(string.Equals(kind,"player",StringComparison.Ordinal))return SpatialEvaluator.TryPosition(trigger,out point);return false;}
 }
 
@@ -106,7 +109,7 @@ public static class TriggerEvaluator {
     return new TriggerProgress { Current = Eval(expression, bounded) ? 1 : 0, Required = 1 };
   }
   public static TriggerProgress Measure(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,TriggerEvaluationContext context) {
-    history??=Array.Empty<RuntimeEvent>();if(expression==null)return new TriggerProgress{Current=0,Required=1};var bounded=Bound(expression,history);if(string.Equals(expression.Op,"COUNT",StringComparison.OrdinalIgnoreCase)&&expression.Children?.Count==1){var required=Math.Max(1,expression.Count.GetValueOrDefault());var current=bounded.Count(value=>EventMatches(expression.Children[0],value));return new TriggerProgress{Current=Math.Min(current,required),Required=required};}if(string.Equals(expression.Op,"THRESHOLD",StringComparison.OrdinalIgnoreCase)){var required=Math.Max(1,expression.Value.GetValueOrDefault());return new TriggerProgress{Current=ThresholdCurrent(expression,context,required),Required=required};}if(string.Equals(expression.Op,"SPATIAL",StringComparison.OrdinalIgnoreCase))return SpatialEvaluator.Progress(expression,bounded,context);return new TriggerProgress{Current=Eval(expression,bounded,context)?1:0,Required=1};
+    history??=Array.Empty<RuntimeEvent>();if(expression==null)return new TriggerProgress{Current=0,Required=1};var bounded=Bound(expression,history);if(string.Equals(expression.Op,"COUNT",StringComparison.OrdinalIgnoreCase)&&expression.Children?.Count==1){var required=Math.Max(1,expression.Count.GetValueOrDefault());var current=bounded.Count(value=>EventMatches(expression.Children[0],value));return new TriggerProgress{Current=Math.Min(current,required),Required=required};}if(string.Equals(expression.Op,"THRESHOLD",StringComparison.OrdinalIgnoreCase))return AdaptiveEvaluator.Progress(expression,context);if(string.Equals(expression.Op,"SPATIAL",StringComparison.OrdinalIgnoreCase))return SpatialEvaluator.Progress(expression,bounded,context);return new TriggerProgress{Current=Eval(expression,bounded,context)?1:0,Required=1};
   }
   public static int EventProgress(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history){history??=Array.Empty<RuntimeEvent>();return EventProgressNode(expression,Bound(expression,history));}
   static bool Eval(TriggerExpression x, IReadOnlyList<RuntimeEvent> h) {
@@ -120,7 +123,7 @@ public static class TriggerEvaluator {
     if(op=="SEQUENCE") { int i=0; foreach(var v in h) if(i<c.Count&&EventMatches(c[i],v)) i++; return i==c.Count; }
     return false;
   }
-  static bool Eval(TriggerExpression x,IReadOnlyList<RuntimeEvent> h,TriggerEvaluationContext context){if(x==null)return false;var op=(x.Op??"").ToUpperInvariant();if(op=="THRESHOLD")return ThresholdSatisfied(x,context);if(op=="SPATIAL")return SpatialEvaluator.Satisfied(x,h,context);if(op=="EVENT")return h.Any(v=>EventMatches(x,v));var c=x.Children??new();if(op=="ANY")return c.Any(v=>Eval(v,h,context));if(op=="ALL")return c.All(v=>Eval(v,h,context));if(op=="COUNT")return c.Count==1&&h.Count(v=>EventMatches(c[0],v))>=x.Count.GetValueOrDefault();if(op=="SEQUENCE"){int i=0;foreach(var v in h)if(i<c.Count&&EventMatches(c[i],v))i++;return i==c.Count;}return false;}
+  static bool Eval(TriggerExpression x,IReadOnlyList<RuntimeEvent> h,TriggerEvaluationContext context){if(x==null)return false;var op=(x.Op??"").ToUpperInvariant();if(op=="THRESHOLD")return AdaptiveEvaluator.Satisfied(x,context);if(op=="SPATIAL")return SpatialEvaluator.Satisfied(x,h,context);if(op=="EVENT")return h.Any(v=>EventMatches(x,v));var c=x.Children??new();if(op=="ANY")return c.Any(v=>Eval(v,h,context));if(op=="ALL")return c.All(v=>Eval(v,h,context));if(op=="COUNT")return c.Count==1&&h.Count(v=>EventMatches(c[0],v))>=x.Count.GetValueOrDefault();if(op=="SEQUENCE"){int i=0;foreach(var v in h)if(i<c.Count&&EventMatches(c[i],v))i++;return i==c.Count;}return false;}
   static TriggerClauseTrace BuildBoundedTrace(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,TriggerEvaluationContext context=null) {
     var nodeCount=CountNodes(expression);
     var full=BuildTrace(expression,history,context,nodeCount,128,out _);
@@ -164,9 +167,9 @@ public static class TriggerEvaluator {
       trace.Current=trace.Satisfied?1:0;trace.Required=1;if(stringsTruncated)trace.Truncated=true;return trace;
     }
     if(op=="THRESHOLD") {
-      var required=Math.Max(1,x.Value.GetValueOrDefault());double actual=0;var found=context!=null&&context.TryMeasure(x.Measure,out actual);var actualText=found?FormatSeconds(actual):null;
-      trace.Current=ThresholdCurrent(x,context,required);trace.Required=required;
-      trace.Where.Add(new TriggerWhereTrace{Field=Trim(x.Measure,maxCharacters,ref stringsTruncated),Expected=Trim(">= "+required.ToString(CultureInfo.InvariantCulture)+" seconds",maxCharacters,ref stringsTruncated),Actual=Trim(actualText,maxCharacters,ref stringsTruncated),Satisfied=trace.Satisfied});
+      var observation=AdaptiveEvaluator.Observe(x,context);
+      trace.Current=observation.Current;trace.Required=observation.Required;
+      trace.Where.Add(new TriggerWhereTrace{Field=Trim(x.Measure,maxCharacters,ref stringsTruncated),Expected=Trim(observation.Expected,maxCharacters,ref stringsTruncated),Actual=Trim(observation.Actual,maxCharacters,ref stringsTruncated),Satisfied=trace.Satisfied});
       if(stringsTruncated)trace.Truncated=true;return trace;
     }
     if(op=="SPATIAL") {
@@ -196,9 +199,6 @@ public static class TriggerEvaluator {
   }
   static int CountNodes(TriggerExpression expression)=>expression==null?1:1+(expression.Children??new()).Sum(CountNodes);
   static IReadOnlyList<RuntimeEvent> Bound(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history)=>expression?.WithinSeconds.HasValue==true&&history.Count>0?history.Where(x=>x.At>=history[history.Count-1].At.AddSeconds(-expression.WithinSeconds.Value)).ToArray():history.ToArray();
-  static bool ThresholdSatisfied(TriggerExpression expression,TriggerEvaluationContext context)=>expression?.Value>0&&string.Equals(expression.Comparison,"gte",StringComparison.Ordinal)&&context!=null&&context.TryMeasure(expression.Measure,out var actual)&&actual>=0&&actual>=expression.Value.Value;
-  static int ThresholdCurrent(TriggerExpression expression,TriggerEvaluationContext context,int required){if(context==null||!context.TryMeasure(expression.Measure,out var actual)||actual<=0)return 0;if(actual>=required)return required;return (int)Math.Floor(actual);}
-  static string FormatSeconds(double value)=>value.ToString(value==Math.Truncate(value)?"0":"0.###",CultureInfo.InvariantCulture)+" seconds";
   static int EventProgressNode(TriggerExpression x,IReadOnlyList<RuntimeEvent> h){if(x==null)return 0;var op=(x.Op??"").ToUpperInvariant();if(op=="THRESHOLD"||op=="SPATIAL")return 0;if(op=="EVENT")return h.Any(v=>EventMatches(x,v))?1:0;var c=x.Children??new();if(op=="COUNT")return c.Count==1?Math.Min(h.Count(v=>EventMatches(c[0],v)),Math.Max(1,x.Count.GetValueOrDefault())):0;if(op=="SEQUENCE"){int i=0;foreach(var v in h)if(i<c.Count&&EventMatches(c[i],v))i++;return i;}return c.Sum(v=>EventProgressNode(v,h));}
   static int TraceBytes(TriggerClauseTrace trace)=>Encoding.UTF8.GetByteCount(JsonConvert.SerializeObject(trace,Formatting.Indented));
   static string Trim(string value,int max,ref bool truncated){if(value==null||value.Length<=max)return value;truncated=true;return value.Substring(0,max);}
