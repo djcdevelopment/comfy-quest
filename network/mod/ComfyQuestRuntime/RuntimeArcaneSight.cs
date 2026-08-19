@@ -208,10 +208,6 @@ sealed class RuntimeArcaneSight {
     catch { return Array.Empty<WearNTear>(); }
   }
 
-  sealed class ActiveSet {
-    [JsonProperty("content_hash")] public string ContentHash { get; set; }
-  }
-
   sealed class Marker {
     public GameObject Host;
     public string PackId;

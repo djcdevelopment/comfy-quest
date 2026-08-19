@@ -27,12 +27,21 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
     def test_runtime_preserves_the_active_set_activation_id(self) -> None:
         engine = ENGINE.read_text(encoding="utf-8")
         for marker in (
-            '[JsonProperty("activation_id")] public string ActivationId { get; set; }',
             "ActivationId = set.ActivationId",
             "public string ActivationId;",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, engine)
+
+    def test_runtime_readers_bind_the_contract_active_set_without_shadow_copies(self) -> None:
+        # active-set.json has one schema owner: ComfyQuestContracts.ActiveSet. A private
+        # nested copy would silently fork the schema the moment a field is added to one
+        # reader and not the others (that fork already happened once, for activation_id).
+        for path in (ENGINE, BINDING, SIGHT, PLUGIN):
+            with self.subTest(reader=path.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertNotIn("sealed class ActiveSet", text)
+                self.assertIn("using ComfyQuestContracts;", text)
 
     def test_arcane_sight_is_read_only_and_restores_visual_state(self) -> None:
         sight = SIGHT.read_text(encoding="utf-8")

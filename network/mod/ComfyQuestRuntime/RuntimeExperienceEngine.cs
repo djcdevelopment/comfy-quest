@@ -535,14 +535,6 @@ sealed class RuntimeExperienceEngine {
         Diagnostics = Array.Empty<ContractDiagnostic>(),
       });
 
-  sealed class ActiveSet {
-    [JsonProperty("pack_id")] public string PackId { get; set; }
-    [JsonProperty("version")] public string Version { get; set; }
-    [JsonProperty("content_hash")] public string ContentHash { get; set; }
-    [JsonProperty("activation_id")] public string ActivationId { get; set; }
-    [JsonProperty("source")] public string Source { get; set; }
-  }
-
   sealed class Active {
     public string PackId;
     public string Version;

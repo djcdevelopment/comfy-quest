@@ -121,8 +121,11 @@ public static class TriggerEvaluator {
     var children=x.Children??new();var stringsTruncated=false;
     var trace=new TriggerClauseTrace{Op=Trim(op,maxCharacters,ref stringsTruncated),Event=Trim(x.Event,maxCharacters,ref stringsTruncated),Target=Trim(x.Target,maxCharacters,ref stringsTruncated),Satisfied=Eval(x,h),WithinSeconds=isRoot?x.WithinSeconds:null};
     if(op=="EVENT") {
+      // Actuals may only come from an event the clause could have considered: same name and,
+      // when the clause names a target, the same target. A name-only fallback would harvest
+      // all-satisfied where rows from an event the target check already rejected.
       var exact=h.Reverse().FirstOrDefault(v=>EventMatches(x,v));
-      var candidate=exact??h.Reverse().FirstOrDefault(v=>string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase)&&(string.IsNullOrWhiteSpace(x.Target)||string.Equals(x.Target,v.Target,StringComparison.OrdinalIgnoreCase)))??h.Reverse().FirstOrDefault(v=>string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase));
+      var candidate=exact??h.Reverse().FirstOrDefault(v=>string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase)&&(string.IsNullOrWhiteSpace(x.Target)||string.Equals(x.Target,v.Target,StringComparison.OrdinalIgnoreCase)));
       var where=(x.Where??new()).OrderBy(v=>v.Key,StringComparer.Ordinal).Select(expected=>{
         string actual=null;var found=candidate?.Fields!=null&&candidate.Fields.TryGetValue(expected.Key,out actual);
         return new TriggerWhereTrace{Field=expected.Key,Expected=expected.Value,Actual=found?actual:null,Satisfied=found&&string.Equals(actual,expected.Value,StringComparison.OrdinalIgnoreCase)};

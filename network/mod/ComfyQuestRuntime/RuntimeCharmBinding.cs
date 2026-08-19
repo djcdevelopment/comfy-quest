@@ -29,6 +29,5 @@ sealed class RuntimeCharmBinding {
   static WorldAuthority World(bool confirmed){try{var dedicated=ZNet.instance!=null&&ZNet.instance.IsDedicated();var host=ZNet.instance!=null&&ZNet.instance.IsServer()&&!dedicated;return new(){IsPrivateWorld=confirmed,IsListenHost=host,IsSolo=host,IsDedicated=dedicated,IsPeerClient=ZNet.instance!=null&&!ZNet.instance.IsServer()};}catch{return new(){IsPrivateWorld=confirmed};}}
   void WriteFailure(string error)=>receipts.Write(new RuntimeReceipt{Operation="bind",Status="rejected",Error=error});
   public sealed class AimPreview {public AimPreview(bool allowed,string summary,ZNetView view,string diagnostic,CharmTargetKind kind){Allowed=allowed;Summary=summary;View=view;Diagnostic=diagnostic;Kind=kind;}public bool Allowed{get;}public string Summary{get;}public ZNetView View{get;}public string Diagnostic{get;}public CharmTargetKind Kind{get;}}
-  sealed class ActiveSet {[JsonProperty("pack_id")]public string PackId{get;set;}[JsonProperty("version")]public string Version{get;set;}[JsonProperty("content_hash")]public string ContentHash{get;set;}[JsonProperty("source")]public string Source{get;set;}}
   sealed class ActiveReference {public string PackId,Version,ContentHash,ExperienceId;public System.Collections.Generic.List<string> TargetKinds;}
 }
