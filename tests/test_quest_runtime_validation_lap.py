@@ -23,6 +23,13 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         self.assertNotIn("rm -rf", source)
         self.assertNotIn("git reset", source)
 
+    def test_line_endings_check_canonical_git_and_lap_worktree_surfaces(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("Canonical Git text is not LF", source)
+        self.assertIn("Validation-lap source is not physical LF", source)
+        self.assertIn("git ls-files --eol -- $lapFiles", source)
+        self.assertNotIn("Where-Object { $_ -match 'w/(crlf|mixed)' }", source)
+
     def test_private_world_window_is_explicit_and_fails_closed(self) -> None:
         source = HARNESS.read_text(encoding="utf-8")
         self.assertIn("ArmPrivateWorld requires a machine-validated r1 first.", source)

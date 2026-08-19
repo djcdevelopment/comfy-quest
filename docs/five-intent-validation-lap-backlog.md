@@ -22,6 +22,7 @@ earlier telling.
 | `PrivateWorldConfirmed` was already true while Valheim was closed. | A previous bounded test left the opt-in enabled. | Preparation forces false; only `ArmPrivateWorld` may enable it after exact r1 validation; cleanup always returns it to false. |
 | The prior runbook described Companion on port 8080 and an obsolete Studio workflow. | It predated the sovereign standalone Studio and current Author → Rehearse → Publish & Play journey. | The slice-1.4 runbook now uses port 8085 and explicitly includes arm, enter-world, CHECK, CAST, play, r2, and restore. |
 | Control receipts do not all carry gameplay correlation IDs. | Check, load, bind, and orphan operations do not originate from an accepted gameplay event. | Acceptance requires activation/correlation agreement on each gameplay event chain and treats control-plane receipts separately. No synthetic correlation is invented. |
+| The first preflight reported CRLF in many unrelated working-tree files even though Git was clean. | This Windows checkout materializes longstanding files with platform endings while Git's canonical index remains LF. The new lap files themselves are physical LF. | The gate now checks LF in the canonical index for all tracked text and physical LF for the session's code, JSON-facing tests, and runbook. It does not rewrite unrelated files or weaken an existing pin. |
 
 ### “Can't answer why” ledger
 

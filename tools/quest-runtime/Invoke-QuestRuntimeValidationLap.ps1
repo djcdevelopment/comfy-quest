@@ -476,9 +476,21 @@ function Invoke-Preflight {
     $unexpected = @(git status --porcelain | Where-Object { $_ -notmatch '^\?\? \.claude/' })
     if ($LASTEXITCODE -ne 0) { throw 'git status failed.' }
     if ($unexpected.Count) { throw "Working tree has unexpected changes: $($unexpected -join '; ')" }
-    $eol = @(git ls-files --eol | Where-Object { $_ -match 'w/(crlf|mixed)' })
+    $allEol = @(git ls-files --eol)
     if ($LASTEXITCODE -ne 0) { throw 'git line-ending inspection failed.' }
-    if ($eol.Count) { throw "Tracked line-ending policy failed: $($eol -join '; ')" }
+    $indexEol = @($allEol | Where-Object { $_ -match 'i/(crlf|mixed).*attr/text' })
+    if ($indexEol.Count) { throw "Canonical Git text is not LF: $($indexEol -join '; ')" }
+    $lapFiles = @(
+        'docs/five-intent-validation-lap-backlog.md',
+        'docs/runbooks/I2-QUESTPACK-OMEN.md',
+        'src/Quest.Studio.E2E.Tests/QuestStudioSyntheticE2ETests.cs',
+        'src/Quest.Studio.Tests/QuestStudioServiceTests.cs',
+        'tests/test_quest_runtime_validation_lap.py',
+        'tools/quest-runtime/Invoke-QuestRuntimeValidationLap.ps1',
+        'tools/quest-runtime/Test-QuestRuntimeValidationLap.ps1'
+    )
+    $lapEol = @(git ls-files --eol -- $lapFiles | Where-Object { $_ -notmatch '^i/lf\s+w/lf\s+' })
+    if ($lapEol.Count) { throw "Validation-lap source is not physical LF: $($lapEol -join '; ')" }
     if (-not $FixtureMode) { Invoke-SourceGates }
     $installed = @()
     foreach ($source in @($runtimeDll,$contractsDll,$jsonDll)) {
