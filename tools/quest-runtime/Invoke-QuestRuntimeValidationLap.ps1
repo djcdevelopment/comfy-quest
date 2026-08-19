@@ -515,7 +515,7 @@ function Invoke-Preflight {
         private_world_confirmed = Get-PrivateConfirmation $configPath
         deployment = $installed
         note = 'Prepare will deploy mismatched payloads, quarantine prior packs, and force safety false before player interaction.'
-    } | ConvertTo-Json -Depth 10
+    }
 }
 
 function New-FileManifest([string] $Source, [string] $DestinationRoot, [string] $OriginalRoot) {

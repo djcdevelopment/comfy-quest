@@ -71,6 +71,14 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         self.assertIn("$result | ConvertTo-Json -Depth 20", source)
         self.assertIn("the real process exit code remains decisive", source)
 
+    def test_preflight_is_serialized_exactly_once_by_the_dispatcher(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        preflight = source.split("function Invoke-Preflight", 1)[1].split(
+            "function New-FileManifest", 1
+        )[0]
+        self.assertNotIn("ConvertTo-Json", preflight)
+        self.assertEqual(source.count("$result | ConvertTo-Json -Depth 20"), 1)
+
     def test_restore_surface_has_observed_need_tests(self) -> None:
         source = SELF_TEST.read_text(encoding="utf-8")
         for expected in (
