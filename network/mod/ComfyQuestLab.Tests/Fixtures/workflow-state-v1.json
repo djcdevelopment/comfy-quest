@@ -1,0 +1,13 @@
+{
+  "schema": "comfy-quest-workflow-state/v1",
+  "states": {
+    "old-world|old-hero|old-zdo|old-hash": {
+      "stage_id": "first",
+      "history": [],
+      "pending_transition_id": null,
+      "pending_from_stage_id": null,
+      "pending_next_stage_id": null,
+      "pending_outcome": null
+    }
+  }
+}

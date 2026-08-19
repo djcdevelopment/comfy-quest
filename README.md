@@ -104,7 +104,7 @@ This is local-only synthetic E2E evidence. It does not prove Unity, BepInEx, Har
 patches, hotkeys, or genuine Valheim events; the OMEN acceptance run remains the live
 proof for those adapters.
 
-The interim packages-local feed exists only until the first public 0.1.0 NuGet
+The interim packages-local feed exists only until the first public 0.2.0 NuGet
 publication and exact consumer repin.
 
 Publication readiness is checked without publishing:

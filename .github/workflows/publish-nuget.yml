@@ -45,9 +45,9 @@ jobs:
         run: |
           import os
           tag = os.environ["GITHUB_REF_NAME"]
-          if tag != "nuget-v0.1.0":
+          if tag != "nuget-v0.2.0":
               raise SystemExit(
-                  f"this first-publication lane accepts only nuget-v0.1.0, got {tag!r}"
+                  f"this first-publication lane accepts only nuget-v0.2.0, got {tag!r}"
               )
           if not os.environ.get("NUGET_USER", "").strip():
               raise SystemExit(
@@ -56,7 +56,7 @@ jobs:
                   "Trusted Publishing policy"
               )
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write("value=0.1.0\n")
+              output.write("value=0.2.0\n")
 
       - name: Pack Contracts first
         run: |

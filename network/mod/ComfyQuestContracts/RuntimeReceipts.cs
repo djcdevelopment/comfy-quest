@@ -6,6 +6,7 @@ using System.IO;
 using Newtonsoft.Json;
 
 public sealed class RuntimeReceipt {
+  // Receipt v1 permits additive nullable fields; reserve a schema v2 for changed field meaning.
   [JsonProperty("schema")] public string Schema { get; set; } = "comfy-quest-runtime-receipt/v1";
   [JsonProperty("id")] public string Id { get; set; }
   [JsonProperty("at_utc")] public DateTimeOffset AtUtc { get; set; }
@@ -28,6 +29,11 @@ public sealed class RuntimeReceipt {
   [JsonProperty("next_stage_id", NullValueHandling=NullValueHandling.Ignore)] public string NextStageId { get; set; }
   [JsonProperty("current_count", NullValueHandling=NullValueHandling.Ignore)] public int? CurrentCount { get; set; }
   [JsonProperty("required_count", NullValueHandling=NullValueHandling.Ignore)] public int? RequiredCount { get; set; }
+  [JsonProperty("activation_id", NullValueHandling=NullValueHandling.Ignore)] public string ActivationId { get; set; }
+  [JsonProperty("correlation_id", NullValueHandling=NullValueHandling.Ignore)] public string CorrelationId { get; set; }
+  [JsonProperty("stage_entered_utc", NullValueHandling=NullValueHandling.Ignore)] public DateTimeOffset? StageEnteredUtc { get; set; }
+  [JsonProperty("evidence", NullValueHandling=NullValueHandling.Ignore)] public TriggerClauseTrace Evidence { get; set; }
+  [JsonProperty("rejected_evidence", NullValueHandling=NullValueHandling.Ignore)] public IReadOnlyList<RejectedTransitionEvidence> RejectedEvidence { get; set; }
   [JsonProperty("diagnostics")] public IReadOnlyList<ContractDiagnostic> Diagnostics { get; set; }
 }
 

@@ -56,6 +56,14 @@ is not missing capability but exposing too much of it too quickly.
    validator proves → Studio explains → hot-load → Arcane Sight shows what
    happened"), not merely finished things copied by people who can't operate the
    editor.
+7. **Answer at the reporter's altitude.** When a human reports a technical symptom,
+   first determine whether the required output is a maintainer diagnosis, a creator
+   explanation, or a player experience — then answer at that altitude. Mechanism-first
+   analysis remains a capability; choosing it is a decision, not a reflex. This is the
+   receipts guardrail's twin for conversations and design work: receipts explain at
+   the reader's level, and so do we. (Adopted 2026-08-18 from the persona-awareness
+   baseline; deliberately a principle here, not a checklist — enumeration ritual was
+   considered and rejected as teaching-to-the-test.)
 
 Orientation map for the whole ecosystem: Grimoire is the vocabulary, Studio the
 workbench, Runtime the interpreter, receipts the explanation/proof, Arcane Sight the
@@ -317,8 +325,15 @@ against upstream.
 3. `dotnet test src/Quest.Studio.Tests` (local only)
 4. `tools/quest-studio/Test-QuestStudioE2E.ps1` (local only)
 5. OMEN mod compile + manual validation lap per `docs/runbooks/I2-QUESTPACK-OMEN.md`
+6. Persona-awareness assessment at each phase exit (external lane; location and
+   protocol live outside this repository by design). A band regression, or any
+   invariant sacrificed under pressure, is a stop-and-recalibrate finding before the
+   next phase begins. Baseline recorded 2026-08-18.
 
-Backlog item (out of program scope): add the Studio test lanes to `ci.yml`.
+Backlog items (out of program scope): add the Studio test lanes to `ci.yml`; reconcile
+the role vocabulary across the source intent docs (doc 01 *author*, doc 03 *creator*,
+doc 02 *creator lead*, doc 04 *author/maintainer* — plausibly one human at different
+moments, with unreconciled skill floors; flagged by the 2026-08-18 persona analysis).
 
 ## Risks
 

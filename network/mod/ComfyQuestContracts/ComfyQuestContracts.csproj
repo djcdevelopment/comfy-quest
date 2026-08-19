@@ -32,7 +32,7 @@
 
   <PropertyGroup>
     <PackageId>Comfy.Quest.Contracts</PackageId>
-    <Version>0.1.0-local</Version>
+    <Version>0.2.0-local</Version>
     <Title>Comfy Quest Contracts</Title>
     <Authors>djcdevelopment</Authors>
     <PackageProjectUrl>https://github.com/djcdevelopment/comfy-quest</PackageProjectUrl>

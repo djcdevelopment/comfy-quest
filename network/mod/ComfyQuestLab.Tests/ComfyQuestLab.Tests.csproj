@@ -16,6 +16,7 @@
   <ItemGroup>
     <None Include="..\ComfyQuestRuntime\LiveTest\manifest.json" Link="LiveTest\manifest.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\ComfyQuestRuntime\LiveTest\experiences\omen-inscription.json" Link="LiveTest\experiences\omen-inscription.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ComfyQuestContracts\ComfyQuestContracts.csproj" />
