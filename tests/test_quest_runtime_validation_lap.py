@@ -1,0 +1,96 @@
+from pathlib import Path
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+HARNESS = ROOT / "tools" / "quest-runtime" / "Invoke-QuestRuntimeValidationLap.ps1"
+SELF_TEST = ROOT / "tools" / "quest-runtime" / "Test-QuestRuntimeValidationLap.ps1"
+RUNBOOK = ROOT / "docs" / "runbooks" / "I2-QUESTPACK-OMEN.md"
+
+
+class QuestRuntimeValidationLapTests(unittest.TestCase):
+    def test_state_changes_are_identity_and_sentinel_guarded(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        for expected in (
+            "Assert-RepoIdentity.ps1",
+            ".comfy-quest-validation-lap",
+            "comfy-quest-validation-lap-sentinel/v1",
+            "Assert-SafeLayout",
+            "Read-Context",
+            "Assert-ValheimClosed",
+        ):
+            self.assertIn(expected, source)
+        self.assertNotIn("rm -rf", source)
+        self.assertNotIn("git reset", source)
+
+    def test_private_world_window_is_explicit_and_fails_closed(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("ArmPrivateWorld requires a machine-validated r1 first.", source)
+        self.assertIn("Set-PrivateConfirmation $configPath $false", source)
+        self.assertIn("Set-PrivateConfirmation $configPath $true", source)
+        self.assertIn("PrivateWorldConfirmed remained true after cleanup.", source)
+        self.assertLess(
+            source.index("Assert-ValheimClosed 'private-world arming'"),
+            source.index("Set-PrivateConfirmation $configPath $true"),
+        )
+
+    def test_exact_player_ritual_is_contract_gated(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        for expected in (
+            "The Woodbound Signal",
+            "The charm wakes. Two offerings of wood, before the moment passes.",
+            "The offering is heard. Reclaim one piece to seal the rite.",
+            "The circuit closes. The charm remembers this telling.",
+            "The circuit closes. The Charm remembers a new telling.",
+            "Stage 2 must drop Wood twice within 30 seconds.",
+            "Stage 3 must pick up Wood.",
+            "normalized_experience_sha256",
+        ):
+            self.assertIn(expected, source)
+
+    def test_monitor_separates_human_pacing_from_machine_timeout(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("waiting_for_player", source)
+        self.assertIn("machine_timer_started=$false", source)
+        self.assertIn("if (-not $ActionObserved)", source)
+        self.assertIn("Machine receipt timeout", source)
+        self.assertIn("do not repeat the player action", source)
+        self.assertLess(source.index("if (-not $ActionObserved)"), source.index("Start-Sleep -Milliseconds 250"))
+
+    def test_restore_surface_has_observed_need_tests(self) -> None:
+        source = SELF_TEST.read_text(encoding="utf-8")
+        for expected in (
+            "running-game refusal",
+            "quarantine",
+            "strict JSON",
+            "machine timeout",
+            "interrupted cleanup",
+            "byte-exact restore",
+            "TestFaultAfter Quarantine",
+        ):
+            self.assertIn(expected, source)
+
+    def test_harness_stays_local_and_does_not_grow_cross_system_reach(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8").lower()
+        for forbidden in (
+            "ssh ",
+            "docker",
+            "am4",
+            "networksense",
+            "companion",
+            "gateway",
+            "invoke-valheimserverruntimecontrol",
+        ):
+            self.assertNotIn(forbidden, source)
+
+    def test_runbook_names_the_player_experience_and_proof_gates(self) -> None:
+        # The runbook update is part of the same session: this pin keeps the tool from
+        # becoming an infrastructure-only ritual in later edits.
+        source = RUNBOOK.read_text(encoding="utf-8")
+        self.assertIn("The Woodbound Signal", source)
+        self.assertIn("player experience", source.lower())
+        self.assertIn("ArmPrivateWorld", source)
+
+
+if __name__ == "__main__":
+    unittest.main()

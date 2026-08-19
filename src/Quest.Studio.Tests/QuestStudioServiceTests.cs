@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using Comfy.Quest.Studio;
@@ -337,6 +338,142 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal(5, result.Inventory["Wood"]);
         Assert.Contains(result.Trace, trace => trace.Status == "ignored" && trace.EventName == "item_picked_up");
         Assert.Contains(result.Trace, trace => trace.RequiredCount == 2 && trace.CurrentCount == 1);
+    }
+
+    [Fact]
+    public async Task Woodbound_signal_certifies_publishes_and_rotates_one_final_message()
+    {
+        const string firstMessage = "The charm wakes. Two offerings of wood, before the moment passes.";
+        const string secondMessage = "The offering is heard. Reclaim one piece to seal the rite.";
+        const string r1FinalMessage = "The circuit closes. The charm remembers this telling.";
+        const string r2FinalMessage = "The circuit closes. The Charm remembers a new telling.";
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        project.Title = "The Woodbound Signal";
+        project.Nodes = new()
+        {
+            Beat("speak", "chat_sent", "normal", "offer", actions: new()
+            {
+                new() { Id = "message-wake", Type = "message", Text = firstMessage }
+            }),
+            Beat("offer", "item_dropped", "Wood", "reclaim", repeatCount: 2, withinSeconds: 30, actions: new()
+            {
+                new() { Id = "message-offering", Type = "message", Text = secondMessage }
+            }),
+            Beat("reclaim", "item_picked_up", "Wood", null, actions: new()
+            {
+                new() { Id = "message-seal", Type = "message", Text = r1FinalMessage }
+            })
+        };
+        project.EntryNodeId = "speak";
+        var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(saved.Ok, saved.Error);
+        project = saved.Project!;
+
+        var rehearsal = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Steps = new()
+        {
+            new() { Kind = "event", EventName = "chat_sent", Target = "normal" },
+            new() { Kind = "event", EventName = "item_dropped", Target = "Wood" },
+            new() { Kind = "event", EventName = "item_dropped", Target = "Wood" },
+            new() { Kind = "event", EventName = "item_picked_up", Target = "Wood" }
+        }});
+        Assert.True(rehearsal.Ok, rehearsal.Error);
+        Assert.Equal("complete", rehearsal.Outcome);
+        Assert.Contains(rehearsal.Trace, trace =>
+            trace.EventName == "item_dropped" && trace.Status == "ignored" &&
+            trace.CurrentCount == 1 && trace.RequiredCount == 2);
+        Assert.Contains(rehearsal.Trace, trace => trace.Effects.Any(effect => effect.Contains(firstMessage)));
+        Assert.Contains(rehearsal.Trace, trace => trace.Effects.Any(effect => effect.Contains(secondMessage)));
+        Assert.Contains(rehearsal.Trace, trace => trace.Effects.Any(effect => effect.Contains(r1FinalMessage)));
+
+        var r1Certification = service.CertifyGraph(project.ProjectId);
+        Assert.True(r1Certification.Ok, string.Join("; ", r1Certification.Diagnostics.Select(value => value.Code)));
+        AssertWoodboundDocument(r1Certification.Document!, r1FinalMessage);
+        var r1Published = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(r1Published.Ok, r1Published.Error);
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var store = new QuestPackStore(runtimeRoot);
+        var r1Candidate = Assert.Single(store.CheckInbox());
+        Assert.True(r1Candidate.IsValid, string.Join("; ", r1Candidate.Diagnostics.Select(value => value.Code)));
+        store.LoadVersion(r1Candidate.Manifest.PackId, "1.0.0");
+        var r1Activation = ReadActivationId(runtimeRoot);
+
+        var bumped = service.BumpPatch(project.ProjectId, project.Revision);
+        Assert.True(bumped.Ok, bumped.Error);
+        project = bumped.Project!;
+        project.Nodes[2].Routes[0].Actions[0].Text = r2FinalMessage;
+        saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(saved.Ok, saved.Error);
+        project = saved.Project!;
+        var r2Certification = service.CertifyGraph(project.ProjectId);
+        Assert.True(r2Certification.Ok, string.Join("; ", r2Certification.Diagnostics.Select(value => value.Code)));
+        AssertWoodboundDocument(r2Certification.Document!, r2FinalMessage);
+        Assert.Equal(NormalizeFinalMessage(r1Certification.ExperienceJson!), NormalizeFinalMessage(r2Certification.ExperienceJson!));
+        Assert.NotEqual(r1Certification.ContentHash, r2Certification.ContentHash);
+
+        var r2Published = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(r2Published.Ok, r2Published.Error);
+        var candidates = store.CheckInbox();
+        Assert.Equal(2, candidates.Count);
+        var r2Candidate = Assert.Single(candidates, value => value.Manifest.Version == "1.0.1");
+        Assert.True(r2Candidate.IsValid, string.Join("; ", r2Candidate.Diagnostics.Select(value => value.Code)));
+        Assert.NotEqual(r1Candidate.ContentHash, r2Candidate.ContentHash);
+        store.LoadVersion(r2Candidate.Manifest.PackId, "1.0.1");
+        var r2Activation = ReadActivationId(runtimeRoot);
+        Assert.NotEqual(r1Activation, r2Activation);
+        Assert.Equal("current", service.RuntimeStatusView(project.ProjectId).ActiveRelation);
+    }
+
+    static void AssertWoodboundDocument(ExperienceDocument document, string finalMessage)
+    {
+        Assert.Equal("The Woodbound Signal", document.Title);
+        Assert.Collection(document.Stages,
+            speak =>
+            {
+                var route = Assert.Single(speak.Transitions);
+                Assert.Equal(("EVENT", "chat_sent", "normal"), (route.When.Op, route.When.Event, route.When.Target));
+                Assert.Equal("The charm wakes. Two offerings of wood, before the moment passes.", MessageText(route));
+            },
+            offer =>
+            {
+                var route = Assert.Single(offer.Transitions);
+                Assert.Equal(("COUNT", 2, 30), (route.When.Op, route.When.Count, route.When.WithinSeconds));
+                var leaf = Assert.Single(route.When.Children!);
+                Assert.Equal(("item_dropped", "Wood"), (leaf.Event, leaf.Target));
+                Assert.Equal("The offering is heard. Reclaim one piece to seal the rite.", MessageText(route));
+            },
+            reclaim =>
+            {
+                var route = Assert.Single(reclaim.Transitions);
+                Assert.Equal(("EVENT", "item_picked_up", "Wood"), (route.When.Op, route.When.Event, route.When.Target));
+                Assert.Equal("complete", route.Outcome);
+                Assert.Equal(finalMessage, MessageText(route));
+            });
+    }
+
+    static string MessageText(ExperienceTransition route)
+    {
+        var action = Assert.Single(route.Actions);
+        Assert.Equal("message", action.Type);
+        return Assert.IsType<string>(action.Parameters["text"].ToObject<string>());
+    }
+
+    static string NormalizeFinalMessage(string json)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        root["stages"]![2]!["transitions"]![0]!["actions"]![0]!["text"] = "__WOODBOUND_FINAL_MESSAGE__";
+        return root.ToJsonString();
+    }
+
+    static string ReadActivationId(string runtimeRoot)
+    {
+        using var active = JsonDocument.Parse(File.ReadAllText(Path.Combine(runtimeRoot, "active", "active-set.json")));
+        var activationId = active.RootElement.GetProperty("activation_id").GetString();
+        Assert.Matches("^act-[0-9]{8}T[0-9]{9}Z-[0-9a-f]{8}$", activationId!);
+        return activationId!;
     }
 
     static StudioNode Beat(string id, string eventName, string? target, string? next,

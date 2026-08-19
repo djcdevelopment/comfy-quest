@@ -290,10 +290,46 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForTextAsync(page.Locator("#extract-status"), optedOutDownload.SuggestedFilename, "opted-out questpack download status");
             Assert.Equal(aggregateBeforeOptedOutOperation, File.ReadAllBytes(usagePath));
 
+            // Before involving a player, drive the exact three-beat Slice 1.4 authoring
+            // path through the real browser and shipping questpack contract. The broader
+            // Signal Circuit above remains intact; this is the one observed-need live-lap pin.
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Back to creator workflow", Exact = true }).ClickAsync();
+            await page.Locator("[data-stage='author']").ClickAsync();
+            await page.Locator("#library-toggle").ClickAsync();
+            await page.Locator("#template").SelectOptionAsync("blank");
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "New quest", Exact = true }).ClickAsync();
+            await WaitForCountAsync(page.Locator(".beat-card"), 1, "one blank Woodbound beat");
+            if (await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"))
+                await page.Locator("#library-close").ClickAsync();
+            await FillAndBlurAsync(page.Locator("#title"), "The Woodbound Signal");
+            await page.Locator(".beat-card[data-beat='0']").ClickAsync();
+            await FillAndBlurAsync(page.Locator("#beat-message"), "The charm wakes. Two offerings of wood, before the moment passes.");
+
+            await AddPickerBeatAsync(page, "item_dropped", "drop Wood beat");
+            await OpenSpecificAsync(page);
+            await FillAndBlurAsync(page.Locator("[data-beat-target]"), "Wood");
+            await FillAndBlurAsync(page.Locator("#beat-repeat"), "2");
+            await FillAndBlurAsync(page.Locator("#beat-window"), "30");
+            await FillAndBlurAsync(page.Locator("#beat-message"), "The offering is heard. Reclaim one piece to seal the rite.");
+
+            await AddPickerBeatAsync(page, "item_picked_up", "reclaim Wood beat");
+            await OpenSpecificAsync(page);
+            await FillAndBlurAsync(page.Locator("[data-beat-target]"), "Wood");
+            await FillAndBlurAsync(page.Locator("#beat-message"), "The circuit closes. The charm remembers this telling.");
+            await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "Woodbound autosave");
+            await page.Locator("[data-stage='rehearse']").ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Run guided rehearsal", Exact = true }).ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#rehearsal-badge"), "Complete", "Woodbound rehearsal", 30_000);
+            await WaitForTextAsync(page.Locator("#rehearsal-result"), "1/2", "Woodbound partial offering");
+            await page.Locator("[data-stage='publish']").ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Certify & publish", Exact = true }).ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "Woodbound publish", 30_000);
+            await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 3, "Woodbound plus two Signal Circuit packs");
+            ValidateWoodboundBrowserPack(run);
+
             // A representative phone-size smoke verifies the responsive primary path is
             // usable without re-running or mutating the journey.
             await page.SetViewportSizeAsync(430, 780);
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Back to creator workflow", Exact = true }).ClickAsync();
             await page.Locator("[data-stage='author']").ClickAsync();
             Assert.True(await page.Locator("#stage-author").IsVisibleAsync());
             Assert.False(await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"));
@@ -356,6 +392,37 @@ public sealed class QuestStudioSyntheticE2ETests
     {
         await locator.FillAsync(value);
         await locator.PressAsync("Tab");
+    }
+
+    static async Task AddPickerBeatAsync(IPage page, string eventName, string description)
+    {
+        var before = await page.Locator(".beat-card").CountAsync();
+        await page.Locator("#browse-events").ClickAsync();
+        await WaitUntilAsync(() => page.Locator("#event-picker").IsVisibleAsync(), description + " picker");
+        var row = page.Locator($"#event-results .event-row[data-picker-event='{eventName}']");
+        await WaitForCountAsync(row, 1, description + " result");
+        await row.ClickAsync();
+        await page.Locator($"#event-preview [data-picker-choose='{eventName}']").ClickAsync();
+        await WaitForCountAsync(page.Locator(".beat-card"), before + 1, description);
+        await WaitUntilAsync(
+            () => page.EvaluateAsync<bool>($"() => !dirty && selectedBeat === {before} && beatOpen"),
+            description + " autosave and selection");
+    }
+
+    static async Task OpenSpecificAsync(IPage page)
+    {
+        var more = page.Locator("#beat-more");
+        if (!await more.EvaluateAsync<bool>("element => element.open"))
+            await page.Locator("#beat-more > summary").ClickAsync();
+        await WaitUntilAsync(
+            () => more.EvaluateAsync<bool>("element => element.open"),
+            "beat More options");
+        var details = page.Locator("#beat-specific details");
+        if (!await details.EvaluateAsync<bool>("element => element.open"))
+            await page.Locator("#beat-specific summary").ClickAsync();
+        await WaitUntilAsync(
+            () => details.EvaluateAsync<bool>("element => element.open"),
+            "specific target controls");
     }
 
     static async Task RefreshRuntimeAsync(IPage page)
@@ -504,6 +571,60 @@ public sealed class QuestStudioSyntheticE2ETests
         Assert.Equal("1.0.1", candidate.Manifest.Version);
         Assert.Equal(expectedContentHash, candidate.ContentHash, ignoreCase: true);
         Assert.Equal(expectedContentHash, candidate.Manifest.ContentHash, ignoreCase: true);
+    }
+
+    static void ValidateWoodboundBrowserPack(SyntheticRun run)
+    {
+        SyntheticRuntimeFixture.AssertOwnedRoot(run, SentinelName, SentinelContents);
+        var candidates = new QuestPackStore(run.RuntimeRoot).CheckInbox();
+        Assert.All(candidates, candidate =>
+            Assert.True(candidate.IsValid, string.Join("; ", candidate.Diagnostics.Select(value => value.Code + ": " + value.Message))));
+        var matches = candidates.Select(candidate => (Candidate: candidate, Document: ReadExperienceDocument(candidate)))
+            .Where(value => value.Document.Title == "The Woodbound Signal").ToArray();
+        var (candidate, document) = Assert.Single(matches);
+        Assert.Equal("1.0.0", candidate.Manifest.Version);
+        Assert.Equal(candidate.ContentHash, candidate.Manifest.ContentHash, ignoreCase: true);
+        Assert.Collection(document.Stages,
+            speak =>
+            {
+                var route = Assert.Single(speak.Transitions);
+                Assert.Equal(("EVENT", "chat_sent", "normal"), (route.When.Op, route.When.Event, route.When.Target));
+                Assert.Equal("The charm wakes. Two offerings of wood, before the moment passes.", RuntimeMessage(route));
+            },
+            offer =>
+            {
+                var route = Assert.Single(offer.Transitions);
+                Assert.Equal(("COUNT", 2, 30), (route.When.Op, route.When.Count, route.When.WithinSeconds));
+                var leaf = Assert.Single(route.When.Children!);
+                Assert.Equal(("item_dropped", "Wood"), (leaf.Event, leaf.Target));
+                Assert.Equal("The offering is heard. Reclaim one piece to seal the rite.", RuntimeMessage(route));
+            },
+            reclaim =>
+            {
+                var route = Assert.Single(reclaim.Transitions);
+                Assert.Equal(("EVENT", "item_picked_up", "Wood"), (route.When.Op, route.When.Event, route.When.Target));
+                Assert.Equal("complete", route.Outcome);
+                Assert.Equal("The circuit closes. The charm remembers this telling.", RuntimeMessage(route));
+            });
+    }
+
+    static ExperienceDocument ReadExperienceDocument(PackCandidate candidate)
+    {
+        using var archive = ZipFile.OpenRead(candidate.Path);
+        var entry = Assert.Single(archive.Entries, value =>
+            value.FullName.StartsWith("experiences/", StringComparison.Ordinal) &&
+            value.FullName.EndsWith(".json", StringComparison.Ordinal));
+        using var reader = new StreamReader(entry.Open());
+        var compiled = ExperienceCompiler.CompileProductionJson(reader.ReadToEnd());
+        Assert.Empty(compiled.Diagnostics);
+        return Assert.IsType<ExperienceDocument>(compiled.Document);
+    }
+
+    static string RuntimeMessage(ExperienceTransition route)
+    {
+        var action = Assert.Single(route.Actions);
+        Assert.Equal("message", action.Type);
+        return action.Parameters["text"].ToString();
     }
 
     static byte[] ReadZipEntry(ZipArchive archive, string path)

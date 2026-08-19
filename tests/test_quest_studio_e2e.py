@@ -51,6 +51,10 @@ class QuestStudioE2ETests(unittest.TestCase):
             '"34 of 34"',
             'Name = "Run guided rehearsal"',
             'page.Locator("#library-toggle")',
+            '"The Woodbound Signal"',
+            'AddPickerBeatAsync(page, "item_dropped"',
+            'AddPickerBeatAsync(page, "item_picked_up"',
+            "ValidateWoodboundBrowserPack(run)",
         ):
             self.assertIn(expected, source)
         self.assertNotIn('page.Locator("#scenario").SelectOptionAsync', source)

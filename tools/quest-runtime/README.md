@@ -1,4 +1,30 @@
-# Quest Runtime native peer acceptance
+# Quest Runtime acceptance harnesses
+
+## Local Studio-to-OMEN validation lap
+
+`Invoke-QuestRuntimeValidationLap.ps1` is the proof-gated local harness for the
+five-intent program's three-stage **Woodbound Signal**. It backs up and hashes the
+installed Runtime payload, quarantines historical inbox and active-state files,
+keeps private-world safety false until an explicit arm step, validates the exact
+Studio questpack through Contracts, and strictly parses receipts before coaching the
+next player action. Human pacing never times out.
+
+The complete author, arm, enter-world, F10/F11, CHECK/CAST, play, r2 orphan, and
+restoration sequence is in `docs/runbooks/I2-QUESTPACK-OMEN.md`. Preview the harness
+without touching the game installation:
+
+```powershell
+tools\quest-runtime\Invoke-QuestRuntimeValidationLap.ps1 -PlanOnly
+```
+
+The destructive preparation and restoration surface has a sentinel-owned filesystem
+self-test:
+
+```powershell
+tools\quest-runtime\Test-QuestRuntimeValidationLap.ps1
+```
+
+## Native peer acceptance
 
 `Invoke-QuestRuntimePeerAcceptance.ps1` stages and receipts an ordinary Valheim multiplayer test:
 OMEN hosts a private listen world as `Tugcorp`, and i5 joins through Steam Friends as `durracktu`.
