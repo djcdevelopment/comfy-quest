@@ -85,12 +85,24 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
             "running-game refusal",
             "quarantine",
             "strict JSON",
+            "valid receipt object",
             "machine timeout",
+            "shared live log",
             "interrupted cleanup",
             "byte-exact restore",
             "TestFaultAfter Quarantine",
         ):
             self.assertIn(expected, source)
+
+    def test_strict_json_reader_does_not_enumerate_valid_objects(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("Write-Output -NoEnumerate $token", source)
+        self.assertNotIn("return $token\n", source)
+
+    def test_live_log_hash_allows_the_bepinex_writer(self) -> None:
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("[IO.FileShare]::ReadWrite", source)
+        self.assertNotIn("Get-FileHash -LiteralPath $Path", source)
 
     def test_harness_stays_local_and_does_not_grow_cross_system_reach(self) -> None:
         source = HARNESS.read_text(encoding="utf-8").lower()

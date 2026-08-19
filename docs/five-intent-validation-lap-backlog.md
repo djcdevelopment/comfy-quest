@@ -26,6 +26,8 @@ earlier telling.
 | The first all-green preflight serialized gate console output beside its final receipt. | PowerShell returned uncaptured scriptblock output through the function pipeline, so `ConvertTo-Json` correctly encoded an array rather than the intended single result. | Gate output is now explicitly rendered to the host and cannot enter the receipt pipeline; preflight must end with one `comfy-quest-validation-lap-preflight/v1` object. |
 | Capturing both native streams made Python's progress dots terminate preflight despite exit code zero. | Windows PowerShell 5.1 promotes redirected native stderr to `NativeCommandError` under `ErrorActionPreference=Stop`; unittest writes progress on stderr. | Only success output is captured for host rendering. Native stderr stays visible, and the external process exit code remains the pass/fail authority. |
 | The next all-green preflight returned one quoted JSON string instead of one JSON object. | `Invoke-Preflight` serialized its result before the common dispatcher serialized every action result, producing valid but double-encoded JSON. | Preflight now returns an object and the dispatcher is the sole serializer; a source pin forbids a second serializer in the preflight function. |
+| The first live startup monitor stopped while reading five valid `active_set_missing` receipts. | `JObject` implements `IEnumerable`; `Read-StrictToken` returned it through PowerShell's success pipeline, which unrolled it into `JProperty` values before typed deserialization. The strict JSON parser had correctly accepted the files. | The reader now emits its token with `Write-Output -NoEnumerate`. An observed-need self-test feeds one valid receipt through `Status` before the existing duplicate-property rejection test. No player action or world entry is repeated. |
+| After valid receipts parsed, startup proof could not hash BepInEx's writer-held `LogOutput.log`. | `Get-FileHash` uses file sharing that conflicts with the active log writer, while the harness's later log text reader already uses shared read/write access. | The common SHA-256 helper now hashes through a read stream with `FileShare.ReadWrite`; an observed-need test holds a fixture log writer open while startup proof reads it. The preserved live startup remains the proof—no relaunch is requested. |
 
 ### “Can't answer why” ledger
 
@@ -48,9 +50,62 @@ These questions are acceptance evidence, not optional polish:
 - Did **OTHER VERSION** communicate an older inscription, or only an internal version mismatch?
 - Did finding target `Wood` under **More options → Make this action specific** feel
   like useful progressive disclosure or like the editor hid a necessary part of the ritual?
+- The guided rehearsal rendered valid first-drop progress as an empty circle beside
+  `1/2`. Derek immediately asked why it lacked a green check. The current mark means
+  "this beat has not advanced yet," but visually resembles a missed or failed input;
+  both drop rows are evaluations of one repeated node, not peer quest nodes, yet the
+  numbered flat list also makes the first evaluation look like a child or separate
+  beat. Group repeated attempts beneath their owning beat with visible hierarchy and
+  explicit partial/complete states (for example, an amber **partial 1/2** child row
+  under beat 2, followed by its green completion) before treating the rehearsal as
+  self-explanatory.
+- After F10, Derek saw yellow text `1 pack, 1 loaded`. The count was visible, but
+  **loaded** is ambiguous because F11 is the step that activates a pack. Replace the
+  debug-shaped summary with language that states what F10 actually proved—for
+  example, one candidate checked and accepted, activation unchanged—and reserve
+  activation language for F11.
+- After F11, the large yellow confirmation led with `Loaded quest-7b849e 1.0.0`
+  followed by the full content hash. Derek expected the friendly name. Lead with
+  **The Woodbound Signal**, retain the version, and demote the pack ID and a shortened
+  hash to diagnostic detail rather than making raw identity the primary player copy.
+- On first opening F9 after r1 activation, the drawer said `0 locally owned` while
+  multiple Arcane Sight labels said `OTHER VERSION / LOCAL OWNER`. The implementation
+  counts only markers that are both current and locally owned, so the values are not
+  mechanically inconsistent, but the summary label is. Either show all local-owner
+  bindings separately or name the intersection explicitly (for example,
+  `0 active + locally owned`).
+- CAST changed the selected sign to a bright purple glow. Derek's immediate reaction
+  was, `woooo it changed glowly colors`. Preserve this strong, magical state change:
+  it made successful binding legible at player altitude without requiring receipt or
+  identity text, and it belongs prominently in the screenshot-led tutorial.
 
 Record Derek's words after the lap, including positive moments. Do not translate a
 player reaction into a mechanism-only diagnosis.
+
+#### Live r1 player read
+
+- As a tutorial sample, chat → two offerings → reclaim felt functional in the
+  demonstration. This establishes legibility, not yet drama.
+- Derek knew the 30-second window existed but did not notice it while playing. If the
+  limit is meant to matter—especially during combat or another task—it needs a
+  universal timer bar, yellow countdown warnings, or another unmistakable temporal
+  affordance. A contract-only deadline is not player tension.
+- F9 felt like a kernel system-information panel. Its valuable role is to make the
+  cognitive switch between defining/creating in the web Studio and acting as an
+  in-world Creator feel limited to nearly cost-free, while still exposing the state
+  needed to build an instance.
+- F6 QuestLab may carry feature bloat. Treat extraction as an attenuation question:
+  identify which creator-facing capabilities belong outside Lab, and investigate
+  Arcane Sight as part of a **spellbook** surface. Do not add a new wholesale palette
+  before ownership and observed need are clear.
+
+### Player-facing follow-through
+
+- Build a screenshot-led Studio authoring tutorial from this exact Woodbound
+  progression. Preserve the useful sequence and field-level landmarks from the live
+  session, sanitize machine/browser details, and do not ask the player to recreate
+  screenshots. Schedule it after the validation lap so tutorial production does not
+  expand or interrupt the proof surface.
 
 ### Observed-need test growth
 

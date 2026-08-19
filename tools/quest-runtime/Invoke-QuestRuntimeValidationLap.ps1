@@ -102,7 +102,16 @@ function Write-Json([string] $Path, [object] $Value) {
 
 function Get-Sha256([string] $Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    # BepInEx keeps LogOutput.log open while the game runs. Hash through a stream
+    # that permits the existing writer instead of Get-FileHash's narrower sharing.
+    $stream = [IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','').ToLowerInvariant()
+    } finally {
+        $sha.Dispose()
+        $stream.Dispose()
+    }
 }
 
 function Get-Relative([string] $Base, [string] $Path) {
@@ -218,7 +227,10 @@ function Read-StrictToken([string] $Path) {
     try {
         $token = [Newtonsoft.Json.Linq.JToken]::ReadFrom($reader, $settings)
         if ($reader.Read()) { throw "JSON has trailing content: $Path" }
-        return $token
+        # JObject implements IEnumerable. Keep PowerShell's success pipeline from
+        # unrolling a valid receipt into JProperty objects before ToObject sees it.
+        Write-Output -NoEnumerate $token
+        return
     } catch {
         throw "Strict JSON parse failed for $Path`: $($_.Exception.Message)"
     } finally {

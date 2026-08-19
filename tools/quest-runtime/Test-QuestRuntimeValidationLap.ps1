@@ -159,6 +159,20 @@ try {
     Assert-True ($waiting.verdict -eq 'waiting_for_player') 'Monitor did not preserve unbounded human pacing.'
     Assert-True (((Get-Date) - $waitingStarted).TotalSeconds -lt 1) 'Human pacing unexpectedly started a machine timeout.'
 
+    Write-Bytes (Join-Path $normal.Runtime 'receipts\valid.json') @"
+{
+  "schema": "comfy-quest-runtime-receipt/v1",
+  "id": "selftest-valid-receipt",
+  "at_utc": "2026-08-19T13:47:13.1491434+00:00",
+  "operation": "transition",
+  "status": "rejected",
+  "error": "active_set_missing",
+  "diagnostics": []
+}
+"@
+    $validStatus = & $harness -Action Status -RunId $normalRun -ValheimRoot $normal.Valheim -EvidenceRoot $evidenceRoot -FixtureMode | ConvertFrom-Json
+    Assert-True ($validStatus.new_receipt_count -eq 1 -and -not $validStatus.strict_parse_error) 'Monitor did not preserve a valid receipt as one JSON object.'
+
     Write-Bytes (Join-Path $normal.Runtime 'receipts\malformed.json') "{`n  `"schema`": `"comfy-quest-runtime-receipt/v1`",`n  `"schema`": `"duplicate`"`n}`n"
     $strictStopped = $false
     try {
@@ -172,6 +186,14 @@ try {
         & $harness -Action Monitor -RunId $normalRun -ValheimRoot $normal.Valheim -EvidenceRoot $evidenceRoot -FixtureMode -Expectation startup -ActionObserved -MachineTimeoutSeconds 1 | Out-Null
     } catch { $timedOut = $_.Exception.Message -match 'Machine receipt timeout' }
     Assert-True $timedOut 'Observed-action monitoring did not stop on a machine timeout.'
+
+    $fixtureLog = Join-Path $normal.Valheim 'BepInEx\LogOutput.log'
+    Write-Bytes $fixtureLog "[Info] Runtime ready.`n"
+    $liveWriter = [IO.File]::Open($fixtureLog,[IO.FileMode]::Open,[IO.FileAccess]::Write,[IO.FileShare]::ReadWrite)
+    try {
+        $startup = & $harness -Action Monitor -RunId $normalRun -ValheimRoot $normal.Valheim -EvidenceRoot $evidenceRoot -FixtureMode -Expectation startup -ActionObserved -MachineTimeoutSeconds 1 | ConvertFrom-Json
+        Assert-True ($startup.verdict -eq 'proved' -and $startup.proof.proof -eq 'fresh Runtime ready log file') 'Monitor could not hash a writer-held live log.'
+    } finally { $liveWriter.Dispose() }
 
     Write-Bytes (Join-Path $normal.Runtime 'active\active-set.json') "lap-active`n"
     $cleanupInterrupted = $false
@@ -205,7 +227,7 @@ try {
     $succeeded = $true
     [ordered]@{
         schema='comfy-quest-validation-lap-self-test/v1';result='passed'
-        checks=@('parser','plan','running-game refusal','quarantine','deployed hashes','safety false','exact r1 contract','private-world arm','r2-only final message','human pacing','strict JSON','machine timeout','interrupted cleanup','byte-exact restore')
+        checks=@('parser','plan','running-game refusal','quarantine','deployed hashes','safety false','exact r1 contract','private-world arm','r2-only final message','human pacing','valid receipt object','strict JSON','machine timeout','shared live log','interrupted cleanup','byte-exact restore')
     } | ConvertTo-Json -Depth 6
 } finally {
     if ($succeeded -and (Test-ChildPathSafe $captures $fixtureRoot)) {
