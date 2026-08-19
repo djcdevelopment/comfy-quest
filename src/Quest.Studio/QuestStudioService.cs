@@ -42,7 +42,7 @@ public sealed class QuestStudioService
     public StudioProjectDocument CreateProject(string? templateId)
     {
         var project = _workspace.CreateProject(templateId);
-        var effectiveTemplate = templateId is "signal-circuit" or "cooperative-ritual" or "reward-cleanup" ? templateId : "blank";
+        var effectiveTemplate = templateId is "signal-circuit" or "cooperative-ritual" or "reward-cleanup" or "desperate-defense" ? templateId : "blank";
         _usage.RecordProject("create", "accepted", project, effectiveTemplate);
         return project;
     }

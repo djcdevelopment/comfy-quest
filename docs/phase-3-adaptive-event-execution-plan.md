@@ -424,18 +424,50 @@ full-history secret scan.
 Phase 3 is complete only when that exit Event is explainable end to end. The temporal
 foundation alone does not satisfy the phase exit.
 
+### Delivered — the synthetic half of 3.5
+
+Steps 2, 4, and 5 are done; the Event exists and is proven everywhere a machine can prove
+it. `desperate-defense` is a Studio template, so the exit Event is a real authored artifact
+rather than a description: muster stages eight Greylings and a ten-minute timer, then
+**hold** carries the four dramatic branches, with **besieged** behind the reinforcement
+route.
+
+| Branch | Fires on | Reads | Ending |
+| --- | --- | --- | --- |
+| `held` | a kill | 8 of 8 cleared | complete, with a reward |
+| `overrun` | the ten-minute timer | 1 or more still standing | fail |
+| `reinforce` | a kill | 3 minutes in and 6 still standing | a second wave, to `besieged` |
+| `mercy` | falling | 2 deaths this stage | complete, the ward releases you |
+
+Each branch is rehearsed to its own outcome from its own synthetic path, and the exit's
+hardest clause — actual facts for branches that did **not** fire — is asserted directly:
+mid-fight, the triumph branch reports `>= 8 enemies` wanted against `3 enemies` seen, and
+the mercy branch reports `>= 2 deaths` against `1 death`. One death alone does not trigger
+mercy, and that non-firing is asserted too.
+
+### What still needs the game
+
+Only steps 1, 3, and 6, and they are deliberately short now that behavior is settled:
+publish the template as a dev revision, play it once, and answer the questions synthetic
+proof cannot — whether the countdown banner carries tension during actual combat, whether
+the reinforcement beat lands as escalation rather than punishment, and whether mercy reads
+as mercy rather than as failure. Record any genuine "can't answer why" moment. Known
+compiler, evaluator, and adapter behavior stays in the synthetic suite; the lap already
+established that re-confirming known behavior at the keyboard produces no decisions.
+
 ## Adjacent observed backlog retained for later slices
 
 The completed Woodbound Signal lap produced valid follow-through that remains in
 `docs/five-intent-validation-lap-backlog.md`:
 
-- group repeated rehearsal evaluations beneath their owning beat with explicit
-  partial and complete hierarchy;
+- ~~group repeated rehearsal evaluations beneath their owning beat with explicit
+  partial and complete hierarchy~~ (delivered in 3.4);
 - replace ambiguous F10 candidate text and lead F11 confirmation with the friendly
   quest name rather than raw identity and full hash;
 - rename the Arcane Sight ownership summary so it describes the actual intersection;
-- provide a universal timer/countdown affordance when an authored deadline is meant
-  to matter during play;
+- ~~provide a universal timer/countdown affordance when an authored deadline is meant
+  to matter during play~~ (delivered in 3.4; the next lap judges whether it carries
+  tension during actual combat);
 - reduce the cognitive cost of switching between Studio creation and the F9 in-world
   creator cockpit;
 - evaluate F6 Quest Lab feature ownership and Arcane Sight's eventual spellbook role;

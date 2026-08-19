@@ -1089,6 +1089,97 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
+    public void Desperate_defense_compiles_and_every_dramatic_branch_reaches_its_own_ending()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("desperate-defense");
+        Assert.Equal("Ten-Minute Desperate Defense", project.Title);
+        var certified = service.CertifyGraph(project.ProjectId);
+        Assert.True(certified.Ok, string.Join("; ", certified.Diagnostics.Select(value => value.Code + " " + value.Path)));
+
+        // The wave is staged once and every counting condition names it.
+        using (var document = JsonDocument.Parse(certified.ExperienceJson!))
+        {
+            var stages = document.RootElement.GetProperty("stages").EnumerateArray().ToArray();
+            Assert.Equal(new[] { "besieged", "hold", "muster" }, stages.Select(value => value.GetProperty("id").GetString()).OrderBy(value => value, StringComparer.Ordinal));
+            var hold = stages.Single(value => value.GetProperty("id").GetString() == "hold");
+            var routes = hold.GetProperty("transitions").EnumerateArray().ToArray();
+            Assert.Equal(new[] { "held", "mercy", "overrun", "reinforce" }, routes.Select(value => value.GetProperty("id").GetString()).OrderBy(value => value, StringComparer.Ordinal));
+            var thresholds = routes.SelectMany(route => route.GetProperty("when").GetProperty("children").EnumerateArray())
+                .Where(child => child.GetProperty("op").GetString() == "THRESHOLD").ToArray();
+            Assert.Equal(5, thresholds.Length);
+            Assert.All(thresholds.Where(value => value.TryGetProperty("action_id", out _)),
+                value => Assert.Equal("wave", value.GetProperty("action_id").GetString()));
+        }
+
+        // The phase exit asks for actual facts on branches that did NOT fire. With five of eight
+        // still standing, the triumph branch must say what it wanted and what it saw.
+        var holdStage = certified.Document!.Stages.Single(value => value.Id == "hold");
+        var midFight = new TriggerEvaluationContext
+        {
+            At = DateTimeOffset.UnixEpoch.AddSeconds(120),
+            StageEnteredUtc = DateTimeOffset.UnixEpoch,
+            LastProgressUtc = DateTimeOffset.UnixEpoch,
+            DeathsInStage = 1,
+            SpawnsByAction = new Dictionary<string, SpawnTally> { { "wave", new SpawnTally(8, 5) } }
+        };
+        var kill = new[] { new RuntimeEvent { Name = "kill", Target = "Greyling", At = midFight.At!.Value } };
+        var heldTrace = TriggerEvaluator.Explain(holdStage.Transitions.Single(value => value.Id == "held").When, kill, midFight);
+        Assert.False(heldTrace.Satisfied);
+        var heldRow = Assert.Single(heldTrace.Children.SelectMany(child => child.Where), row => row.Field == AdaptiveMeasureCatalog.ClearedMeasure);
+        Assert.Equal(">= 8 enemies", heldRow.Expected);
+        Assert.Equal("3 enemies", heldRow.Actual);
+        // The mercy branch explains itself too, with the death count it actually saw.
+        var mercyTrace = TriggerEvaluator.Explain(holdStage.Transitions.Single(value => value.Id == "mercy").When, kill, midFight);
+        var mercyReason = Assert.Single(mercyTrace.Children.SelectMany(child => child.Where), row => row.Field == AdaptiveMeasureCatalog.DeathsMeasure);
+        Assert.Equal(">= 2 deaths", mercyReason.Expected);
+        Assert.Equal("1 death", mercyReason.Actual);
+
+        // Triumph: guided rehearsal follows the highest-priority chain and clears the wave.
+        var triumph = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(triumph.Ok, triumph.Error);
+        Assert.Equal("complete", triumph.Outcome);
+        Assert.Contains(triumph.Trace, value => value.RouteId == "held");
+
+        // Overrun: the same staged wave, left standing when the ten minutes elapse.
+        var overrun = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Steps = new()
+        {
+            new() { Kind = "event", EventName = "chat_sent", Target = "normal" },
+            new() { Kind = "advance", Seconds = 600 }
+        }});
+        Assert.True(overrun.Ok, overrun.Error);
+        Assert.Equal("fail", overrun.Outcome);
+        Assert.Contains(overrun.Trace, value => value.RouteId == "overrun");
+
+        // Mercy: falling twice ends the ward rather than watching a third fall.
+        var mercy = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Steps = new()
+        {
+            new() { Kind = "event", EventName = "chat_sent", Target = "normal" },
+            new() { Kind = "event", EventName = "player_died", Target = "you" },
+            new() { Kind = "event", EventName = "player_died", Target = "you" }
+        }});
+        Assert.True(mercy.Ok, mercy.Error);
+        Assert.Equal("complete", mercy.Outcome);
+        var mercyRow = Assert.Single(mercy.Trace, value => value.RouteId == "mercy");
+        Assert.Contains(mercyRow.Effects, value => value.Contains("releases you"));
+        // One death alone must not trigger mercy.
+        Assert.Contains(mercy.Trace, value => value.Status == "ignored" && value.EventName == "player_died");
+
+        // Reinforcement: three minutes in with the pack barely thinned sends the second wave.
+        var besieged = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Steps = new()
+        {
+            new() { Kind = "event", EventName = "chat_sent", Target = "normal" },
+            new() { Kind = "despawn", ActionId = "wave", Count = 1 },
+            new() { Kind = "advance", Seconds = 190 },
+            new() { Kind = "event", EventName = "kill" }
+        }});
+        Assert.True(besieged.Ok, besieged.Error);
+        Assert.Null(besieged.Outcome);
+        Assert.Equal("besieged", besieged.CurrentNodeId);
+        Assert.Contains(besieged.Trace, value => value.RouteId == "reinforce");
+    }
+
+    [Fact]
     public async Task Bundle_includes_only_requested_matching_published_and_live_evidence()
     {
         var valheim = Path.Combine(_root, "Valheim");

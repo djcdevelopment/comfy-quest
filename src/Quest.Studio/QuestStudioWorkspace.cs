@@ -176,7 +176,8 @@ internal sealed class QuestStudioWorkspace
             new { id = "blank", label = "Blank local quest", note = "One low-friction local beat." },
             new { id = "signal-circuit", label = "R&D Signal Circuit", note = "One compact lap across chat, timing, inventory, healing, and reward." },
             new { id = "cooperative-ritual", label = "Two Voices, One Rune", note = "Captured 1.6 peer Shout then listen-host sign placement." },
-            new { id = "reward-cleanup", label = "Reward, spawn, and cleanup", note = "Proven 1.5 grant, marked spawn, timer, and cleanup." }
+            new { id = "reward-cleanup", label = "Reward, spawn, and cleanup", note = "Proven 1.5 grant, marked spawn, timer, and cleanup." },
+            new { id = "desperate-defense", label = "Ten-Minute Desperate Defense", note = "Advanced: hold ground against a staged wave, with reinforcement and mercy branches." }
         },
         scenarios = Scenarios(),
         simple_triggers = CreatorSignalCatalog.All.Select(signal => new
@@ -264,6 +265,7 @@ internal sealed class QuestStudioWorkspace
                 "signal-circuit" => SignalCircuitTemplate(projectId, suffix),
                 "cooperative-ritual" => CooperativeTemplate(projectId, suffix),
                 "reward-cleanup" => RewardTemplate(projectId, suffix),
+                "desperate-defense" => DesperateDefenseTemplate(projectId, suffix),
                 _ => BlankTemplate(projectId, suffix)
             };
             WriteProject(project, create: true);
@@ -718,6 +720,111 @@ internal sealed class QuestStudioWorkspace
                 new StudioAction { Id = "message-complete", Type = "message", Text = "The signal circuit is complete." },
                 new StudioAction { Id = "reward-wood", Type = "grant_item", Item = "Wood", Quantity = 5 }
             })
+        }
+    };
+
+    /// <summary>The phase-exit Event: hold ground for ten minutes. Every adaptive primitive appears
+    /// as a dramatic branch rather than a demonstration — the wave you cleared, the wave that
+    /// overran you, the reinforcements that arrive when you are too slow, and the mercy you are
+    /// shown after falling twice.</summary>
+    static StudioProjectDocument DesperateDefenseTemplate(string projectId, string suffix) => new()
+    {
+        ProjectId = projectId, Revision = 1, UpdatedUtc = DateTimeOffset.UtcNow,
+        PackId = "desperate-defense-" + suffix, Version = "1.0.0", ExperienceId = "desperate-defense-" + suffix,
+        Title = "Ten-Minute Desperate Defense", BindingTargetKind = null,
+        BindingTargetKinds = AllCharmTargetKinds.ToList(), EntryNodeId = "muster",
+        Nodes = new()
+        {
+            new StudioNode
+            {
+                Id = "muster", Label = "Muster", X = 80, Y = 240,
+                Routes = new()
+                {
+                    new StudioRoute
+                    {
+                        Id = "call-the-ward", Priority = 100, Event = "chat_sent", Target = "normal",
+                        DestinationNodeId = "hold",
+                        Actions = new()
+                        {
+                            new StudioAction { Id = "message-muster", Type = "message", Text = "The ward wakes. Hold this ground." },
+                            new StudioAction { Id = "wave", Type = "spawn", Kind = "creature", Prefab = "Greyling", Count = 8, Radius = 12 },
+                            new StudioAction { Id = "start-defense", Type = "timer_start", TimerId = "defense", Seconds = 600 }
+                        }
+                    }
+                }
+            },
+            new StudioNode
+            {
+                Id = "hold", Label = "Hold the ground", X = 380, Y = 240,
+                Routes = new()
+                {
+                    new StudioRoute
+                    {
+                        Id = "held", Priority = 40, Event = "kill", Outcome = "complete",
+                        AdaptiveConditions = { new StudioAdaptiveCondition { Measure = AdaptiveMeasureCatalog.ClearedMeasure, Comparison = "gte", Value = 8, ActionId = "wave" } },
+                        Actions = new()
+                        {
+                            new StudioAction { Id = "message-held", Type = "message", Text = "The last of them falls. The ground is yours." },
+                            new StudioAction { Id = "reward-held", Type = "grant_item", Item = "Wood", Quantity = 10 },
+                            new StudioAction { Id = "stop-defense", Type = "timer_cancel", TimerId = "defense" }
+                        }
+                    },
+                    new StudioRoute
+                    {
+                        Id = "overrun", Priority = 30, Event = "timer_elapsed", TimerId = "defense", Outcome = "fail",
+                        AdaptiveConditions = { new StudioAdaptiveCondition { Measure = AdaptiveMeasureCatalog.RemainingMeasure, Comparison = "gte", Value = 1, ActionId = "wave" } },
+                        Actions = new() { new StudioAction { Id = "message-overrun", Type = "message", Text = "The ten minutes burn away. They still stand. The ward breaks." } }
+                    },
+                    new StudioRoute
+                    {
+                        Id = "reinforce", Priority = 20, Event = "kill", DestinationNodeId = "besieged",
+                        AdaptiveConditions =
+                        {
+                            new StudioAdaptiveCondition { Measure = "time_since_stage_entered", Comparison = "gte", Value = 180 },
+                            new StudioAdaptiveCondition { Measure = AdaptiveMeasureCatalog.RemainingMeasure, Comparison = "gte", Value = 6, ActionId = "wave" }
+                        },
+                        Actions = new()
+                        {
+                            new StudioAction { Id = "message-reinforce", Type = "message", Text = "Three minutes gone and the pack is barely thinned. More come." },
+                            new StudioAction { Id = "reinforcements", Type = "spawn", Kind = "creature", Prefab = "Greyling", Count = 4, Radius = 14 }
+                        }
+                    },
+                    new StudioRoute
+                    {
+                        Id = "mercy", Priority = 10, Event = "player_died", Outcome = "complete",
+                        AdaptiveConditions = { new StudioAdaptiveCondition { Measure = AdaptiveMeasureCatalog.DeathsMeasure, Comparison = "gte", Value = 2 } },
+                        Actions = new()
+                        {
+                            new StudioAction { Id = "message-mercy", Type = "message", Text = "Twice you have fallen. The ward releases you rather than watch a third." },
+                            new StudioAction { Id = "clear-mercy", Type = "clear_spawned", ActionId = "wave" }
+                        }
+                    }
+                }
+            },
+            new StudioNode
+            {
+                Id = "besieged", Label = "Besieged", X = 680, Y = 240,
+                Routes = new()
+                {
+                    new StudioRoute
+                    {
+                        Id = "endured", Priority = 40, Event = "kill", Outcome = "complete",
+                        AdaptiveConditions = { new StudioAdaptiveCondition { Measure = AdaptiveMeasureCatalog.ClearedMeasure, Comparison = "gte", Value = 4, ActionId = "reinforcements" } },
+                        Actions = new()
+                        {
+                            new StudioAction { Id = "message-endured", Type = "message", Text = "Even the second wave breaks on you. The ward holds." },
+                            new StudioAction { Id = "reward-endured", Type = "grant_item", Item = "Wood", Quantity = 20 },
+                            new StudioAction { Id = "stop-siege", Type = "timer_cancel", TimerId = "defense" }
+                        }
+                    },
+                    new StudioRoute
+                    {
+                        Id = "fell", Priority = 30, Event = "timer_elapsed", TimerId = "defense", Outcome = "fail",
+                        AdaptiveConditions = { new StudioAdaptiveCondition { Measure = AdaptiveMeasureCatalog.RemainingMeasure, Comparison = "gte", Value = 1, ActionId = "reinforcements" } },
+                        Actions = new() { new StudioAction { Id = "message-fell", Type = "message", Text = "The ward gutters out with the last of the time." } }
+                    }
+                }
+            }
         }
     };
 
