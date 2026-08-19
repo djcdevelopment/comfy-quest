@@ -424,7 +424,10 @@ function Find-Expectation([string] $Name, [object] $Context, [object[]] $Rows) {
 
 function Invoke-CommandGate([string] $Name, [scriptblock] $Command) {
     Write-Host "=== $Name ==="
-    $gateOutput = @(& $Command 2>&1)
+    # PowerShell 5.1 turns redirected native stderr (including unittest progress)
+    # into NativeCommandError under Stop. Capture only success output; stderr stays
+    # visible on its native stream and the real process exit code remains decisive.
+    $gateOutput = @(& $Command)
     $gateExit = $LASTEXITCODE
     $gateOutput | Out-Host
     if ($gateExit -ne 0) { throw "$Name failed with exit code $gateExit." }

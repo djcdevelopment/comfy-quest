@@ -66,9 +66,10 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
 
     def test_preflight_gate_output_cannot_pollute_the_json_receipt(self) -> None:
         source = HARNESS.read_text(encoding="utf-8")
-        self.assertIn("$gateOutput = @(& $Command 2>&1)", source)
+        self.assertIn("$gateOutput = @(& $Command)", source)
         self.assertIn("$gateOutput | Out-Host", source)
         self.assertIn("$result | ConvertTo-Json -Depth 20", source)
+        self.assertIn("the real process exit code remains decisive", source)
 
     def test_restore_surface_has_observed_need_tests(self) -> None:
         source = SELF_TEST.read_text(encoding="utf-8")
