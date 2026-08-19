@@ -72,6 +72,61 @@ public sealed class ExperienceContractTests {
     Assert.Contains(ExperienceCompiler.CompileJson(child,new HashSet<string>{"kill"}).Diagnostics,x=>x.Code=="threshold.children");
   }
   [Fact]
+  public void EveryCompilableActionHasARuntimeExecutorSoNoTransitionFailsForever() {
+    // An action that compiles without an executor throws action_not_implemented, which leaves the
+    // transition pending and replays it forever. The registry therefore admits only what ships.
+    var engine=File.ReadAllText(Path.Combine(RepoRoot(),"network","mod","ComfyQuestRuntime","RuntimeExperienceEngine.cs"));
+    var executed=System.Text.RegularExpressions.Regex.Matches(engine,"case \"(?<type>[a-z_]+)\":\\s*\\r?\\n")
+        .Select(match=>match.Groups["type"].Value).ToHashSet(StringComparer.Ordinal);
+    foreach(var type in new[]{"message","timer_start","timer_cancel","grant_item","spawn","clear_spawned"}) {
+      Assert.Contains(type,executed);
+      var document=Valid.Replace("{\"id\":\"say\",\"type\":\"message\",\"text\":\"Skal!\"}",ActionJson(type));
+      Assert.True(ExperienceCompiler.CompileJson(document,new HashSet<string>{"kill"}).IsValid,type);
+    }
+    // Terminal results are a transition outcome; counters and effects were never implemented.
+    foreach(var retired in new[]{"arcane_sight","counter_set","counter_add","stage_activate","experience_complete","experience_fail"}) {
+      Assert.DoesNotContain(retired,executed);
+      var document=Valid.Replace("{\"id\":\"say\",\"type\":\"message\",\"text\":\"Skal!\"}","{\"id\":\"say\",\"type\":\""+retired+"\"}");
+      Assert.Contains(ExperienceCompiler.CompileJson(document,new HashSet<string>{"kill"}).Diagnostics,x=>x.Code=="action.unsupported");
+    }
+  }
+  static string ActionJson(string type)=>type switch {
+    "message"=>"{\"id\":\"say\",\"type\":\"message\",\"text\":\"Skal!\"}",
+    "timer_start"=>"{\"id\":\"say\",\"type\":\"timer_start\",\"timer_id\":\"window\",\"seconds\":30}",
+    "timer_cancel"=>"{\"id\":\"say\",\"type\":\"timer_cancel\",\"timer_id\":\"window\"}",
+    "grant_item"=>"{\"id\":\"say\",\"type\":\"grant_item\",\"item\":\"Wood\",\"quantity\":1}",
+    "spawn"=>"{\"id\":\"say\",\"type\":\"spawn\",\"kind\":\"creature\",\"prefab\":\"Greyling\",\"count\":1,\"radius\":3}",
+    _=>"{\"id\":\"say\",\"type\":\"clear_spawned\",\"action_id\":\"say\"}"
+  };
+  static string RepoRoot(){var directory=new DirectoryInfo(AppContext.BaseDirectory);while(directory!=null&&!Directory.Exists(Path.Combine(directory.FullName,"network")))directory=directory.Parent;return directory?.FullName??".";}
+  [Fact]
+  public void AuthoredWindowsReportTheDeadlineThePlayerIsActuallyRacing() {
+    var at=DateTimeOffset.UnixEpoch;
+    var drop=new TriggerExpression{Op="EVENT",Event="item_dropped",Target="Wood"};
+    var repeat=new TriggerExpression{Op="COUNT",Count=2,WithinSeconds=10,Children=new(){drop}};
+    // Before the first attempt there is nothing to race.
+    Assert.False(TriggerCountdown.Read(repeat,Array.Empty<RuntimeEvent>(),at).Running);
+    var first=new[]{new RuntimeEvent{Name="item_dropped",Target="Wood",At=at}};
+    var running=TriggerCountdown.Read(repeat,first,at.AddSeconds(4));
+    Assert.True(running.Running);
+    Assert.Equal(1,running.Current);
+    Assert.Equal(2,running.Required);
+    Assert.Equal(6,running.RemainingSeconds);
+    Assert.Equal(10,running.TotalSeconds);
+    Assert.Equal("1/2, 6 seconds remaining",running.Label);
+    Assert.Equal("1/2, 1 second remaining",TriggerCountdown.Read(repeat,first,at.AddSeconds(9)).Label);
+    // The window closes when the earliest attempt leaves it, and a satisfied beat is not a race.
+    Assert.False(TriggerCountdown.Read(repeat,first,at.AddSeconds(11)).Running);
+    var both=first.Concat(new[]{new RuntimeEvent{Name="item_dropped",Target="Wood",At=at.AddSeconds(3)}}).ToArray();
+    Assert.False(TriggerCountdown.Read(repeat,both,at.AddSeconds(4)).Running);
+    // A non-matching event neither starts nor extends the window.
+    Assert.False(TriggerCountdown.Read(repeat,new[]{new RuntimeEvent{Name="item_dropped",Target="Stone",At=at}},at.AddSeconds(4)).Running);
+    Assert.False(TriggerCountdown.Read(new TriggerExpression{Op="EVENT",Event="item_dropped"},first,at).Running);
+    // The window may sit on a composite above the adaptive conditions and is still the deadline.
+    var composite=new TriggerExpression{Op="ALL",WithinSeconds=10,Children=new(){repeat,new(){Op="THRESHOLD",Measure="time_since_stage_entered",Comparison="gte",Value=5}}};
+    Assert.Equal("1/2, 6 seconds remaining",TriggerCountdown.Read(composite,first,at.AddSeconds(4)).Label);
+  }
+  [Fact]
   public void EncounterMeasureSchemaMovesAsOneClosedGate() {
     Assert.True(ExperienceCompiler.CompileJson(Defense,DefenseEvents).IsValid);
     Assert.All(AdaptiveMeasureCatalog.All.Where(x=>x.RequiresSpawnAction),x=>Assert.Equal("enemies",x.Unit));

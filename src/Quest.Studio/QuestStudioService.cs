@@ -110,7 +110,9 @@ public sealed class QuestStudioService
                 receipt.EventName, receipt.CurrentCount, receipt.RequiredCount, receipt.AtUtc,
                 receipt.TransitionId, receipt.ActionId, receipt.ActivationId, receipt.CorrelationId, receipt.Error,
                 receipt.TransitionId is not null && status.RouteLabels.TryGetValue(receipt.TransitionId, out var routeLabel) ? routeLabel : null,
-                receipt.ActionId is not null && status.EffectLabels.TryGetValue(receipt.ActionId, out var effectLabel) ? effectLabel : null)).ToArray(),
+                receipt.ActionId is not null && status.EffectLabels.TryGetValue(receipt.ActionId, out var effectLabel) ? effectLabel : null,
+                StudioRehearsal.UnmetPhrase(receipt.Evidence),
+                StudioRehearsal.NotTakenPhrase(receipt.RejectedEvidence, status.RouteLabels))).ToArray(),
             status.Diagnostics)
         {
             DevConnected = status.DevConnected,

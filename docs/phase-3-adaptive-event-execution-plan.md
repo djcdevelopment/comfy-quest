@@ -1,6 +1,6 @@
 # Phase 3 adaptive event semantics — execution plan and status
 
-Status date: 2026-08-19 (updated after the Phase 3.3 encounter slice)
+Status date: 2026-08-19 (updated after the Phase 3.4 presentation slice)
 Temporal foundation landed in `665838a` (`Add adaptive temporal predicates`); the
 spatial substrate landed in `6ef6d62` (`Add spatial anchors and predicates`); the
 encounter facts landed in the following `Add encounter and performance facts` commit.
@@ -336,21 +336,79 @@ generated-tome checks, and the full-history secret scan.
 - `count_in_area` still counts only this workflow's tracked spawns, and authored anchors
   still have no Studio editor (Phase 3.2 holds, unchanged).
 
+## Delivered — Phase 3.4 the five-level presentation
+
+Phase 3.4 is complete. The attenuation ladder now carries every admitted adaptive
+primitive from beginner prose to live Runtime values, and the lap's loudest
+player-experience finding — "a contract-only deadline is not player tension" — is closed.
+
+### A deadline you can see
+
+`TriggerCountdown` is the new pure fact. A repeat window is a sliding window anchored on
+the most recent contributing event, so the deadline a player actually faces is the moment
+their earliest still-counted attempt leaves it. It reports as running only once an attempt
+has started it and while it is unsatisfied, because before the first attempt there is
+nothing to race. It renders exactly the sentence the receipts guardrail always promised:
+`1/2, 6 seconds remaining`.
+
+Runtime draws that on an always-on banner. `OnGUI` previously returned early unless the F9
+drawer was open, so the mod had no player surface at all; the banner now draws before that
+return and turns red under five seconds. The line is recomputed once a second beside the
+existing timer poll and cached, because the surface that draws it runs every frame — the
+countdown never repeats `DescribeProgress`'s unbounded per-frame scan. `DurableTimerStore`
+gained `Pending`, since a store that could only answer "is it due yet" cannot show a clock.
+
+### Levels one through five
+
+1. **Prose** — guided rehearsal and the drawer speak the running deadline; the drawer's
+   pinned `in stage` line is appended to, never replaced.
+2. **Structured controls** — unchanged from 3.3; bounds and closed facts already hold.
+3. **Graph notation** — adaptive and spatial routes now carry chips and a distinct dotted
+   violet edge keyed on *having conditions*, not on being the second route drawn.
+4. **Canonical JSON** — the same shared trigger expression throughout.
+5. **Live values and rejected branches** — Runtime evidence lines now say why the branches
+   that outrank the winner did not take it (`Not mercy needs >= 2 deaths (1 death)`), and
+   Studio projects `unmet` and `not_taken` onto receipt rows. Both read the actual-versus-
+   expected slot that Slice 1 put on the trace and 3.1–3.3 filled in.
+
+### Repeated attempts read as progress
+
+The lap recorded that a valid first drop rendered as an empty circle beside `1/2` and
+looked like a failure, and that repeated evaluations of one beat looked like separate
+beats. Rehearsal traces now carry their owning beat, whether the attempt contributed, and
+the deadline; the browser groups consecutive attempts beneath their beat and marks them
+amber **partial 1/2** before the green completion. "Contributed" deliberately means the
+event matched that beat's own clause rather than that structural progress advanced — under
+a sliding window a later attempt can replace an expired one without advancing the count,
+and it is still the player making progress.
+
+### One fail-open closed on the way
+
+Six action types compiled but had no Runtime executor (`arcane_sight`, the two counters,
+`stage_activate`, and the two terminal results). An unimplemented action throws, which
+leaves its transition pending and replays it forever — a hand-authored pack could silently
+brick its own workflow. Nothing used them, Studio's catalog already excluded them, and
+terminal results are authored as a transition outcome. The registry now admits exactly what
+ships, with a test that fails if the two ever diverge again.
+
+### Versions and verification
+
+Packages stay at `0.6.0-local` (the 3.3 refresh already carried this contract line); the
+interim payloads were repacked to include the countdown. Gates: licensed Lab and Runtime
+Release builds, 253 Contracts/Lab xUnit tests, 272 Python pin tests, 76 Studio xUnit tests,
+loopback browser E2E now asserting the grouped partial row in the real DOM, plus the
+interim-package, no-reach-in, repo-identity, and generated-tome checks and a clean
+full-history secret scan.
+
+### Deliberate scope holds
+
+- The banner shows one deadline — the soonest running timer, else the highest-priority
+  running window. Stacked simultaneous deadlines wait for an authored quest that needs them.
+- Studio still shows the authored window rather than a live ticking clock; the countdown
+  belongs to the player in-world, and Studio's live lane remains receipt-driven.
+- Adaptive primitives remain advanced-only. Nothing was promoted to the beginner palette.
+
 ## Remaining Phase 3 work
-
-### Phase 3.4 — complete the five-level presentation
-
-Finish the attenuation ladder for every admitted adaptive primitive:
-
-1. beginner prose that states the player action and relevant condition;
-2. structured advanced controls with closed facts and bounds;
-3. graph notation that makes adaptive branches visually distinct;
-4. canonical JSON using the shared trigger expression;
-5. live Runtime values and rejected-branch reasons in Arcane Sight.
-
-This includes remaining-time or countdown language where a time limit is intended to
-create player tension. Capability remains advanced-only until a later validation lap
-demonstrates a compelling beginner use.
 
 ### Phase 3.5 — dev-channel proof and phase exit
 

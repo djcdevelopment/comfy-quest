@@ -177,6 +177,34 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("authored event predicates may evaluate", readme)
         self.assertIn("without ever filtering\nwhich bindings participate", readme)
 
+    def test_a_running_deadline_is_visible_without_opening_the_creator_drawer(self) -> None:
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        engine = ENGINE.read_text(encoding="utf-8")
+        # The banner draws before the drawer's early return, so a deadline is player-visible.
+        self.assertIn("void OnGUI(){EnsureStyles();DrawDeadline();if(!drawerVisible)return;", plugin)
+        self.assertIn("UnityEngine.GUI.Label(rect,line,Urgent(line)?deadlineUrgentStyle:deadlineStyle)", plugin)
+        self.assertIn("engine?.Deadline()", plugin)
+        # Every pinned texture is still released.
+        for texture in ("deadlineBackground", "deadlineUrgentBackground"):
+            with self.subTest(texture=texture):
+                self.assertIn(f"Destroy(ref {texture});", plugin)
+                self.assertIn(f'{texture}=Solid("runtime-deadline', plugin)
+        # The countdown is cached once a second, never recomputed per frame.
+        self.assertIn("RefreshDeadline(now);", engine)
+        self.assertIn("public string Deadline() {", engine)
+        self.assertIn("TriggerCountdown.Read(transition.When, progress.History, now)", engine)
+        self.assertIn("timers.Pending(now, 1)", engine)
+        # The existing stage-elapsed line keeps its exact shape; remaining time is appended.
+        self.assertIn('return " - in stage "', engine)
+        self.assertIn('+ (string.IsNullOrWhiteSpace(running) ? "" : " - " + running)', engine)
+
+    def test_rejected_branches_explain_themselves_in_runtime_evidence(self) -> None:
+        engine = ENGINE.read_text(encoding="utf-8")
+        self.assertIn("MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence)", engine)
+        self.assertIn("static string RejectedLine(", engine)
+        self.assertIn('" Not " + string.Join("; not ", reasons)', engine)
+        self.assertIn("static string Unmet(TriggerClauseTrace trace)", engine)
+
     def test_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
         observation = (RUNTIME / "RuntimeObservation.cs").read_text(encoding="utf-8")
         binding = BINDING.read_text(encoding="utf-8")

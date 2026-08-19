@@ -136,6 +136,10 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Run guided rehearsal", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#rehearsal-badge"), "Complete", "completed rehearsal", 30_000);
             await WaitForTextAsync(page.Locator("#rehearsal-result"), "1/2", "partial rehearsal progress");
+            // A repeated beat's first attempt must read as progress under its owning beat, never as a miss.
+            await WaitForCountAsync(page.Locator("#rehearsal-result .trace-beat .trace-attempts .trace-row.attempt.partial"), 1,
+                "repeated attempts group beneath their beat with an explicit partial state");
+            await WaitForTextAsync(page.Locator("#rehearsal-result .trace-row.attempt.partial"), "partial 1/2", "amber partial attempt row");
             await WaitForTextAsync(page.Locator("#rehearsal-result .disclaimer"), "does not prove a Valheim adapter", "rehearsal evidence disclaimer");
 
             await page.Locator("[data-stage='publish']").ClickAsync();

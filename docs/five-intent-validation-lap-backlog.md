@@ -59,6 +59,10 @@ These questions are acceptance evidence, not optional polish:
   explicit partial/complete states (for example, an amber **partial 1/2** child row
   under beat 2, followed by its green completion) before treating the rehearsal as
   self-explanatory.
+  **Resolved in Phase 3.4.** Attempts group beneath their owning beat and render an
+  amber `partial 1/2` row before the green completion; the synthetic E2E asserts that
+  row in the real DOM. An attempt counts as progress when it matched the beat's own
+  clause, so a sliding window that replaces an expired attempt still reads as progress.
 - After F10, Derek saw yellow text `1 pack, 1 loaded`. The count was visible, but
   **loaded** is ambiguous because F11 is the step that activates a pack. Replace the
   debug-shaped summary with language that states what F10 actually proved—for
@@ -90,6 +94,11 @@ player reaction into a mechanism-only diagnosis.
   limit is meant to matter—especially during combat or another task—it needs a
   universal timer bar, yellow countdown warnings, or another unmistakable temporal
   affordance. A contract-only deadline is not player tension.
+  **Resolved in Phase 3.4.** An always-on banner shows the running deadline
+  (`1/2, 6 seconds remaining`) without opening the creator drawer, and turns red under
+  five seconds. It reads one pure fact, `TriggerCountdown`, which reports a window as
+  running only once an attempt has started it. The next lap should judge whether the
+  banner's placement and wording carry tension during actual combat.
 - F9 felt like a kernel system-information panel. Its valuable role is to make the
   cognitive switch between defining/creating in the web Studio and acting as an
   in-world Creator feel limited to nearly cost-free, while still exposing the state

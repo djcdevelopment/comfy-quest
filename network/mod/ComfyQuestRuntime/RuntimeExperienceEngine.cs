@@ -22,6 +22,7 @@ sealed class RuntimeExperienceEngine {
       new(StringComparer.Ordinal);
   readonly object evidenceGate = new();
   readonly List<string> recentEvidence = new();
+  string deadlineLine;
   DateTimeOffset nextTimerPoll;
   Active cachedActive;
   DateTime cachedActiveWriteUtc;
@@ -67,7 +68,15 @@ sealed class RuntimeExperienceEngine {
       OnEvent(elapsed);
       timers.Acknowledge(timer.Key);
     }
+    RefreshDeadline(now);
   }
+
+  /// <summary>The authored deadline a player is currently racing, or null. Recomputed once a second
+  /// beside the timer poll and cached, because the surface that draws it runs every frame.</summary>
+  public string Deadline() {
+    lock (evidenceGate) return deadlineLine;
+  }
+
 
   public void OnEvent(RuntimeEvent evt) {
     evt = RuntimeEventPolicy.Normalize(evt);
@@ -144,7 +153,7 @@ sealed class RuntimeExperienceEngine {
             "matched", active, zdo.m_uid.ToString(), evt, currentStage.Id,
             decision.Transition.NextStage, matchedProgress, correlationId,
             evidence, rejectedEvidence),
-            MatchedLine(currentStage.Id, decision.Transition, matchedProgress));
+            MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence));
 
         var succeeded = true;
         foreach (var action in decision.Transition.Actions ?? new())
@@ -253,6 +262,45 @@ sealed class RuntimeExperienceEngine {
     Diagnostics = Array.Empty<ContractDiagnostic>(),
   };
 
+  /// <summary>Recomputed once a second from the cached binding set, well off the event hot path.</summary>
+  void RefreshDeadline(DateTimeOffset now) {
+    string line = null;
+    try {
+      if (TryLoad(out var active, out _)) {
+        var soonest = timers.Pending(now, 1).FirstOrDefault();
+        if (soonest != null)
+          line = Countdown((int)Math.Ceiling((soonest.DueUtc - now).TotalSeconds), null);
+        else {
+          foreach (var wear in Bindings(active)) {
+            var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
+            if (zdo == null) continue;
+            var reference = Read(zdo);
+            if (reference == null || reference.ContentHash != active.ContentHash) continue;
+            var progress = workflows.Get(Identity(zdo, active));
+            if (progress == null || !string.IsNullOrWhiteSpace(progress.Outcome)) break;
+            var stage = active.Document.Stages.FirstOrDefault(value => value.Id == progress.StageId);
+            foreach (var transition in (stage?.Transitions ?? new())
+                .OrderByDescending(value => value.Priority)
+                .ThenBy(value => value.Id, StringComparer.Ordinal)) {
+              var deadline = TriggerCountdown.Read(transition.When, progress.History, now);
+              if (!deadline.Running) continue;
+              line = Countdown(deadline.RemainingSeconds, deadline.Current + "/" + deadline.Required);
+              break;
+            }
+            break;
+          }
+        }
+      }
+    } catch {
+      line = null;
+    }
+    lock (evidenceGate) deadlineLine = line;
+  }
+
+  static string Countdown(int seconds, string progress) =>
+      seconds < 0 ? null
+      : (progress == null ? "" : progress + " — ") + TriggerCountdown.Seconds(seconds) + " remaining";
+
   static IReadOnlyList<RejectedTransitionEvidence> ExplainRejected(
       ExperienceStage stage,
       ExperienceTransition selected,
@@ -275,11 +323,36 @@ sealed class RuntimeExperienceEngine {
   }
 
   static string MatchedLine(
-      string stage, ExperienceTransition transition, TriggerProgress progress) {
+      string stage, ExperienceTransition transition, TriggerProgress progress,
+      IReadOnlyList<RejectedTransitionEvidence> rejected = null) {
     var count = progress?.Required > 1
         ? " — " + progress.Current + "/" + progress.Required : "";
     return "Matched " + Describe(transition?.When) + count + "; "
-        + stage + " → " + Destination(transition) + ".";
+        + stage + " → " + Destination(transition) + "." + RejectedLine(rejected);
+  }
+
+  /// <summary>Why the branches that outrank the winner did not take it, in their own words.</summary>
+  static string RejectedLine(IReadOnlyList<RejectedTransitionEvidence> rejected) {
+    if (rejected == null || rejected.Count == 0) return "";
+    var reasons = rejected.Select(value => value.TransitionId + " needs " + Unmet(value.Evidence))
+        .Take(2).ToArray();
+    return " Not " + string.Join("; not ", reasons) + ".";
+  }
+
+  static string Unmet(TriggerClauseTrace trace) {
+    if (trace == null) return "an unmet condition";
+    var where = Where(trace).FirstOrDefault(value => !value.Satisfied
+        && !string.IsNullOrWhiteSpace(value.Expected));
+    if (where != null)
+      return where.Expected + (string.IsNullOrWhiteSpace(where.Actual) ? "" : " (" + where.Actual + ")");
+    return trace.Required > 1 ? trace.Current + "/" + trace.Required : "its player action";
+  }
+
+  static IEnumerable<TriggerWhereTrace> Where(TriggerClauseTrace trace) {
+    if (trace == null) yield break;
+    foreach (var entry in trace.Where ?? new List<TriggerWhereTrace>()) yield return entry;
+    foreach (var child in trace.Children ?? new List<TriggerClauseTrace>())
+      foreach (var found in Where(child)) yield return found;
   }
 
   static string TransitionLine(string stage, ExperienceTransition transition) =>
@@ -532,8 +605,10 @@ sealed class RuntimeExperienceEngine {
         });
         var count = measured.Required > 1
             ? " - " + measured.Current + "/" + measured.Required : "";
+        var running = Deadline();
         return active.Document.Title + ": " + progress.StageId + " - "
-            + Describe(transition?.When) + count + DescribeStageElapsed(progress.StageEnteredUtc);
+            + Describe(transition?.When) + count + DescribeStageElapsed(progress.StageEnteredUtc)
+            + (string.IsNullOrWhiteSpace(running) ? "" : " - " + running);
       }
       return active.Document.Title + ": not started";
     } catch {

@@ -1274,10 +1274,14 @@ internal static class StudioRehearsal
                 var candidate = ordered.FirstOrDefault();
                 var partial = TriggerEvaluator.Measure(candidate?.When, history, context);
                 trace.Add(new(trace.Count + 1, evt.Name, evt.Target, stageId, null, Array.Empty<string>(), stageId, null,
-                    "ignored", partial.Current, partial.Required, Describe(candidate?.When)));
+                    "ignored", partial.Current, partial.Required, Describe(candidate?.When),
+                    candidate?.Id, Describe(candidate?.When),
+                    TriggerEvaluator.EventProgress(candidate?.When, new[] { evt }) > 0,
+                    TriggerCountdown.Read(candidate?.When, history, evt.At).Label));
                 return;
             }
             var progress = TriggerEvaluator.Measure(transition.When, history, context);
+            var beat = Describe(transition.When);
             var effects = new List<string>();
             foreach (var action in transition.Actions ?? new())
             {
@@ -1305,7 +1309,8 @@ internal static class StudioRehearsal
             outcome = string.IsNullOrWhiteSpace(transition.Outcome) ? null : transition.Outcome;
             history.Clear();
             trace.Add(new(trace.Count + 1, evt.Name, evt.Target, from, transition.Id, effects, stageId, outcome,
-                "matched", progress.Current, progress.Required, outcome is null ? Describe(document.Stages.FirstOrDefault(value => value.Id == stageId)?.Transitions?.OrderByDescending(value => value.Priority).FirstOrDefault()?.When) : null));
+                "matched", progress.Current, progress.Required, outcome is null ? Describe(document.Stages.FirstOrDefault(value => value.Id == stageId)?.Transitions?.OrderByDescending(value => value.Priority).FirstOrDefault()?.When) : null,
+                transition.Id, beat, true, null));
         }
     }
 
@@ -1445,6 +1450,36 @@ internal static class StudioRehearsal
         return CreatorEventCatalog.TryGet(eventName, out var definition) && !string.Equals(definition.ExampleTarget, "any", StringComparison.OrdinalIgnoreCase)
             ? definition.ExampleTarget
             : null;
+    }
+
+    /// <summary>The first authored condition this evidence did not meet, in creator words.</summary>
+    public static string? UnmetPhrase(TriggerClauseTrace? evidence)
+    {
+        var unmet = WhereEntries(evidence).FirstOrDefault(entry => !entry.Satisfied && !string.IsNullOrWhiteSpace(entry.Expected));
+        if (unmet is null) return null;
+        return string.IsNullOrWhiteSpace(unmet.Actual) ? unmet.Expected : $"{unmet.Expected} (was {unmet.Actual})";
+    }
+
+    /// <summary>Why the higher-priority branches did not take it, so a creator sees the road not taken.</summary>
+    public static string? NotTakenPhrase(IReadOnlyList<RejectedTransitionEvidence>? rejected, IReadOnlyDictionary<string, string>? routeLabels)
+    {
+        var reasons = (rejected ?? Array.Empty<RejectedTransitionEvidence>()).Where(value => value is not null).Take(2)
+            .Select(value =>
+            {
+                var label = value.TransitionId is not null && routeLabels is not null && routeLabels.TryGetValue(value.TransitionId, out var routeLabel)
+                    ? routeLabel : value.TransitionId ?? "another route";
+                var reason = UnmetPhrase(value.Evidence);
+                return reason is null ? label : $"{label} needed {reason}";
+            }).ToArray();
+        return reasons.Length == 0 ? null : string.Join("; ", reasons);
+    }
+
+    static IEnumerable<TriggerWhereTrace> WhereEntries(TriggerClauseTrace? trace)
+    {
+        if (trace is null) yield break;
+        foreach (var entry in trace.Where ?? new List<TriggerWhereTrace>()) yield return entry;
+        foreach (var child in trace.Children ?? new List<TriggerClauseTrace>())
+            foreach (var found in WhereEntries(child)) yield return found;
     }
 
     static string? Describe(TriggerExpression? trigger)
@@ -1694,7 +1729,7 @@ public sealed class StudioRehearsalInput
     public int Count { get; set; }
 }
 
-public sealed record StudioRehearsalTrace(int Step, string EventName, string? Target, string FromNodeId, string? RouteId, IReadOnlyList<string> Effects, string CurrentNodeId, string? Outcome, string Status, int CurrentCount, int RequiredCount, string? NextInstruction);
+public sealed record StudioRehearsalTrace(int Step, string EventName, string? Target, string FromNodeId, string? RouteId, IReadOnlyList<string> Effects, string CurrentNodeId, string? Outcome, string Status, int CurrentCount, int RequiredCount, string? NextInstruction, string? BeatRouteId = null, string? Beat = null, bool Contributed = false, string? Deadline = null);
 public sealed record StudioRehearsalResult(int SchemaVersion, bool Ok, string? Error, string ProofLevel, string Disclaimer, string? CurrentNodeId, string? Outcome, IReadOnlyList<StudioRehearsalTrace> Trace, IReadOnlyList<string> Transcript, IReadOnlyDictionary<string,int> Inventory, IReadOnlyDictionary<string,int> Spawns, IReadOnlyDictionary<string,int> Timers,
     IReadOnlyList<StudioRehearsalInput> GeneratedSteps, IReadOnlyList<string> Limitations, IReadOnlyList<string> AvailablePaths)
 {
@@ -1723,7 +1758,7 @@ public sealed record StudioRuntimeReceiptSummary(
     string? Operation, string? Status, string? StageId, string? EventName,
     int? CurrentCount, int? RequiredCount, DateTimeOffset AtUtc,
     string? TransitionId, string? ActionId, string? ActivationId, string? CorrelationId, string? Error,
-    string? RouteLabel, string? EffectLabel);
+    string? RouteLabel, string? EffectLabel, string? Unmet = null, string? NotTaken = null);
 
 public sealed record StudioRuntimePassLine(string Kind, string Status, string Message,
     string? ActivationId, string? CorrelationId, DateTimeOffset? AtUtc);

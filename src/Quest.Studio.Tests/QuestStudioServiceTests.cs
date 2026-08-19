@@ -357,6 +357,13 @@ public sealed class QuestStudioServiceTests : IDisposable
             first => { Assert.Equal("ignored", first.Status); Assert.Equal((1, 2), (first.CurrentCount, first.RequiredCount)); },
             second => { Assert.Equal("ignored", second.Status); Assert.Equal((1, 2), (second.CurrentCount, second.RequiredCount)); },
             third => { Assert.Equal("matched", third.Status); Assert.Equal((2, 2), (third.CurrentCount, third.RequiredCount)); });
+        // Every attempt belongs to one owning beat, is marked as real progress rather than a miss,
+        // and carries the deadline the player is racing while it is still running.
+        Assert.All(result.Trace, value => Assert.Equal("advance-drop-twice", value.BeatRouteId));
+        Assert.All(result.Trace, value => Assert.True(value.Contributed));
+        Assert.All(result.Trace, value => Assert.False(string.IsNullOrWhiteSpace(value.Beat)));
+        Assert.Equal("1/2, 30 seconds remaining", result.Trace[0].Deadline);
+        Assert.Null(result.Trace[2].Deadline);
     }
 
     [Fact]
