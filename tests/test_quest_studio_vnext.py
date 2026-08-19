@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / "src" / "Quest.Studio" / "QuestStudioPage.cs"
 WORKSPACE = ROOT / "src" / "Quest.Studio" / "QuestStudioWorkspace.cs"
+SERVICE = ROOT / "src" / "Quest.Studio" / "QuestStudioService.cs"
 ENDPOINTS = ROOT / "src" / "Quest.Studio" / "QuestStudioEndpoints.cs"
 EASY_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeEasyEventPatches.cs"
 CORE_ACTION_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeCoreActionPatches.cs"
@@ -86,6 +87,9 @@ class QuestStudioVNextTests(unittest.TestCase):
 
         for surface in ("bg", "panel", "panel-raised"):
             self.assertGreaterEqual(contrast(colors["dim"], colors[surface]), 4.5)
+        for tone in ("ink-soft", "green", "amber"):
+            for runtime_surface in ("#0f1417", "#101619"):
+                self.assertGreaterEqual(contrast(colors[tone], runtime_surface), 4.5)
         self.assertIn(".preview-keys{margin-top:22px;font-size:11.5px;color:var(--dim)}", css)
 
     def test_creator_lane_hides_implementation_plumbing(self) -> None:
@@ -131,6 +135,39 @@ class QuestStudioVNextTests(unittest.TestCase):
         self.assertIn("GRAPH_INSPECTOR_WIDTH_KEY", script)
         self.assertIn("function bindGraphResizer()", script)
         self.assertIn("e.key==='ArrowLeft'", script)
+
+    def test_runtime_return_path_projects_active_identity_and_server_labels(self) -> None:
+        html = raw_constant("Html")
+        script = raw_constant("Js")
+        workspace = WORKSPACE.read_text(encoding="utf-8")
+        service = SERVICE.read_text(encoding="utf-8")
+        for element_id in (
+            "active-revision",
+            "advanced-active-revision",
+            "advanced-runtime-receipts",
+        ):
+            self.assertIn(f'id="{element_id}"', html)
+        self.assertIn("Active in game", html)
+        self.assertIn("matches this draft", script)
+        self.assertIn("differs from this draft", script)
+        self.assertIn("r.route_label,r.effect_label", script)
+        self.assertIn("data-live-node", script)
+        self.assertIn("liveNodeId=row.dataset.liveNode", script)
+        for function_name in (
+            "activeRevisionText",
+            "renderActiveRevision",
+            "runtimeReceiptHtml",
+            "bindRuntimeReceiptHover",
+            "setRuntimeReceipts",
+        ):
+            body = script[script.index(f"function {function_name}") :]
+            self.assertIn("}", body[: body.index("\n")], function_name)
+        self.assertIn("RuntimeRouteLabels", workspace)
+        self.assertIn("RuntimeEffectLabels", workspace)
+        self.assertIn('ActiveRelation = activeRelation', workspace)
+        self.assertIn("active?.ActivationId", service)
+        self.assertIn("status.RouteLabels.TryGetValue", service)
+        self.assertIn("status.EffectLabels.TryGetValue", service)
 
     def test_grimoire_picker_scales_the_creator_catalog_without_exposing_seams(self) -> None:
         html = raw_constant("Html")

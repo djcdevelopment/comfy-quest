@@ -386,6 +386,76 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Runtime_status_projects_active_identity_and_relates_it_to_the_current_draft()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var published = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(published.Ok, published.Error);
+
+        var none = service.RuntimeStatusView(project.ProjectId);
+        Assert.Equal("published", none.Phase);
+        Assert.Equal("none", none.ActiveRelation);
+        Assert.Null(none.ActivePackId);
+        Assert.Null(none.ActiveActivationId);
+
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        new QuestPackStore(runtimeRoot).LoadLatest();
+        var current = service.RuntimeStatusView(project.ProjectId);
+        Assert.Equal("active", current.Phase);
+        Assert.Equal("current", current.ActiveRelation);
+        Assert.Equal(project.PackId, current.ActivePackId);
+        Assert.Equal(project.Version, current.ActiveVersion);
+        Assert.Equal(current.ContentHash, current.ActiveContentHash);
+        Assert.Matches("^act-[0-9]{8}T[0-9]{9}Z-[0-9a-f]{8}$", current.ActiveActivationId!);
+        Assert.NotNull(current.ActivatedUtc);
+
+        var bumped = service.BumpPatch(project.ProjectId, project.Revision);
+        Assert.True(bumped.Ok, bumped.Error);
+        var other = service.RuntimeStatusView(project.ProjectId);
+        Assert.Equal("certified", other.Phase);
+        Assert.Equal("other_version", other.ActiveRelation);
+        Assert.Equal(project.Version, other.ActiveVersion);
+        Assert.Equal(current.ActiveActivationId, other.ActiveActivationId);
+    }
+
+    [Fact]
+    public async Task Runtime_receipt_summary_resolves_route_and_effect_labels_on_the_server()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var route = Assert.Single(Assert.Single(project.Nodes).Routes);
+        route.Actions.Add(new StudioAction { Id = "give-wood", Type = "grant_item", Item = "Wood", Quantity = 2 });
+        var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(saved.Ok, saved.Error);
+        project = saved.Project!;
+        var published = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(published.Ok, published.Error);
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var candidate = new QuestPackStore(runtimeRoot).CheckInbox().Single(value => value.IsValid);
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Operation = "action", Status = "applied", StageId = "start",
+            PackId = candidate.Manifest.PackId, Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash,
+            TransitionId = route.Id, ActionId = "give-wood", CorrelationId = "corr-labels",
+            Diagnostics = Array.Empty<ContractDiagnostic>()
+        });
+
+        var receipt = Assert.Single(service.RuntimeStatusView(project.ProjectId).Receipts);
+        Assert.Equal(route.Id, receipt.TransitionId);
+        Assert.Equal("give-wood", receipt.ActionId);
+        Assert.Equal("corr-labels", receipt.CorrelationId);
+        Assert.Equal("Say something in normal chat.", receipt.RouteLabel);
+        Assert.Equal("Give 2 Wood", receipt.EffectLabel);
+    }
+
+    [Fact]
     public async Task Runtime_cockpit_advances_from_publish_through_check_and_load()
     {
         var valheim = Path.Combine(_root, "Valheim");

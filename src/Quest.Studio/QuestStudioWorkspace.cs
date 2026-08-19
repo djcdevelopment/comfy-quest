@@ -400,6 +400,7 @@ internal sealed class QuestStudioWorkspace
             .ToArray();
         var isActive = active?.PackId == project.PackId && active.Version == project.Version
             && string.Equals(active.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase);
+        var activeRelation = active is null ? "none" : isActive ? "current" : "other_version";
         var checkedOk = orderedReceipts.Any(value => value.Operation == "check" && value.Status == "accepted");
         var bound = orderedReceipts.Any(value => value.Operation == "bind" && value.Status is "inscribed" or "accepted");
         var completed = orderedReceipts.FirstOrDefault(value => value.Operation == "transition" && value.Status is "complete" or "fail");
@@ -433,23 +434,62 @@ internal sealed class QuestStudioWorkspace
             _ => "Inspect the latest Runtime receipt."
         };
         return new(2, true, phase, instruction, compiled.ContentHash, published?.Sha256, active,
-            currentStageId, currentCount, requiredCount, orderedReceipts.Take(20).ToArray(), compiled.Diagnostics);
+            currentStageId, currentCount, requiredCount, orderedReceipts.Take(20).ToArray(), compiled.Diagnostics)
+        {
+            ActiveRelation = activeRelation,
+            RouteLabels = RuntimeRouteLabels(compiled.Document!),
+            EffectLabels = RuntimeEffectLabels(compiled.Document!)
+        };
     }
 
     static string DescribeLiveTrigger(TriggerExpression? trigger)
     {
-        var leaf = string.Equals(trigger?.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
-            ? trigger?.Children?.FirstOrDefault()
-            : trigger;
-        if (leaf is not null && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal))
+        if (trigger is null) return "Perform the current quest beat.";
+        var op = (trigger.Op ?? string.Empty).ToUpperInvariant();
+        if (op == "COUNT" && trigger.Children?.FirstOrDefault() is { } counted)
+            return DescribeLiveTrigger(counted);
+        if (op is "ANY" or "ALL" or "SEQUENCE" && trigger.Children?.Count > 0)
+        {
+            var separator = op == "SEQUENCE" ? "; then " : op == "ALL" ? "; and " : "; or ";
+            var prefix = op == "ALL" ? "Complete all: " : op == "SEQUENCE" ? "In order: " : "Complete either: ";
+            return prefix + string.Join(separator, trigger.Children.Select(DescribeLiveTrigger));
+        }
+        if (CreatorSignalCatalog.TryDescribe(trigger.Event, trigger.Target, out var signal))
             return signal.Instruction;
-        if (leaf is not null && CreatorEventCatalog.TryGet(leaf.Event, out var definition))
+        if (CreatorEventCatalog.TryGet(trigger.Event, out var definition))
             return definition.Instruction;
-        if (leaf is not null && RuntimeProductionEventCatalog.TryGetEngine(leaf.Event, out var engine))
+        if (RuntimeProductionEventCatalog.TryGetEngine(trigger.Event, out var engine))
             return engine.Instruction;
-        return string.IsNullOrWhiteSpace(leaf?.Event)
+        return string.IsNullOrWhiteSpace(trigger.Event)
             ? "Perform the current quest beat."
-            : "Perform: " + leaf.Event.Replace('_', ' ');
+            : "Perform: " + trigger.Event.Replace('_', ' ');
+    }
+
+    static IReadOnlyDictionary<string, string> RuntimeRouteLabels(ExperienceDocument document) =>
+        (document.Stages ?? new()).SelectMany(stage => stage.Transitions ?? new())
+            .Where(transition => !string.IsNullOrWhiteSpace(transition.Id))
+            .ToDictionary(transition => transition.Id, transition => DescribeLiveTrigger(transition.When), StringComparer.Ordinal);
+
+    static IReadOnlyDictionary<string, string> RuntimeEffectLabels(ExperienceDocument document) =>
+        (document.Stages ?? new()).SelectMany(stage =>
+                (stage.EntryActions ?? new()).Concat((stage.Transitions ?? new()).SelectMany(transition => transition.Actions ?? new())))
+            .Where(action => !string.IsNullOrWhiteSpace(action.Id))
+            .ToDictionary(action => action.Id, DescribeRuntimeEffect, StringComparer.Ordinal);
+
+    static string DescribeRuntimeEffect(ExperienceAction action)
+    {
+        string Value(string name) => action.Parameters is not null && action.Parameters.TryGetValue(name, out var value)
+            ? value.ToString() : string.Empty;
+        return action.Type switch
+        {
+            "message" => "Show message",
+            "timer_start" => $"Start timer {Value("timer_id")} for {Value("seconds")} seconds",
+            "timer_cancel" => $"Cancel timer {Value("timer_id")}",
+            "grant_item" => $"Give {Value("quantity")} {Value("item")}",
+            "spawn" => $"Create {Value("count")} {Humanize(Value("prefab"))}",
+            "clear_spawned" => "Clear staged objects",
+            _ => Humanize(action.Type ?? action.Id)
+        };
     }
 
     void EnsureLegacyMigration()
@@ -1330,6 +1370,10 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
     string? CurrentStageId, int? CurrentCount, int? RequiredCount,
     IReadOnlyList<RuntimeReceipt> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics)
 {
+    public string ActiveRelation { get; init; } = "none";
+    public IReadOnlyDictionary<string, string> RouteLabels { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<string, string> EffectLabels { get; init; } = new Dictionary<string, string>();
+
     public static StudioRuntimeStatus Unavailable(string phase, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
         new(2, false, phase,
             phase == "draft_invalid" ? "Resolve the graph diagnostics before publishing." : "Runtime state is unavailable on this machine.",
@@ -1338,8 +1382,12 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
 
 public sealed record StudioRuntimeReceiptSummary(
     string? Operation, string? Status, string? StageId, string? EventName,
-    int? CurrentCount, int? RequiredCount, DateTimeOffset AtUtc);
+    int? CurrentCount, int? RequiredCount, DateTimeOffset AtUtc,
+    string? TransitionId, string? ActionId, string? CorrelationId, string? RouteLabel, string? EffectLabel);
 
 public sealed record StudioRuntimeStatusView(int SchemaVersion, bool Available, string Phase, string NextInstruction,
-    string? ContentHash, string? PackageSha256, string? CurrentStageId, int? CurrentCount, int? RequiredCount,
+    string? ContentHash, string? PackageSha256,
+    string? ActivePackId, string? ActiveVersion, string? ActiveContentHash, string? ActiveActivationId,
+    DateTimeOffset? ActivatedUtc, string ActiveRelation,
+    string? CurrentStageId, int? CurrentCount, int? RequiredCount,
     IReadOnlyList<StudioRuntimeReceiptSummary> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics);

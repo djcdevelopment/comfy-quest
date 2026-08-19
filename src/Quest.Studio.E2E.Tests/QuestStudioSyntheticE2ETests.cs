@@ -143,6 +143,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "first publish", 30_000);
             await RefreshRuntimeAsync(page);
             await WaitForExactTextAsync(page.Locator("#runtime-phase"), "published", "published Runtime phase");
+            await WaitForTextAsync(page.Locator("#active-revision"), "Nothing active in game", "empty active revision");
             await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 1, "published questpack");
 
             var fixture = SyntheticRuntimeFixture.Open(run, SentinelName, SentinelContents);
@@ -157,6 +158,9 @@ public sealed class QuestStudioSyntheticE2ETests
             await RefreshRuntimeAsync(page);
             await WaitForExactTextAsync(page.Locator("#runtime-phase"), "active", "active Runtime phase");
             await WaitForTextAsync(page.Locator("#runtime-next"), "backtick twice", "binding instruction");
+            await WaitForTextAsync(page.Locator("#active-revision"), fixture.Version, "active version");
+            await WaitForTextAsync(page.Locator("#active-revision"), fixture.ShortActivationId, "short activation id");
+            await WaitForTextAsync(page.Locator("#active-revision"), "matches this draft", "active revision relation");
 
             fixture.WriteBound();
             await RefreshRuntimeAsync(page);
@@ -181,6 +185,15 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.Locator("#tools-menu summary").ClickAsync();
             await page.Locator("[data-tool='graph']").ClickAsync();
             await WaitForCountAsync(page.Locator("#nodes .graph-node"), 8, "eight preserved graph nodes");
+            await WaitForTextAsync(page.Locator("#advanced-active-revision"), fixture.ShortActivationId, "advanced active revision");
+            await WaitForTextAsync(page.Locator("#advanced-runtime-receipts"), "Show message", "server-labeled Runtime effect");
+            var hoverReceipt = page.Locator("#advanced-runtime-receipts .receipt-row[data-live-node]").First;
+            var hoverNodeId = await hoverReceipt.GetAttributeAsync("data-live-node");
+            Assert.False(string.IsNullOrWhiteSpace(hoverNodeId));
+            await hoverReceipt.HoverAsync();
+            await WaitUntilAsync(
+                async () => await page.Locator($"#nodes .graph-node[data-node='{hoverNodeId}'].live").CountAsync() == 1,
+                "receipt hover flashes its graph node");
             var graphWorkspaceWidth = await page.Locator("#tool-graph").EvaluateAsync<double>("element => element.getBoundingClientRect().width");
             Assert.True(graphWorkspaceWidth > 1450, $"Expected the desktop graph workspace to use the viewport; got {graphWorkspaceWidth}px.");
             var graphResizer = page.Locator("#graph-resizer");
@@ -548,6 +561,9 @@ public sealed class QuestStudioSyntheticE2ETests
         readonly ExperienceDocument _document;
         readonly RuntimeReceiptStore _receipts;
         DateTimeOffset _nextReceiptAt = DateTimeOffset.UtcNow.AddSeconds(1);
+        string? _activationId;
+        DateTimeOffset? _stageEnteredUtc;
+        int _correlationSequence;
 
         SyntheticRuntimeFixture(SyntheticRun run, PackCandidate candidate)
         {
@@ -558,6 +574,8 @@ public sealed class QuestStudioSyntheticE2ETests
         }
 
         public string Version => _candidate.Manifest.Version;
+        public string ActivationId => _activationId ?? throw new InvalidOperationException("synthetic_activation_missing");
+        public string ShortActivationId => ActivationId[^8..];
 
         public static SyntheticRuntimeFixture Open(SyntheticRun run, string sentinelName, string sentinelContents)
         {
@@ -586,14 +604,19 @@ public sealed class QuestStudioSyntheticE2ETests
             Assert.Equal(_candidate.Manifest.PackId, activated.Manifest.PackId);
             Assert.Equal(_candidate.Manifest.Version, activated.Manifest.Version);
             Assert.Equal(_candidate.ContentHash, activated.ContentHash);
-            WriteForPack(new RuntimeReceipt { Operation = "load", Status = "activated" });
+            using var active = JsonDocument.Parse(File.ReadAllText(Path.Combine(_run.RuntimeRoot, "active", "active-set.json")));
+            _activationId = active.RootElement.GetProperty("activation_id").GetString();
+            _stageEnteredUtc = active.RootElement.GetProperty("activated_utc").GetDateTimeOffset();
+            Assert.Matches("^act-[0-9]{8}T[0-9]{9}Z-[0-9a-f]{8}$", ActivationId);
+            WriteForPack(new RuntimeReceipt { Operation = "load", Status = "activated", CorrelationId = "corr-synthetic-load" });
         }
 
         public void WriteBound() => WriteForPack(new RuntimeReceipt
         {
             Operation = "bind",
             Status = "inscribed",
-            BindingZdo = "synthetic:0:1"
+            BindingZdo = "synthetic:0:1",
+            CorrelationId = "corr-synthetic-bind"
         });
 
         public void WritePartialProgress(string eventName, int current, int required)
@@ -607,7 +630,8 @@ public sealed class QuestStudioSyntheticE2ETests
                 EventTarget = "Wood",
                 CurrentStageId = stage.Id,
                 CurrentCount = current,
-                RequiredCount = required
+                RequiredCount = required,
+                CorrelationId = "corr-synthetic-" + eventName
             });
         }
 
@@ -615,6 +639,21 @@ public sealed class QuestStudioSyntheticE2ETests
         {
             var (stage, transition) = RouteForEvent(eventName);
             Assert.False(string.IsNullOrWhiteSpace(transition.NextStage));
+            var correlationId = "corr-synthetic-" + transition.Id;
+            var eventAt = _nextReceiptAt;
+            var evidence = EvidenceFor(transition, eventAt);
+            WriteForPack(new RuntimeReceipt
+            {
+                Operation = "event", Status = "matched", StageId = stage.Id, CurrentStageId = stage.Id,
+                NextStageId = transition.NextStage, EventName = eventName, TransitionId = transition.Id,
+                CorrelationId = correlationId, Evidence = evidence
+            });
+            foreach (var action in transition.Actions ?? [])
+                WriteForPack(new RuntimeReceipt
+                {
+                    Operation = "action", Status = "applied", StageId = stage.Id, CurrentStageId = stage.Id,
+                    TransitionId = transition.Id, ActionId = action.Id, CorrelationId = correlationId
+                });
             WriteForPack(new RuntimeReceipt
             {
                 Operation = "transition",
@@ -622,8 +661,13 @@ public sealed class QuestStudioSyntheticE2ETests
                 StageId = stage.Id,
                 CurrentStageId = stage.Id,
                 NextStageId = transition.NextStage,
-                TransitionId = transition.Id
+                TransitionId = transition.Id,
+                EventName = eventName,
+                CorrelationId = correlationId,
+                StageEnteredUtc = eventAt,
+                Evidence = evidence
             });
+            _stageEnteredUtc = eventAt;
         }
 
         public void WriteComplete()
@@ -633,13 +677,32 @@ public sealed class QuestStudioSyntheticE2ETests
                 .Where(value => value.transition.Outcome is "complete" or "fail")
                 .ToArray();
             var (stage, transition) = Assert.Single(matches);
+            var eventName = FirstEvent(transition.When).Event;
+            var correlationId = "corr-synthetic-" + transition.Id;
+            var eventAt = _nextReceiptAt;
+            var evidence = EvidenceFor(transition, eventAt);
+            WriteForPack(new RuntimeReceipt
+            {
+                Operation = "event", Status = "matched", StageId = stage.Id, CurrentStageId = stage.Id,
+                EventName = eventName, TransitionId = transition.Id, CorrelationId = correlationId, Evidence = evidence
+            });
+            foreach (var action in transition.Actions ?? [])
+                WriteForPack(new RuntimeReceipt
+                {
+                    Operation = "action", Status = "applied", StageId = stage.Id, CurrentStageId = stage.Id,
+                    TransitionId = transition.Id, ActionId = action.Id, CorrelationId = correlationId
+                });
             WriteForPack(new RuntimeReceipt
             {
                 Operation = "transition",
                 Status = transition.Outcome,
                 StageId = stage.Id,
                 CurrentStageId = stage.Id,
-                TransitionId = transition.Id
+                TransitionId = transition.Id,
+                EventName = eventName,
+                CorrelationId = correlationId,
+                StageEnteredUtc = _stageEnteredUtc,
+                Evidence = evidence
             });
         }
 
@@ -656,6 +719,38 @@ public sealed class QuestStudioSyntheticE2ETests
             trigger is not null &&
             (string.Equals(trigger.Event, eventName, StringComparison.Ordinal) ||
              (trigger.Children ?? []).Any(child => TriggerContains(child, eventName)));
+
+        static TriggerExpression FirstEvent(TriggerExpression trigger) =>
+            string.Equals(trigger.Op, "EVENT", StringComparison.OrdinalIgnoreCase)
+                ? trigger
+                : FirstEvent(Assert.Single(trigger.Children ?? []));
+
+        static TriggerClauseTrace EvidenceFor(ExperienceTransition transition, DateTimeOffset eventAt)
+        {
+            var history = EvidenceEvents(transition.When, eventAt).ToArray();
+            var evidence = TriggerEvaluator.Explain(transition.When, history);
+            Assert.True(evidence.Satisfied);
+            return evidence;
+        }
+
+        static IEnumerable<RuntimeEvent> EvidenceEvents(TriggerExpression trigger, DateTimeOffset eventAt)
+        {
+            if (string.Equals(trigger.Op, "EVENT", StringComparison.OrdinalIgnoreCase))
+            {
+                yield return new RuntimeEvent
+                {
+                    Name = trigger.Event, Target = trigger.Target, At = eventAt,
+                    Fields = trigger.Where ?? new Dictionary<string, string>()
+                };
+                yield break;
+            }
+            var repetitions = string.Equals(trigger.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
+                ? Math.Max(1, trigger.Count.GetValueOrDefault()) : 1;
+            for (var repeat = 0; repeat < repetitions; repeat++)
+                foreach (var child in trigger.Children ?? [])
+                    foreach (var evt in EvidenceEvents(child, eventAt.AddMilliseconds(repeat)))
+                        yield return evt;
+        }
 
         static ExperienceDocument ReadExperience(PackCandidate candidate)
         {
@@ -675,6 +770,8 @@ public sealed class QuestStudioSyntheticE2ETests
             receipt.PackId = _candidate.Manifest.PackId;
             receipt.Version = _candidate.Manifest.Version;
             receipt.ContentHash = _candidate.ContentHash;
+            receipt.ActivationId ??= _activationId;
+            receipt.CorrelationId ??= $"corr-synthetic-{++_correlationSequence:D3}";
             receipt.Diagnostics = Array.Empty<ContractDiagnostic>();
             Write(receipt);
         }

@@ -93,12 +93,18 @@ public sealed class QuestStudioService
     public StudioRuntimeStatusView RuntimeStatusView(string projectId)
     {
         var status = _workspace.RuntimeStatus(projectId);
+        var active = status.ActiveSet;
         return new StudioRuntimeStatusView(status.SchemaVersion, status.Available, status.Phase, status.NextInstruction,
-            status.ContentHash, status.PackageSha256, status.CurrentStageId, status.CurrentCount, status.RequiredCount,
+            status.ContentHash, status.PackageSha256,
+            active?.PackId, active?.Version, active?.ContentHash, active?.ActivationId, active?.ActivatedUtc,
+            status.ActiveRelation, status.CurrentStageId, status.CurrentCount, status.RequiredCount,
             status.Receipts.Select(receipt => new StudioRuntimeReceiptSummary(
                 receipt.Operation, receipt.Status,
                 receipt.NextStageId ?? receipt.CurrentStageId ?? receipt.StageId,
-                receipt.EventName, receipt.CurrentCount, receipt.RequiredCount, receipt.AtUtc)).ToArray(),
+                receipt.EventName, receipt.CurrentCount, receipt.RequiredCount, receipt.AtUtc,
+                receipt.TransitionId, receipt.ActionId, receipt.CorrelationId,
+                receipt.TransitionId is not null && status.RouteLabels.TryGetValue(receipt.TransitionId, out var routeLabel) ? routeLabel : null,
+                receipt.ActionId is not null && status.EffectLabels.TryGetValue(receipt.ActionId, out var effectLabel) ? effectLabel : null)).ToArray(),
             status.Diagnostics);
     }
     public object ProjectHistory(string projectId) => _workspace.History(projectId);
