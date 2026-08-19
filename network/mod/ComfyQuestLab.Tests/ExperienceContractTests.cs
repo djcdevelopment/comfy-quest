@@ -97,6 +97,141 @@ public sealed class ExperienceContractTests {
     context.At=start.AddSeconds(51);
     Assert.True(TriggerEvaluator.Matches(quiet,history,context));
   }
+  [Fact]
+  public void SpatialSchemaMovesAsOneClosedGate() {
+    Assert.Equal(new[]{"count_in_area","entered","left","remained","within_radius"},SpatialPredicateCatalog.All.Select(x=>x.Name).OrderBy(x=>x,StringComparer.Ordinal));
+    Assert.All(SpatialPredicateCatalog.All,x=>Assert.Equal("extended",x.Palette));
+    var events=new HashSet<string>{"kill"};
+    var anchored=Valid.Replace("\"entry_stage\"","\"anchors\":[{\"id\":\"camp\",\"x\":12.5,\"y\":31,\"z\":-40}],\"entry_stage\"");
+    var spatial=anchored.Replace("\"when\":{\"op\":\"EVENT\",\"event\":\"kill\",\"target\":\"Troll\"}","\"when\":{\"op\":\"ALL\",\"children\":[{\"op\":\"EVENT\",\"event\":\"kill\",\"target\":\"Troll\"},{\"op\":\"SPATIAL\",\"spatial\":\"within_radius\",\"anchor\":{\"kind\":\"authored\",\"anchor_id\":\"camp\"},\"radius\":20}]}");
+    var compiled=ExperienceCompiler.CompileJson(spatial,events);
+    Assert.True(compiled.IsValid,string.Join(";",compiled.Diagnostics.Select(x=>x.Code)));
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"within_radius\"","\"hovering\""),events).Diagnostics,x=>x.Code=="spatial.predicate");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace(",\"anchor\":{\"kind\":\"authored\",\"anchor_id\":\"camp\"}",""),events).Diagnostics,x=>x.Code=="spatial.anchor");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"kind\":\"authored\"","\"kind\":\"nearby\""),events).Diagnostics,x=>x.Code=="spatial.anchor_kind");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"anchor_id\":\"camp\"","\"anchor_id\":\"missing\""),events).Diagnostics,x=>x.Code=="spatial.anchor_reference");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("{\"kind\":\"authored\",\"anchor_id\":\"camp\"}","{\"kind\":\"coordinates\",\"x\":1,\"y\":2}"),events).Diagnostics,x=>x.Code=="spatial.anchor_coordinates");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("{\"kind\":\"authored\",\"anchor_id\":\"camp\"}","{\"kind\":\"coordinates\",\"x\":1,\"y\":2,\"z\":10501}"),events).Diagnostics,x=>x.Code=="spatial.anchor_coordinates");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("{\"kind\":\"authored\",\"anchor_id\":\"camp\"}","{\"kind\":\"binding\",\"anchor_id\":\"camp\"}"),events).Diagnostics,x=>x.Code=="spatial.anchor_fields");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("{\"kind\":\"authored\",\"anchor_id\":\"camp\"}","{\"kind\":\"player\"}"),events).Diagnostics,x=>x.Code=="spatial.anchor_player");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"radius\":20","\"radius\":0"),events).Diagnostics,x=>x.Code=="spatial.radius");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"radius\":20","\"radius\":101"),events).Diagnostics,x=>x.Code=="spatial.radius");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"radius\":20","\"radius\":20,\"value\":5"),events).Diagnostics,x=>x.Code=="spatial.value");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"within_radius\"","\"remained\""),events).Diagnostics,x=>x.Code=="spatial.value");
+    var remained=ExperienceCompiler.CompileJson(spatial.Replace("\"within_radius\"","\"remained\"").Replace("\"radius\":20","\"radius\":20,\"value\":60"),events);
+    Assert.True(remained.IsValid,string.Join(";",remained.Diagnostics.Select(x=>x.Code)));
+    var counted=ExperienceCompiler.CompileJson(spatial.Replace("{\"op\":\"SPATIAL\",\"spatial\":\"within_radius\",\"anchor\":{\"kind\":\"authored\",\"anchor_id\":\"camp\"},\"radius\":20}","{\"op\":\"SPATIAL\",\"spatial\":\"count_in_area\",\"anchor\":{\"kind\":\"player\"},\"radius\":20,\"value\":3}"),events);
+    Assert.True(counted.IsValid,string.Join(";",counted.Diagnostics.Select(x=>x.Code)));
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("{\"op\":\"SPATIAL\",\"spatial\":\"within_radius\",\"anchor\":{\"kind\":\"authored\",\"anchor_id\":\"camp\"},\"radius\":20}","{\"op\":\"SPATIAL\",\"spatial\":\"count_in_area\",\"anchor\":{\"kind\":\"player\"},\"radius\":20,\"value\":129}"),events).Diagnostics,x=>x.Code=="spatial.value");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"radius\":20","\"radius\":20,\"children\":[{\"op\":\"EVENT\",\"event\":\"kill\"}]"),events).Diagnostics,x=>x.Code=="spatial.children");
+    Assert.Contains(ExperienceCompiler.CompileJson(anchored.Replace("{\"op\":\"EVENT\",\"event\":\"kill\",\"target\":\"Troll\"}","{\"op\":\"SPATIAL\",\"spatial\":\"within_radius\",\"anchor\":{\"kind\":\"binding\"},\"radius\":20}"),events).Diagnostics,x=>x.Code=="trigger.event_driver");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("[{\"id\":\"camp\",\"x\":12.5,\"y\":31,\"z\":-40}]","[{\"id\":\"camp\",\"x\":12.5,\"y\":31,\"z\":-40},{\"id\":\"camp\",\"x\":1,\"y\":2,\"z\":3}]"),events).Diagnostics,x=>x.Code=="id.duplicate");
+    Assert.Contains(ExperienceCompiler.CompileJson(spatial.Replace("\"x\":12.5","\"x\":10501"),events).Diagnostics,x=>x.Code=="anchor.coordinates");
+    var crowded=spatial.Replace("[{\"id\":\"camp\",\"x\":12.5,\"y\":31,\"z\":-40}]","["+string.Join(",",Enumerable.Range(0,33).Select(i=>i==0?"{\"id\":\"camp\",\"x\":12.5,\"y\":31,\"z\":-40}":$"{{\"id\":\"a{i}\",\"x\":1,\"y\":2,\"z\":3}}"))+"]");
+    Assert.Contains(ExperienceCompiler.CompileJson(crowded,events).Diagnostics,x=>x.Code=="anchors.bounds");
+  }
+  [Fact]
+  public void SpatialPredicatesEvaluateObservedPositionsAndExplainActualVersusExpected() {
+    var start=DateTimeOffset.Parse("2026-08-19T05:00:00Z");
+    RuntimeEvent At(string name,double seconds,double? x=null,double? z=null)=>new(){Name=name,At=start.AddSeconds(seconds),PosX=x,PosY=x.HasValue?(double?)30:null,PosZ=z};
+    var context=new TriggerEvaluationContext{At=start.AddSeconds(10),AuthoredAnchors=new Dictionary<string,SpatialPoint>{["camp"]=new SpatialPoint(0,30,0)}};
+    var within=new TriggerExpression{Op="SPATIAL",Spatial="within_radius",Anchor=new AreaAnchor{Kind="authored",AnchorId="camp"},Radius=20};
+    var expression=new TriggerExpression{Op="ALL",Children=new(){new(){Op="EVENT",Event="kill"},within}};
+    var history=new[]{At("hit",0,50,0),At("kill",10,12,9)};
+    Assert.False(TriggerEvaluator.Matches(expression,history));
+    Assert.True(TriggerEvaluator.Matches(expression,history,context));
+    var trace=TriggerEvaluator.Explain(expression,history,context);
+    Assert.True(trace.Satisfied);
+    var node=Assert.Single(trace.Children,x=>x.Op=="SPATIAL");
+    var row=Assert.Single(node.Where);
+    Assert.Equal("within_radius",row.Field);
+    Assert.Equal("within 20 m of camp",row.Expected);
+    Assert.Equal("15 m",row.Actual);
+    Assert.True(row.Satisfied);
+    Assert.Equal(JsonConvert.SerializeObject(trace),JsonConvert.SerializeObject(TriggerEvaluator.Explain(expression,history,context)));
+    var far=new[]{At("kill",10,30,0)};
+    Assert.False(TriggerEvaluator.Matches(expression,far,context));
+    Assert.Equal("30 m",Assert.Single(Assert.Single(TriggerEvaluator.Explain(expression,far,context).Children,x=>x.Op=="SPATIAL").Where).Actual);
+    var unobserved=new[]{At("kill",10)};
+    Assert.False(TriggerEvaluator.Matches(expression,unobserved,context));
+    Assert.Null(Assert.Single(Assert.Single(TriggerEvaluator.Explain(expression,unobserved,context).Children,x=>x.Op=="SPATIAL").Where).Actual);
+    Assert.False(TriggerEvaluator.Matches(expression,history,new TriggerEvaluationContext{At=start.AddSeconds(10)}));
+  }
+  [Fact]
+  public void EnteredLeftAndRemainedRequireObservedTransitionsAndTrailingPresence() {
+    var start=DateTimeOffset.Parse("2026-08-19T06:00:00Z");
+    RuntimeEvent At(double seconds,double x)=>new(){Name="piece_damaged",At=start.AddSeconds(seconds),PosX=x,PosY=0,PosZ=0};
+    var context=new TriggerEvaluationContext{BindingPosition=new SpatialPoint(0,0,0)};
+    TriggerExpression Predicate(string name,int? value=null)=>new(){Op="SPATIAL",Spatial=name,Anchor=new AreaAnchor{Kind="binding"},Radius=10,Value=value};
+    Assert.True(TriggerEvaluator.Matches(Predicate("entered"),new[]{At(0,30),At(10,5)},context));
+    Assert.False(TriggerEvaluator.Matches(Predicate("entered"),new[]{At(0,5),At(10,3)},context));
+    Assert.False(TriggerEvaluator.Matches(Predicate("entered"),new[]{At(10,5)},context));
+    Assert.True(TriggerEvaluator.Matches(Predicate("left"),new[]{At(0,5),At(10,30)},context));
+    Assert.False(TriggerEvaluator.Matches(Predicate("left"),new[]{At(0,30),At(10,5)},context));
+    var remained=Predicate("remained",60);
+    Assert.True(TriggerEvaluator.Matches(remained,new[]{At(0,5),At(30,3),At(70,4)},context));
+    Assert.False(TriggerEvaluator.Matches(remained,new[]{At(0,5),At(40,30),At(50,3),At(70,4)},context));
+    var interrupted=TriggerEvaluator.Explain(remained,new[]{At(0,5),At(40,30),At(50,3),At(70,4)},context);
+    var row=Assert.Single(interrupted.Where);
+    Assert.Equal(">= 60 seconds in the area 10 m around the bound Charm",row.Expected);
+    Assert.Equal("20 seconds",row.Actual);
+    Assert.Equal(20,interrupted.Current);
+    Assert.Equal(60,interrupted.Required);
+    Assert.Equal("outside the area",Assert.Single(TriggerEvaluator.Explain(remained,new[]{At(0,5),At(70,30)},context).Where).Actual);
+    Assert.False(TriggerEvaluator.Matches(remained,new[]{At(0,5),At(70,30)},context));
+  }
+  [Fact]
+  public void CountInAreaCountsTrackedSpawnedObjectsAndFailsClosedWithoutResolution() {
+    var start=DateTimeOffset.Parse("2026-08-19T07:00:00Z");
+    var trigger=new RuntimeEvent{Name="kill",At=start,PosX=0,PosY=0,PosZ=0};
+    var count=new TriggerExpression{Op="SPATIAL",Spatial="count_in_area",Anchor=new AreaAnchor{Kind="player"},Radius=15,Value=2};
+    var context=new TriggerEvaluationContext{SpawnedPositions=new[]{new SpatialPoint(5,0,0),new SpatialPoint(60,0,0),new SpatialPoint(0,0,8)}};
+    Assert.True(TriggerEvaluator.Matches(count,new[]{trigger},context));
+    var trace=TriggerEvaluator.Explain(count,new[]{trigger},context);
+    var row=Assert.Single(trace.Where);
+    Assert.Equal(">= 2 objects in the area 15 m around the player",row.Expected);
+    Assert.Equal("2 objects",row.Actual);
+    Assert.Equal(2,trace.Current);
+    Assert.Equal(2,trace.Required);
+    Assert.False(TriggerEvaluator.Matches(count,new[]{trigger},new TriggerEvaluationContext()));
+    Assert.Null(Assert.Single(TriggerEvaluator.Explain(count,new[]{trigger},new TriggerEvaluationContext()).Where).Actual);
+    Assert.False(TriggerEvaluator.Matches(count,new[]{new RuntimeEvent{Name="kill",At=start}},context));
+  }
+  [Fact]
+  public void WorkflowSuppliesDocumentAnchorsAndSpatialFactsToEvaluation() {
+    var root=Path.Combine(Path.GetTempPath(),"comfy-workflow-"+Guid.NewGuid().ToString("N"));
+    try {
+      var doc=TwoStage();
+      doc.Anchors=new(){new ExperienceAnchor{Id="camp",X=0,Y=0,Z=0}};
+      doc.Stages[0].Transitions[0].When=new TriggerExpression{Op="ALL",Children=new(){new(){Op="EVENT",Event="piece_damaged"},new(){Op="SPATIAL",Spatial="within_radius",Anchor=new AreaAnchor{Kind="authored",AnchorId="camp"},Radius=10}}};
+      var id=new WorkflowIdentity{WorldId="w",CharacterId="p",BindingZdo="z",ContentHash="spatial"};
+      var start=DateTimeOffset.Parse("2026-08-19T08:00:00Z");
+      var store=new WorkflowStateStore(root);
+      Assert.Null(store.Begin(id,doc,new RuntimeEvent{Name="piece_damaged",At=start}));
+      var decision=new WorkflowStateStore(root).Begin(id,doc,new RuntimeEvent{Name="piece_damaged",At=start.AddSeconds(5),PosX=3,PosY=0,PosZ=4});
+      Assert.NotNull(decision);
+      Assert.True(decision.EvaluationContext.AuthoredAnchors.ContainsKey("camp"));
+      Assert.True(new WorkflowStateStore(root).Complete(decision));
+      doc.Stages[1].Transitions[0].When=new TriggerExpression{Op="ALL",Children=new(){new(){Op="EVENT",Event="piece_damaged"},new(){Op="SPATIAL",Spatial="count_in_area",Anchor=new AreaAnchor{Kind="binding"},Radius=10,Value=1}}};
+      Assert.Null(new WorkflowStateStore(root).Begin(id,doc,new RuntimeEvent{Name="piece_damaged",At=start.AddSeconds(10)}));
+      var counted=new WorkflowStateStore(root).Begin(id,doc,new RuntimeEvent{Name="piece_damaged",At=start.AddSeconds(11)},new SpatialFacts{BindingPosition=new SpatialPoint(0,0,0),SpawnedPositions=new[]{new SpatialPoint(2,0,0)}});
+      Assert.NotNull(counted);
+      Assert.Equal("finish",counted.Transition.Id);
+    } finally { Directory.Delete(root,true); }
+  }
+  [Fact]
+  public void NormalizationPreservesOnlyBoundedRoundedCompletePositions() {
+    var normalized=RuntimeEventPolicy.Normalize(new RuntimeEvent{Name="kill",Target="Troll",At=DateTimeOffset.UnixEpoch,PosX=10.16,PosY=30.0,PosZ=-5.04});
+    Assert.Equal(10.2,normalized.PosX!.Value,3);
+    Assert.Equal(30.0,normalized.PosY!.Value,3);
+    Assert.Equal(-5.0,normalized.PosZ!.Value,3);
+    Assert.DoesNotContain("PosX",JsonConvert.SerializeObject(RuntimeEventPolicy.Normalize(new RuntimeEvent{Name="kill",Target="Troll",At=DateTimeOffset.UnixEpoch})));
+    Assert.Null(RuntimeEventPolicy.Normalize(new RuntimeEvent{Name="kill",Target="Troll",At=DateTimeOffset.UnixEpoch,PosX=1,PosY=2}).PosX);
+    Assert.Null(RuntimeEventPolicy.Normalize(new RuntimeEvent{Name="kill",Target="Troll",At=DateTimeOffset.UnixEpoch,PosX=double.NaN,PosY=2,PosZ=3}).PosX);
+    Assert.Null(RuntimeEventPolicy.Normalize(new RuntimeEvent{Name="kill",Target="Troll",At=DateTimeOffset.UnixEpoch,PosX=10501,PosY=2,PosZ=3}).PosX);
+    var old=JsonConvert.DeserializeObject<RuntimeEvent>("{\"Name\":\"kill\",\"Target\":\"Troll\",\"At\":\"1970-01-01T00:00:00+00:00\"}");
+    Assert.Null(old.PosX);
+  }
   [Theory][InlineData(CharmTargetKind.PlayerBuiltPiece)][InlineData(CharmTargetKind.Sign)][InlineData(CharmTargetKind.ItemStand)][InlineData(CharmTargetKind.DedicatedCharm)] public void PrivateHostCanInscribeAllowlistedOwnedTargets(CharmTargetKind kind){var world=new WorldAuthority{IsPrivateWorld=true,IsListenHost=true};Assert.True(CharmPolicy.CanInscribe(world,new CharmTarget{Kind=kind,HasZdo=true,LocallyOwned=true}).Allowed);}
   [Theory][InlineData(CharmTargetKind.Creature)][InlineData(CharmTargetKind.Portal)][InlineData(CharmTargetKind.Terrain)][InlineData(CharmTargetKind.Container)][InlineData(CharmTargetKind.DroppedItem)] public void UnsafeCharmTargetsFailClosed(CharmTargetKind kind){var world=new WorldAuthority{IsPrivateWorld=true,IsSolo=true};Assert.Equal("charm_target_not_allowlisted",CharmPolicy.CanInscribe(world,new CharmTarget{Kind=kind,HasZdo=true,LocallyOwned=true}).Diagnostic);}
   [Fact] public void PeerMutationFailsClosedButReferenceRemainsInspectable(){var world=new WorldAuthority{IsPrivateWorld=true,IsPeerClient=true};Assert.Equal("mutation_authority_unavailable",CharmPolicy.CanMutate(world).Diagnostic);Assert.True(CharmPolicy.ValidateReference(new CharmReference{PackId="demo",ExperienceId="quest",BindingId="default",Version="1.0.0",ContentHash=new string('a',64)}).Allowed);}

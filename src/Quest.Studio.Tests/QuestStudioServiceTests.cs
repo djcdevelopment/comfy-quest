@@ -906,6 +906,100 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
+    public void Advanced_spatial_conditions_compile_rehearse_and_stay_extended()
+    {
+        var service = CreateService();
+        using var catalog = JsonDocument.Parse(JsonSerializer.Serialize(service.WorkspaceCatalog()));
+        var predicates = catalog.RootElement.GetProperty("spatial_predicates").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "count_in_area", "entered", "left", "remained", "within_radius" },
+            predicates.Select(value => value.GetProperty("name").GetString()).OrderBy(value => value, StringComparer.Ordinal));
+        Assert.All(predicates, value => Assert.Equal("extended", value.GetProperty("palette").GetString()));
+
+        var project = service.CreateProject("blank");
+        project.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition
+        {
+            Predicate = "remained",
+            AnchorKind = "coordinates",
+            X = 10, Y = 30, Z = -4,
+            Radius = 15,
+            Value = 45
+        });
+        var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(saved.Ok, saved.Error);
+
+        var certified = service.CertifyGraph(project.ProjectId);
+        Assert.True(certified.Ok, certified.Error);
+        using (var document = JsonDocument.Parse(certified.ExperienceJson!))
+        {
+            var when = document.RootElement.GetProperty("stages")[0].GetProperty("transitions")[0].GetProperty("when");
+            Assert.Equal("ALL", when.GetProperty("op").GetString());
+            var spatial = Assert.Single(when.GetProperty("children").EnumerateArray(), value => value.GetProperty("op").GetString() == "SPATIAL");
+            Assert.Equal("remained", spatial.GetProperty("spatial").GetString());
+            Assert.Equal("coordinates", spatial.GetProperty("anchor").GetProperty("kind").GetString());
+            Assert.Equal(15, spatial.GetProperty("radius").GetInt32());
+            Assert.Equal(45, spatial.GetProperty("value").GetInt32());
+        }
+
+        var rehearsal = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(rehearsal.Ok, rehearsal.Error);
+        Assert.Equal(new[] { "event", "advance", "event" }, rehearsal.GeneratedSteps.Select(value => value.Kind));
+        Assert.Equal(45, rehearsal.GeneratedSteps[1].Seconds);
+        Assert.Equal(10, rehearsal.GeneratedSteps[0].X);
+        Assert.Equal(10, rehearsal.GeneratedSteps[2].X);
+        Assert.Equal("complete", rehearsal.Outcome);
+
+        var entered = service.CreateProject("blank");
+        entered.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "entered", AnchorKind = "binding", Radius = 10 });
+        Assert.True(service.SaveDraft(entered.ProjectId, new StudioSaveRequest(entered.Revision, entered)).Ok);
+        var enteredRun = service.Rehearse(entered.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(enteredRun.Ok, enteredRun.Error);
+        Assert.Equal(new[] { "event", "event" }, enteredRun.GeneratedSteps.Select(value => value.Kind));
+        Assert.Equal(35, enteredRun.GeneratedSteps[0].X);
+        Assert.Equal(0, enteredRun.GeneratedSteps[1].X);
+        Assert.Equal("complete", enteredRun.Outcome);
+
+        var near = service.CreateProject("blank");
+        near.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "within_radius", AnchorKind = "binding", Radius = 20 });
+        Assert.True(service.SaveDraft(near.ProjectId, new StudioSaveRequest(near.Revision, near)).Ok);
+        var nearRun = service.Rehearse(near.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(nearRun.Ok, nearRun.Error);
+        Assert.Equal(0, Assert.Single(nearRun.GeneratedSteps).X);
+        Assert.Equal("complete", nearRun.Outcome);
+
+        var departed = service.CreateProject("blank");
+        departed.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "left", AnchorKind = "binding", Radius = 10 });
+        Assert.True(service.SaveDraft(departed.ProjectId, new StudioSaveRequest(departed.Revision, departed)).Ok);
+        var departedRun = service.Rehearse(departed.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(departedRun.Ok, departedRun.Error);
+        Assert.Equal(new double?[] { 0, 35 }, departedRun.GeneratedSteps.Select(value => value.X));
+        Assert.Equal("complete", departedRun.Outcome);
+
+        var counted = service.CreateProject("blank");
+        var opening = counted.Nodes[0].Routes[0];
+        opening.Actions.Add(new StudioAction { Id = "stage-guards", Type = "spawn", Kind = "creature", Prefab = "Greyling", Count = 2, Radius = 3 });
+        counted.Nodes.Add(new StudioNode
+        {
+            Id = "defend", Label = "Defend",
+            Routes = { new StudioRoute { Id = "hold", Event = opening.Event, Target = opening.Target, Outcome = "complete",
+                SpatialConditions = { new StudioSpatialCondition { Predicate = "count_in_area", AnchorKind = "player", Radius = 20, Value = 2 } } } }
+        });
+        opening.DestinationNodeId = "defend";
+        opening.Outcome = null;
+        Assert.True(service.SaveDraft(counted.ProjectId, new StudioSaveRequest(counted.Revision, counted)).Ok);
+        var countedRun = service.Rehearse(counted.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
+        Assert.True(countedRun.Ok, countedRun.Error);
+        Assert.Equal("complete", countedRun.Outcome);
+        Assert.Contains(countedRun.Limitations, value => value.Contains("counts objects"));
+
+        var invalid = service.CreateProject("blank");
+        invalid.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "within_radius", AnchorKind = "player", Radius = 10 });
+        Assert.True(service.SaveDraft(invalid.ProjectId, new StudioSaveRequest(invalid.Revision, invalid)).Ok);
+        var rejected = service.CertifyGraph(invalid.ProjectId);
+        Assert.False(rejected.Ok);
+        Assert.Contains(rejected.Diagnostics, value => value.Code == "spatial_anchor_player_invalid");
+    }
+
+    [Fact]
     public async Task Bundle_includes_only_requested_matching_published_and_live_evidence()
     {
         var valheim = Path.Combine(_root, "Valheim");

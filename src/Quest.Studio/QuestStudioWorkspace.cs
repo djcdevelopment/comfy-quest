@@ -47,6 +47,20 @@ internal sealed class QuestStudioWorkspace
             palette = measure.Palette,
             comparison = "gte"
         }).ToArray(),
+        spatial_predicates = SpatialPredicateCatalog.All.Select(predicate => new
+        {
+            name = predicate.Name,
+            label = predicate.Label,
+            requires_value = predicate.RequiresValue,
+            value_minimum = predicate.ValueMinimum,
+            value_maximum = predicate.ValueMaximum,
+            value_unit = predicate.ValueUnit,
+            allows_player_anchor = predicate.AllowsPlayerAnchor,
+            palette = predicate.Palette,
+            radius_minimum = SpatialPredicateCatalog.RadiusMinimum,
+            radius_maximum = SpatialPredicateCatalog.RadiusMaximum,
+            coordinate_bound = SpatialPredicateCatalog.MaxWorldCoordinate
+        }).ToArray(),
         quick_presets = CreatorSignalCatalog.All.Select(signal => new
         {
             id = signal.Id,
@@ -515,6 +529,7 @@ internal sealed class QuestStudioWorkspace
             return trigger.Measure == "time_since_stage_entered"
                 ? $"Wait until this stage has lasted {trigger.Value.GetValueOrDefault()} seconds."
                 : $"Wait until {trigger.Value.GetValueOrDefault()} seconds have passed without quest progress.";
+        if (op == "SPATIAL") return StudioRehearsal.SpatialLiveInstruction(trigger);
         if (op == "COUNT" && trigger.Children?.FirstOrDefault() is { } counted)
             return DescribeLiveTrigger(counted);
         if (op is "ANY" or "ALL" or "SEQUENCE" && trigger.Children?.Count > 0)
@@ -935,7 +950,7 @@ internal static class StudioGraphCompiler
                 }
                 var eventTrigger = new TriggerExpression { Op = "EVENT", Event = route.Event, Target = NullIfWhite(route.Target), Where = where.Count == 0 ? null : where };
                 var eventClause = route.RepeatCount > 1
-                    ? new TriggerExpression { Op = "COUNT", Count = route.RepeatCount, WithinSeconds = (route.AdaptiveConditions?.Count ?? 0) == 0 ? route.WithinSeconds : null, Children = new() { eventTrigger } }
+                    ? new TriggerExpression { Op = "COUNT", Count = route.RepeatCount, WithinSeconds = (route.AdaptiveConditions?.Count ?? 0) == 0 && (route.SpatialConditions?.Count ?? 0) == 0 ? route.WithinSeconds : null, Children = new() { eventTrigger } }
                     : eventTrigger;
                 var adaptive = new List<TriggerExpression>();
                 var seenMeasures = new HashSet<string>(StringComparer.Ordinal);
@@ -954,9 +969,38 @@ internal static class StudioGraphCompiler
                     if (condition.Value < (measure?.Minimum ?? 1) || condition.Value > (measure?.Maximum ?? 86400)) Add("adaptive_value_invalid", conditionPath + ".value", "Adaptive value is outside the measure's reviewed bounds.");
                     adaptive.Add(new TriggerExpression { Op = "THRESHOLD", Measure = condition.Measure, Comparison = condition.Comparison, Value = condition.Value });
                 }
-                var trigger = adaptive.Count == 0
+                var spatial = new List<TriggerExpression>();
+                var seenPredicates = new HashSet<string>(StringComparer.Ordinal);
+                var spatialIndex = 0;
+                foreach (var condition in route.SpatialConditions ?? new())
+                {
+                    var conditionPath = path + ".spatial_conditions." + spatialIndex++;
+                    if (condition is null)
+                    {
+                        Add("spatial_condition_required", conditionPath, "Spatial conditions cannot be null.");
+                        continue;
+                    }
+                    if (!SpatialPredicateCatalog.TryGet(condition.Predicate, out var predicate)) Add("spatial_predicate_invalid", conditionPath + ".predicate", "Choose a predicate from the advanced spatial registry.");
+                    else if (!seenPredicates.Add(condition.Predicate)) Add("spatial_predicate_duplicate", conditionPath + ".predicate", "Each spatial predicate may appear once per route.");
+                    var kind = condition.AnchorKind ?? string.Empty;
+                    AreaAnchor? anchor = null;
+                    if (kind is "binding" or "player") anchor = new AreaAnchor { Kind = kind };
+                    else if (kind == "coordinates")
+                    {
+                        if (!(BoundedCoordinate(condition.X) && BoundedCoordinate(condition.Y) && BoundedCoordinate(condition.Z))) Add("spatial_coordinates_invalid", conditionPath, "Coordinates must be complete, finite, and within the reviewed world bounds.");
+                        else anchor = new AreaAnchor { Kind = "coordinates", X = condition.X, Y = condition.Y, Z = condition.Z };
+                    }
+                    else Add("spatial_anchor_invalid", conditionPath + ".anchor_kind", "Choose the bound Charm, the player, or explicit coordinates.");
+                    if (kind == "player" && predicate is not null && !predicate.AllowsPlayerAnchor) Add("spatial_anchor_player_invalid", conditionPath + ".anchor_kind", "The player anchor applies only to counting objects near the player.");
+                    if (condition.Radius is < SpatialPredicateCatalog.RadiusMinimum or > SpatialPredicateCatalog.RadiusMaximum) Add("spatial_radius_invalid", conditionPath + ".radius", "Radius must be 1..100 whole meters.");
+                    if (predicate is not null && predicate.RequiresValue && (condition.Value is null || condition.Value < predicate.ValueMinimum || condition.Value > predicate.ValueMaximum)) Add("spatial_value_invalid", conditionPath + ".value", "Value is outside the predicate's reviewed bounds.");
+                    if (predicate is not null && !predicate.RequiresValue && condition.Value is not null) Add("spatial_value_invalid", conditionPath + ".value", "This predicate does not take a value.");
+                    if (anchor is not null && predicate is not null)
+                        spatial.Add(new TriggerExpression { Op = "SPATIAL", Spatial = condition.Predicate, Anchor = anchor, Radius = condition.Radius, Value = condition.Value });
+                }
+                var trigger = adaptive.Count == 0 && spatial.Count == 0
                     ? eventClause
-                    : new TriggerExpression { Op = "ALL", WithinSeconds = route.WithinSeconds, Children = new List<TriggerExpression> { eventClause }.Concat(adaptive).ToList() };
+                    : new TriggerExpression { Op = "ALL", WithinSeconds = route.WithinSeconds, Children = new List<TriggerExpression> { eventClause }.Concat(adaptive).Concat(spatial).ToList() };
                 transitions.Add(new ExperienceTransition
                 {
                     Id = route.Id, Priority = route.Priority,
@@ -1109,6 +1153,7 @@ internal static class StudioGraphCompiler
         writer.Write(content);
     }
     static bool SafeId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 64 && value.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '$');
+    static bool BoundedCoordinate(double? value) => value.HasValue && !double.IsNaN(value.Value) && !double.IsInfinity(value.Value) && Math.Abs(value.Value) <= SpatialPredicateCatalog.MaxWorldCoordinate;
     static string? NullIfWhite(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }
 
@@ -1164,7 +1209,7 @@ internal static class StudioRehearsal
             }
             if (!MergeLegacy("actor_role", input.ActorRole) || !MergeLegacy("timer_id", input.TimerId))
                 return StudioRehearsalResult.Fail("rehearsal_fields_conflict");
-            Emit(new RuntimeEvent { Name = input.EventName, Target = input.Target, At = now, Fields = fields });
+            Emit(new RuntimeEvent { Name = input.EventName, Target = input.Target, At = now, Fields = fields, PosX = input.X, PosY = input.Y, PosZ = input.Z });
 
             bool MergeLegacy(string key, string? value)
             {
@@ -1192,7 +1237,15 @@ internal static class StudioRehearsal
             var stage = document.Stages.FirstOrDefault(value => value.Id == stageId);
             if (stage is null) return;
             var ordered = (stage.Transitions ?? new()).OrderByDescending(value => value.Priority).ThenBy(value => value.Id, StringComparer.Ordinal).ToArray();
-            var context = new TriggerEvaluationContext { At = evt.At, StageEnteredUtc = stageEnteredUtc, LastProgressUtc = lastProgressUtc };
+            // The synthetic binding rehearses at the origin; this path's spawned objects rehearse
+            // beside it so area predicates can be exercised without a live scene.
+            var context = new TriggerEvaluationContext
+            {
+                At = evt.At, StageEnteredUtc = stageEnteredUtc, LastProgressUtc = lastProgressUtc,
+                BindingPosition = new SpatialPoint(0, 0, 0),
+                SpawnedPositions = spawns.Values.SelectMany(count => Enumerable.Repeat(new SpatialPoint(0, 0, 0), Math.Max(0, count))).ToArray(),
+                AuthoredAnchors = SpatialEvaluator.AnchorMap(document)
+            };
             var progressBefore = ordered.Sum(value => TriggerEvaluator.EventProgress(value.When, history));
             history.Add(evt);
             var madeProgress = ordered.Sum(value => TriggerEvaluator.EventProgress(value.When, history)) > progressBefore;
@@ -1255,6 +1308,18 @@ internal static class StudioRehearsal
             var adaptive = (route.AdaptiveConditions ?? new()).Where(value => value is not null).ToArray();
             var adaptiveSeconds = adaptive.Select(value => value.Value).DefaultIfEmpty(0).Max();
             var noProgressSeconds = adaptive.Where(value => value.Measure == "time_since_progress").Select(value => value.Value).DefaultIfEmpty(0).Max();
+            var spatialConditions = (route.SpatialConditions ?? new()).Where(value => value is not null).ToArray();
+            var remainedSeconds = spatialConditions.Where(value => value.Predicate == "remained").Select(value => value.Value ?? 0).DefaultIfEmpty(0).Max();
+            var positioned = spatialConditions.Length > 0;
+            var coordinates = spatialConditions.FirstOrDefault(value => value.AnchorKind == "coordinates" && value.X.HasValue && value.Y.HasValue && value.Z.HasValue);
+            var insideX = coordinates?.X ?? 0d; var insideY = coordinates?.Y ?? 0d; var insideZ = coordinates?.Z ?? 0d;
+            var maxRadius = spatialConditions.Select(value => value.Radius).DefaultIfEmpty(0).Max();
+            var outsideX = insideX + maxRadius + 25 <= SpatialPredicateCatalog.MaxWorldCoordinate ? insideX + maxRadius + 25 : insideX - maxRadius - 25;
+            var needsEnter = spatialConditions.Any(value => value.Predicate == "entered");
+            var needsLeave = spatialConditions.Any(value => value.Predicate == "left");
+            var finalInside = !needsLeave;
+            if (spatialConditions.Any(value => value.Predicate == "count_in_area"))
+                limitations.Add($"Route {route.Id} counts objects in an area; guided rehearsal places this path's spawned objects at the synthetic binding origin.");
             if (routes.Length > 1)
             {
                 availablePaths.AddRange(routes.Select(candidate => node.Id + ":" + candidate.Id));
@@ -1267,33 +1332,31 @@ internal static class StudioRehearsal
                     seconds = 1;
                     limitations.Add($"Timer {route.TimerId} was not started on the selected path, so no timer event was injected.");
                 }
+                if (positioned)
+                    limitations.Add($"Route {route.Id} pairs a timer beat with spatial conditions; synthetic timer events carry no position, so those conditions were not satisfied.");
                 steps.Add(new StudioRehearsalInput { Kind = "advance", Seconds = Math.Max(seconds, adaptiveSeconds) });
             }
             else
             {
                 var target = string.IsNullOrWhiteSpace(route.Target) ? ExampleTarget(route.Event) : route.Target;
                 var repeats = Math.Max(1, route.RepeatCount);
-                var beforeWait = noProgressSeconds > 0 ? Math.Max(0, repeats - 1) : 0;
-                for (var count = 0; count < beforeWait; count++)
+                StudioRehearsalInput Positioned(bool inside) => new()
                 {
-                    steps.Add(new StudioRehearsalInput
-                    {
-                        Kind = "event", EventName = route.Event, Target = target,
-                        Fields = SyntheticFields(route)
-                    });
-                }
-                if (adaptiveSeconds > 0) steps.Add(new StudioRehearsalInput { Kind = "advance", Seconds = adaptiveSeconds });
+                    Kind = "event", EventName = route.Event, Target = target, Fields = SyntheticFields(route),
+                    X = positioned ? (inside ? insideX : outsideX) : null,
+                    Y = positioned ? insideY : null,
+                    Z = positioned ? insideZ : null
+                };
+                if (needsEnter) steps.Add(Positioned(false));
+                if (remainedSeconds > 0 || needsLeave) steps.Add(Positioned(true));
+                var beforeWait = noProgressSeconds > 0 ? Math.Max(0, repeats - 1) : 0;
+                for (var count = 0; count < beforeWait; count++) steps.Add(Positioned(finalInside));
+                var waitSeconds = Math.Max(adaptiveSeconds, remainedSeconds);
+                if (waitSeconds > 0) steps.Add(new StudioRehearsalInput { Kind = "advance", Seconds = waitSeconds });
                 var afterWait = noProgressSeconds > 0 && route.WithinSeconds.HasValue && route.WithinSeconds.Value < adaptiveSeconds
                     ? repeats
                     : repeats - beforeWait;
-                for (var count = 0; count < afterWait; count++)
-                {
-                    steps.Add(new StudioRehearsalInput
-                    {
-                        Kind = "event", EventName = route.Event, Target = target,
-                        Fields = SyntheticFields(route)
-                    });
-                }
+                for (var count = 0; count < afterWait; count++) steps.Add(Positioned(finalInside));
             }
             foreach (var action in route.Actions ?? new())
             {
@@ -1347,7 +1410,8 @@ internal static class StudioRehearsal
             : leaf is not null && RuntimeProductionEventCatalog.TryGetEngine(leaf.Event, out var engine) ? engine.Instruction : null;
         var conditions = Thresholds(trigger).Select(value => value.Measure == "time_since_stage_entered"
             ? $"after {value.Value.GetValueOrDefault()} seconds in this stage"
-            : $"after {value.Value.GetValueOrDefault()} seconds without quest progress").ToArray();
+            : $"after {value.Value.GetValueOrDefault()} seconds without quest progress")
+            .Concat(SpatialNodes(trigger).Select(SpatialConditionPhrase)).ToArray();
         return instruction is null || conditions.Length == 0 ? instruction : instruction.TrimEnd('.') + ", " + string.Join(" and ", conditions) + ".";
     }
 
@@ -1363,6 +1427,41 @@ internal static class StudioRehearsal
         if (trigger is null) yield break;
         if (string.Equals(trigger.Op, "THRESHOLD", StringComparison.OrdinalIgnoreCase)) yield return trigger;
         foreach (var child in trigger.Children ?? new()) foreach (var threshold in Thresholds(child)) yield return threshold;
+    }
+
+    static IEnumerable<TriggerExpression> SpatialNodes(TriggerExpression? trigger)
+    {
+        if (trigger is null) yield break;
+        if (string.Equals(trigger.Op, "SPATIAL", StringComparison.OrdinalIgnoreCase)) yield return trigger;
+        foreach (var child in trigger.Children ?? new()) foreach (var node in SpatialNodes(child)) yield return node;
+    }
+
+    internal static string SpatialLiveInstruction(TriggerExpression trigger)
+    {
+        var label = SpatialEvaluator.Label(trigger.Anchor);
+        var radius = trigger.Radius.GetValueOrDefault();
+        return trigger.Spatial switch
+        {
+            "entered" => $"Enter the area {radius} m around {label}.",
+            "left" => $"Leave the area {radius} m around {label}.",
+            "remained" => $"Remain in the area {radius} m around {label} for {trigger.Value.GetValueOrDefault()} seconds.",
+            "count_in_area" => $"Keep {trigger.Value.GetValueOrDefault()} objects within {radius} m of {label}.",
+            _ => $"Stay within {radius} m of {label}."
+        };
+    }
+
+    static string SpatialConditionPhrase(TriggerExpression trigger)
+    {
+        var label = SpatialEvaluator.Label(trigger.Anchor);
+        var radius = trigger.Radius.GetValueOrDefault();
+        return trigger.Spatial switch
+        {
+            "entered" => $"after entering the area {radius} m around {label}",
+            "left" => $"after leaving the area {radius} m around {label}",
+            "remained" => $"after {trigger.Value.GetValueOrDefault()} seconds in the area {radius} m around {label}",
+            "count_in_area" => $"with {trigger.Value.GetValueOrDefault()} objects within {radius} m of {label}",
+            _ => $"while within {radius} m of {label}"
+        };
     }
 }
 
@@ -1421,6 +1520,7 @@ public sealed class StudioRoute
     public string? Outcome { get; set; }
     public List<StudioAction> Actions { get; set; } = new();
     public List<StudioAdaptiveCondition> AdaptiveConditions { get; set; } = new();
+    public List<StudioSpatialCondition> SpatialConditions { get; set; } = new();
 
     void SetWhere(string key, string? value)
     {
@@ -1435,6 +1535,17 @@ public sealed class StudioAdaptiveCondition
     public string Measure { get; set; } = "time_since_stage_entered";
     public string Comparison { get; set; } = "gte";
     public int Value { get; set; } = 30;
+}
+
+public sealed class StudioSpatialCondition
+{
+    public string Predicate { get; set; } = "within_radius";
+    public string AnchorKind { get; set; } = "binding";
+    public double? X { get; set; }
+    public double? Y { get; set; }
+    public double? Z { get; set; }
+    public int Radius { get; set; } = 20;
+    public int? Value { get; set; }
 }
 
 public sealed class StudioAction
@@ -1498,6 +1609,9 @@ public sealed class StudioRehearsalInput
     public string? TimerId { get; set; }
     public Dictionary<string, string> Fields { get; set; } = new(StringComparer.Ordinal);
     public int Seconds { get; set; }
+    public double? X { get; set; }
+    public double? Y { get; set; }
+    public double? Z { get; set; }
 }
 
 public sealed record StudioRehearsalTrace(int Step, string EventName, string? Target, string FromNodeId, string? RouteId, IReadOnlyList<string> Effects, string CurrentNodeId, string? Outcome, string Status, int CurrentCount, int RequiredCount, string? NextInstruction);

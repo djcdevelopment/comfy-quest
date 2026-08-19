@@ -31,15 +31,35 @@ public static class RuntimeEventPolicy {
         if (!fields.ContainsKey(required)) return null;
       }
     }
+    var position = NormalizePosition(source);
     return new RuntimeEvent {
       Name = source.Name.Trim().ToLowerInvariant(),
       Target = target,
       SourceId = NormalizeScalar(source.SourceId),
       At = source.At,
       Fields = fields.Count == 0 ? null : fields,
+      PosX = position?.X,
+      PosY = position?.Y,
+      PosZ = position?.Z,
       DedupeKey = NormalizeScalar(source.DedupeKey),
     };
   }
+
+  // A witness position passes the boundary only complete, finite, inside the reviewed world
+  // bounds, and rounded to 0.1 m; anything else is dropped whole rather than partially kept.
+  static SpatialPoint? NormalizePosition(RuntimeEvent source) {
+    if (!source.PosX.HasValue || !source.PosY.HasValue || !source.PosZ.HasValue) return null;
+    var x = source.PosX.Value; var y = source.PosY.Value; var z = source.PosZ.Value;
+    if (!BoundedCoordinate(x) || !BoundedCoordinate(y) || !BoundedCoordinate(z)) return null;
+    return new SpatialPoint(
+        Math.Round(x, 1, MidpointRounding.AwayFromZero),
+        Math.Round(y, 1, MidpointRounding.AwayFromZero),
+        Math.Round(z, 1, MidpointRounding.AwayFromZero));
+  }
+
+  static bool BoundedCoordinate(double value) =>
+      !double.IsNaN(value) && !double.IsInfinity(value)
+      && Math.Abs(value) <= SpatialPredicateCatalog.MaxWorldCoordinate;
 
   static readonly IReadOnlyDictionary<string, string> EmptyFields =
       new Dictionary<string, string>();

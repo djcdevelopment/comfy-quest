@@ -22,6 +22,42 @@ measure, comparison `gte`, and an integer number of seconds from 1 through 86400
 transition must also contain an `EVENT`, keeping evaluation event-driven. `Explain`
 reports the measured actual value beside the authored threshold.
 
+## Admitted spatial facts
+
+| Fact | Authoritative source | Meaning | Missing-data behavior |
+| --- | --- | --- | --- |
+| Witness position | `Player.m_localPlayer.transform.position`, read once at emission by the Runtime spatial observation seam and stamped onto the normalized event | Where the local player stood when the event was witnessed, rounded to 0.1 m | Events without a stamped position fail every player-subject spatial predicate closed |
+| Binding position | The bound Charm's `ZDO.GetPosition()`, read at evaluation time | Where the bound Charm object currently stands | The `binding` anchor fails closed when unavailable |
+| Tracked spawned-object positions | `SpawnExecutionStore` ownership records resolved to live ZDO positions at evaluation time; records whose spawned identity marks no longer match are excluded | Where this workflow's still-live authored spawns currently stand | `count_in_area` fails closed when no resolution was provided |
+| Authored anchor positions | The experience document's own `anchors` list | Coordinates the creator wrote down and named | An `authored` reference to a missing anchor is rejected at compile time |
+
+Positions are stamped by exactly one Runtime observation module and normalized (finite,
+bounded, rounded to 0.1 m) at the shared privacy boundary. Distance is 3D Euclidean,
+computed only in the pure Contracts `SpatialEvaluator` — binding discovery keeps no
+radius and the pinned Bindings region keeps no distance code.
+
+The contract form mirrors `THRESHOLD`: one `SPATIAL` trigger operator with a closed
+predicate registry — `within_radius`, `entered`, `left`, `remained` (>= 1..86400
+seconds), and `count_in_area` (>= 1..128 objects) — a required anchor, and a required
+radius of 1..100 whole meters. A transition must still contain an `EVENT`. The
+`player` anchor is admitted only for `count_in_area`; the other predicates already
+take the player as their subject, so a player-relative area would be circular.
+
+### Interpretation limits, stated deliberately
+
+- `within_radius` and `remained` read the triggering event's own stamped position;
+  they never substitute an older observation for "where the player is now".
+- `entered` and `left` require an observed transition between two stamped positions
+  inside the current trigger history. No observation, no transition.
+- `remained` measures the trailing run of in-area observations ending at the
+  triggering event. Two in-area observations bracket the interval between them; a
+  teleport away and back inside one window would itself be observed, because
+  `player_teleported` is a stamped normalized event. This is the same
+  no-invented-continuity standard that keeps combat duration deferred.
+- Spatial facts are evaluated fresh during pending-transition replay (binding and
+  spawned positions are live facts, not history); the persisted event history keeps
+  the original witness positions.
+
 ## Deferred facts
 
 ### Continuous combat duration
@@ -38,8 +74,15 @@ for a specified duration. Admit this measure only after a dedicated observation
 module supplies a named, testable combat-state fact with explicit start, end, and
 reload semantics.
 
-### Spatial and performance facts
+### Performance facts
 
-Area anchors, radius membership, wave-clear time, deaths, and remaining enemies stay
-deferred to their later Phase 3 milestones. They require their own authoritative
-observation seams and do not borrow meaning from the temporal predicates above.
+Wave-clear time, deaths, and remaining-enemy counts stay deferred to Phase 3.3. They
+require their own authoritative observation seams and do not borrow meaning from the
+temporal or spatial predicates above.
+
+### Positions of other players and unspawned creatures
+
+Only the local witness, the bound Charm, and this workflow's own tracked spawns have
+admitted positions. Ambient creatures, other players, and world objects have no
+authoritative per-event position source yet; predicates over them are rejected rather
+than approximated from scene scans.

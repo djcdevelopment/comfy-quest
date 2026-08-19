@@ -57,12 +57,14 @@ sealed class RuntimeExperienceEngine {
     if (now < nextTimerPoll) return;
     nextTimerPoll = now.AddSeconds(1);
     foreach (var timer in timers.Due(now)) {
-      OnEvent(new RuntimeEvent {
+      var elapsed = new RuntimeEvent {
         Name = ExperienceSchema.TimerElapsedEvent,
         SourceId = timer.Identity.BindingZdo,
         At = now,
         Fields = new Dictionary<string, string> { ["timer_id"] = timer.TimerId },
-      });
+      };
+      RuntimeSpatialObservation.StampLocalPlayer(elapsed);
+      OnEvent(elapsed);
       timers.Acknowledge(timer.Key);
     }
   }
@@ -103,13 +105,18 @@ sealed class RuntimeExperienceEngine {
 
         foundBinding = true;
         var identity = Identity(zdo, active);
+        var spatialFacts = RuntimeSpatialObservation.Facts(
+            zdo, spawned, identity.Key, active.ContentHash);
         var before = workflows.Get(identity);
         var evaluationContext = new TriggerEvaluationContext {
           At = evt.At,
           StageEnteredUtc = before?.StageEnteredUtc ?? (before == null ? evt.At : (DateTimeOffset?)null),
           LastProgressUtc = before?.LastProgressUtc ?? (before == null ? evt.At : (DateTimeOffset?)null),
+          BindingPosition = spatialFacts.BindingPosition,
+          SpawnedPositions = spatialFacts.SpawnedPositions,
+          AuthoredAnchors = SpatialEvaluator.AnchorMap(active.Document),
         };
-        var decision = workflows.Begin(identity, active.Document, evt);
+        var decision = workflows.Begin(identity, active.Document, evt, spatialFacts);
         if (decision == null) {
           var state = workflows.Get(identity);
           var stage = active.Document.Stages.FirstOrDefault(value => value.Id == state?.StageId);
@@ -495,7 +502,8 @@ sealed class RuntimeExperienceEngine {
         if (zdo == null) continue;
         var reference = Read(zdo);
         if (reference == null || reference.ContentHash != active.ContentHash) continue;
-        var progress = workflows.Get(Identity(zdo, active));
+        var identity = Identity(zdo, active);
+        var progress = workflows.Get(identity);
         if (progress == null) {
           var first = active.Document.Stages.FirstOrDefault(
               value => value.Id == active.Document.EntryStage);
@@ -507,10 +515,15 @@ sealed class RuntimeExperienceEngine {
         var stage = active.Document.Stages.FirstOrDefault(value => value.Id == progress.StageId);
         var transition = stage?.Transitions?.OrderByDescending(value => value.Priority)
             .ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault();
+        var spatialFacts = RuntimeSpatialObservation.Facts(
+            zdo, spawned, identity.Key, active.ContentHash);
         var measured = TriggerEvaluator.Measure(transition?.When, progress.History, new TriggerEvaluationContext {
           At = progress.LastEventUtc,
           StageEnteredUtc = progress.StageEnteredUtc,
           LastProgressUtc = progress.LastProgressUtc,
+          BindingPosition = spatialFacts.BindingPosition,
+          SpawnedPositions = spatialFacts.SpawnedPositions,
+          AuthoredAnchors = SpatialEvaluator.AnchorMap(active.Document),
         });
         var count = measured.Required > 1
             ? " - " + measured.Current + "/" + measured.Required : "";
@@ -541,8 +554,9 @@ sealed class RuntimeExperienceEngine {
     var leaf = EventLeaf(trigger);
     if (leaf != null
         && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal))
-      return signal.Instruction + ThresholdSuffix(trigger);
-    return (leaf?.Event ?? "perform the current beat").Replace('_', ' ') + ThresholdSuffix(trigger);
+      return signal.Instruction + ThresholdSuffix(trigger) + SpatialSuffix(trigger);
+    return (leaf?.Event ?? "perform the current beat").Replace('_', ' ')
+        + ThresholdSuffix(trigger) + SpatialSuffix(trigger);
   }
 
   static TriggerExpression EventLeaf(TriggerExpression trigger) {
@@ -569,6 +583,27 @@ sealed class RuntimeExperienceEngine {
     if (string.Equals(trigger.Op, "THRESHOLD", StringComparison.OrdinalIgnoreCase)) yield return trigger;
     foreach (var child in trigger.Children ?? new List<TriggerExpression>())
       foreach (var found in Thresholds(child)) yield return found;
+  }
+
+  static string SpatialSuffix(TriggerExpression trigger) {
+    var predicates = Spatials(trigger).Select(value => {
+      var label = SpatialEvaluator.Label(value.Anchor);
+      var radius = value.Radius.GetValueOrDefault();
+      if (value.Spatial == "within_radius") return "while within " + radius + " m of " + label;
+      if (value.Spatial == "entered") return "after entering the area " + radius + " m around " + label;
+      if (value.Spatial == "left") return "after leaving the area " + radius + " m around " + label;
+      if (value.Spatial == "remained")
+        return "after " + value.Value.GetValueOrDefault() + "s in the area " + radius + " m around " + label;
+      return "with " + value.Value.GetValueOrDefault() + " objects within " + radius + " m of " + label;
+    }).ToArray();
+    return predicates.Length == 0 ? "" : " " + string.Join(" and ", predicates);
+  }
+
+  static IEnumerable<TriggerExpression> Spatials(TriggerExpression trigger) {
+    if (trigger == null) yield break;
+    if (string.Equals(trigger.Op, "SPATIAL", StringComparison.OrdinalIgnoreCase)) yield return trigger;
+    foreach (var child in trigger.Children ?? new List<TriggerExpression>())
+      foreach (var found in Spatials(child)) yield return found;
   }
 
   static string DescribeStageElapsed(DateTimeOffset? entered) {

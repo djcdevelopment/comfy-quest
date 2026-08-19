@@ -50,6 +50,10 @@ restores the prior renderer property blocks and removes the temporary lights; Ar
 writes a ZDO or changes event routing. CHECK's fallback aim ray is bounded to 10 metres. Ambient
 quest events have no fixed metre radius: Runtime currently considers every matching, locally
 owned binding present in the loaded `WearNTear` instance set, and the drawer says so explicitly.
+"No fixed radius" describes binding discovery only: authored event predicates may evaluate
+spatial relationships. A reviewed `SPATIAL` trigger clause compares stamped witness positions
+against an authored anchor and radius in the pure Contracts evaluator, without ever filtering
+which bindings participate.
 
 The second visual candidate prioritizes the normal operator path: a green READY/INSCRIBE affordance first,
 then a numbered Look/Validate/Load/Confirm update workflow driven by one context-sensitive button. Loading

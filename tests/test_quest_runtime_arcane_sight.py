@@ -171,6 +171,37 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("client-local **Arcane Sight**", readme)
         self.assertIn("no fixed", readme)
         self.assertIn("loaded `WearNTear` instance set", readme)
+        # "No fixed radius" describes binding discovery; authored event predicates may still
+        # evaluate spatial relationships through the single observation seam.
+        self.assertIn('"No fixed radius" describes binding discovery only', readme)
+        self.assertIn("authored event predicates may evaluate", readme)
+        self.assertIn("without ever filtering\nwhich bindings participate", readme)
+
+    def test_spatial_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
+        observation = (RUNTIME / "RuntimeSpatialObservation.cs").read_text(encoding="utf-8")
+        binding = BINDING.read_text(encoding="utf-8")
+        engine = ENGINE.read_text(encoding="utf-8")
+        router = (RUNTIME / "RuntimeEventRouter.cs").read_text(encoding="utf-8")
+        for marker in (
+            "public static void StampLocalPlayer(RuntimeEvent runtimeEvent)",
+            "player.transform.position",
+            "binding.GetPosition()",
+            "facts.SpawnedPositions = positions;",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, observation)
+        # Every routed witness and engine timer event carries the local witness position.
+        self.assertEqual(2, router.count("RuntimeSpatialObservation.StampLocalPlayer("))
+        self.assertIn("RuntimeSpatialObservation.StampLocalPlayer(elapsed)", engine)
+        self.assertIn("RuntimeSpatialObservation.Facts(", engine)
+        # Distance math lives only in the pure Contracts SpatialEvaluator: the observation
+        # seam, the engine, and the Charm binding surface never compute one, and the binding
+        # surface never learns about positions at all.
+        self.assertNotIn("Vector3.Distance", observation)
+        self.assertNotIn("Vector3.Distance", engine)
+        self.assertNotIn("RuntimeSpatialObservation", binding)
+        self.assertNotIn("PosX", binding)
+        self.assertNotIn("GetPosition", binding)
 
 
 if __name__ == "__main__":

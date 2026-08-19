@@ -35,7 +35,7 @@ if (-not $dotnetExe) {
 $hostProject = Join-Path $repoRoot 'src\Quest.Studio.Host\Quest.Studio.Host.csproj'
 $testProject = Join-Path $repoRoot 'src\Quest.Studio.E2E.Tests\Quest.Studio.E2E.Tests.csproj'
 $testOutput = Join-Path $repoRoot 'src\Quest.Studio.E2E.Tests\bin\Release\net9.0'
-$contractsPackage = Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.4.0-local.nupkg'
+$contractsPackage = Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.5.0-local.nupkg'
 $packageCacheKey = if (Test-Path -LiteralPath $contractsPackage) {
     (Get-FileHash -LiteralPath $contractsPackage -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0, 16)
 } else {

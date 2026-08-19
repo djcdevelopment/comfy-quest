@@ -94,7 +94,7 @@
        and owes a roadmap note; until then the lab declares its own copy in LabEvents
        and a test will pin the two together. -->
   <ItemGroup>
-    <PackageReference Include="Comfy.Quest.Contracts" Version="[0.4.0-local]"
+    <PackageReference Include="Comfy.Quest.Contracts" Version="[0.5.0-local]"
                        IncludeAssets="contentFiles" ExcludeAssets="compile;runtime" />
   </ItemGroup>
 

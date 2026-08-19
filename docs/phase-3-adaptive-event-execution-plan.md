@@ -1,7 +1,8 @@
 # Phase 3 adaptive event semantics — execution plan and status
 
-Status date: 2026-08-19
-Current landed commit: `665838a` (`Add adaptive temporal predicates`)
+Status date: 2026-08-19 (updated after the Phase 3.2 spatial slice)
+Temporal foundation landed in `665838a` (`Add adaptive temporal predicates`); the
+spatial substrate landed in the following `Add spatial anchors and predicates` commit.
 
 This document records the working plan behind Phase 3, what the first implementation
 slice delivered, and what remains. It is subordinate to
@@ -169,30 +170,92 @@ observation module defines authoritative start, end, reload, death, teleport, an
 disconnect semantics and covers them with tests. This is a missing fact, not a reason
 to broaden the current threshold registry.
 
+## Delivered — Phase 3.2 spatial substrate
+
+Phase 3.2 is complete. The seven planned steps landed together behind the schema-gate
+test, and the exit is met: every spatial primitive runs as a synthetic Event through
+guided Studio rehearsal with bounded actual-versus-expected evidence, and nothing
+entered the beginner palette.
+
+### Fact inventory
+
+The position-fact inventory confirmed **no normalized event carried any position**;
+the privacy boundary would have stripped one, and every `Vector3` in Runtime patches
+was a Harmony signature type, never a captured value. `docs/adaptive-event-fact-inventory.md`
+now admits three spatial facts — the stamped witness position, the bound Charm's
+position, and this workflow's tracked spawned-object positions resolved from the
+spawn ledger — plus authored anchor positions from the document itself. Interpretation
+limits (no invented continuity for `remained`, observed transitions only for
+`entered`/`left`, live facts at replay) are stated in the inventory.
+
+### Contracts
+
+`ExperienceContract.cs` provides one `SPATIAL` leaf operator mirroring `THRESHOLD`:
+a closed `SpatialPredicateCatalog` (`within_radius`, `entered`, `left`, `remained`
+>= 1..86400 seconds, `count_in_area` >= 1..128 objects, all `extended` palette), a
+canonical `AreaAnchor` (`authored` | `binding` | `player` | `coordinates`), a
+required radius of 1..100 whole meters, and an additive document-level `anchors`
+list (<= 32, bounded coordinates). The compiler rejects unknown predicates, missing
+or malformed anchors, dangling authored references, out-of-bounds radii and values,
+spatial children, and spatial-only triggers without an `EVENT` driver. The `player`
+anchor is admitted only for `count_in_area`; the other predicates already take the
+player as their subject.
+
+`SpatialEvaluator.cs` is the pure evaluator: all distance math (3D Euclidean over a
+Unity-free `SpatialPoint`) lives here. `RuntimeEvent` gains additive nullable
+`PosX/PosY/PosZ`; the privacy boundary passes a position only complete, finite,
+inside ±10500, rounded to 0.1 m. `TriggerEvaluationContext` resolves anchors from
+authored maps, the binding position, or the triggering event; missing anything fails
+closed. `Explain` emits one actual-versus-expected row per predicate ("within 20 m
+of camp" / "15 m") without retaining raw player coordinates in traces.
+`WorkflowStateStore.Begin` accepts optional live `SpatialFacts` and threads document
+anchors into every evaluation context, including pending replay.
+
+### Runtime
+
+`RuntimeSpatialObservation.cs` is the single new observation seam: it stamps the
+local player's position onto every routed witness event and engine timer event, and
+resolves binding plus still-matching spawned-object positions at evaluation time
+(`SpawnExecutionStore.ForOwner` is the supporting ledger query). Binding discovery
+is untouched, `RuntimeCharmBinding.cs` never learns about positions, `Vector3.Distance`
+still appears nowhere in the engine, and the arcane-sight python pin was extended —
+not weakened — to enforce all of that plus the README clarification that "no fixed
+radius" describes binding discovery only. Drawer prose now speaks spatial
+requirements ("while within 20 m of the bound Charm").
+
+### Studio
+
+Advanced Graph tools gain a catalog-driven spatial-condition editor beside the
+adaptive one (one condition per predicate, closed anchor kinds, bounded radius and
+value), compiling into the same `ALL(EVENT-or-COUNT, THRESHOLD..., SPATIAL...)`
+tree with the repeat window preserved on the composite root. Routes with spatial
+conditions stop projecting into the beginner beat editor, and the graph canvas marks
+them. Guided rehearsal shapes synthetic paths per primitive — an outside-then-inside
+walk for `entered`, inside-then-outside for `left`, an anchored wait for `remained`,
+and origin-staged spawned objects for `count_in_area` (with an explicit limitation
+line) — and custom rehearsal steps accept positions. Prose, graph notation, and
+certified JSON all render the new conditions; live-Runtime values ride the existing
+evidence path.
+
+### Versions and verification
+
+`Comfy.Quest.Contracts` and `Comfy.Quest.Studio` moved to `0.5.0-local` with exact
+repins everywhere (the future public publication targets 0.5.0). The full gate set
+passed: licensed Lab and Runtime Release builds, 246 Contracts/Lab xUnit tests, 270
+Python pin/boundary/drift tests, 75 Studio xUnit tests, loopback browser Studio E2E,
+interim-package and no-reach-in checks, generated-tome check, and the full-history
+secret scan.
+
+### Deliberate scope holds
+
+- Authored (`authored` kind) anchors are contract-complete but have no Studio editor
+  yet; creators reach them through coordinates or the JSON surface until a validation
+  lap demonstrates the authoring need (palette-admission rule applied to UI).
+- Positions for ambient creatures, other players, and world objects remain
+  unadmitted; `count_in_area` counts only this workflow's tracked spawns.
+- Timer-driven routes rehearse without positions and say so in a limitation line.
+
 ## Remaining Phase 3 work
-
-### Phase 3.2 — area anchors and spatial predicates
-
-Build the spatial substrate next:
-
-1. Inventory the authoritative position facts already emitted by normalized events
-   and identify missing observation seams without borrowing private or unstable game
-   state.
-2. Define canonical `AreaAnchor` forms for authored anchors, binding ZDO, player, and
-   explicit coordinates, including validation and serialization rules.
-3. Add a pure Contracts `SpatialEvaluator` and the smallest reviewed operator set:
-   `within_radius`, `entered`, `left`, `remained`, and `count_in_area`.
-4. Put all distance calculation in a new event-observation module. Do not add radius
-   filtering to binding discovery and do not modify its pinned region.
-5. Write schema-gate tests first, then move compiler, evaluator, `Explain`, rehearsal,
-   Studio advanced controls, and catalogs together.
-6. Explain anchor identity, expected radius/duration/count, and observed values without
-   retaining unnecessary location detail.
-7. Add a README clarification that “no fixed radius” describes binding discovery,
-   while authored event predicates may evaluate spatial relationships.
-
-Exit for 3.2: one synthetic Event per spatial primitive, with bounded deterministic
-evidence and no beginner-palette promotion.
 
 ### Phase 3.3 — encounter and performance facts
 
