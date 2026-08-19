@@ -127,6 +127,54 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Play_revision_uses_the_dev_lane_and_allows_same_version_iterations()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var coordinator = new RuntimeDevChannelCoordinator(runtimeRoot);
+
+        var disconnected = await service.PlayRevisionAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.False(disconnected.Ok);
+        Assert.Equal("dev_channel_disconnected", disconnected.Error);
+        Assert.False(Directory.Exists(Path.Combine(runtimeRoot, "inbox-dev")));
+
+        coordinator.Heartbeat(DateTimeOffset.UtcNow);
+        var disarmed = await service.PlayRevisionAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.False(disarmed.Ok);
+        Assert.Equal("dev_channel_not_armed", disarmed.Error);
+        Assert.False(Directory.Exists(Path.Combine(runtimeRoot, "inbox-dev")));
+
+        coordinator.Arm(DateTimeOffset.UtcNow);
+
+        var first = await service.PlayRevisionAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(first.Ok, first.Error);
+        Assert.Equal("dev", first.Receipt!.Channel);
+
+        project.Title = "Same semantic version, next creator revision";
+        var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(saved.Ok, saved.Error);
+        project = saved.Project!;
+        var second = await service.PlayRevisionAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(second.Ok, second.Error);
+        Assert.Equal("dev", second.Receipt!.Channel);
+        Assert.NotEqual(first.Receipt.ContentHash, second.Receipt.ContentHash);
+
+        Assert.False(Directory.Exists(Path.Combine(runtimeRoot, "inbox")));
+        Assert.Equal(2, Directory.GetFiles(Path.Combine(runtimeRoot, "inbox-dev"), "*.questpack").Length);
+        Assert.All(new QuestPackStore(runtimeRoot).CheckDevInbox(), candidate => Assert.Equal(QuestPackLane.Dev, candidate.Lane));
+
+        await using var invalid = new MemoryStream();
+        var rejected = await new QuestPackPublisher(host).PublishDevAsync(invalid, "../not-safe.questpack", CancellationToken.None);
+        Assert.False(rejected.Ok);
+        Assert.Equal("filename_invalid", rejected.Error);
+        Assert.Equal("dev", rejected.Channel);
+    }
+
+    [Fact]
     public void Legacy_live_1_7_project_migrates_once_and_preserves_its_content_hash()
     {
         var state = Path.Combine(_root, "quest-studio");
@@ -560,6 +608,72 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Runtime_status_returns_armed_dev_proof_and_runtime_observation()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var coordinator = new RuntimeDevChannelCoordinator(runtimeRoot, (active, correlation) => new[]
+        {
+            new RuntimeReceipt
+            {
+                Operation = "dev_rebind", Status = "rebound", PackId = active.PackId,
+                Version = active.Version, ContentHash = active.ContentHash, ActivationId = active.ActivationId,
+                CorrelationId = correlation, Diagnostics = Array.Empty<ContractDiagnostic>()
+            }
+        });
+
+        var disconnected = service.RuntimeStatusView(project.ProjectId);
+        Assert.False(disconnected.DevConnected);
+        Assert.Contains("Start the local Runtime", disconnected.NextInstruction);
+
+        coordinator.Heartbeat(DateTimeOffset.UtcNow);
+        var disarmed = service.RuntimeStatusView(project.ProjectId);
+        Assert.True(disarmed.DevConnected);
+        Assert.False(disarmed.DevArmed);
+        Assert.Contains("arm the dev channel", disarmed.NextInstruction, StringComparison.OrdinalIgnoreCase);
+
+        coordinator.Arm(DateTimeOffset.UtcNow);
+        var armed = service.RuntimeStatusView(project.ProjectId);
+        Assert.True(armed.DevConnected);
+        Assert.True(armed.DevArmed);
+        Assert.Contains("Play this revision", armed.NextInstruction);
+
+        var played = await service.PlayRevisionAsync(project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(played.Ok, played.Error);
+        var poll = coordinator.Poll(DateTimeOffset.UtcNow, project.EntryNodeId);
+        Assert.True(poll.Activated, poll.Message);
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Operation = "event", Status = "matched", PackId = project.PackId, Version = project.Version,
+            ContentHash = played.Receipt!.ContentHash, ActivationId = poll.ActiveSet.ActivationId,
+            CorrelationId = "evt-runtime-observed", CurrentStageId = project.EntryNodeId,
+            EventName = "chat_sent", Diagnostics = Array.Empty<ContractDiagnostic>()
+        });
+
+        var view = service.RuntimeStatusView(project.ProjectId);
+        Assert.Equal("bound", view.Phase);
+        Assert.True(view.DevConnected);
+        Assert.True(view.DevArmed);
+        Assert.True(view.DevPublished);
+        Assert.Equal(project.EntryNodeId, view.CurrentStageId);
+        Assert.Collection(view.PassLines,
+            line => Assert.Equal(("Validation", "PASS"), (line.Kind, line.Status)),
+            line => Assert.Equal(("Transfer", "PASS"), (line.Kind, line.Status)),
+            line => Assert.Equal(("Activation", "PASS"), (line.Kind, line.Status)),
+            line => Assert.Equal(("Rebind", "PASS"), (line.Kind, line.Status)),
+            line => Assert.Equal(("Runtime observed", "PASS"), (line.Kind, line.Status)));
+        Assert.All(view.PassLines.Take(4), line =>
+        {
+            Assert.Equal(poll.ActiveSet.ActivationId, line.ActivationId);
+            Assert.Equal(poll.CorrelationId, line.CorrelationId);
+        });
+    }
+
+    [Fact]
     public async Task Runtime_receipt_summary_resolves_route_and_effect_labels_on_the_server()
     {
         var valheim = Path.Combine(_root, "Valheim");
@@ -635,13 +749,17 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.True(published.Ok, published.Error);
 
         var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
-        var candidate = new QuestPackStore(runtimeRoot).LoadLatest();
+        var store = new QuestPackStore(runtimeRoot);
+        var candidate = store.LoadLatest();
+        var activationId = store.ReadActive()!.ActivationId;
         var receipts = new RuntimeReceiptStore(runtimeRoot);
         receipts.Write(new RuntimeReceipt { Operation = "bind", Status = "inscribed", PackId = candidate.Manifest.PackId,
-            Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, Diagnostics = Array.Empty<ContractDiagnostic>() });
+            Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, ActivationId = activationId,
+            Diagnostics = Array.Empty<ContractDiagnostic>() });
         receipts.Write(new RuntimeReceipt { Operation = "event", Status = "ignored", PackId = candidate.Manifest.PackId,
             Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, EventName = "chat_sent", EventTarget = "normal",
-            CurrentStageId = "start", CurrentCount = 1, RequiredCount = 2, Diagnostics = Array.Empty<ContractDiagnostic>() });
+            ActivationId = activationId, CurrentStageId = "start", CurrentCount = 1, RequiredCount = 2,
+            Diagnostics = Array.Empty<ContractDiagnostic>() });
 
         var status = service.RuntimeStatus(project.ProjectId);
         Assert.Equal("bound", status.Phase);

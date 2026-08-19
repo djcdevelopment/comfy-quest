@@ -333,6 +333,36 @@ internal sealed class QuestStudioWorkspace
             : StudioPublishResult.Fail(receipt.Error!, receipt.Diagnostics ?? Array.Empty<ContractDiagnostic>(), receipt);
     }
 
+    public async Task<StudioPublishResult> PlayRevisionAsync(string projectId, int expectedRevision, CancellationToken cancellationToken)
+    {
+        StudioProjectDocument project;
+        lock (_gate)
+        {
+            project = ReadDocument(DraftPath(projectId))!;
+            if (project is null) return StudioPublishResult.Fail("project_missing");
+            if (project.Revision != expectedRevision) return StudioPublishResult.RevisionConflict(project);
+        }
+        var valheim = _host.FindValheim();
+        if (valheim is null) return StudioPublishResult.Fail("valheim_not_found");
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var devStatus = new RuntimeDevChannelStatusStore(runtimeRoot).Read();
+        var now = DateTimeOffset.UtcNow;
+        var devConnected = devStatus is not null && devStatus.ObservedUtc <= now.AddSeconds(1)
+            && devStatus.ObservedUtc >= now.AddSeconds(-3);
+        if (!devConnected) return StudioPublishResult.Fail("dev_channel_disconnected");
+        if (devStatus!.Armed != true) return StudioPublishResult.Fail("dev_channel_not_armed");
+        var compiled = StudioGraphCompiler.Compile(project);
+        if (!compiled.Ok) return StudioPublishResult.Fail(compiled.Error!, compiled.Diagnostics);
+        var bytes = StudioGraphCompiler.BuildPack(project, compiled.ExperienceJson!, compiled.ContentHash!);
+        await using var stream = new MemoryStream(bytes, writable: false);
+        var shortHash = compiled.ContentHash!.Substring(0, 12);
+        var filename = $"{project.PackId}-{project.Version}-r{project.Revision}-{shortHash}.questpack";
+        var receipt = await _publisher.PublishDevAsync(stream, filename, cancellationToken);
+        return receipt.Ok
+            ? StudioPublishResult.Success(receipt.Status, receipt, project, compiled.Diagnostics)
+            : StudioPublishResult.Fail(receipt.Error!, receipt.Diagnostics ?? Array.Empty<ContractDiagnostic>(), receipt);
+    }
+
     public object History(string projectId)
     {
         if (!SafeLocalId(projectId)) return new { schema_version = 3, versions = Array.Empty<StudioProjectSnapshot>() };
@@ -369,6 +399,12 @@ internal sealed class QuestStudioWorkspace
         var published = store.CheckInbox(RuntimeProductionEventCatalog.CreateSet()).FirstOrDefault(candidate => candidate.IsValid
             && candidate.Manifest.PackId == project.PackId && candidate.Manifest.Version == project.Version
             && string.Equals(candidate.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase));
+        var devPublished = store.CheckDevInbox(RuntimeProductionEventCatalog.CreateSet()).FirstOrDefault(candidate => candidate.IsValid
+            && candidate.Manifest.PackId == project.PackId && candidate.Manifest.Version == project.Version
+            && string.Equals(candidate.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase));
+        var devStatus = new RuntimeDevChannelStatusStore(runtimeRoot).Read();
+        var devConnected = devStatus is not null && devStatus.ObservedUtc <= DateTimeOffset.UtcNow.AddSeconds(1)
+            && devStatus.ObservedUtc >= DateTimeOffset.UtcNow.AddSeconds(-3);
         ComfyQuestContracts.ActiveSet? active = null;
         try
         {
@@ -401,19 +437,27 @@ internal sealed class QuestStudioWorkspace
         var isActive = active?.PackId == project.PackId && active.Version == project.Version
             && string.Equals(active.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase);
         var activeRelation = active is null ? "none" : isActive ? "current" : "other_version";
+        var activeReceipts = !isActive ? Array.Empty<RuntimeReceipt>()
+            : string.IsNullOrWhiteSpace(active?.ActivationId) ? orderedReceipts
+            : orderedReceipts.Where(value => value.ActivationId == active.ActivationId).ToArray();
         var checkedOk = orderedReceipts.Any(value => value.Operation == "check" && value.Status == "accepted");
-        var bound = orderedReceipts.Any(value => value.Operation == "bind" && value.Status is "inscribed" or "accepted");
-        var completed = orderedReceipts.FirstOrDefault(value => value.Operation == "transition" && value.Status is "complete" or "fail");
-        var liveReceipt = orderedReceipts.FirstOrDefault(value =>
+        var bound = activeReceipts.Any(value => (value.Operation == "bind" && value.Status is "inscribed" or "accepted")
+            || (value.Operation == "dev_rebind" && (value.Status == "rebound" || value.Error == "already_current")));
+        var completed = activeReceipts.FirstOrDefault(value => value.Operation == "transition" && value.Status is "complete" or "fail");
+        var liveReceipt = activeReceipts.FirstOrDefault(value =>
             (value.Operation == "transition" && value.Status == "advanced")
             || (value.Operation == "event" && value.Status is "matched" or "ignored"));
         var currentStageId = liveReceipt?.Operation == "transition"
             ? liveReceipt.NextStageId ?? liveReceipt.CurrentStageId ?? liveReceipt.StageId
             : liveReceipt?.CurrentStageId ?? liveReceipt?.StageId;
+        currentStageId ??= devConnected ? devStatus?.CurrentStageId : null;
         if (bound && string.IsNullOrWhiteSpace(currentStageId)) currentStageId = compiled.Document!.EntryStage;
         var currentCount = liveReceipt?.Operation == "event" ? liveReceipt.CurrentCount : null;
         var requiredCount = liveReceipt?.Operation == "event" ? liveReceipt.RequiredCount : null;
-        var phase = completed is not null ? completed.Status : bound ? "bound" : isActive ? "active" : checkedOk ? "checked" : published is not null ? "published" : "certified";
+        var phase = completed is not null ? completed.Status : bound ? "bound" : isActive ? "active"
+            : devPublished is not null && active is not null ? "other_active"
+            : devPublished is not null ? !devConnected ? "dev_disconnected" : devStatus!.Armed ? "dev_queued" : "dev_waiting_for_arm"
+            : checkedOk ? "checked" : published is not null ? "published" : "certified";
         var currentStage = compiled.Document!.Stages.FirstOrDefault(value => value.Id == currentStageId);
         var currentRoute = currentStage?.Transitions?
             .OrderByDescending(value => value.Priority)
@@ -424,7 +468,15 @@ internal sealed class QuestStudioWorkspace
             liveInstruction += $" ({currentCount.GetValueOrDefault()}/{requiredCount})";
         var instruction = phase switch
         {
-            "certified" => "Publish this version to the Runtime inbox.",
+            "certified" => !devConnected
+                ? "Start the local Runtime; Studio is waiting for its read-only heartbeat."
+                : devStatus?.Armed != true
+                    ? "Open F9 once and arm the dev channel for this game session."
+                    : "Runtime is armed. Play this revision when ready, or publish it independently.",
+            "dev_disconnected" => "Start the local Runtime; Studio is waiting for its read-only heartbeat.",
+            "dev_waiting_for_arm" => "Open F9 once and arm the dev channel for this game session.",
+            "dev_queued" => "Revision transferred; the armed Runtime is validating and activating it.",
+            "other_active" => "A different revision is active. Play this revision to return to the current draft.",
             "published" => "In Valheim, press F10 to check the published update.",
             "checked" => "In Valheim, press F11 to load the validated update.",
             "active" => "Open F9, aim at the Charm target, then press backtick twice for CHECK and CAST.",
@@ -433,12 +485,15 @@ internal sealed class QuestStudioWorkspace
             "fail" => "The live Runtime reports the fail outcome.",
             _ => "Inspect the latest Runtime receipt."
         };
-        return new(2, true, phase, instruction, compiled.ContentHash, published?.Sha256, active,
+        return new(2, true, phase, instruction, compiled.ContentHash, devPublished?.Sha256 ?? published?.Sha256, active,
             currentStageId, currentCount, requiredCount, orderedReceipts.Take(20).ToArray(), compiled.Diagnostics)
         {
             ActiveRelation = activeRelation,
             RouteLabels = RuntimeRouteLabels(compiled.Document!),
-            EffectLabels = RuntimeEffectLabels(compiled.Document!)
+            EffectLabels = RuntimeEffectLabels(compiled.Document!),
+            DevConnected = devConnected,
+            DevPublished = devPublished is not null,
+            DevStatus = devStatus
         };
     }
 
@@ -1371,6 +1426,9 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
     IReadOnlyList<RuntimeReceipt> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics)
 {
     public string ActiveRelation { get; init; } = "none";
+    public bool DevConnected { get; init; }
+    public bool DevPublished { get; init; }
+    public RuntimeDevChannelStatus? DevStatus { get; init; }
     public IReadOnlyDictionary<string, string> RouteLabels { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> EffectLabels { get; init; } = new Dictionary<string, string>();
 
@@ -1383,11 +1441,24 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
 public sealed record StudioRuntimeReceiptSummary(
     string? Operation, string? Status, string? StageId, string? EventName,
     int? CurrentCount, int? RequiredCount, DateTimeOffset AtUtc,
-    string? TransitionId, string? ActionId, string? CorrelationId, string? RouteLabel, string? EffectLabel);
+    string? TransitionId, string? ActionId, string? ActivationId, string? CorrelationId, string? Error,
+    string? RouteLabel, string? EffectLabel);
+
+public sealed record StudioRuntimePassLine(string Kind, string Status, string Message,
+    string? ActivationId, string? CorrelationId, DateTimeOffset? AtUtc);
 
 public sealed record StudioRuntimeStatusView(int SchemaVersion, bool Available, string Phase, string NextInstruction,
     string? ContentHash, string? PackageSha256,
     string? ActivePackId, string? ActiveVersion, string? ActiveContentHash, string? ActiveActivationId,
     DateTimeOffset? ActivatedUtc, string ActiveRelation,
     string? CurrentStageId, int? CurrentCount, int? RequiredCount,
-    IReadOnlyList<StudioRuntimeReceiptSummary> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics);
+    IReadOnlyList<StudioRuntimeReceiptSummary> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics)
+{
+    public bool DevConnected { get; init; }
+    public bool DevArmed { get; init; }
+    public bool DevPublished { get; init; }
+    public string? DevState { get; init; }
+    public string? DevSessionId { get; init; }
+    public string? LastRejection { get; init; }
+    public IReadOnlyList<StudioRuntimePassLine> PassLines { get; init; } = Array.Empty<StudioRuntimePassLine>();
+}

@@ -10,6 +10,7 @@ SIGHT = RUNTIME / "RuntimeArcaneSight.cs"
 PLUGIN = RUNTIME / "ComfyQuestRuntime.cs"
 ENGINE = RUNTIME / "RuntimeExperienceEngine.cs"
 BINDING = RUNTIME / "RuntimeCharmBinding.cs"
+DEV_CHANNEL = ROOT / "network" / "mod" / "ComfyQuestContracts" / "RuntimeDevChannel.cs"
 
 
 class QuestRuntimeArcaneSightTests(unittest.TestCase):
@@ -126,6 +127,33 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, plugin)
+
+    def test_creator_loop_is_session_armed_and_game_owned(self) -> None:
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        channel = DEV_CHANNEL.read_text(encoding="utf-8")
+        for marker in (
+            "RuntimeDevChannelCoordinator",
+            '"ARM DEV CHANNEL"',
+            "privateWorldConfirmed.Value",
+            "devChannel.Poll",
+            "devChannel?.Disarm",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, plugin)
+        self.assertIn("only an armed", channel)
+        self.assertIn('Path.Combine(runtimeRoot,"inbox-dev")', channel)
+        self.assertIn('Stage("dev_activation"', channel)
+
+    def test_dev_rebind_updates_only_the_existing_five_string_reference(self) -> None:
+        binding = BINDING.read_text(encoding="utf-8")
+        written = set(__import__("re").findall(r'zdo\.Set\(Prefix\+"([^"]+)"', binding))
+        self.assertEqual(
+            {"packId", "experienceId", "bindingId", "version", "contentHash"},
+            written,
+        )
+        self.assertIn("RebindDevActive", binding)
+        self.assertIn('set.SourceChannel,"dev"', binding)
+        self.assertIn('dev?"inbox-dev":"inbox"', binding)
 
     def test_arcane_sight_labels_activation_epoch_and_binding(self) -> None:
         sight = SIGHT.read_text(encoding="utf-8")

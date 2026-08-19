@@ -11,6 +11,7 @@ PAGE = ROOT / "src" / "Quest.Studio" / "QuestStudioPage.cs"
 WORKSPACE = ROOT / "src" / "Quest.Studio" / "QuestStudioWorkspace.cs"
 SERVICE = ROOT / "src" / "Quest.Studio" / "QuestStudioService.cs"
 ENDPOINTS = ROOT / "src" / "Quest.Studio" / "QuestStudioEndpoints.cs"
+PUBLISHER = ROOT / "src" / "Quest.Studio" / "QuestPackPublisher.cs"
 EASY_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeEasyEventPatches.cs"
 CORE_ACTION_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeCoreActionPatches.cs"
 COMBAT_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeKillPatches.cs"
@@ -56,10 +57,10 @@ class QuestStudioVNextTests(unittest.TestCase):
         for expected in (
             "Shape the quest one beat at a time",
             "Rehearse this quest",
-            "Certify &amp; publish",
-            "Runtime receipts",
-            "F10 &mdash; Check",
-            "F11 &mdash; Load",
+            "Play this revision",
+            "Publish immutable version",
+            "Runtime validates and pulls",
+            "Live proof",
         ):
             self.assertIn(expected, html)
         self.assertIn("function showStage(name,moveFocus=true)", script)
@@ -168,6 +169,42 @@ class QuestStudioVNextTests(unittest.TestCase):
         self.assertIn("active?.ActivationId", service)
         self.assertIn("status.RouteLabels.TryGetValue", service)
         self.assertIn("status.EffectLabels.TryGetValue", service)
+        for expected in ("Validation", "Transfer", "Activation", "Rebind", "Runtime observed"):
+            self.assertIn(expected, service)
+        self.assertIn("line.status==='FAIL'", script)
+        self.assertIn("d.pass_lines||[]", script)
+
+    def test_play_revision_is_revision_guarded_and_uses_the_dev_only_route(self) -> None:
+        script = raw_constant("Js")
+        workspace = WORKSPACE.read_text(encoding="utf-8")
+        publisher = PUBLISHER.read_text(encoding="utf-8")
+        routes = ENDPOINTS.read_text(encoding="utf-8")
+        play = script[script.index("async function playRevision()") :]
+        play = play[: play.index("\n")]
+        self.assertIn("expected_revision:context.revision", play)
+        self.assertIn("context.revision!==checked.request_context.revision", play)
+        self.assertIn("setPublishLock(true)", play)
+        self.assertIn("setPublishLock(false)", play)
+        self.assertIn("PublishDevAsync", workspace)
+        self.assertIn('"inbox-dev"', publisher)
+        self.assertIn('/api/v2/quest-studio/projects/{projectId}/play', routes)
+
+    def test_play_revision_stays_locked_until_runtime_is_connected_and_armed(self) -> None:
+        script = raw_constant("Js")
+        journey = script[script.index("function renderJourney()") :]
+        journey = journey[: journey.index("\n")]
+        self.assertIn("devReady=runtimeState?.dev_connected&&runtimeState?.dev_armed", journey)
+        self.assertIn("$('#play-project').disabled=!project||!devReady", journey)
+
+        workspace = WORKSPACE.read_text(encoding="utf-8")
+        self.assertIn('"certified" => !devConnected', workspace)
+        self.assertIn('devStatus?.Armed != true', workspace)
+        self.assertIn('Runtime is armed. Play this revision when ready', workspace)
+        play = workspace[workspace.index("public async Task<StudioPublishResult> PlayRevisionAsync") :]
+        play = play[: play.index("public object History")]
+        self.assertIn('StudioPublishResult.Fail("dev_channel_disconnected")', play)
+        self.assertIn('StudioPublishResult.Fail("dev_channel_not_armed")', play)
+        self.assertLess(play.index('dev_channel_not_armed'), play.index('_publisher.PublishDevAsync'))
 
     def test_grimoire_picker_scales_the_creator_catalog_without_exposing_seams(self) -> None:
         html = raw_constant("Html")
@@ -539,6 +576,7 @@ class QuestStudioVNextTests(unittest.TestCase):
         routes = ENDPOINTS.read_text(encoding="utf-8")
         self.assertIn('/api/v2/quest-studio/projects/{projectId}/rehearse', routes)
         self.assertIn('/api/v2/quest-studio/projects/{projectId}/runtime-status', routes)
+        self.assertIn('/api/v2/quest-studio/projects/{projectId}/play', routes)
         self.assertNotIn('/api/v2/quest-studio/check', routes)
         self.assertNotIn('/api/v2/quest-studio/load', routes)
         self.assertNotIn('/api/v2/quest-studio/bind', routes)

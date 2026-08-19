@@ -139,7 +139,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForTextAsync(page.Locator("#rehearsal-result .disclaimer"), "does not prove a Valheim adapter", "rehearsal evidence disclaimer");
 
             await page.Locator("[data-stage='publish']").ClickAsync();
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Certify & publish", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish immutable version", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "first publish", 30_000);
             await RefreshRuntimeAsync(page);
             await WaitForExactTextAsync(page.Locator("#runtime-phase"), "published", "published Runtime phase");
@@ -229,7 +229,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Back to creator workflow", Exact = true }).ClickAsync();
 
             await page.Locator("[data-stage='publish']").ClickAsync();
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Certify & publish", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish immutable version", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Version already published", "immutable version collision", 30_000);
             await WaitForTextAsync(page.Locator("#status-detail"), "Start a new iteration", "collision recovery instruction");
 
@@ -239,7 +239,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForInputValueAsync(page.Locator("#version"), "1.0.1", "patch version bump");
             if (await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"))
                 await page.Locator("#library-close").ClickAsync();
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Certify & publish", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish immutable version", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "new iteration publish", 30_000);
             await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 2, "two immutable questpack versions");
 
@@ -321,8 +321,64 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Run guided rehearsal", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#rehearsal-badge"), "Complete", "Woodbound rehearsal", 30_000);
             await WaitForTextAsync(page.Locator("#rehearsal-result"), "1/2", "Woodbound partial offering");
+
+            var devChannel = new RuntimeDevChannelCoordinator(run.RuntimeRoot, (active, correlation) => new[]
+            {
+                new RuntimeReceipt
+                {
+                    Operation = "dev_rebind", Status = "rebound", PackId = active.PackId,
+                    Version = active.Version, ContentHash = active.ContentHash, ActivationId = active.ActivationId,
+                    CorrelationId = correlation, BindingZdo = "synthetic:dev:1",
+                    Diagnostics = Array.Empty<ContractDiagnostic>()
+                }
+            });
+            devChannel.Arm(DateTimeOffset.UtcNow);
             await page.Locator("[data-stage='publish']").ClickAsync();
-            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Certify & publish", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Play this revision", Exact = true }).ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Playing The Woodbound Signal", "Woodbound r1 dev transfer", 30_000);
+            await WaitForFileCountAsync(Path.Combine(run.RuntimeRoot, "inbox-dev"), "*.questpack", 1, "Woodbound r1 dev questpack");
+            var r1 = devChannel.Poll(DateTimeOffset.UtcNow, "start");
+            Assert.True(r1.Activated, r1.Message);
+            new RuntimeReceiptStore(run.RuntimeRoot).Write(new RuntimeReceipt
+            {
+                Operation = "event", Status = "matched", PackId = r1.ActiveSet.PackId,
+                Version = r1.ActiveSet.Version, ContentHash = r1.ActiveSet.ContentHash,
+                ActivationId = r1.ActiveSet.ActivationId, CorrelationId = "evt-woodbound-r1",
+                CurrentStageId = "start", EventName = "chat_sent", Diagnostics = Array.Empty<ContractDiagnostic>()
+            });
+            await RefreshRuntimeAsync(page);
+            await WaitForExactTextAsync(page.Locator("#runtime-phase"), "bound", "Woodbound r1 bound through dev channel");
+            foreach (var proof in new[] { "Validation", "Transfer", "Activation", "Rebind", "Runtime observed" })
+                await WaitForTextAsync(page.Locator("#runtime-receipts"), proof, $"Woodbound r1 {proof} proof");
+
+            await page.Locator("[data-stage='author']").ClickAsync();
+            await page.Locator(".beat-card[data-beat='2']").ClickAsync();
+            await FillAndBlurAsync(page.Locator("#beat-message"), "The circuit closes. The revised charm remembers this telling.");
+            await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "Woodbound r2 autosave");
+            await page.Locator("[data-stage='publish']").ClickAsync();
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Play this revision", Exact = true }).ClickAsync();
+            await WaitForFileCountAsync(Path.Combine(run.RuntimeRoot, "inbox-dev"), "*.questpack", 2, "Woodbound r2 dev questpack");
+            var r2 = devChannel.Poll(DateTimeOffset.UtcNow, "start");
+            Assert.True(r2.Activated, r2.Message);
+            Assert.NotEqual(r1.ActiveSet.ActivationId, r2.ActiveSet.ActivationId);
+            Assert.Equal(r1.ActiveSet.ActivationId, r2.ActiveSet.PreviousActivationId);
+            await RefreshRuntimeAsync(page);
+            await WaitForExactTextAsync(page.Locator("#runtime-phase"), "bound", "Woodbound r2 rebound without CAST");
+            await WaitForTextAsync(page.Locator("#active-revision"), r2.ActiveSet.ActivationId[^8..], "Woodbound r2 activation identity");
+
+            var store = new QuestPackStore(run.RuntimeRoot);
+            var rolledCandidate = store.Rollback(r1.ActiveSet.ActivationId);
+            Assert.NotNull(rolledCandidate);
+            var rolled = store.ReadActive();
+            Assert.NotNull(rolled);
+            Assert.Equal(r1.ActiveSet.ContentHash, rolled.ContentHash);
+            Assert.NotEqual(r1.ActiveSet.ActivationId, rolled.ActivationId);
+            devChannel.Heartbeat(DateTimeOffset.UtcNow, "start");
+            await RefreshRuntimeAsync(page);
+            await WaitForExactTextAsync(page.Locator("#runtime-phase"), "other active", "Woodbound addressed rollback");
+            await WaitForTextAsync(page.Locator("#active-revision"), "differs from this draft", "Woodbound rollback relation");
+
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish immutable version", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "Woodbound publish", 30_000);
             await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 3, "Woodbound plus two Signal Circuit packs");
             ValidateWoodboundBrowserPack(run);
@@ -604,7 +660,7 @@ public sealed class QuestStudioSyntheticE2ETests
                 var route = Assert.Single(reclaim.Transitions);
                 Assert.Equal(("EVENT", "item_picked_up", "Wood"), (route.When.Op, route.When.Event, route.When.Target));
                 Assert.Equal("complete", route.Outcome);
-                Assert.Equal("The circuit closes. The charm remembers this telling.", RuntimeMessage(route));
+                Assert.Equal("The circuit closes. The revised charm remembers this telling.", RuntimeMessage(route));
             });
     }
 

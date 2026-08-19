@@ -93,6 +93,14 @@ public static class QuestStudioEndpoints
             return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
                 : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
         });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/play", async (string projectId, HttpRequest request, HttpResponse response, StudioPublishRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.PlayRevisionAsync(projectId, body?.ExpectedRevision ?? -1, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+        });
         app.MapGet("/api/v2/quest-studio/projects/{projectId}/history", (string projectId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
         {
             NoStore(response);

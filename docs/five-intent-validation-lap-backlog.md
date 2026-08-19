@@ -98,6 +98,11 @@ player reaction into a mechanism-only diagnosis.
   identify which creator-facing capabilities belong outside Lab, and investigate
   Arcane Sight as part of a **spellbook** surface. Do not add a new wholesale palette
   before ownership and observed need are clear.
+- Once the already-known chat/drop/pickup path had reconfirmed behavior established
+  two weeks earlier, the manual lap stopped producing decision-bearing evidence.
+  Derek said, **“this is putting me to sleep.”** Treat known contract behavior as a
+  synthetic regression surface; ask for player keyboard time only when a novel
+  uncertainty can change the product decision or the next build.
 
 ### Player-facing follow-through
 

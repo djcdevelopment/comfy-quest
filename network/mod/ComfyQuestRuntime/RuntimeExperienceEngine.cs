@@ -512,6 +512,20 @@ sealed class RuntimeExperienceEngine {
     }
   }
 
+  public string CurrentStageId() {
+    try {
+      if (!TryLoad(out var active, out _)) return null;
+      foreach (var wear in WearNTear.GetAllInstances()) {
+        var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
+        if (zdo == null) continue;
+        var reference = Read(zdo);
+        if (reference == null || reference.ContentHash != active.ContentHash) continue;
+        return workflows.Get(Identity(zdo, active))?.StageId ?? active.Document.EntryStage;
+      }
+    } catch { }
+    return null;
+  }
+
   static string Describe(TriggerExpression trigger) {
     var leaf = string.Equals(trigger?.Op, "COUNT", StringComparison.OrdinalIgnoreCase)
         ? trigger?.Children?.FirstOrDefault()
@@ -552,8 +566,10 @@ sealed class RuntimeExperienceEngine {
         error = "active_source_invalid";
         return false;
       }
-      var package = Path.Combine(root, "inbox", set.Source);
-      var inspected = new QuestPackStore(root).Inspect(package);
+      var dev = string.Equals(set.SourceChannel, "dev", StringComparison.OrdinalIgnoreCase);
+      var package = Path.Combine(root, dev ? "inbox-dev" : "inbox", set.Source);
+      var store = new QuestPackStore(root);
+      var inspected = dev ? store.InspectDev(package) : store.Inspect(package);
       if (!inspected.IsValid
           || inspected.ContentHash != set.ContentHash
           || inspected.Manifest.PackId != set.PackId

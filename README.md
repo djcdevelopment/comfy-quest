@@ -51,26 +51,29 @@ for production authoring. The two engine events stay separate from that creator
 vocabulary. The 91
 low-level assembly seams never become authoring choices.
 
-Studio lowers production beats into bounded acyclic Runtime graphs, certifies them
-against the shared contract, and publishes immutable `.questpack` files to the local
-Runtime inbox. Contextual targets and event fields appear only when useful. Route IDs,
+Studio lowers production beats into bounded acyclic Runtime graphs and certifies them
+against the shared contract. **Play this revision** writes an isolated dev artifact;
+an explicitly armed Runtime session pulls, validates, activates, and rebinds it.
+**Publish immutable version** remains an independent production action. Contextual targets and event fields appear only when useful. Route IDs,
 the full-width graph editor, and certified JSON stay under **Advanced tools**. Runtime
 identity and the older single-surface Charm override sit with **Data & history**, next
 to the lossless project/history bundle, current questpack, compiled JSON, and
 privacy-explicit local usage aggregate. Existing branched quests open without
-conversion or data loss. Runtime still requires explicit F10 Check and F11 Load.
+conversion or data loss. Production activation still requires explicit F10 Check and
+F11 Load; the creator loop never places dev revisions in that production inbox.
 
 The Studio workspace is the fast R&D loop: an on-demand local quest library, beat-first
 authoring, autosaved drafts, server-generated guided rehearsal, and a compact Publish &
-Play cockpit that turns local receipts into the next manual instruction. Guided
+Play cockpit that renders Validation, Transfer, Activation, Rebind, and Runtime-observed
+proof from local receipts. Guided
 rehearsal derives representative inputs from the saved quest, evaluator-checks the
 selected path, and reports untested branches or generation limits. Browser rehearsal
 previews logic and effects; it never claims to prove a Valheim adapter or mutation. The
 optional local usage toggle stores only fixed selections and broad quantity buckets for
 13 weeks on this machine—never titles, messages, targets, searches, identities, exact
 timestamps, or uploads. The normal lap is
-**Author -> Rehearse -> Publish & Play -> F10 -> F11 -> F9/backtick CHECK/CAST -> one
-live event -> inspect receipts**. Reuse captured multiplayer scenarios for quest-content
+**Author -> Rehearse -> arm once in F9 -> Play this revision -> play -> inspect proof**.
+CAST is needed only for a quest without an existing Charm target. Reuse captured multiplayer scenarios for quest-content
 changes; run i5 only when the multiplayer event adapter itself changes.
 
 While the F9 Runtime drawer is open, Arcane Sight highlights and labels every valid
@@ -89,8 +92,8 @@ Run the local synthetic Studio E2E with the pinned Playwright Chromium build:
     tools/quest-studio/Test-QuestStudioE2E.ps1
 
 The test drives the real loopback browser UI through create, autosave, reload, guided
-rehearsal, certification, immutable questpack publication, advanced-graph preservation,
-and version iteration. Focused static and browser coverage also exercises the Grimoire
+rehearsal, same-version dev revisions, activation-addressed rollback, independent
+immutable publication, advanced-graph preservation, and version iteration. Focused static and browser coverage also exercises the Grimoire
 picker boundary, progressive event/effect fields, hidden extraction controls, and
 responsive/keyboard semantics. It activates the published bytes through `QuestPackStore` and
 writes contract-native synthetic receipts beneath a sentinel-guarded disposable Valheim
@@ -104,7 +107,7 @@ This is local-only synthetic E2E evidence. It does not prove Unity, BepInEx, Har
 patches, hotkeys, or genuine Valheim events; the OMEN acceptance run remains the live
 proof for those adapters.
 
-The interim packages-local feed exists only until the first public 0.2.0 NuGet
+The interim packages-local feed exists only until the first public 0.3.0 NuGet
 publication and exact consumer repin.
 
 Publication readiness is checked without publishing:

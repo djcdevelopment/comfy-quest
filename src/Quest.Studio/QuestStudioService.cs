@@ -83,6 +83,12 @@ public sealed class QuestStudioService
         _usage.RecordCheckpoint("publish", UsageOutcome(result.Ok, result.Conflict, result.Error), result.Ok ? result.Project : null);
         return result;
     }
+    public async Task<StudioPublishResult> PlayRevisionAsync(string projectId, int expectedRevision, CancellationToken cancellationToken)
+    {
+        var result = await _workspace.PlayRevisionAsync(projectId, expectedRevision, cancellationToken);
+        _usage.RecordCheckpoint("play_revision", UsageOutcome(result.Ok, result.Conflict, result.Error), result.Ok ? result.Project : null);
+        return result;
+    }
     public StudioRehearsalResult Rehearse(string projectId, StudioRehearsalRequest? request)
     {
         var result = _workspace.Rehearse(projectId, request);
@@ -102,10 +108,55 @@ public sealed class QuestStudioService
                 receipt.Operation, receipt.Status,
                 receipt.NextStageId ?? receipt.CurrentStageId ?? receipt.StageId,
                 receipt.EventName, receipt.CurrentCount, receipt.RequiredCount, receipt.AtUtc,
-                receipt.TransitionId, receipt.ActionId, receipt.CorrelationId,
+                receipt.TransitionId, receipt.ActionId, receipt.ActivationId, receipt.CorrelationId, receipt.Error,
                 receipt.TransitionId is not null && status.RouteLabels.TryGetValue(receipt.TransitionId, out var routeLabel) ? routeLabel : null,
                 receipt.ActionId is not null && status.EffectLabels.TryGetValue(receipt.ActionId, out var effectLabel) ? effectLabel : null)).ToArray(),
-            status.Diagnostics);
+            status.Diagnostics)
+        {
+            DevConnected = status.DevConnected,
+            DevArmed = status.DevConnected && status.DevStatus?.Armed == true,
+            DevPublished = status.DevPublished,
+            DevState = status.DevStatus?.State,
+            DevSessionId = status.DevStatus?.SessionId,
+            LastRejection = status.DevStatus?.LastRejection,
+            PassLines = ComposePassLines(status.ActiveRelation == "current" && !string.IsNullOrWhiteSpace(active?.ActivationId)
+                ? status.Receipts.Where(receipt => receipt.ActivationId == active.ActivationId).ToArray()
+                : Array.Empty<RuntimeReceipt>())
+        };
+    }
+
+    static IReadOnlyList<StudioRuntimePassLine> ComposePassLines(IReadOnlyList<RuntimeReceipt> receipts)
+    {
+        var result = new List<StudioRuntimePassLine>();
+        Add("Validation", "dev_validation", "Revision satisfies the shared contract.");
+        Add("Transfer", "dev_transfer", "Revision reached the game-owned dev inbox.");
+        Add("Activation", "dev_activation", "The game activated this exact revision.");
+        Add("Rebind", "dev_rebind", "Loaded local Charm bindings now use this revision.");
+        var observed = receipts.Where(value => value.Operation is "event" or "transition"
+                && value.Status is "matched" or "advanced" or "complete" or "fail")
+            .OrderByDescending(value => value.AtUtc).FirstOrDefault();
+        if (observed is not null)
+            result.Add(new("Runtime observed", "PASS", observed.Status is "complete" or "fail"
+                    ? $"Runtime observed the {observed.Status} outcome."
+                    : "Runtime observed gameplay for this activation.",
+                observed.ActivationId, observed.CorrelationId, observed.AtUtc));
+        return result;
+
+        void Add(string kind, string operation, string success)
+        {
+            var receipt = receipts.Where(value => value.Operation == operation)
+                .OrderByDescending(value => value.AtUtc).FirstOrDefault();
+            if (receipt is null) return;
+            var failed = receipt.Status == "rejected";
+            var skipped = receipt.Status == "skipped";
+            var message = failed ? $"{kind} stopped: {receipt.Error ?? "rejected"}."
+                : skipped ? receipt.Error == "no_loaded_binding"
+                    ? "No loaded Charm binding needed rebinding."
+                    : $"Rebind not needed: {receipt.Error ?? "already current"}."
+                : success;
+            result.Add(new(kind, failed ? "FAIL" : "PASS", message,
+                receipt.ActivationId, receipt.CorrelationId, receipt.AtUtc));
+        }
     }
     public object ProjectHistory(string projectId) => _workspace.History(projectId);
 
