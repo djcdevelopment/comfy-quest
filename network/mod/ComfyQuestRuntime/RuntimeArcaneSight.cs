@@ -56,8 +56,10 @@ sealed class RuntimeArcaneSight {
             .Select(value => Vector3.Distance(player.transform.position,
                 value.Host.transform.position)).ToArray();
     var nearest = distances.Length == 0 ? "" : $" · nearest {Math.Round(distances.Min())}m";
+    // The summary names the intersection it actually counts: the lap read a bare
+    // "0 locally owned" as contradicting OTHER VERSION / LOCAL OWNER labels on screen.
     return $"{markers.Count} loaded binding{(markers.Count == 1 ? "" : "s")}"
-        + $" · {current} active · {eligible} locally owned{nearest}"
+        + $" · {current} active · {eligible} active + locally owned{nearest}"
         + " · loaded scene, no fixed radius";
   }
 

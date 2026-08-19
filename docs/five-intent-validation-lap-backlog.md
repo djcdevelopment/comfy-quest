@@ -68,16 +68,32 @@ These questions are acceptance evidence, not optional polish:
   debug-shaped summary with language that states what F10 actually proved—for
   example, one candidate checked and accepted, activation unchanged—and reserve
   activation language for F11.
+  **Resolved in the creator-loop UX baseline.** Check copy now states what checking
+  proved and names the quest (`The Woodbound Signal 1.2.0 is ready. Press F11 to play
+  it.`); activation language belongs to load alone. All copy is composed by the pure
+  `CreatorLoopNotice` contract fact and proven sentence-by-sentence in xUnit; the
+  plumbing also moved off the story's Center HUD channel to TopLeft. See
+  `docs/creator-loop-ux-baseline.md`.
 - After F11, the large yellow confirmation led with `Loaded quest-7b849e 1.0.0`
   followed by the full content hash. Derek expected the friendly name. Lead with
   **The Woodbound Signal**, retain the version, and demote the pack ID and a shortened
   hash to diagnostic detail rather than making raw identity the primary player copy.
+  **Resolved in the creator-loop UX baseline.** The confirmation is now
+  `Now playing: The Woodbound Signal — 1.2.0`; pack id, short hash, and activation tail
+  live in the drawer's detail line. The title rides the pack inspection's existing
+  compile pass, so no manifest change was needed. Two structural fixes landed with the
+  copy: an idle repeat F11 no longer archives a fresh activation epoch (ten presses used
+  to evict the entire rollback history), and the orphaned-charm consequence
+  (`3 charms belong to an earlier telling`) now travels with the keypress instead of
+  hiding in the drawer's evidence scroll.
 - On first opening F9 after r1 activation, the drawer said `0 locally owned` while
   multiple Arcane Sight labels said `OTHER VERSION / LOCAL OWNER`. The implementation
   counts only markers that are both current and locally owned, so the values are not
   mechanically inconsistent, but the summary label is. Either show all local-owner
   bindings separately or name the intersection explicitly (for example,
   `0 active + locally owned`).
+  **Resolved in the creator-loop UX baseline.** The summary now names the intersection
+  it counts: `0 active + locally owned`, pinned in the python suite.
 - CAST changed the selected sign to a bright purple glow. Derek's immediate reaction
   was, `woooo it changed glowly colors`. Preserve this strong, magical state change:
   it made successful binding legible at player altitude without requiring receipt or
@@ -107,6 +123,13 @@ player reaction into a mechanism-only diagnosis.
   identify which creator-facing capabilities belong outside Lab, and investigate
   Arcane Sight as part of a **spellbook** surface. Do not add a new wholesale palette
   before ownership and observed need are clear.
+  **Identification complete** in `docs/quest-lab-persona-audit.md`: the Lab is ~70%
+  diagnostics, ~20% release-gate machinery, ~10% indirect authoring, 0% publishing,
+  with a persona-by-persona ownership map. Two facts that reframe the question: there
+  are **two unrelated Arcane Sights** (Lab gallery highlighting vs. Runtime charm
+  debugging), and the Lab's "Spellbook" tab already occupies the name Phase 4's
+  portable notebook needs. Extraction itself stays deferred to Phase 4 on observed
+  need, per this bullet's own rule.
 - Once the already-known chat/drop/pickup path had reconfirmed behavior established
   two weeks earlier, the manual lap stopped producing decision-bearing evidence.
   Derek said, **“this is putting me to sleep.”** Treat known contract behavior as a

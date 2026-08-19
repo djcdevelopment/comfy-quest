@@ -462,15 +462,23 @@ The completed Woodbound Signal lap produced valid follow-through that remains in
 
 - ~~group repeated rehearsal evaluations beneath their owning beat with explicit
   partial and complete hierarchy~~ (delivered in 3.4);
-- replace ambiguous F10 candidate text and lead F11 confirmation with the friendly
-  quest name rather than raw identity and full hash;
-- rename the Arcane Sight ownership summary so it describes the actual intersection;
+- ~~replace ambiguous F10 candidate text and lead F11 confirmation with the friendly
+  quest name rather than raw identity and full hash~~ (delivered in the creator-loop
+  UX baseline, `docs/creator-loop-ux-baseline.md`, together with the story/plumbing
+  HUD channel split, the idle-F11 rollback-history fix, and keypress-borne orphan
+  consequences);
+- ~~rename the Arcane Sight ownership summary so it describes the actual
+  intersection~~ (delivered: `0 active + locally owned`);
 - ~~provide a universal timer/countdown affordance when an authored deadline is meant
   to matter during play~~ (delivered in 3.4; the next lap judges whether it carries
   tension during actual combat);
 - reduce the cognitive cost of switching between Studio creation and the F9 in-world
-  creator cockpit;
-- evaluate F6 Quest Lab feature ownership and Arcane Sight's eventual spellbook role;
+  creator cockpit (`docs/quest-lab-persona-audit.md` reframes this as a scope
+  decision: no in-world editor exists anywhere, and the Lab's Scenarios machinery is
+  the strongest existing asset for in-world rehearsal);
+- ~~evaluate F6 Quest Lab feature ownership and Arcane Sight's eventual spellbook
+  role~~ (identification delivered in `docs/quest-lab-persona-audit.md`; extraction
+  stays deferred to Phase 4 on observed need);
 - build a sanitized, screenshot-led Studio tutorial from the already captured
   Woodbound authoring sequence without asking the player to recreate it.
 

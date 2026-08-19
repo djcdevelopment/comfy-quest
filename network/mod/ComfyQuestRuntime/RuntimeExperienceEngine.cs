@@ -23,6 +23,8 @@ sealed class RuntimeExperienceEngine {
   readonly object evidenceGate = new();
   readonly List<string> recentEvidence = new();
   string deadlineLine;
+  bool deadlineUrgent;
+  int lastOrphanCount;
   DateTimeOffset nextTimerPoll;
   Active cachedActive;
   DateTime cachedActiveWriteUtc;
@@ -75,6 +77,20 @@ sealed class RuntimeExperienceEngine {
   /// beside the timer poll and cached, because the surface that draws it runs every frame.</summary>
   public string Deadline() {
     lock (evidenceGate) return deadlineLine;
+  }
+
+  /// <summary>True while the cached deadline has five seconds or fewer left. A fact beside the
+  /// line rather than parsed back out of it, so a copy change can never kill the red state.</summary>
+  public bool DeadlineUrgent() {
+    lock (evidenceGate) return deadlineUrgent;
+  }
+
+  /// <summary>How many loaded bindings the most recent activation left on an earlier content
+  /// hash. The count comes from the same single bounded scan that writes the orphaned_bindings
+  /// receipt, so the keypress that caused the activation can carry its own consequence.</summary>
+  public int OrphanedBindingsAfterActivation() {
+    try { if (!TryLoad(out _, out _)) return 0; } catch { return 0; }
+    lock (evidenceGate) return lastOrphanCount;
   }
 
 
@@ -265,12 +281,14 @@ sealed class RuntimeExperienceEngine {
   /// <summary>Recomputed once a second from the cached binding set, well off the event hot path.</summary>
   void RefreshDeadline(DateTimeOffset now) {
     string line = null;
+    var seconds = -1;
     try {
       if (TryLoad(out var active, out _)) {
         var soonest = timers.Pending(now, 1).FirstOrDefault();
-        if (soonest != null)
-          line = Countdown((int)Math.Ceiling((soonest.DueUtc - now).TotalSeconds), null);
-        else {
+        if (soonest != null) {
+          seconds = (int)Math.Ceiling((soonest.DueUtc - now).TotalSeconds);
+          line = Countdown(seconds, null);
+        } else {
           foreach (var wear in Bindings(active)) {
             var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
             if (zdo == null) continue;
@@ -284,7 +302,8 @@ sealed class RuntimeExperienceEngine {
                 .ThenBy(value => value.Id, StringComparer.Ordinal)) {
               var deadline = TriggerCountdown.Read(transition.When, progress.History, now);
               if (!deadline.Running) continue;
-              line = Countdown(deadline.RemainingSeconds, deadline.Current + "/" + deadline.Required);
+              seconds = deadline.RemainingSeconds;
+              line = Countdown(seconds, deadline.Current + "/" + deadline.Required);
               break;
             }
             break;
@@ -294,12 +313,16 @@ sealed class RuntimeExperienceEngine {
     } catch {
       line = null;
     }
-    lock (evidenceGate) deadlineLine = line;
+    lock (evidenceGate) {
+      deadlineLine = line;
+      deadlineUrgent = line != null && seconds >= 0 && seconds <= 5;
+    }
   }
 
+  // One separator convention with TriggerDeadline.Label: "1/2, 6 seconds remaining".
   static string Countdown(int seconds, string progress) =>
       seconds < 0 ? null
-      : (progress == null ? "" : progress + " — ") + TriggerCountdown.Seconds(seconds) + " remaining";
+      : (progress == null ? "" : progress + ", ") + TriggerCountdown.Seconds(seconds) + " remaining";
 
   static IReadOnlyList<RejectedTransitionEvidence> ExplainRejected(
       ExperienceStage stage,
@@ -771,6 +794,7 @@ sealed class RuntimeExperienceEngine {
           && !string.Equals(previousContentHash, cachedActive.ContentHash,
               StringComparison.OrdinalIgnoreCase))
         ReportOrphanedBindings(cachedActive);
+      else lock (evidenceGate) lastOrphanCount = 0;
       return true;
     } catch {
       InvalidateActive();
@@ -797,6 +821,7 @@ sealed class RuntimeExperienceEngine {
             && !string.Equals(reference.ContentHash, active.ContentHash,
                 StringComparison.OrdinalIgnoreCase)) count++;
       }
+      lock (evidenceGate) lastOrphanCount = count;
       WriteReceipt(new RuntimeReceipt {
         Operation = "activation",
         Status = "orphaned_bindings",

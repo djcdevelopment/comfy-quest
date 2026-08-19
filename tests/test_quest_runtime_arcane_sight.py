@@ -93,6 +93,9 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             "WorldToScreenPoint",
             "view.IsOwner()",
             "LOCAL OWNER",
+            # The summary names the intersection it counts; a bare "locally owned" read as
+            # contradicting the OTHER VERSION / LOCAL OWNER labels during the live lap.
+            "active + locally owned",
             "loaded scene, no fixed radius",
             "SetPropertyBlock(pair.Value)",
             "UnityEngine.Object.Destroy(lamp.gameObject)",
@@ -182,8 +185,17 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         engine = ENGINE.read_text(encoding="utf-8")
         # The banner draws before the drawer's early return, so a deadline is player-visible.
         self.assertIn("void OnGUI(){EnsureStyles();DrawDeadline();if(!drawerVisible)return;", plugin)
-        self.assertIn("UnityEngine.GUI.Label(rect,line,Urgent(line)?deadlineUrgentStyle:deadlineStyle)", plugin)
+        # Urgency is a fact beside the line, never parsed back out of the rendered copy —
+        # a wording change must not be able to kill the red state.
+        self.assertIn(
+            "UnityEngine.GUI.Label(rect,line,engine.DeadlineUrgent()?deadlineUrgentStyle:deadlineStyle)",
+            plugin,
+        )
+        self.assertNotIn('" second"', plugin)
+        self.assertIn("public bool DeadlineUrgent() {", engine)
         self.assertIn("engine?.Deadline()", plugin)
+        # One separator convention with TriggerDeadline.Label: "1/2, 6 seconds remaining".
+        self.assertIn('(progress == null ? "" : progress + ", ")', engine)
         # Every pinned texture is still released.
         for texture in ("deadlineBackground", "deadlineUrgentBackground"):
             with self.subTest(texture=texture):
@@ -204,6 +216,69 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("static string RejectedLine(", engine)
         self.assertIn('" Not " + string.Join("; not ", reasons)', engine)
         self.assertIn("static string Unmet(TriggerClauseTrace trace)", engine)
+
+    def test_creator_loop_copy_is_a_contract_fact_on_the_plumbing_channel(self) -> None:
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        engine = ENGINE.read_text(encoding="utf-8")
+        contract = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "RuntimeContract.cs"
+        ).read_text(encoding="utf-8")
+        notice = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "CreatorLoopNotice.cs"
+        ).read_text(encoding="utf-8")
+        # Creator plumbing speaks TopLeft; Center belongs to the authored story and the
+        # countdown. The engine keeps exactly one Center writer: the message action.
+        self.assertIn("MessageHud.MessageType.TopLeft", plugin)
+        self.assertNotIn("MessageType.Center", plugin)
+        self.assertEqual(1, engine.count("MessageHud.MessageType.Center"))
+        # The plugin renders CreatorLoopNotice; it composes no creator copy inline.
+        for marker in (
+            "CreatorLoopNotice.Check(",
+            "CreatorLoopNotice.CheckFailed(",
+            "CreatorLoopNotice.NothingToLoad(",
+            "CreatorLoopNotice.AlreadyPlaying(",
+            "CreatorLoopNotice.Loaded(",
+            "CreatorLoopNotice.LoadFailed(",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, plugin)
+        self.assertNotIn("pack(s)", plugin)
+        self.assertNotIn('"Activated {', plugin)
+        self.assertNotIn('"Load failed: "', plugin)
+        # The check path can no longer die silently, and an idle repeat load neither
+        # activates a fresh epoch nor goes unreceipted.
+        self.assertIn('Operation="check",Status="rejected"', plugin)
+        self.assertIn('Status="already_active"', plugin)
+        self.assertIn("OrphanedBindingsAfterActivation()", plugin)
+        self.assertIn("public int OrphanedBindingsAfterActivation() {", engine)
+        self.assertIn(
+            "StringComparison.OrdinalIgnoreCase))return valid[0];return ActivateCandidate(valid[0]);",
+            contract,
+        )
+        # F11 refreshes the same inbox state F10 populates, so the ladder is factual.
+        self.assertIn("public string LoadLatest(){try{RefreshInbox();", plugin)
+        # Every hotkey respects game text focus, mirroring the Lab guard without
+        # referencing its assembly.
+        self.assertIn("static bool TypingInGame()", plugin)
+        self.assertLess(
+            plugin.index("if(TypingInGame())return;"),
+            plugin.index("checkHotkey.Value.IsDown()"),
+        )
+        # Discoverability: one session-scoped hint, and the drawer buttons teach their keys.
+        self.assertIn('"Comfy Quest ready. Press "+drawerHotkey.Value', plugin)
+        self.assertIn('"CHECK FOR UPDATES · "+checkHotkey.Value', plugin)
+        self.assertIn('"LOAD VALIDATED UPDATE · "+loadHotkey.Value', plugin)
+        # The notice type carries both altitudes; the xUnit matrix proves the headline
+        # never leaks identity, and Detail is where identity is allowed to live.
+        self.assertIn("public string Headline", notice)
+        self.assertIn("public string Detail", notice)
+        # Titles ride the existing compile pass; no second file read, no manifest change.
+        self.assertIn("titles.Add(compiled.Document.Title)", contract)
+        self.assertNotIn('"title"', contract)
+        cfg = (RUNTIME / "LiveTest" / "djcdevelopment.valheim.comfyquestruntime.cfg").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("CharmGestureHotkey = BackQuote", cfg)
 
     def test_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
         observation = (RUNTIME / "RuntimeObservation.cs").read_text(encoding="utf-8")
