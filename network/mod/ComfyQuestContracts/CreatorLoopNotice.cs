@@ -4,6 +4,19 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
+/// <summary>The evidence-row taxonomy from the creator-loop design language. A row's kind
+/// is a fact tagged where the line is composed — never re-derived by parsing the rendered
+/// string — so a copy change can never silently reclassify a row.</summary>
+public enum CreatorEvidenceKind { Plumbing, Story, Cast, Warning }
+
+/// <summary>One evidence row: what happened, and which voice says it. Story advances the
+/// telling; Cast is the signature charm moment (the only tinted row); Warning needs a
+/// decision and always says what to do next; Plumbing is machinery talking to itself.</summary>
+public sealed class CreatorEvidenceLine {
+  public CreatorEvidenceKind Kind { get; set; }
+  public string Text { get; set; }
+}
+
 /// <summary>One creator-facing sentence about the check/load loop.
 ///
 /// A pure fact type, mirroring TriggerCountdown: the plugin renders, it never composes

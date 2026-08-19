@@ -21,7 +21,7 @@ sealed class RuntimeExperienceEngine {
   readonly Dictionary<string, DateTimeOffset> recentEventKeys =
       new(StringComparer.Ordinal);
   readonly object evidenceGate = new();
-  readonly List<string> recentEvidence = new();
+  readonly List<CreatorEvidenceLine> recentEvidence = new();
   string deadlineLine;
   bool deadlineUrgent;
   int lastOrphanCount;
@@ -52,6 +52,12 @@ sealed class RuntimeExperienceEngine {
   }
 
   public IReadOnlyList<string> RecentEvidence() {
+    lock (evidenceGate) return recentEvidence.Select(value => value.Text).ToArray();
+  }
+
+  /// <summary>The same bounded evidence with each row's kind — a fact tagged where the
+  /// line was composed, so the drawer never classifies by parsing rendered copy.</summary>
+  public IReadOnlyList<CreatorEvidenceLine> RecentEvidenceLines() {
     lock (evidenceGate) return recentEvidence.ToArray();
   }
 
@@ -169,7 +175,8 @@ sealed class RuntimeExperienceEngine {
             "matched", active, zdo.m_uid.ToString(), evt, currentStage.Id,
             decision.Transition.NextStage, matchedProgress, correlationId,
             evidence, rejectedEvidence),
-            MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence));
+            MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence),
+            CreatorEvidenceKind.Story);
 
         var succeeded = true;
         foreach (var action in decision.Transition.Actions ?? new())
@@ -206,7 +213,7 @@ sealed class RuntimeExperienceEngine {
             Evidence = evidence,
             RejectedEvidence = rejectedEvidence,
             Diagnostics = Array.Empty<ContractDiagnostic>(),
-          }, TransitionLine(currentStage.Id, decision.Transition));
+          }, TransitionLine(currentStage.Id, decision.Transition), CreatorEvidenceKind.Story);
         }
       }
 
@@ -451,7 +458,7 @@ sealed class RuntimeExperienceEngine {
     } catch (Exception e) {
       WriteReceipt(ActionReceipt(
           "rejected", e.Message, active, zdoId, stage, transition, action?.Id,
-          correlationId), ActionLine(action, "failed: " + e.Message));
+          correlationId), ActionLine(action, "failed: " + e.Message), CreatorEvidenceKind.Warning);
       return false;
     }
   }
@@ -831,7 +838,8 @@ sealed class RuntimeExperienceEngine {
         ActivationId = active.ActivationId,
         CandidateCount = count,
         Diagnostics = Array.Empty<ContractDiagnostic>(),
-      }, count + " bindings now OTHER VERSION — re-CAST or roll back");
+      }, count + " bindings now OTHER VERSION — re-CAST or roll back",
+          CreatorEvidenceKind.Warning);
     } catch {
       // Loaded-scene diagnostics must not make otherwise valid active content unusable.
     }
@@ -853,11 +861,15 @@ sealed class RuntimeExperienceEngine {
     }
   }
 
-  void WriteReceipt(RuntimeReceipt receipt, string evidenceLine = null) {
+  void WriteReceipt(RuntimeReceipt receipt, string evidenceLine = null,
+      CreatorEvidenceKind kind = CreatorEvidenceKind.Plumbing) {
     receipts.Write(receipt);
     if (string.IsNullOrWhiteSpace(evidenceLine)) return;
     if (evidenceLine.Length > 220) evidenceLine = evidenceLine.Substring(0, 219) + "…";
-    var line = receipt.AtUtc.ToLocalTime().ToString("HH:mm:ss") + "  " + evidenceLine;
+    var line = new CreatorEvidenceLine {
+      Kind = kind,
+      Text = receipt.AtUtc.ToLocalTime().ToString("HH:mm:ss") + "  " + evidenceLine,
+    };
     lock (evidenceGate) {
       recentEvidence.Add(line);
       if (recentEvidence.Count > MaxRecentEvidence)

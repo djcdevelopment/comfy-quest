@@ -125,7 +125,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         for marker in (
             "DrawRecentEvidence();",
             '"RECENT RUNTIME EVIDENCE"',
-            "engine?.RecentEvidence()",
+            "engine?.RecentEvidenceLines()",
             '"No gameplay evidence yet."',
         ):
             with self.subTest(marker=marker):
@@ -279,6 +279,44 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("CharmGestureHotkey = BackQuote", cfg)
+
+    def test_evidence_rows_carry_their_kind_as_a_fact_in_the_design_tokens(self) -> None:
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        engine = ENGINE.read_text(encoding="utf-8")
+        notice = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "CreatorLoopNotice.cs"
+        ).read_text(encoding="utf-8")
+        # The taxonomy lives in Contracts; kinds are tagged where lines are composed,
+        # never parsed back out of rendered copy (the DeadlineUrgent lesson, again).
+        self.assertIn(
+            "public enum CreatorEvidenceKind { Plumbing, Story, Cast, Warning }", notice
+        )
+        self.assertIn(
+            "MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence),\n            CreatorEvidenceKind.Story);",
+            engine,
+        )
+        self.assertIn(
+            'TransitionLine(currentStage.Id, decision.Transition), CreatorEvidenceKind.Story);',
+            engine,
+        )
+        self.assertIn('ActionLine(action, "failed: " + e.Message), CreatorEvidenceKind.Warning);', engine)
+        self.assertIn('bindings now OTHER VERSION — re-CAST or roll back",\n          CreatorEvidenceKind.Warning);', engine)
+        self.assertIn("public IReadOnlyList<CreatorEvidenceLine> RecentEvidenceLines()", engine)
+        # The drawer renders kinds; it never classifies by inspecting the text.
+        self.assertIn("engine?.RecentEvidenceLines()", plugin)
+        self.assertIn("void DrawEvidenceRow(CreatorEvidenceLine line)", plugin)
+        self.assertIn('AddOutcome(CreatorEvidenceKind.Cast,"CAST · "+status)', plugin)
+        self.assertNotIn('Contains("CAST', plugin)
+        self.assertNotIn('StartsWith("Matched', plugin)
+        # The two load-bearing design tokens: bright amber primary (dark ink) and the
+        # urgent red; and the new textures are released like every other.
+        self.assertIn('Solid("runtime-primary",new UnityEngine.Color(.914f,.659f,.247f,1f))', plugin)
+        self.assertIn('Solid("runtime-deadline-urgent",new UnityEngine.Color(.561f,.086f,.086f,.92f))', plugin)
+        for texture in ("primaryBackground", "castRowBackground"):
+            with self.subTest(texture=texture):
+                self.assertIn(f"Destroy(ref {texture});", plugin)
+        # Grammar: green is state, never a button — the primary action is amber.
+        self.assertIn("primaryStyle=ButtonStyle(primaryBackground", plugin)
 
     def test_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
         observation = (RUNTIME / "RuntimeObservation.cs").read_text(encoding="utf-8")
