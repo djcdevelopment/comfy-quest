@@ -483,6 +483,7 @@ sealed class RuntimeExperienceEngine {
         PackId = set.PackId,
         Version = set.Version,
         ContentHash = set.ContentHash,
+        ActivationId = set.ActivationId,
         Document = compiled.Document,
         Subscriptions = RuntimeSubscriptionIndex.Create(compiled.Document),
         PackagePath = package,
@@ -538,6 +539,7 @@ sealed class RuntimeExperienceEngine {
     [JsonProperty("pack_id")] public string PackId { get; set; }
     [JsonProperty("version")] public string Version { get; set; }
     [JsonProperty("content_hash")] public string ContentHash { get; set; }
+    [JsonProperty("activation_id")] public string ActivationId { get; set; }
     [JsonProperty("source")] public string Source { get; set; }
   }
 
@@ -545,6 +547,7 @@ sealed class RuntimeExperienceEngine {
     public string PackId;
     public string Version;
     public string ContentHash;
+    public string ActivationId;
     public ExperienceDocument Document;
     public RuntimeSubscriptionIndex Subscriptions;
     public string PackagePath;

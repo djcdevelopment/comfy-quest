@@ -1,0 +1,13 @@
+{
+  "schema": "comfy-quest-workflow-state/v1",
+  "states": {
+    "pending-world|pending-hero|pending-zdo|pending-hash": {
+      "stage_id": "first",
+      "history": null,
+      "pending_transition_id": "first-hit",
+      "pending_from_stage_id": "first",
+      "pending_next_stage_id": "second",
+      "pending_outcome": null
+    }
+  }
+}

@@ -3,7 +3,7 @@
   "states": {
     "old-world|old-hero|old-zdo|old-hash": {
       "stage_id": "first",
-      "history": [],
+      "history": null,
       "pending_transition_id": null,
       "pending_from_stage_id": null,
       "pending_next_stage_id": null,

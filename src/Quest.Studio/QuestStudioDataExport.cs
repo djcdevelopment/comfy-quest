@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ComfyQuestContracts;
 
 namespace Comfy.Quest.Studio;
@@ -141,6 +142,10 @@ internal sealed class QuestStudioDataExport
                     && string.Equals(receipt.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase))
                     .ToArray();
                 matchingReceiptCount = matchingReceipts.Length;
+                var evidenceJson = new JsonSerializerOptions(_host.Json)
+                {
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
                 builder.Add("evidence/runtime-status.json", JsonSerializer.SerializeToUtf8Bytes(new
                 {
                     schema_version = 1,
@@ -156,7 +161,7 @@ internal sealed class QuestStudioDataExport
                     exactLiveStatus.RequiredCount,
                     receipts = matchingReceipts,
                     exactLiveStatus.Diagnostics
-                }, _host.Json));
+                }, evidenceJson));
             }
 
             var manifest = new

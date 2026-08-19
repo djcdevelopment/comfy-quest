@@ -24,6 +24,16 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("WearNTear.GetAllInstances()", bindings)
         self.assertNotIn("Vector3.Distance", bindings)
 
+    def test_runtime_preserves_the_active_set_activation_id(self) -> None:
+        engine = ENGINE.read_text(encoding="utf-8")
+        for marker in (
+            '[JsonProperty("activation_id")] public string ActivationId { get; set; }',
+            "ActivationId = set.ActivationId",
+            "public string ActivationId;",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, engine)
+
     def test_arcane_sight_is_read_only_and_restores_visual_state(self) -> None:
         sight = SIGHT.read_text(encoding="utf-8")
         for marker in (

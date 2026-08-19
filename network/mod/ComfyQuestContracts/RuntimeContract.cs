@@ -67,9 +67,7 @@ public static class TriggerEvaluator {
     var bounded = expression?.WithinSeconds.HasValue == true && history.Count > 0
       ? history.Where(x => x.At >= history[history.Count - 1].At.AddSeconds(-expression.WithinSeconds.Value)).ToArray()
       : history.ToArray();
-    var trace = ExplainNode(expression, bounded);
-    BoundTrace(trace);
-    return trace;
+    return BuildBoundedTrace(expression, bounded);
   }
   public static TriggerProgress Measure(TriggerExpression expression, IReadOnlyList<RuntimeEvent> history) {
     history ??= Array.Empty<RuntimeEvent>();
@@ -96,55 +94,67 @@ public static class TriggerEvaluator {
     if(op=="SEQUENCE") { int i=0; foreach(var v in h) if(i<c.Count&&EventMatches(c[i],v)) i++; return i==c.Count; }
     return false;
   }
-  static TriggerClauseTrace ExplainNode(TriggerExpression x,IReadOnlyList<RuntimeEvent> h) {
+  static TriggerClauseTrace BuildBoundedTrace(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history) {
+    var nodeCount=CountNodes(expression);
+    var full=BuildTrace(expression,history,nodeCount,128,out _);
+    if(TraceBytes(full)<=MaxTraceSerializedBytes)return full;
+    TriggerClauseTrace best=null;var bestNodes=0;var bestCharacters=0;
+    for(var maxCharacters=128;maxCharacters>=8;maxCharacters/=2) {
+      var low=1;var high=nodeCount;TriggerClauseTrace fit=null;var fitNodes=0;
+      while(low<=high) {
+        var budget=low+(high-low)/2;
+        var candidate=BuildTrace(expression,history,budget,maxCharacters,out var used);
+        candidate.Truncated=true;
+        if(TraceBytes(candidate)<=MaxTraceSerializedBytes){fit=candidate;fitNodes=used;low=budget+1;}else high=budget-1;
+      }
+      if(fit!=null&&(fitNodes>bestNodes||(fitNodes==bestNodes&&maxCharacters>bestCharacters))){best=fit;bestNodes=fitNodes;bestCharacters=maxCharacters;}
+    }
+    return best??new TriggerClauseTrace{Op="",Satisfied=false,Current=0,Required=1,Truncated=true};
+  }
+  static TriggerClauseTrace BuildTrace(TriggerExpression expression,IReadOnlyList<RuntimeEvent> history,int nodeBudget,int maxCharacters,out int used) {
+    var remaining=Math.Max(1,nodeBudget);var trace=ExplainNode(expression,history,true,ref remaining,maxCharacters);used=Math.Max(1,nodeBudget)-remaining;return trace;
+  }
+  static TriggerClauseTrace ExplainNode(TriggerExpression x,IReadOnlyList<RuntimeEvent> h,bool isRoot,ref int remaining,int maxCharacters) {
+    remaining--;
     if(x==null)return new(){Satisfied=false,Current=0,Required=1};
     var op=(x.Op??"").ToUpperInvariant();
-    var children=x.Children??new();
-    var trace=new TriggerClauseTrace{Op=op,Event=x.Event,Target=x.Target,Satisfied=Eval(x,h),WithinSeconds=x.WithinSeconds};
+    var children=x.Children??new();var stringsTruncated=false;
+    var trace=new TriggerClauseTrace{Op=Trim(op,maxCharacters,ref stringsTruncated),Event=Trim(x.Event,maxCharacters,ref stringsTruncated),Target=Trim(x.Target,maxCharacters,ref stringsTruncated),Satisfied=Eval(x,h),WithinSeconds=isRoot?x.WithinSeconds:null};
     if(op=="EVENT") {
-      var exact=h.FirstOrDefault(v=>EventMatches(x,v));
-      var candidate=exact??h.FirstOrDefault(v=>string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase)&&(string.IsNullOrWhiteSpace(x.Target)||string.Equals(x.Target,v.Target,StringComparison.OrdinalIgnoreCase)))??h.FirstOrDefault(v=>string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase));
-      foreach(var expected in (x.Where??new()).OrderBy(v=>v.Key,StringComparer.Ordinal).Take(MaxTraceWhereEntries)) {
+      var exact=h.Reverse().FirstOrDefault(v=>EventMatches(x,v));
+      var candidate=exact??h.Reverse().FirstOrDefault(v=>string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase)&&(string.IsNullOrWhiteSpace(x.Target)||string.Equals(x.Target,v.Target,StringComparison.OrdinalIgnoreCase)))??h.Reverse().FirstOrDefault(v=>string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase));
+      var where=(x.Where??new()).OrderBy(v=>v.Key,StringComparer.Ordinal).Select(expected=>{
         string actual=null;var found=candidate?.Fields!=null&&candidate.Fields.TryGetValue(expected.Key,out actual);
-        trace.Where.Add(new(){Field=expected.Key,Expected=expected.Value,Actual=found?actual:null,Satisfied=found&&string.Equals(actual,expected.Value,StringComparison.OrdinalIgnoreCase)});
+        return new TriggerWhereTrace{Field=expected.Key,Expected=expected.Value,Actual=found?actual:null,Satisfied=found&&string.Equals(actual,expected.Value,StringComparison.OrdinalIgnoreCase)};
+      }).ToArray();
+      foreach(var item in where.OrderBy(v=>v.Satisfied?1:0).ThenBy(v=>v.Field,StringComparer.Ordinal).Take(MaxTraceWhereEntries).OrderBy(v=>v.Field,StringComparer.Ordinal)) {
+        trace.Where.Add(new(){Field=Trim(item.Field,maxCharacters,ref stringsTruncated),Expected=Trim(item.Expected,maxCharacters,ref stringsTruncated),Actual=Trim(item.Actual,maxCharacters,ref stringsTruncated),Satisfied=item.Satisfied});
       }
-      trace.Current=trace.Satisfied?1:0;trace.Required=1;return trace;
+      if(where.Length>MaxTraceWhereEntries)trace.Truncated=true;
+      trace.Current=trace.Satisfied?1:0;trace.Required=1;if(stringsTruncated)trace.Truncated=true;return trace;
     }
-    foreach(var child in children)trace.Children.Add(ExplainNode(child,h));
-    if(op=="ANY") {trace.Current=trace.Children.Count(v=>v.Satisfied);trace.Required=1;return trace;}
-    if(op=="ALL") {trace.Current=trace.Children.Count(v=>v.Satisfied);trace.Required=trace.Children.Count;return trace;}
-    if(op=="COUNT") {
-      var required=x.Count.GetValueOrDefault();
+    foreach(var child in children) {
+      if(remaining<=0){trace.Truncated=true;break;}
+      trace.Children.Add(ExplainNode(child,h,false,ref remaining,maxCharacters));
+    }
+    if(op=="ANY") {trace.Current=children.Count(v=>Eval(v,h));trace.Required=1;}
+    else if(op=="ALL") {trace.Current=children.Count(v=>Eval(v,h));trace.Required=children.Count;}
+    else if(op=="COUNT") {
+      var required=Math.Max(1,x.Count.GetValueOrDefault());
       var current=children.Count==1?h.Count(v=>EventMatches(children[0],v)):0;
-      trace.Current=required>0?Math.Min(current,required):current;trace.Required=required;return trace;
+      // Creator-facing progress deliberately saturates at the threshold, matching Measure.
+      trace.Current=Math.Min(current,required);trace.Required=required;
     }
-    if(op=="SEQUENCE") {
+    else if(op=="SEQUENCE") {
       int index=0;foreach(var value in h)if(index<children.Count&&EventMatches(children[index],value))index++;
-      trace.Current=index;trace.Required=children.Count;trace.SequenceIndex=index;return trace;
+      trace.Current=index;trace.Required=children.Count;trace.SequenceIndex=index;
     }
-    trace.Current=0;trace.Required=1;return trace;
+    else {trace.Current=0;trace.Required=1;}
+    if(stringsTruncated)trace.Truncated=true;return trace;
   }
-  static void BoundTrace(TriggerClauseTrace trace) {
-    if(trace==null)return;
-    while(TraceBytes(trace)>MaxTraceSerializedBytes&&TrimLastChild(trace))trace.Truncated=true;
-    while(TraceBytes(trace)>MaxTraceSerializedBytes&&TrimLastWhere(trace))trace.Truncated=true;
-    var maxCharacters=256;
-    while(TraceBytes(trace)>MaxTraceSerializedBytes&&maxCharacters>8){maxCharacters/=2;TrimStrings(trace,maxCharacters);trace.Truncated=true;}
-  }
-  static int TraceBytes(TriggerClauseTrace trace)=>Encoding.UTF8.GetByteCount(JsonConvert.SerializeObject(trace,Formatting.None));
-  static bool TrimLastChild(TriggerClauseTrace trace) {
-    if(trace.Children.Count==0)return false;var last=trace.Children.Count-1;if(TrimLastChild(trace.Children[last]))return true;trace.Children.RemoveAt(last);return true;
-  }
-  static bool TrimLastWhere(TriggerClauseTrace trace) {
-    for(var i=trace.Children.Count-1;i>=0;i--)if(TrimLastWhere(trace.Children[i]))return true;
-    if(trace.Where.Count==0)return false;trace.Where.RemoveAt(trace.Where.Count-1);return true;
-  }
-  static void TrimStrings(TriggerClauseTrace trace,int max) {
-    trace.Op=Trim(trace.Op,max);trace.Event=Trim(trace.Event,max);trace.Target=Trim(trace.Target,max);
-    foreach(var item in trace.Where){item.Field=Trim(item.Field,max);item.Expected=Trim(item.Expected,max);item.Actual=Trim(item.Actual,max);}
-    foreach(var child in trace.Children)TrimStrings(child,max);
-  }
-  static string Trim(string value,int max)=>value==null||value.Length<=max?value:value.Substring(0,max);
+  static int CountNodes(TriggerExpression expression)=>expression==null?1:1+(expression.Children??new()).Sum(CountNodes);
+  static int TraceBytes(TriggerClauseTrace trace)=>Encoding.UTF8.GetByteCount(JsonConvert.SerializeObject(trace,Formatting.Indented));
+  static string Trim(string value,int max,ref bool truncated){if(value==null||value.Length<=max)return value;truncated=true;return value.Substring(0,max);}
   static bool EventMatches(TriggerExpression x,RuntimeEvent v){if(x==null||!string.Equals(x.Op,"EVENT",StringComparison.OrdinalIgnoreCase)||!string.Equals(x.Event,v.Name,StringComparison.OrdinalIgnoreCase))return false;if(!string.IsNullOrWhiteSpace(x.Target)&&!string.Equals(x.Target,v.Target,StringComparison.OrdinalIgnoreCase))return false;foreach(var p in x.Where??new()){if(v.Fields==null||!v.Fields.TryGetValue(p.Key,out var value)||!string.Equals(value,p.Value,StringComparison.OrdinalIgnoreCase))return false;}return true;}
 }
 

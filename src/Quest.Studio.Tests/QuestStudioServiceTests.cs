@@ -547,6 +547,18 @@ public sealed class QuestStudioServiceTests : IDisposable
         var nextPublished = await service.PublishGraphAsync(project.ProjectId, project.Revision, CancellationToken.None);
         Assert.True(nextPublished.Ok, nextPublished.Error);
         var nextInboxPath = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime", "inbox", nextPublished.Receipt!.Filename!);
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var current = new QuestPackStore(runtimeRoot).CheckInbox().Single(candidate => candidate.Manifest.Version == project.Version);
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Operation = "transition",
+            Status = "completed",
+            PackId = current.Manifest.PackId,
+            Version = current.Manifest.Version,
+            ContentHash = current.ContentHash,
+            ActivationId = "act-20260818T010203004Z-deadbeef",
+            Diagnostics = Array.Empty<ContractDiagnostic>()
+        });
 
         var privateBundle = service.ExportProject(project.ProjectId, new StudioExportRequest(false, false));
         using (var archive = new ZipArchive(new MemoryStream(privateBundle.Bytes!), ZipArchiveMode.Read))
@@ -562,6 +574,11 @@ public sealed class QuestStudioServiceTests : IDisposable
         var evidence = System.Text.Encoding.UTF8.GetString(ReadEntry(evidenceArchive, "evidence/runtime-status.json"));
         Assert.Contains("privacy_notice", evidence);
         Assert.DoesNotContain(inboxPath, evidence, StringComparison.OrdinalIgnoreCase);
+        using var evidenceDocument = JsonDocument.Parse(evidence);
+        var receipt = Assert.Single(evidenceDocument.RootElement.GetProperty("receipts").EnumerateArray());
+        Assert.Equal("act-20260818T010203004Z-deadbeef", receipt.GetProperty("activation_id").GetString());
+        foreach (var nullable in new[] { "correlation_id", "stage_entered_utc", "evidence", "rejected_evidence" })
+            Assert.False(receipt.TryGetProperty(nullable, out _), nullable);
     }
 
     [Fact]

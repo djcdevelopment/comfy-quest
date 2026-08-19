@@ -2,6 +2,7 @@ namespace ComfyQuestContracts;
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using Newtonsoft.Json;
 
@@ -40,6 +41,6 @@ public sealed class RuntimeReceipt {
 public sealed class RuntimeReceiptStore {
   readonly object gate = new(); readonly string directory;
   public RuntimeReceiptStore(string runtimeRoot){directory=Path.Combine(Path.GetFullPath(runtimeRoot),"receipts");}
-  public string Write(RuntimeReceipt receipt){if(receipt==null)throw new ArgumentNullException(nameof(receipt));lock(gate){Directory.CreateDirectory(directory);receipt.AtUtc=receipt.AtUtc==default?DateTimeOffset.UtcNow:receipt.AtUtc;receipt.Id=string.IsNullOrWhiteSpace(receipt.Id)?receipt.AtUtc.ToString("yyyyMMddTHHmmssfffZ")+"-"+Guid.NewGuid().ToString("N"):receipt.Id;var safe=receipt.Id.Replace("/","_").Replace("\\","_");var target=Path.Combine(directory,safe+".json");var temp=target+".tmp";File.WriteAllText(temp,JsonConvert.SerializeObject(receipt,Formatting.Indented));File.Move(temp,target);return target;}}
+  public string Write(RuntimeReceipt receipt){if(receipt==null)throw new ArgumentNullException(nameof(receipt));lock(gate){Directory.CreateDirectory(directory);receipt.AtUtc=receipt.AtUtc==default?DateTimeOffset.UtcNow:receipt.AtUtc;receipt.Id=string.IsNullOrWhiteSpace(receipt.Id)?receipt.AtUtc.ToUniversalTime().ToString("yyyyMMdd'T'HHmmssfff'Z'",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N"):receipt.Id;var safe=receipt.Id.Replace("/","_").Replace("\\","_");var target=Path.Combine(directory,safe+".json");var temp=target+".tmp";File.WriteAllText(temp,JsonConvert.SerializeObject(receipt,Formatting.Indented));File.Move(temp,target);return target;}}
   public IReadOnlyList<string> List(int limit=50){if(!Directory.Exists(directory))return Array.Empty<string>();var files=Directory.GetFiles(directory,"*.json");Array.Sort(files,StringComparer.Ordinal);Array.Reverse(files);if(limit<0)limit=0;if(limit>200)limit=200;if(files.Length>limit)Array.Resize(ref files,limit);return files;}
 }
