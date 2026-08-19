@@ -81,15 +81,18 @@ sealed class RuntimeArcaneSight {
           player.transform.position, marker.Host.transform.position))}m";
       var state = marker.Current ? "ACTIVE" : "OTHER VERSION";
       var owner = marker.LocallyOwned ? "LOCAL OWNER" : "REMOTE OWNER";
+      var activation = marker.Current && !string.IsNullOrWhiteSpace(marker.ActivationId)
+          ? " · " + marker.ActivationId : "";
       GUI.Label(new Rect(x, y, 420f, 48f),
-          $"{state} / {owner} · {marker.ExperienceId} {marker.Version}{distance}\n"
-          + $"{marker.PackId} · loaded-scene scope", style);
+          $"{state}{activation} / {owner} · {marker.ExperienceId} {marker.Version}{distance}\n"
+          + $"{marker.PackId} · ZDO {marker.BindingZdo} · loaded-scene scope", style);
     }
   }
 
   void Sync() {
     nextSync = Time.realtimeSinceStartup + 0.75f;
-    var activeHash = ActiveContentHash();
+    var activeSet = ReadActive();
+    var activeHash = activeSet?.ContentHash;
     var found = new List<Marker>();
     try {
       foreach (var wear in WearNTear.GetAllInstances()) {
@@ -109,6 +112,8 @@ sealed class RuntimeArcaneSight {
           PackId = reference.PackId,
           ExperienceId = reference.ExperienceId,
           Version = reference.Version,
+          ActivationId = current ? ShortActivationId(activeSet?.ActivationId) : null,
+          BindingZdo = ShortBindingZdo(zdo.m_uid.ToString()),
           Current = current,
           LocallyOwned = locallyOwned,
           LabelHeight = Apply(wear.gameObject, current, locallyOwned),
@@ -183,12 +188,26 @@ sealed class RuntimeArcaneSight {
     active = false;
   }
 
-  string ActiveContentHash() {
+  ActiveSet ReadActive() {
     try {
       var path = Path.Combine(root, "active", "active-set.json");
       if (!File.Exists(path)) return null;
-      return JsonConvert.DeserializeObject<ActiveSet>(File.ReadAllText(path))?.ContentHash;
+      return JsonConvert.DeserializeObject<ActiveSet>(File.ReadAllText(path));
     } catch { return null; }
+  }
+
+  static string ShortActivationId(string value) {
+    if (string.IsNullOrWhiteSpace(value)) return null;
+    var separator = value.LastIndexOf('-');
+    var suffix = separator >= 0 ? value.Substring(separator + 1) : value;
+    return suffix.Length <= 8 ? "act-" + suffix : ShortId(value);
+  }
+
+  static string ShortBindingZdo(string value) => ShortId(value);
+
+  static string ShortId(string value) {
+    if (string.IsNullOrWhiteSpace(value) || value.Length <= 16) return value;
+    return value.Substring(0, 7) + "…" + value.Substring(value.Length - 8);
   }
 
   static CharmReference Read(ZDO zdo) {
@@ -213,6 +232,8 @@ sealed class RuntimeArcaneSight {
     public string PackId;
     public string ExperienceId;
     public string Version;
+    public string ActivationId;
+    public string BindingZdo;
     public bool Current;
     public bool LocallyOwned;
     public float LabelHeight;

@@ -33,6 +33,46 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, engine)
 
+    def test_runtime_evidence_is_correlated_bounded_and_replay_safe(self) -> None:
+        engine = ENGINE.read_text(encoding="utf-8")
+        for marker in (
+            "const int MaxRecentEvidence = 8;",
+            '"evt-" + Guid.NewGuid().ToString("N").Substring(0, 12)',
+            "CorrelationId = correlationId",
+            "TriggerEvaluator.Explain(decision.Transition.When, currentState?.History)",
+            "var evidence = decision.IsPendingReplay",
+            "Evidence = evidence",
+            "RejectedEvidence = rejectedEvidence",
+            "StageEnteredUtc = currentState?.StageEnteredUtc",
+            'return " - in stage "',
+            "public IReadOnlyList<string> RecentEvidence()",
+            "recentEvidence.RemoveRange(0, recentEvidence.Count - MaxRecentEvidence)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, engine)
+        self.assertLess(engine.index("workflows.Begin"), engine.index("TriggerEvaluator.Explain"))
+        self.assertLess(engine.index("TriggerEvaluator.Explain"), engine.index("workflows.Complete"))
+
+    def test_activation_change_reports_one_bounded_orphan_scan(self) -> None:
+        engine = ENGINE.read_text(encoding="utf-8")
+        orphan = engine[
+            engine.index("void ReportOrphanedBindings"):
+            engine.index("WorldAuthority World")
+        ]
+        self.assertEqual(1, orphan.count("WearNTear.GetAllInstances()"))
+        self.assertIn(
+            "!string.Equals(previousContentHash, cachedActive.ContentHash",
+            engine,
+        )
+        for marker in (
+            'Operation = "activation"',
+            'Status = "orphaned_bindings"',
+            "CandidateCount = count",
+            'bindings now OTHER VERSION — re-CAST or roll back',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, orphan)
+
     def test_runtime_readers_bind_the_contract_active_set_without_shadow_copies(self) -> None:
         # active-set.json has one schema owner: ComfyQuestContracts.ActiveSet. A private
         # nested copy would silently fork the schema the moment a field is added to one
@@ -75,6 +115,28 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, plugin)
+
+    def test_f9_drawer_surfaces_recent_runtime_evidence(self) -> None:
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        for marker in (
+            "DrawRecentEvidence();",
+            '"RECENT RUNTIME EVIDENCE"',
+            "engine?.RecentEvidence()",
+            '"No gameplay evidence yet."',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, plugin)
+
+    def test_arcane_sight_labels_activation_epoch_and_binding(self) -> None:
+        sight = SIGHT.read_text(encoding="utf-8")
+        for marker in (
+            "ShortActivationId(activeSet?.ActivationId)",
+            "ShortBindingZdo(zdo.m_uid.ToString())",
+            "marker.Current && !string.IsNullOrWhiteSpace(marker.ActivationId)",
+            "ZDO {marker.BindingZdo}",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, sight)
 
     def test_runtime_docs_name_loaded_scene_scope(self) -> None:
         readme = (RUNTIME / "README.md").read_text(encoding="utf-8")

@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 
 sealed class RuntimeExperienceEngine {
   const string Prefix = "comfyQuestRuntime.";
+  const int MaxRecentEvidence = 8;
   readonly string root;
   readonly RuntimeReceiptStore receipts;
   readonly ActionExecutionLedger ledger;
@@ -19,6 +20,8 @@ sealed class RuntimeExperienceEngine {
   readonly Func<bool> privateConfirmed;
   readonly Dictionary<string, DateTimeOffset> recentEventKeys =
       new(StringComparer.Ordinal);
+  readonly object evidenceGate = new();
+  readonly List<string> recentEvidence = new();
   DateTimeOffset nextTimerPoll;
   Active cachedActive;
   DateTime cachedActiveWriteUtc;
@@ -45,6 +48,10 @@ sealed class RuntimeExperienceEngine {
     if (evt != null) OnEvent(evt);
   }
 
+  public IReadOnlyList<string> RecentEvidence() {
+    lock (evidenceGate) return recentEvidence.ToArray();
+  }
+
   public void Tick() {
     var now = DateTimeOffset.UtcNow;
     if (now < nextTimerPoll) return;
@@ -63,16 +70,19 @@ sealed class RuntimeExperienceEngine {
   public void OnEvent(RuntimeEvent evt) {
     evt = RuntimeEventPolicy.Normalize(evt);
     if (evt == null) return;
+    Active active = null;
+    string correlationId = null;
     try {
-      if (!TryLoad(out var active, out var diagnostic)) {
-        Write("transition", diagnostic, null, null, null);
+      if (!TryLoad(out active, out var diagnostic)) {
+        Write("transition", diagnostic, null, null, null, null);
         return;
       }
       // The high-frequency lane stops here: no scene walk, receipt, or workflow write.
       if (!active.Subscriptions.Contains(evt.Name) || IsDuplicate(evt)) return;
+      correlationId = NewCorrelationId();
       var authority = CharmPolicy.CanMutate(World());
       if (!authority.Allowed) {
-        Write("transition", authority.Diagnostic, null, null, null);
+        Write("transition", authority.Diagnostic, active, null, null, correlationId);
         return;
       }
 
@@ -100,9 +110,9 @@ sealed class RuntimeExperienceEngine {
           var route = stage?.Transitions?.OrderByDescending(value => value.Priority)
               .ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault();
           var progress = TriggerEvaluator.Measure(route?.When, state?.History);
-          receipts.Write(EventReceipt(
+          WriteReceipt(EventReceipt(
               "ignored", active, zdo.m_uid.ToString(), evt, state?.StageId,
-              state?.StageId, progress));
+              state?.StageId, progress, correlationId));
           continue;
         }
 
@@ -110,28 +120,37 @@ sealed class RuntimeExperienceEngine {
         if (currentStage == null) continue;
         var currentState = workflows.Get(identity);
         var matchedProgress = TriggerEvaluator.Measure(decision.Transition.When, currentState?.History);
-        receipts.Write(EventReceipt(
+        var evidence = decision.IsPendingReplay
+            ? null : TriggerEvaluator.Explain(decision.Transition.When, currentState?.History);
+        var rejectedEvidence = decision.IsPendingReplay
+            ? null : ExplainRejected(currentStage, decision.Transition, currentState?.History);
+        WriteReceipt(EventReceipt(
             "matched", active, zdo.m_uid.ToString(), evt, currentStage.Id,
-            decision.Transition.NextStage, matchedProgress));
+            decision.Transition.NextStage, matchedProgress, correlationId,
+            evidence, rejectedEvidence),
+            MatchedLine(currentStage.Id, decision.Transition, matchedProgress));
 
         var succeeded = true;
         foreach (var action in decision.Transition.Actions ?? new())
-          succeeded &= Execute(active, zdo, currentStage.Id, decision.Transition.Id, action);
+          succeeded &= Execute(
+              active, zdo, currentStage.Id, decision.Transition.Id, action, correlationId);
         if (succeeded && !string.IsNullOrWhiteSpace(decision.Transition.NextStage)) {
           var next = active.Document.Stages.FirstOrDefault(
               value => value.Id == decision.Transition.NextStage);
           foreach (var action in next?.EntryActions ?? new())
-            succeeded &= Execute(active, zdo, next.Id, "entry", action);
+            succeeded &= Execute(active, zdo, next.Id, "entry", action, correlationId);
         }
         if (!succeeded) continue;
         if (workflows.Complete(decision)) {
-          receipts.Write(new RuntimeReceipt {
+          WriteReceipt(new RuntimeReceipt {
             Operation = "transition",
             Status = string.IsNullOrWhiteSpace(decision.Transition.Outcome)
                 ? "advanced" : decision.Transition.Outcome,
             PackId = active.PackId,
             Version = active.Version,
             ContentHash = active.ContentHash,
+            ActivationId = active.ActivationId,
+            CorrelationId = correlationId,
             BindingZdo = zdo.m_uid.ToString(),
             StageId = currentStage.Id,
             TransitionId = decision.Transition.Id,
@@ -142,17 +161,20 @@ sealed class RuntimeExperienceEngine {
             NextStageId = decision.Transition.NextStage,
             CurrentCount = matchedProgress.Current,
             RequiredCount = matchedProgress.Required,
+            StageEnteredUtc = currentState?.StageEnteredUtc,
+            Evidence = evidence,
+            RejectedEvidence = rejectedEvidence,
             Diagnostics = Array.Empty<ContractDiagnostic>(),
-          });
+          }, TransitionLine(currentStage.Id, decision.Transition));
         }
       }
 
       if (!foundBinding) {
-        receipts.Write(EventReceipt("unbound", active, null, evt, null, null,
-            new TriggerProgress { Current = 0, Required = 1 }));
+        WriteReceipt(EventReceipt("unbound", active, null, evt, null, null,
+            new TriggerProgress { Current = 0, Required = 1 }, correlationId));
       }
     } catch (Exception e) {
-      Write("action", "runtime_event_failed", null, null, e.Message);
+      Write("action", "runtime_event_failed", active, null, e.Message, correlationId);
     }
   }
 
@@ -169,6 +191,9 @@ sealed class RuntimeExperienceEngine {
     recentEventKeys[evt.DedupeKey] = now;
     return false;
   }
+
+  static string NewCorrelationId() =>
+      "evt-" + Guid.NewGuid().ToString("N").Substring(0, 12);
 
   IReadOnlyList<WearNTear> Bindings(Active active) {
     var now = UnityEngine.Time.realtimeSinceStartup;
@@ -188,12 +213,17 @@ sealed class RuntimeExperienceEngine {
       RuntimeEvent evt,
       string currentStage,
       string nextStage,
-      TriggerProgress progress) => new() {
+      TriggerProgress progress,
+      string correlationId,
+      TriggerClauseTrace evidence = null,
+      IReadOnlyList<RejectedTransitionEvidence> rejectedEvidence = null) => new() {
     Operation = "event",
     Status = status,
     PackId = active.PackId,
     Version = active.Version,
     ContentHash = active.ContentHash,
+    ActivationId = active.ActivationId,
+    CorrelationId = correlationId,
     BindingZdo = bindingZdo,
     EventName = evt.Name,
     EventTarget = evt.Target,
@@ -202,22 +232,79 @@ sealed class RuntimeExperienceEngine {
     NextStageId = nextStage,
     CurrentCount = progress?.Current,
     RequiredCount = progress?.Required,
+    Evidence = evidence,
+    RejectedEvidence = rejectedEvidence,
     Diagnostics = Array.Empty<ContractDiagnostic>(),
   };
+
+  static IReadOnlyList<RejectedTransitionEvidence> ExplainRejected(
+      ExperienceStage stage,
+      ExperienceTransition selected,
+      IReadOnlyList<RuntimeEvent> history) {
+    var rejected = new List<RejectedTransitionEvidence>();
+    foreach (var candidate in (stage?.Transitions ?? new())
+        .Where(value => value != null && value.Priority > selected.Priority)
+        .OrderByDescending(value => value.Priority)
+        .ThenBy(value => value.Id, StringComparer.Ordinal)) {
+      var trace = TriggerEvaluator.Explain(candidate.When, history);
+      if (trace.Satisfied) continue;
+      rejected.Add(new RejectedTransitionEvidence {
+        TransitionId = candidate.Id,
+        Evidence = trace,
+      });
+      if (rejected.Count == 3) break;
+    }
+    return rejected.Count == 0 ? null : rejected;
+  }
+
+  static string MatchedLine(
+      string stage, ExperienceTransition transition, TriggerProgress progress) {
+    var count = progress?.Required > 1
+        ? " — " + progress.Current + "/" + progress.Required : "";
+    return "Matched " + Describe(transition?.When) + count + "; "
+        + stage + " → " + Destination(transition) + ".";
+  }
+
+  static string TransitionLine(string stage, ExperienceTransition transition) =>
+      "Advanced " + stage + " → " + Destination(transition) + ".";
+
+  static string Destination(ExperienceTransition transition) {
+    if (!string.IsNullOrWhiteSpace(transition?.Outcome))
+      return "outcome " + transition.Outcome;
+    return string.IsNullOrWhiteSpace(transition?.NextStage)
+        ? "current stage" : transition.NextStage;
+  }
+
+  static string ActionLine(ExperienceAction action, string result) =>
+      ActionName(action) + " — " + result + ".";
+
+  static string ActionName(ExperienceAction action) {
+    switch (action?.Type) {
+      case "message": return "Show the message";
+      case "timer_start": return "Start the timer";
+      case "timer_cancel": return "Cancel the timer";
+      case "grant_item": return "Give the item reward";
+      case "spawn": return "Create the staged object";
+      case "clear_spawned": return "Clear the staged objects";
+      default: return "Run " + (action?.Id ?? "the action");
+    }
+  }
 
   bool Execute(
       Active active,
       ZDO zdo,
       string stage,
       string transition,
-      ExperienceAction action) {
+      ExperienceAction action,
+      string correlationId) {
+    var zdoId = zdo.m_uid.ToString();
     try {
       var identity = Identity(zdo, active);
-      var zdoId = zdo.m_uid.ToString();
       var key = string.Join("|", identity.Key, stage, transition, action.Id);
       if (!ledger.TryClaim(key)) {
-        receipts.Write(ActionReceipt(
-            "suppressed", "duplicate_suppressed", active, zdoId, stage, transition, action.Id));
+        WriteReceipt(ActionReceipt(
+            "suppressed", "duplicate_suppressed", active, zdoId, stage,
+            transition, action.Id, correlationId), ActionLine(action, "duplicate suppressed"));
         return true;
       }
       switch (action.Type) {
@@ -244,11 +331,14 @@ sealed class RuntimeExperienceEngine {
         default:
           throw new InvalidOperationException("action_not_implemented");
       }
-      receipts.Write(ActionReceipt(
-          "executed", null, active, zdoId, stage, transition, action.Id));
+      WriteReceipt(ActionReceipt(
+          "executed", null, active, zdoId, stage, transition, action.Id,
+          correlationId), ActionLine(action, "executed"));
       return true;
     } catch (Exception e) {
-      Write("action", e.Message, active, null, action.Id);
+      WriteReceipt(ActionReceipt(
+          "rejected", e.Message, active, zdoId, stage, transition, action?.Id,
+          correlationId), ActionLine(action, "failed: " + e.Message));
       return false;
     }
   }
@@ -353,13 +443,16 @@ sealed class RuntimeExperienceEngine {
       string zdo,
       string stage,
       string transition,
-      string action) => new() {
+      string action,
+      string correlationId) => new() {
     Operation = "action",
     Status = status,
     Error = error,
     PackId = active.PackId,
     Version = active.Version,
     ContentHash = active.ContentHash,
+    ActivationId = active.ActivationId,
+    CorrelationId = correlationId,
     BindingZdo = zdo,
     StageId = stage,
     CurrentStageId = stage,
@@ -411,7 +504,7 @@ sealed class RuntimeExperienceEngine {
         var count = measured.Required > 1
             ? " - " + measured.Current + "/" + measured.Required : "";
         return active.Document.Title + ": " + progress.StageId + " - "
-            + Describe(transition?.When) + count;
+            + Describe(transition?.When) + count + DescribeStageElapsed(progress.StageEnteredUtc);
       }
       return active.Document.Title + ": not started";
     } catch {
@@ -427,6 +520,13 @@ sealed class RuntimeExperienceEngine {
         && CreatorSignalCatalog.TryDescribe(leaf.Event, leaf.Target, out var signal))
       return signal.Instruction;
     return (leaf?.Event ?? "perform the current beat").Replace('_', ' ');
+  }
+
+  static string DescribeStageElapsed(DateTimeOffset? entered) {
+    if (!entered.HasValue) return "";
+    var seconds = Math.Max(
+        0L, (long)(DateTimeOffset.UtcNow - entered.Value).TotalSeconds);
+    return " - in stage " + seconds / 60 + "m " + seconds % 60 + "s";
   }
 
   bool TryLoad(out Active active, out string error) {
@@ -479,6 +579,7 @@ sealed class RuntimeExperienceEngine {
         return false;
       }
       var packageInfo = new FileInfo(package);
+      var previousContentHash = cachedActive?.ContentHash;
       cachedActive = new Active {
         PackId = set.PackId,
         Version = set.Version,
@@ -493,6 +594,10 @@ sealed class RuntimeExperienceEngine {
       cachedPackageLength = packageInfo.Length;
       active = cachedActive;
       error = null;
+      if (!string.IsNullOrWhiteSpace(previousContentHash)
+          && !string.Equals(previousContentHash, cachedActive.ContentHash,
+              StringComparison.OrdinalIgnoreCase))
+        ReportOrphanedBindings(cachedActive);
       return true;
     } catch {
       InvalidateActive();
@@ -506,6 +611,32 @@ sealed class RuntimeExperienceEngine {
     cachedBindings = Array.Empty<WearNTear>();
     cachedBindingContentHash = null;
     recentEventKeys.Clear();
+  }
+
+  void ReportOrphanedBindings(Active active) {
+    try {
+      var count = 0;
+      foreach (var wear in WearNTear.GetAllInstances()) {
+        var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
+        if (zdo == null) continue;
+        var reference = Read(zdo);
+        if (reference != null
+            && !string.Equals(reference.ContentHash, active.ContentHash,
+                StringComparison.OrdinalIgnoreCase)) count++;
+      }
+      WriteReceipt(new RuntimeReceipt {
+        Operation = "activation",
+        Status = "orphaned_bindings",
+        PackId = active.PackId,
+        Version = active.Version,
+        ContentHash = active.ContentHash,
+        ActivationId = active.ActivationId,
+        CandidateCount = count,
+        Diagnostics = Array.Empty<ContractDiagnostic>(),
+      }, count + " bindings now OTHER VERSION — re-CAST or roll back");
+    } catch {
+      // Loaded-scene diagnostics must not make otherwise valid active content unusable.
+    }
   }
 
   WorldAuthority World() {
@@ -524,14 +655,34 @@ sealed class RuntimeExperienceEngine {
     }
   }
 
-  void Write(string operation, string error, Active active, string status, string detail) =>
-      receipts.Write(new RuntimeReceipt {
+  void WriteReceipt(RuntimeReceipt receipt, string evidenceLine = null) {
+    receipts.Write(receipt);
+    if (string.IsNullOrWhiteSpace(evidenceLine)) return;
+    if (evidenceLine.Length > 220) evidenceLine = evidenceLine.Substring(0, 219) + "…";
+    var line = receipt.AtUtc.ToLocalTime().ToString("HH:mm:ss") + "  " + evidenceLine;
+    lock (evidenceGate) {
+      recentEvidence.Add(line);
+      if (recentEvidence.Count > MaxRecentEvidence)
+        recentEvidence.RemoveRange(0, recentEvidence.Count - MaxRecentEvidence);
+    }
+  }
+
+  void Write(
+      string operation,
+      string error,
+      Active active,
+      string status,
+      string detail,
+      string correlationId) =>
+      WriteReceipt(new RuntimeReceipt {
         Operation = operation,
         Status = status ?? "rejected",
         Error = detail == null ? error : error + ":" + detail,
         PackId = active?.PackId,
         Version = active?.Version,
         ContentHash = active?.ContentHash,
+        ActivationId = active?.ActivationId,
+        CorrelationId = correlationId,
         Diagnostics = Array.Empty<ContractDiagnostic>(),
       });
 
