@@ -79,6 +79,34 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         self.assertNotIn("ConvertTo-Json", preflight)
         self.assertEqual(source.count("$result | ConvertTo-Json -Depth 20"), 1)
 
+    def test_studio_gates_use_hash_keyed_interim_package_cache(self) -> None:
+        # The interim package version is fixed while its bytes evolve, so the Studio
+        # gates must never trust NuGet's immutable-version global cache.
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("packages-local\\Comfy.Quest.Contracts.0.6.0-local.nupkg", source)
+        self.assertIn(".Hash.ToLowerInvariant().Substring(0, 16)", source)
+        self.assertIn(
+            "SetEnvironmentVariable('NUGET_PACKAGES', $studioGateCache, 'Process')", source
+        )
+        self.assertIn(
+            "SetEnvironmentVariable('NUGET_PACKAGES', $previousNugetPackages, 'Process')",
+            source,
+        )
+        # The override wraps exactly the two gates that consume the interim package
+        # and is restored before the browser E2E gate manages its own cache.
+        self.assertLess(
+            source.index("SetEnvironmentVariable('NUGET_PACKAGES', $studioGateCache"),
+            source.index("Invoke-CommandGate 'Studio build'"),
+        )
+        self.assertLess(
+            source.index("Invoke-CommandGate 'Studio xUnit'"),
+            source.index("SetEnvironmentVariable('NUGET_PACKAGES', $previousNugetPackages"),
+        )
+        self.assertLess(
+            source.index("SetEnvironmentVariable('NUGET_PACKAGES', $previousNugetPackages"),
+            source.index("Invoke-CommandGate 'Studio browser E2E'"),
+        )
+
     def test_restore_surface_has_observed_need_tests(self) -> None:
         source = SELF_TEST.read_text(encoding="utf-8")
         for expected in (
