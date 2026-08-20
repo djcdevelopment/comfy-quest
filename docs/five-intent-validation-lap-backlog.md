@@ -189,6 +189,28 @@ remains open so the defense verdicts can still be taken on the same preparation.
 | --- | --- | --- | --- | --- |
 | Update loop, after 1.0.1 was active | Five F10 presses and three F11 presses over seven seconds appeared to do nothing; the player concluded the keys were broken and ended the session. | Receipts show every press was accepted (`check/accepted` for both versions ×5, `load/already_active` ×3). `CreatorLoopNotice` composes copy for both branches ("… is already playing. Nothing new to load." / "… is already playing.") and the notices are wired to the top-left channel. | **Answered by the bounded inspection.** Every idle press composed a byte-identical string and handed it to the HUD with a message amount of 0; the top-left channel merges a repeated text into the line already on screen and only renders its "xN" counter once summed amounts exceed one, so every repeat vanished — and the HUD-not-live branch was silent, so the captures could not separate "not live" from "shown and missed". | Landed, no new channel: idleness is a contract fact tagged where the sentence is composed, idle responses ride amount 1 so a repeat re-asserts as "… x2", the status card carries a first-class "Now playing — up to date" state, and emission now logs `hud_absent` when the HUD is not live. **CLOSED in session 2:** the seat observed the native counter live — seven idle presses rendered "… x7" on the top-left channel while the card held "Now playing — up to date". |
 
+### W3 fixes confirmed live, 2026-08-20 (Demo World, other agent's session)
+
+A screenshot of the Demo World: First Portal running in-game confirms four W3 fixes that
+were landed but live-unproven. Not from the defense lap, but the surfaces are shared:
+
+- **CAST strip's LANDED state** — shows `LANDED` with "Charm cast on Sign [826413622:43081]",
+  instead of session 2's snap back to READY.
+- **EXPERIENCE row no longer stacks the title** — reads "Not started - player teleported".
+- **Card's up-to-date state** — "Now playing — up to date" with all four rungs green.
+- **CAST row tint** — the purple `CAST ·` row is visually distinct from the plain
+  `CHECK READY` row above it in captures.
+
+**New finding from the same frame: a stale warning reads as a current instruction.** The
+evidence feed shows `UnboundLine` ("Demo World: First Portal has no Charm yet — aim the
+fixed center crosshair… press ` to CHECK, then ` again to CAST") while the card, Arcane
+Sight (1 active binding, locally owned, 4m) and the captures list all show a charm cast.
+The line fires once per activation and then persists in the bounded eight-row ring. It is
+historically true and currently false, and the taxonomy says a warning means act now.
+Disposition: **warnings should expire when the condition they describe clears** (preferred
+over dimming). Feeds the alert-anchor design — the row telling the player what to do next
+was reachable only by opening F9.
+
 ### Session-2 player-experience observations
 
 - The story text landed well — "the yellow text was nice" — but it is a glimpse with
