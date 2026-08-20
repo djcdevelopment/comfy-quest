@@ -17,15 +17,18 @@ CATALOG = ROOT / "network" / "mod" / "ComfyQuestContracts" / "ModGlue" / "QuestE
 DEFAULT_JSON = ROOT / "artifacts" / "questlab-grimoire.json"
 DEFAULT_MD = ROOT / "docs" / "questlab-grimoire.md"
 
+# Each school's invocation must fit EVERY event in that school: the old combat line
+# ("...witnesses a foe fall") read as nonsense beside character_healed and attack_blocked,
+# because the prose was written for one event and keyed on the whole category.
 RUNE = {
-    "combat": ("Tiwaz", "crimson", "When the spear-rune witnesses a foe fall..."),
-    "harvest": ("Jera", "emerald", "When your steel bites the living wood..."),
-    "inventory": ("Fehu", "amber", "When you claim a thing from the hall..."),
-    "building": ("Othala", "amber", "When you raise a structure upon the hearth..."),
+    "combat": ("Tiwaz", "crimson", "When the spear-rune stirs in the clash of arms..."),
+    "harvest": ("Jera", "emerald", "When you take the land's bounty by hand or by steel..."),
+    "inventory": ("Fehu", "amber", "When goods pass through your hands..."),
+    "building": ("Othala", "amber", "When the works of your hearth rise or fall..."),
     "crafting": ("Kenaz", "amber", "When the forge answers your hands..."),
-    "progression": ("Ansuz", "sapphire", "When your strength crosses a new threshold..."),
-    "world": ("Raidho", "sapphire", "When the road carries you between worlds..."),
-    "social": ("Mannaz", "sapphire", "When your voice speaks to the hall..."),
+    "progression": ("Ansuz", "sapphire", "When your own strength waxes or wanes..."),
+    "world": ("Raidho", "sapphire", "When the world itself marks your passage..."),
+    "social": ("Mannaz", "sapphire", "When you speak or set words before the hall..."),
 }
 
 

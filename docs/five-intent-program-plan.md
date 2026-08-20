@@ -63,7 +63,10 @@ is not missing capability but exposing too much of it too quickly.
    receipts guardrail's twin for conversations and design work: receipts explain at
    the reader's level, and so do we. (Adopted 2026-08-18 from the persona-awareness
    baseline; deliberately a principle here, not a checklist — enumeration ritual was
-   considered and rejected as teaching-to-the-test.)
+   considered and rejected as teaching-to-the-test.) One coached habit, added at the
+   phase-1 exit (2026-08-19): when issuing a go/no-go, name whose authored moment is
+   at stake in the first answer — the people a decision protects deserve to appear
+   before the decision, not after an enumeration pass.
 
 Orientation map for the whole ecosystem: Grimoire is the vocabulary, Studio the
 workbench, Runtime the interpreter, receipts the explanation/proof, Arcane Sight the

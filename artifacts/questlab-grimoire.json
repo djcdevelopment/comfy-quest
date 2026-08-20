@@ -7,7 +7,7 @@
       "profile": "core",
       "rune": "Tiwaz",
       "color": "crimson",
-      "invocation": "When the spear-rune witnesses a foe fall...",
+      "invocation": "When the spear-rune stirs in the clash of arms...",
       "bindable": true
     },
     {
@@ -16,7 +16,7 @@
       "profile": "core",
       "rune": "Tiwaz",
       "color": "crimson",
-      "invocation": "When the spear-rune witnesses a foe fall...",
+      "invocation": "When the spear-rune stirs in the clash of arms...",
       "bindable": true
     },
     {
@@ -25,7 +25,7 @@
       "profile": "core",
       "rune": "Tiwaz",
       "color": "crimson",
-      "invocation": "When the spear-rune witnesses a foe fall...",
+      "invocation": "When the spear-rune stirs in the clash of arms...",
       "bindable": true
     },
     {
@@ -34,7 +34,7 @@
       "profile": "core",
       "rune": "Mannaz",
       "color": "sapphire",
-      "invocation": "When your voice speaks to the hall...",
+      "invocation": "When you speak or set words before the hall...",
       "bindable": true
     },
     {
@@ -43,7 +43,7 @@
       "profile": "core",
       "rune": "Fehu",
       "color": "amber",
-      "invocation": "When you claim a thing from the hall...",
+      "invocation": "When goods pass through your hands...",
       "bindable": true
     },
     {
@@ -52,7 +52,7 @@
       "profile": "extended",
       "rune": "Tiwaz",
       "color": "crimson",
-      "invocation": "When the spear-rune witnesses a foe fall...",
+      "invocation": "When the spear-rune stirs in the clash of arms...",
       "bindable": true
     },
     {
@@ -61,7 +61,7 @@
       "profile": "core",
       "rune": "Raidho",
       "color": "sapphire",
-      "invocation": "When the road carries you between worlds...",
+      "invocation": "When the world itself marks your passage...",
       "bindable": true
     },
     {
@@ -70,7 +70,7 @@
       "profile": "core",
       "rune": "Raidho",
       "color": "sapphire",
-      "invocation": "When the road carries you between worlds...",
+      "invocation": "When the world itself marks your passage...",
       "bindable": true
     },
     {
@@ -79,7 +79,7 @@
       "profile": "core",
       "rune": "Fehu",
       "color": "amber",
-      "invocation": "When you claim a thing from the hall...",
+      "invocation": "When goods pass through your hands...",
       "bindable": true
     },
     {
@@ -97,7 +97,7 @@
       "profile": "core",
       "rune": "Fehu",
       "color": "amber",
-      "invocation": "When you claim a thing from the hall...",
+      "invocation": "When goods pass through your hands...",
       "bindable": true
     },
     {
@@ -106,7 +106,7 @@
       "profile": "core",
       "rune": "Fehu",
       "color": "amber",
-      "invocation": "When you claim a thing from the hall...",
+      "invocation": "When goods pass through your hands...",
       "bindable": true
     },
     {
@@ -115,7 +115,7 @@
       "profile": "core",
       "rune": "Fehu",
       "color": "amber",
-      "invocation": "When you claim a thing from the hall...",
+      "invocation": "When goods pass through your hands...",
       "bindable": true
     },
     {
@@ -124,7 +124,7 @@
       "profile": "core",
       "rune": "Fehu",
       "color": "amber",
-      "invocation": "When you claim a thing from the hall...",
+      "invocation": "When goods pass through your hands...",
       "bindable": true
     },
     {
@@ -133,7 +133,7 @@
       "profile": "core",
       "rune": "Tiwaz",
       "color": "crimson",
-      "invocation": "When the spear-rune witnesses a foe fall...",
+      "invocation": "When the spear-rune stirs in the clash of arms...",
       "bindable": true
     },
     {
@@ -142,7 +142,7 @@
       "profile": "extended",
       "rune": "Ansuz",
       "color": "sapphire",
-      "invocation": "When your strength crosses a new threshold...",
+      "invocation": "When your own strength waxes or wanes...",
       "bindable": true
     },
     {
@@ -151,7 +151,7 @@
       "profile": "extended",
       "rune": "Othala",
       "color": "amber",
-      "invocation": "When you raise a structure upon the hearth...",
+      "invocation": "When the works of your hearth rise or fall...",
       "bindable": true
     },
     {
@@ -160,7 +160,7 @@
       "profile": "core",
       "rune": "Othala",
       "color": "amber",
-      "invocation": "When you raise a structure upon the hearth...",
+      "invocation": "When the works of your hearth rise or fall...",
       "bindable": true
     },
     {
@@ -169,7 +169,7 @@
       "profile": "core",
       "rune": "Othala",
       "color": "amber",
-      "invocation": "When you raise a structure upon the hearth...",
+      "invocation": "When the works of your hearth rise or fall...",
       "bindable": true
     },
     {
@@ -178,7 +178,7 @@
       "profile": "core",
       "rune": "Othala",
       "color": "amber",
-      "invocation": "When you raise a structure upon the hearth...",
+      "invocation": "When the works of your hearth rise or fall...",
       "bindable": true
     },
     {
@@ -187,7 +187,7 @@
       "profile": "core",
       "rune": "Othala",
       "color": "amber",
-      "invocation": "When you raise a structure upon the hearth...",
+      "invocation": "When the works of your hearth rise or fall...",
       "bindable": true
     },
     {
@@ -196,7 +196,7 @@
       "profile": "core",
       "rune": "Ansuz",
       "color": "sapphire",
-      "invocation": "When your strength crosses a new threshold...",
+      "invocation": "When your own strength waxes or wanes...",
       "bindable": true
     },
     {
@@ -205,7 +205,7 @@
       "profile": "core",
       "rune": "Raidho",
       "color": "sapphire",
-      "invocation": "When the road carries you between worlds...",
+      "invocation": "When the world itself marks your passage...",
       "bindable": true
     },
     {
@@ -214,7 +214,7 @@
       "profile": "extended",
       "rune": "Jera",
       "color": "emerald",
-      "invocation": "When your steel bites the living wood...",
+      "invocation": "When you take the land's bounty by hand or by steel...",
       "bindable": true
     },
     {
@@ -223,7 +223,7 @@
       "profile": "core",
       "rune": "Jera",
       "color": "emerald",
-      "invocation": "When your steel bites the living wood...",
+      "invocation": "When you take the land's bounty by hand or by steel...",
       "bindable": true
     },
     {
@@ -232,7 +232,7 @@
       "profile": "core",
       "rune": "Mannaz",
       "color": "sapphire",
-      "invocation": "When your voice speaks to the hall...",
+      "invocation": "When you speak or set words before the hall...",
       "bindable": true
     },
     {
@@ -241,7 +241,7 @@
       "profile": "core",
       "rune": "Ansuz",
       "color": "sapphire",
-      "invocation": "When your strength crosses a new threshold...",
+      "invocation": "When your own strength waxes or wanes...",
       "bindable": true
     },
     {
@@ -250,7 +250,7 @@
       "profile": "core",
       "rune": "Ansuz",
       "color": "sapphire",
-      "invocation": "When your strength crosses a new threshold...",
+      "invocation": "When your own strength waxes or wanes...",
       "bindable": true
     },
     {
@@ -259,7 +259,7 @@
       "profile": "extended",
       "rune": "Ansuz",
       "color": "sapphire",
-      "invocation": "When your strength crosses a new threshold...",
+      "invocation": "When your own strength waxes or wanes...",
       "bindable": true
     },
     {
@@ -268,7 +268,7 @@
       "profile": "extended",
       "rune": "Ansuz",
       "color": "sapphire",
-      "invocation": "When your strength crosses a new threshold...",
+      "invocation": "When your own strength waxes or wanes...",
       "bindable": true
     },
     {

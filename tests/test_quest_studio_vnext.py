@@ -133,6 +133,15 @@ class QuestStudioVNextTests(unittest.TestCase):
         self.assertNotIn("https://", css)
         self.assertNotIn("@import", css)
 
+    def test_page_carries_no_machine_identity(self) -> None:
+        # The tutorial screenshots are captured straight from this page, and the lap
+        # record requires captures sanitized of machine identities. "OMEN receipts prove
+        # the game adapters" shipped in the rehearsal footer until a capture caught it.
+        source = PAGE.read_text(encoding="utf-8")
+        for identity in ("OMEN", "Derek", "derek", "AM4"):
+            with self.subTest(identity=identity):
+                self.assertNotIn(identity, source)
+
     def test_creator_lane_hides_implementation_plumbing(self) -> None:
         html = raw_constant("Html")
         simple = html[

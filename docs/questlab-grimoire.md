@@ -4,7 +4,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Attack Blocked — Tiwaz (combat)
 
-- **Invocation:** *When the spear-rune witnesses a foe fall...*
+- **Invocation:** *When the spear-rune stirs in the clash of arms...*
 - **Canonical event:** `attack_blocked`
 - **Runtime profile:** `core`
 - **School color:** `crimson`
@@ -12,7 +12,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Character Healed — Tiwaz (combat)
 
-- **Invocation:** *When the spear-rune witnesses a foe fall...*
+- **Invocation:** *When the spear-rune stirs in the clash of arms...*
 - **Canonical event:** `character_healed`
 - **Runtime profile:** `core`
 - **School color:** `crimson`
@@ -20,7 +20,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Character Staggered — Tiwaz (combat)
 
-- **Invocation:** *When the spear-rune witnesses a foe fall...*
+- **Invocation:** *When the spear-rune stirs in the clash of arms...*
 - **Canonical event:** `character_staggered`
 - **Runtime profile:** `core`
 - **School color:** `crimson`
@@ -28,7 +28,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Chat Sent — Mannaz (social)
 
-- **Invocation:** *When your voice speaks to the hall...*
+- **Invocation:** *When you speak or set words before the hall...*
 - **Canonical event:** `chat_sent`
 - **Runtime profile:** `core`
 - **School color:** `sapphire`
@@ -36,7 +36,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Container Emptied — Fehu (inventory)
 
-- **Invocation:** *When you claim a thing from the hall...*
+- **Invocation:** *When goods pass through your hands...*
 - **Canonical event:** `container_emptied`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -44,7 +44,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Damage Dealt — Tiwaz (combat)
 
-- **Invocation:** *When the spear-rune witnesses a foe fall...*
+- **Invocation:** *When the spear-rune stirs in the clash of arms...*
 - **Canonical event:** `damage_dealt`
 - **Runtime profile:** `extended`
 - **School color:** `crimson`
@@ -52,7 +52,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Global Key Removed — Raidho (world)
 
-- **Invocation:** *When the road carries you between worlds...*
+- **Invocation:** *When the world itself marks your passage...*
 - **Canonical event:** `global_key_removed`
 - **Runtime profile:** `core`
 - **School color:** `sapphire`
@@ -60,7 +60,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Global Key Set — Raidho (world)
 
-- **Invocation:** *When the road carries you between worlds...*
+- **Invocation:** *When the world itself marks your passage...*
 - **Canonical event:** `global_key_set`
 - **Runtime profile:** `core`
 - **School color:** `sapphire`
@@ -68,7 +68,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Item Consumed — Fehu (inventory)
 
-- **Invocation:** *When you claim a thing from the hall...*
+- **Invocation:** *When goods pass through your hands...*
 - **Canonical event:** `item_consumed`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -84,7 +84,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Item Dropped — Fehu (inventory)
 
-- **Invocation:** *When you claim a thing from the hall...*
+- **Invocation:** *When goods pass through your hands...*
 - **Canonical event:** `item_dropped`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -92,7 +92,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Item Equipped — Fehu (inventory)
 
-- **Invocation:** *When you claim a thing from the hall...*
+- **Invocation:** *When goods pass through your hands...*
 - **Canonical event:** `item_equipped`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -100,7 +100,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Item Picked Up — Fehu (inventory)
 
-- **Invocation:** *When you claim a thing from the hall...*
+- **Invocation:** *When goods pass through your hands...*
 - **Canonical event:** `item_picked_up`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -108,7 +108,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Item Unequipped — Fehu (inventory)
 
-- **Invocation:** *When you claim a thing from the hall...*
+- **Invocation:** *When goods pass through your hands...*
 - **Canonical event:** `item_unequipped`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -116,7 +116,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Kill — Tiwaz (combat)
 
-- **Invocation:** *When the spear-rune witnesses a foe fall...*
+- **Invocation:** *When the spear-rune stirs in the clash of arms...*
 - **Canonical event:** `kill`
 - **Runtime profile:** `core`
 - **School color:** `crimson`
@@ -124,7 +124,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Max Health Changed — Ansuz (progression)
 
-- **Invocation:** *When your strength crosses a new threshold...*
+- **Invocation:** *When your own strength waxes or wanes...*
 - **Canonical event:** `max_health_changed`
 - **Runtime profile:** `extended`
 - **School color:** `sapphire`
@@ -132,7 +132,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Piece Damaged — Othala (building)
 
-- **Invocation:** *When you raise a structure upon the hearth...*
+- **Invocation:** *When the works of your hearth rise or fall...*
 - **Canonical event:** `piece_damaged`
 - **Runtime profile:** `extended`
 - **School color:** `amber`
@@ -140,7 +140,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Piece Destroyed — Othala (building)
 
-- **Invocation:** *When you raise a structure upon the hearth...*
+- **Invocation:** *When the works of your hearth rise or fall...*
 - **Canonical event:** `piece_destroyed`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -148,7 +148,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Piece Placed — Othala (building)
 
-- **Invocation:** *When you raise a structure upon the hearth...*
+- **Invocation:** *When the works of your hearth rise or fall...*
 - **Canonical event:** `piece_placed`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -156,7 +156,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Piece Removed — Othala (building)
 
-- **Invocation:** *When you raise a structure upon the hearth...*
+- **Invocation:** *When the works of your hearth rise or fall...*
 - **Canonical event:** `piece_removed`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -164,7 +164,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Piece Repaired — Othala (building)
 
-- **Invocation:** *When you raise a structure upon the hearth...*
+- **Invocation:** *When the works of your hearth rise or fall...*
 - **Canonical event:** `piece_repaired`
 - **Runtime profile:** `core`
 - **School color:** `amber`
@@ -172,7 +172,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Player Died — Ansuz (progression)
 
-- **Invocation:** *When your strength crosses a new threshold...*
+- **Invocation:** *When your own strength waxes or wanes...*
 - **Canonical event:** `player_died`
 - **Runtime profile:** `core`
 - **School color:** `sapphire`
@@ -180,7 +180,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Player Teleported — Raidho (world)
 
-- **Invocation:** *When the road carries you between worlds...*
+- **Invocation:** *When the world itself marks your passage...*
 - **Canonical event:** `player_teleported`
 - **Runtime profile:** `core`
 - **School color:** `sapphire`
@@ -188,7 +188,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Resource Damaged — Jera (harvest)
 
-- **Invocation:** *When your steel bites the living wood...*
+- **Invocation:** *When you take the land's bounty by hand or by steel...*
 - **Canonical event:** `resource_damaged`
 - **Runtime profile:** `extended`
 - **School color:** `emerald`
@@ -196,7 +196,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Resource Picked — Jera (harvest)
 
-- **Invocation:** *When your steel bites the living wood...*
+- **Invocation:** *When you take the land's bounty by hand or by steel...*
 - **Canonical event:** `resource_picked`
 - **Runtime profile:** `core`
 - **School color:** `emerald`
@@ -204,7 +204,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Sign Written — Mannaz (social)
 
-- **Invocation:** *When your voice speaks to the hall...*
+- **Invocation:** *When you speak or set words before the hall...*
 - **Canonical event:** `sign_written`
 - **Runtime profile:** `core`
 - **School color:** `sapphire`
@@ -212,7 +212,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Skill Raised — Ansuz (progression)
 
-- **Invocation:** *When your strength crosses a new threshold...*
+- **Invocation:** *When your own strength waxes or wanes...*
 - **Canonical event:** `skill_raised`
 - **Runtime profile:** `core`
 - **School color:** `sapphire`
@@ -220,7 +220,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Skills Lowered — Ansuz (progression)
 
-- **Invocation:** *When your strength crosses a new threshold...*
+- **Invocation:** *When your own strength waxes or wanes...*
 - **Canonical event:** `skills_lowered`
 - **Runtime profile:** `core`
 - **School color:** `sapphire`
@@ -228,7 +228,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Stamina Gained — Ansuz (progression)
 
-- **Invocation:** *When your strength crosses a new threshold...*
+- **Invocation:** *When your own strength waxes or wanes...*
 - **Canonical event:** `stamina_gained`
 - **Runtime profile:** `extended`
 - **School color:** `sapphire`
@@ -236,7 +236,7 @@ Generated from `QuestEventCatalog.g.cs`; canonical event names remain evaluator-
 
 ## Stamina Spent — Ansuz (progression)
 
-- **Invocation:** *When your strength crosses a new threshold...*
+- **Invocation:** *When your own strength waxes or wanes...*
 - **Canonical event:** `stamina_spent`
 - **Runtime profile:** `extended`
 - **School color:** `sapphire`

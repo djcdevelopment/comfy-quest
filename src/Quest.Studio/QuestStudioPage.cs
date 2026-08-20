@@ -119,7 +119,7 @@ static class QuestStudioPage
           <details class="manual-rehearsal"><summary>More rehearsal options</summary><label>Prepared scenario<select id="scenario"></select></label><button id="run-prepared-scenario" class="quiet wide-button">Run selected scenario</button><h3>Try individual player actions</h3><div id="event-tray" class="event-tray"></div><div class="manual-event"><select id="manual-event" aria-label="Player action"></select><input id="manual-target" aria-label="Event target" placeholder="Optional target"><select id="manual-role" aria-label="Actor"><option value="">Local player</option><option value="peer">Peer</option><option value="listen_host">Listen host</option></select><button id="fire-event">Try event</button></div><div class="advance"><input id="advance-seconds" aria-label="Seconds to advance" type="number" min="0" max="86400" value="5"><button id="advance-time" class="quiet">Advance time</button></div></details>
         </section>
         <section id="rehearsal-result" class="result-card empty">Choose a quest and run the rehearsal.</section>
-        <p class="proof-line">Browser rehearsal previews quest logic and effects only &mdash; it does not prove behavior in a live game. OMEN receipts prove the game adapters.</p>
+        <p class="proof-line">Browser rehearsal previews quest logic and effects only &mdash; it does not prove behavior in a live game. In-game Runtime receipts prove the adapters.</p>
       </div>
     </section>
 

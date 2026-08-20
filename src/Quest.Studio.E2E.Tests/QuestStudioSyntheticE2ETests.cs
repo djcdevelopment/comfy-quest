@@ -311,23 +311,29 @@ public sealed class QuestStudioSyntheticE2ETests
             await FillAndBlurAsync(page.Locator("#title"), "The Woodbound Signal");
             await page.Locator(".beat-card[data-beat='0']").ClickAsync();
             await FillAndBlurAsync(page.Locator("#beat-message"), "The charm wakes. Two offerings of wood, before the moment passes.");
+            await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "wake-the-charm settle");
+            await ShotAsync(page, "01-wake-the-charm");
 
-            await AddPickerBeatAsync(page, "item_dropped", "drop Wood beat");
+            await AddPickerBeatAsync(page, "item_dropped", "drop Wood beat", "02-browse-player-actions");
             await OpenSpecificAsync(page);
             await FillAndBlurAsync(page.Locator("[data-beat-target]"), "Wood");
             await FillAndBlurAsync(page.Locator("#beat-repeat"), "2");
             await FillAndBlurAsync(page.Locator("#beat-window"), "30");
             await FillAndBlurAsync(page.Locator("#beat-message"), "The offering is heard. Reclaim one piece to seal the rite.");
+            await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "two-offerings settle");
+            await ShotAsync(page, "03-two-offerings");
 
             await AddPickerBeatAsync(page, "item_picked_up", "reclaim Wood beat");
             await OpenSpecificAsync(page);
             await FillAndBlurAsync(page.Locator("[data-beat-target]"), "Wood");
             await FillAndBlurAsync(page.Locator("#beat-message"), "The circuit closes. The charm remembers this telling.");
             await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "Woodbound autosave");
+            await ShotAsync(page, "04-seal-the-rite");
             await page.Locator("[data-stage='rehearse']").ClickAsync();
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Run guided rehearsal", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#rehearsal-badge"), "Complete", "Woodbound rehearsal", 30_000);
             await WaitForTextAsync(page.Locator("#rehearsal-result"), "1/2", "Woodbound partial offering");
+            await ShotAsync(page, "05-rehearse-the-rite");
 
             var devChannel = new RuntimeDevChannelCoordinator(run.RuntimeRoot, (active, correlation) => new[]
             {
@@ -357,6 +363,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForExactTextAsync(page.Locator("#runtime-phase"), "bound", "Woodbound r1 bound through dev channel");
             foreach (var proof in new[] { "Validation", "Transfer", "Activation", "Rebind", "Runtime observed" })
                 await WaitForTextAsync(page.Locator("#runtime-receipts"), proof, $"Woodbound r1 {proof} proof");
+            await ShotAsync(page, "06-live-proof");
 
             await page.Locator("[data-stage='author']").ClickAsync();
             await page.Locator(".beat-card[data-beat='2']").ClickAsync();
@@ -457,7 +464,25 @@ public sealed class QuestStudioSyntheticE2ETests
         await locator.PressAsync("Tab");
     }
 
-    static async Task AddPickerBeatAsync(IPage page, string eventName, string description)
+    // Tutorial capture lane: when QUEST_STUDIO_TUTORIAL_SHOTS names a directory, the one
+    // journey also saves labeled screenshots of the Woodbound authoring path — the
+    // screenshot-led tutorial is generated from the same synthetic browser that proves the
+    // path, so the player is never asked to recreate captures. Unset, this is a no-op.
+    static readonly string TutorialShots =
+        Environment.GetEnvironmentVariable("QUEST_STUDIO_TUTORIAL_SHOTS");
+
+    static async Task ShotAsync(IPage page, string name)
+    {
+        if (string.IsNullOrWhiteSpace(TutorialShots)) return;
+        Directory.CreateDirectory(TutorialShots);
+        await page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            Path = Path.Combine(TutorialShots, name + ".png"),
+        });
+    }
+
+    static async Task AddPickerBeatAsync(IPage page, string eventName, string description,
+        string shotName = null)
     {
         var before = await page.Locator(".beat-card").CountAsync();
         await page.Locator("#browse-events").ClickAsync();
@@ -465,6 +490,7 @@ public sealed class QuestStudioSyntheticE2ETests
         var row = page.Locator($"#event-results .event-row[data-picker-event='{eventName}']");
         await WaitForCountAsync(row, 1, description + " result");
         await row.ClickAsync();
+        if (shotName != null) await ShotAsync(page, shotName);
         await page.Locator($"#event-preview [data-picker-choose='{eventName}']").ClickAsync();
         await WaitForCountAsync(page.Locator(".beat-card"), before + 1, description);
         await WaitUntilAsync(

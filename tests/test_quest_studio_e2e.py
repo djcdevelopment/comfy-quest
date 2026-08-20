@@ -43,6 +43,33 @@ class QuestStudioE2ETests(unittest.TestCase):
         for hardcoded_stage in ('"beat-4"', '"beat-5"', '"beat-8"', '"advance-4"', '"advance-8"'):
             self.assertNotIn(hardcoded_stage, source)
 
+    def test_tutorial_captures_ride_the_proving_journey_and_stay_opt_in(self) -> None:
+        # The screenshot-led Woodbound tutorial is generated from the same synthetic
+        # journey that proves the authoring path — never by asking a player to recreate
+        # captures — and the lane is a no-op unless explicitly enabled.
+        source = TEST.read_text(encoding="utf-8")
+        self.assertIn('Environment.GetEnvironmentVariable("QUEST_STUDIO_TUTORIAL_SHOTS")', source)
+        self.assertIn("if (string.IsNullOrWhiteSpace(TutorialShots)) return;", source)
+        for shot in (
+            "01-wake-the-charm",
+            "02-browse-player-actions",
+            "03-two-offerings",
+            "04-seal-the-rite",
+            "05-rehearse-the-rite",
+            "06-live-proof",
+        ):
+            self.assertIn(f'"{shot}"', source)
+        capture = (ROOT / "tools" / "quest-studio" / "Capture-WoodboundTutorial.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("QUEST_STUDIO_TUTORIAL_SHOTS", capture)
+        self.assertIn("Test-QuestStudioE2E.ps1", capture)
+        tutorial = (ROOT / "docs" / "tutorials" / "the-woodbound-signal.md").read_text(
+            encoding="utf-8"
+        )
+        for shot in ("01-wake-the-charm", "06-live-proof"):
+            self.assertIn(f"woodbound/{shot}.png", tutorial)
+
     def test_browser_journey_covers_catalog_guidance_and_server_rehearsal(self) -> None:
         source = TEST.read_text(encoding="utf-8")
         for expected in (
