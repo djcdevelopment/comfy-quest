@@ -8,3 +8,4 @@ captures/
 tools/questlab-package/dist/
 artifacts/*
 !artifacts/questlab-grimoire.json
+.claude/

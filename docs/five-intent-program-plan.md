@@ -280,6 +280,16 @@ exposure are separate decisions made at separate times.
 Exit: the "ten-minute desperate defense" lap Event with every adaptive branch
 explained in Arcane Sight.
 
+Status 2026-08-20: two exit-lap sessions run; **Phase 3 has not exited.** Session 2
+(`docs/five-intent-validation-lap-backlog.md`, "Phase 3 exit — session 2") proved the
+creator loop end-to-end but surfaced two live-only blockers now on that section's
+ledger: the THRESHOLD spawn tally raced object destruction (8-for-8 kills counted as
+zero; fix strategy = bounded recheck + explaining ignored receipts), and the running
+deadline carried no perceived tension (presentation, not code). The close-out
+strategy lives at `docs/phase-3-close-strategy.md`; decisions are recorded in
+`docs/adr/`. Session 3 (short, targeted) takes the three exit verdicts once W1/W2
+land.
+
 ## Phase 4 — Quest Lab spellbook (02)
 
 Key decisions, made jointly with Phase 5's manifest: pattern identity
