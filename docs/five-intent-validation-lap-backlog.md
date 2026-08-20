@@ -187,7 +187,44 @@ remains open so the defense verdicts can still be taken on the same preparation.
 
 | UTC phase | Player-visible symptom | Evidence preserved | Why still unknown | Bounded next investigation |
 | --- | --- | --- | --- | --- |
-| Update loop, after 1.0.1 was active | Five F10 presses and three F11 presses over seven seconds appeared to do nothing; the player concluded the keys were broken and ended the session. | Receipts show every press was accepted (`check/accepted` for both versions ×5, `load/already_active` ×3). `CreatorLoopNotice` composes copy for both branches ("… is already playing. Nothing new to load." / "… is already playing.") and the notices are wired to the top-left channel. | **Answered by the bounded inspection.** Every idle press composed a byte-identical string and handed it to the HUD with a message amount of 0; the top-left channel merges a repeated text into the line already on screen and only renders its "xN" counter once summed amounts exceed one, so every repeat vanished — and the HUD-not-live branch was silent, so the captures could not separate "not live" from "shown and missed". | Landed, no new channel: idleness is a contract fact tagged where the sentence is composed, idle responses ride amount 1 so a repeat re-asserts as "… x2", the status card carries a first-class "Now playing — up to date" state, and emission now logs `hud_absent` when the HUD is not live. Session 2 verifies the visible "x2/x3" in the seat; only that live observation closes this row. |
+| Update loop, after 1.0.1 was active | Five F10 presses and three F11 presses over seven seconds appeared to do nothing; the player concluded the keys were broken and ended the session. | Receipts show every press was accepted (`check/accepted` for both versions ×5, `load/already_active` ×3). `CreatorLoopNotice` composes copy for both branches ("… is already playing. Nothing new to load." / "… is already playing.") and the notices are wired to the top-left channel. | **Answered by the bounded inspection.** Every idle press composed a byte-identical string and handed it to the HUD with a message amount of 0; the top-left channel merges a repeated text into the line already on screen and only renders its "xN" counter once summed amounts exceed one, so every repeat vanished — and the HUD-not-live branch was silent, so the captures could not separate "not live" from "shown and missed". | Landed, no new channel: idleness is a contract fact tagged where the sentence is composed, idle responses ride amount 1 so a repeat re-asserts as "… x2", the status card carries a first-class "Now playing — up to date" state, and emission now logs `hud_absent` when the HUD is not live. **CLOSED in session 2:** the seat observed the native counter live — seven idle presses rendered "… x7" on the top-left channel while the card held "Now playing — up to date". |
+
+### Session-2 player-experience observations
+
+- The overrun story text landed well — "the yellow text was nice" — but it is a
+  glimpse with no history: "i think we should also post it in chat or say so there's
+  history of it not just the glimpse." Product direction: story messages should also
+  land in chat scrollback so a moment can be re-read.
+- The evidence feed failed discoverability cold: "if you didn't ask me to read it i
+  wouldn't even have known it was there."
+- Composition direction from the seat, verbatim: "i think this addon works better as
+  a top bar with horizontal layout, the 4 step sequence is large because we're in
+  R&D but think of a user doing this hundreds of times, it could just minimize to 4
+  dots and they'd understand what was happening." The ladder earned its size for
+  first-run legibility; the hundredth run wants a minimized horizontal strip. Feeds
+  the Phase 4 composition/scope decision alongside the switch-cost brief.
+- After the overrun (authored outcome `fail`), the EXPERIENCE row read
+  "Ten-Minute Desperate Defense: **complete**" — a failed ending labeled with the
+  workflow's terminal state instead of the authored outcome. A player who missed the
+  story text would believe they won. Surface the outcome, not the machinery's
+  "reached an ending".
+- The evidence gutter's local HH:MM:SS stamps rendered in the feed as designed.
+- The unifying alert finding, verbatim: "yeah we need a way for these alerts to
+  appear in a known *config plan on the screen. it too much to ask in these simple
+  ones let alone hard combat." Every channel miss this session — the camouflaged
+  deadline, the glimpse-only story text, corner plumbing, the undiscovered evidence
+  feed — is one failure: there is no single, player-known (and player-configurable)
+  alert anchor. Tonight's channel taxonomy says who is speaking; nothing yet
+  guarantees where the player should look. This is a Phase 4 presentation
+  requirement, senior to per-channel fixes.
+- Verdict 5, answered in part: "the click to open feels nice" — the drawer→Studio
+  crossing landed. The card-agreement check is honestly unanswered (the game was
+  closed before comparing states). Studio layout direction, verbatim: "button need
+  to be larger and we need to think thru the positioning, as a user flow and how the
+  UI placement and size can optimized for to align left to right, top to bottom sort
+  of naturally reading patterns for (for me) relative the flow of actions, outputs,
+  decision points and feedback(s)." Same family as the drawer's top-bar/4-dots
+  direction: composition should follow the reading order of the creator's flow.
 
 ### Player-experience observations
 
@@ -207,3 +244,40 @@ remains open so the defense verdicts can still be taken on the same preparation.
 - Defense verdicts (countdown tension, escalation, mercy), evidence read-back, and
   the Studio round-trip were not reached; the experience never started. They remain
   the open Phase 3 exit questions for session 2.
+
+## Phase 3 exit — session 2 (2026-08-20, concluded — Phase 3 does not exit yet)
+
+Session verdict: the creator loop ran end-to-end in the proven order and every
+session-1 fix held live (state quarantine, staging gate, idle "x7" re-assertion,
+punctual timer). The defense itself surfaced two live-only defects that block the
+exit: the kill tally never counted a visibly slaughtered wave, and a running
+ten-minute deadline carried zero tension. Both sit in this section's ledger with
+bounded next investigations. Verdict 1 (composition) never received a yes/no — it
+was superseded by a direction: the seat wants a horizontal top-bar that can minimize
+to four dots, with alerts in one known configurable anchor. Verdicts on escalation
+and mercy were unreachable behind the tally defect. The lap did what only a lap can
+do.
+
+### "Can't answer why" ledger
+
+| UTC phase | Player-visible symptom | Evidence preserved | Why still unknown | Bounded next investigation |
+| --- | --- | --- | --- | --- |
+| Defense, 12:07:21–12:08:14 | Derek killed the entire wave ("i slaughtered them, but it was fun :]") and nothing happened — no held/victory message, no completion; the quest stayed in `hold` with the ward timer running toward overrun while the seat believed it had won. | Eight `event/ignored · kill · $enemy_greyling` receipts, every one `0/1`, no rejection diagnostics on the event receipts; `transition/advanced muster→hold` and its three executed actions are clean at 12:07:16. | The held route's adaptive threshold (spawned-enemies cleared/remaining) never counted a single kill. Unknown which link broke live: kill→spawned-object attribution (SpawnExecutionStore records vs the kill event's source), the tally read at evaluation time, or the spawn action's records never landing. Synthetic rehearsal proved all four branches by feeding the tally directly — the live attribution seam was never under test. | Read `state/spawned-objects.json` and `state/executed-actions.json` from the run capture against the kill receipts' correlation/source ids; reproduce with one spawned Greyling in a bounded fixture. Also: the ignore receipts carry no reason — an adaptive-unmet kill should say which clause was unmet, at least in the drawer's rejected-branch evidence. |
+| Defense, whole ten minutes | No countdown was perceived while a real 600-second deadline ran: "it might have and i didn't see it.. but i didn't see one." The overrun then fired to the second, so the timer itself was live throughout. | Seat answer; fight-start screenshot shows no pill; receipts prove the timer ran 12:07:16→12:17:17. | `RefreshDeadline` has a dedicated durable-timer branch (`timers.Pending(now, 1)`), so a line should have been composed for the full window — unknown whether it failed to render, or rendered at its fixed y=64 top-center slot directly beneath the NetworkSense overlay's second line (same dark-pill/light-text treatment) and was camouflaged. | Reproduce with a short durable timer live and screenshot the top band with NetworkSense on and off; check `Countdown(seconds, null)` formatting for large values (does "594 seconds remaining" even read as a countdown?); revisit the banner's anchor — verdict 3a's product answer is that a ten-minute deadline needs an unmistakable, unshared screen position. |
+
+Run `phase3-exit-2026-08-20-s2`. Prepare quarantined 12 packs + 2 active + 8 state
+files and deployed the day's payload; 1.0.0 published alone, 1.0.1 held as an
+unpublished draft until the activation proof passed (receipt + active-set agreement,
+activation `…2d270b3f`) — the new staging gate ran live and the update beat survived.
+The ladder's ✓ glyph renders in the game font; startup produced no rejection burst.
+The idle re-assertion is live-confirmed: seven idle presses rendered "… x7" on the
+top-left channel — session 1's silent-idle ledger row is closed.
+
+### Findings
+
+| Observation | Evidence | Disposition |
+| --- | --- | --- |
+| With 1.0.0 playing and 1.0.1 staged, F10 composed the multi-quest copy — "2 quests are ready. Open F9 to choose." — and the card said "2 quests ready — choose". Derek hunted for a chooser that does not exist: both candidates are versions of one quest, and the only action is Load validated update / F11. Verbatim: "ahh this is very not intuitive… it seems like i should click on something to start the quest or select it? but... not sure how or where." "tollerable for a dev loop, unacceptable for a user." | Session-2 seat screenshots; `CreatorLoopNotice.Check` (`valid.Length == 1` branch) and `Card` (`valid.Length > 1` → Choice) count valid candidates, not distinct pack ids. | Copy defect, seat unblocked via the amber button. Fix: when every valid candidate shares one pack id (a fortiori when it matches the active pack), compose the update sentence ("〈title〉 〈version〉 is ready. Press F11 to play it.") and the card's UpdateReady state; reserve "choose" for genuinely distinct quests. |
+| Speaking in chat did not start the defense; Derek first suspected his own position ("maybe it's at ground level and it's cuz i'm in the air"). The receipt said otherwise: `event/unbound · chat_sent` — the event arrived and matched the active quest, but no charm was bound, and an unbound quest evaluates nothing. | Session-2 receipts (`event/unbound` at 12:01:35Z); runbook and seat workbook both omit the CAST beat for the defense (Woodbound's script had `bind_r1`; the defense script never did). | Two fixes: (a) the runbook/workbook gain an explicit "cast the ward's anchor" beat before first contact copy promises a start; (b) product follow-up — `event/unbound` is honest machinery but invisible at player altitude; the player-facing surface should say "this quest needs a charm cast on an object" (card state or notice) instead of silently ignoring input the way session 1's idle loop did. |
+| CHECK captured a different object than the player believed — the raycast grabbed a stone through/behind a wall — and the cast's purple glow appeared around the corner: "it seems to cast but i don't see the purple" then "haha, looks like it just selected a target thru the wall??". The READY summary named only `player-built piece [1:26827]`, a ZDO id no player can map to a thing in the world, so the real target was only discovered after CAST, by glow location. The strip also snapped straight back to READY, and extra ` presses silently re-captured. | Session-2 receipts 12:04:35Z (`bind/inscribed` ZDO 1:26827); seat screenshots — the glow itself works on player_built_piece. | Pre-cast target legibility: CHECK should visibly mark the captured object in-world (the same highlight machinery the glow uses, in a "pending" treatment) so the player confirms *what* before CAST; investigate whether the capture raycast should stop at occluding geometry; and the strip needs a landed state instead of re-arming silently. |
+| The authored title stacks in three places at once — status card title, the status line under the ladder ("Now playing: Ten-Minute Desperate Defense — …"), and the EXPERIENCE row ("Ten-Minute Desperate Defense: not started") — making section boundaries unclear. | Session-2 seat screenshot; Derek: "the stacked text repeats itself … in multiple places making it unclear where the sections are". | Composition follow-up: the card owns the title; the ladder's status line and the EXPERIENCE row should speak state without re-announcing the name (e.g. "not started", "up to date"). |
