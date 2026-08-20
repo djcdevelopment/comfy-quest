@@ -579,6 +579,9 @@ public sealed class LabGalleryBuilder {
         LightPiece(built, fixture.LightSchool,
             fixture.Orient == "rune-name-lit" ? LabRuneLight.BannerFaceStyle : null);
       }
+      if (fixture.InfiniteFuel) {
+        GalleryStructurePatches.MarkAndLight(built, true);
+      }
       if (placed % piecesPerFrame == 0) {
         yield return null;
       }

@@ -106,14 +106,14 @@
         "floorTiles": 823,
         "roofTiles": 550,
         "ceilingFixtures": 9,
-        "fixtures": 373,
+        "fixtures": 375,
         "runeBeams": 134,
         "runeNameHeaders": 8,
         "runeNameSigns": 60,
         "runeNameLights": 8,
         "courseDrops": 6,
         "welcomeFixtures": 6,
-        "estimatedPlacedObjects": 1912
+        "estimatedPlacedObjects": 1914
       }
     }
   ]

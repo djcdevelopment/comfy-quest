@@ -58,7 +58,7 @@ retains weather-coverage and fresh-prefab warnings as honest follow-up evidence.
 non-mutating compare request was delivered after acceptance but OMEN exited before its receipt
 returned; automated compare coverage is green.
 
-## R25 Demo World target update (2026-08-20)
+## R25/R26 Demo World target update (2026-08-20)
 
 An ordinary cold-drop lap proved the Runtime package, Charm binding, paired portal,
 message, and terminal receipt chain, but failed the zero-lift onboarding bar. The
@@ -66,8 +66,19 @@ generic `sign here` copy and a runbook that said WORLD sign sent the player to t
 allowlist-rejected WORLD portal; the drawer's movable cursor also obscured that world
 selection comes from Valheim's fixed center crosshair. R25 makes the existing
 arrival-side tutorial sign say `CAST HERE`, names the First Portal tutorial, and puts
-the crosshair instruction on the object itself. Exact r25 visual acceptance remains
-pending until the rebuilt gallery is viewed in ordinary Valheim.
+the crosshair instruction on the object itself. The exact r25 lap then proved the
+full Runtime chain with a fresh character: exact activation, unbound ascent,
+`charm_check/ready`, `bind/inscribed`, a correlated targetless portal event/action/
+completion chain, and durable `outcome=complete`. The sign copy was readable at
+interaction distance, but Derek's arrival review still found it visually blended
+into the hall and discovered that backtick is ignored while F9 is closed.
+
+R26 responds directly: two infinite-fuel blue iron torches flank the sign and carry
+the Social school's bright magenta light; both the sign and Runtime drawer say to
+open/keep F9 open; and the portable tutorial says to take the nearest obvious portal
+because `player_teleported` is targetless. Exact r26 beacon appearance remains
+pending an ordinary-Valheim frame; the r25 mechanics evidence is historical and is
+not relabelled as r26 visual proof.
 
 ## Why this exists
 

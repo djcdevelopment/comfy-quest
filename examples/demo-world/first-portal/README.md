@@ -23,16 +23,18 @@ constitute a successful lap.
 5. Import intentionally creates new project, pack, and experience IDs. That makes
    the draft safe to edit without overwriting the canonical artifact, but it also
    means an existing canonical Demo World Charm cannot auto-rebind to the fork.
-   Use the immediately visible illuminated **CAST HERE** First Portal tutorial sign
-   on the hub's inner arrival edge. Close F9, aim Valheim's fixed center crosshair
-   at the sign face, reopen F9 without moving the camera, and press backtick once
-   to CHECK, then again to CAST the active fork. The drawer's movable mouse cursor
-   does not select world targets. In the generated plan the sign is at relative
+   Use the immediately visible **CAST HERE** First Portal tutorial sign between
+   the two blue-magenta iron beacon torches on the hub's inner arrival edge. Close
+   F9, aim Valheim's fixed center crosshair at the sign face, reopen F9 without
+   moving the camera, and press backtick once to CHECK, then again to CAST the
+   active fork. Backtick is a drawer hotkey and is ignored while F9 is closed; the
+   drawer's movable mouse cursor does not select world targets. In the generated
+   plan the sign is at relative
    `(x=3.5, y=1.7, z=6, yaw=180)` from the gallery floor origin. Expect
    `bind/inscribed` after the initial
    `dev_rebind/skipped` receipt with `no_loaded_binding`.
-6. Take the paired portal at the World school. This is the first portal after the
-   quest is bound. The trigger is targetless `player_teleported`; Runtime
+6. Take the nearest obvious portal. The trigger is intentionally targetless
+   `player_teleported`, so any portal is valid after the quest is bound. Runtime
    shows "The First Portal answers. Your quest is complete." and completes the
    workflow.
 
@@ -57,7 +59,8 @@ semantic version and a nonempty inbox may contain another pack. Confirm the acti
 pack and experience IDs are both exactly `demo-world-first-portal`. If no exact
 canonical binding is already present, the ascent is unbound; once upstairs, CHECK
 and CAST the canonical experience onto the generated `marble-grand` **CAST HERE**
-tutorial sign identified above before taking the World school's paired portal.
+tutorial sign identified above before taking the nearest obvious portal. The
+trigger is targetless, so no school-name scavenger hunt is part of this tutorial.
 For editing, use the Studio import-and-Play loop above; its fork needs
 one fresh CAST, and subsequent same-fork revisions auto-rebind.
 

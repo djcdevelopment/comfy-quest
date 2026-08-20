@@ -128,7 +128,7 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 8;", source)
+        self.assertIn("public const int PlanVersion = 9;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
         self.assertIn(
             "public float PlatformClearance, RoofClearance, GroundPortalX, GroundPortalZ;",
@@ -143,6 +143,7 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("public bool AtGround;", source)
         self.assertIn("RuneNameHeaders, RuneNameSigns, RuneNameLights;", source)
         self.assertIn("Orient, Text, LightSchool, TextGlowSchool;", source)
+        self.assertIn("public bool InfiniteFuel;", source)
         self.assertEqual(source.count('Orient = "rune-name-lit"'), 16)
         self.assertEqual(source.count('Orient = "rune-name",'), 104)
         self.assertEqual(source.count('LightSchool = "combat"'), 2)
@@ -155,8 +156,10 @@ class GalleryProfileTests(unittest.TestCase):
         grand = plan[plan.index('Id = "marble-grand"') :]
         builder = BUILDER.read_text(encoding="utf-8")
         for marker in (
-            'Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\\nFirst Portal tutorial\\n<color=#8fdc8f>use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f',
+            'Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\\nFirst Portal tutorial\\n<color=#8fdc8f>open F9 · use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f',
             'Prefab = "wood_pole2", X = 3.5f, Y = 0f, Z = 6f',
+            'Prefab = "piece_groundtorch_blue", X = 2f, Y = 0f, Z = 6f, Yaw = 0f, Orient = "tutorial-beacon", Text = "", LightSchool = "social", InfiniteFuel = true',
+            'Prefab = "piece_groundtorch_blue", X = 5f, Y = 0f, Z = 6f, Yaw = 0f, Orient = "tutorial-beacon", Text = "", LightSchool = "social", InfiniteFuel = true',
             'Prefab = "Birch1", Kind = "prop", Note = "ground Birch and bronze axe before the ascent portal"',
             'X = 5f, Y = 0f, Z = 2.5f, Yaw = 0f, AtGround = true',
             'Prefab = "AxeBronze", Note = "bronze axe beside the ground welcome Birch", X = 5.5f',
@@ -178,7 +181,7 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("AttachDisplayItem(built, fixture.AttachedItem)", builder)
         self.assertIn("SetStack(drop, item.Stack)", builder)
         self.assertEqual(self.profiles["marble-grand"]["counts"]["welcomeFixtures"], 6)
-        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1912)
+        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1914)
 
     def test_runtime_reports_clearance_and_horizontal_headers(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")

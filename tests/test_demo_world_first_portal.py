@@ -45,14 +45,19 @@ class DemoWorldFirstPortalTests(unittest.TestCase):
         self.assertEqual("generated_cast_here_tutorial_sign", target["role"])
         self.assertEqual("CAST HERE", target["text_heading"])
         self.assertEqual("fixed_center_crosshair", target["targeting"])
+        self.assertTrue(target["backtick_requires_f9_drawer_open"])
         self.assertFalse(target["ui_mouse_cursor_selects_world_target"])
         self.assertTrue(target["must_be_immediately_visible_from_hub_arrival"])
+        self.assertEqual("piece_groundtorch_blue", target["beacon"]["prefab"])
+        self.assertEqual(2, target["beacon"]["count"])
+        self.assertTrue(target["beacon"]["infinite_fuel"])
         self.assertEqual("Creator Hub ascent portal", expected["demo_world"]["unavoidable_ascent_portal"]["to"])
         self.assertEqual("unbound_no_progress", expected["demo_world"]["unavoidable_ascent_portal"]["imported_fork_state"])
-        self.assertEqual("World school paired portal", expected["demo_world"]["tutorial_completion_portal"]["role"])
+        self.assertEqual("nearest obvious portal", expected["demo_world"]["tutorial_completion_portal"]["role"])
+        self.assertTrue(expected["demo_world"]["tutorial_completion_portal"]["any_portal_is_valid"])
         self.assertEqual("load_selected", expected["canonical_artifact"]["activation_receipt"]["operation"])
         self.assertEqual(
-            ["matching_prebound_ascent", "portable_cast_then_world_portal"],
+            ["matching_prebound_ascent", "portable_cast_then_any_portal"],
             [path["id"] for path in expected["canonical_artifact"]["accepted_paths"]],
         )
         self.assertFalse(expected["replay_precondition"]["world_restore_alone_resets_completion"])

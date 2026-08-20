@@ -233,18 +233,24 @@ public sealed class QuestStudioDemoWorldTests : IDisposable
         Assert.Equal("generated_cast_here_tutorial_sign", target.GetProperty("role").GetString());
         Assert.Equal("CAST HERE", target.GetProperty("text_heading").GetString());
         Assert.Equal("fixed_center_crosshair", target.GetProperty("targeting").GetString());
+        Assert.True(target.GetProperty("backtick_requires_f9_drawer_open").GetBoolean());
         Assert.False(target.GetProperty("ui_mouse_cursor_selects_world_target").GetBoolean());
         Assert.True(target.GetProperty("must_be_immediately_visible_from_hub_arrival").GetBoolean());
+        var beacon = target.GetProperty("beacon");
+        Assert.Equal("piece_groundtorch_blue", beacon.GetProperty("prefab").GetString());
+        Assert.Equal(2, beacon.GetProperty("count").GetInt32());
+        Assert.True(beacon.GetProperty("infinite_fuel").GetBoolean());
         Assert.Equal("ground welcome camp", world.GetProperty("unavoidable_ascent_portal").GetProperty("from").GetString());
         Assert.Equal("Creator Hub ascent portal", world.GetProperty("unavoidable_ascent_portal").GetProperty("to").GetString());
         Assert.Equal("unbound_no_progress", world.GetProperty("unavoidable_ascent_portal").GetProperty("imported_fork_state").GetString());
-        Assert.Equal("World school paired portal", world.GetProperty("tutorial_completion_portal").GetProperty("role").GetString());
+        Assert.Equal("nearest obvious portal", world.GetProperty("tutorial_completion_portal").GetProperty("role").GetString());
+        Assert.True(world.GetProperty("tutorial_completion_portal").GetProperty("any_portal_is_valid").GetBoolean());
 
         var canonical = root.GetProperty("canonical_artifact");
         Assert.Equal("demo-world-first-portal", canonical.GetProperty("required_pack_id").GetString());
         Assert.Equal("load_selected", canonical.GetProperty("activation_receipt").GetProperty("operation").GetString());
         var canonicalPaths = canonical.GetProperty("accepted_paths").EnumerateArray().ToArray();
-        Assert.Equal(new[] { "matching_prebound_ascent", "portable_cast_then_world_portal" },
+        Assert.Equal(new[] { "matching_prebound_ascent", "portable_cast_then_any_portal" },
             canonicalPaths.Select(value => value.GetProperty("id").GetString()));
         Assert.False(canonicalPaths[0].GetProperty("matching_prebound_save_is_live_proven").GetBoolean());
         Assert.True(canonicalPaths[1].GetProperty("fresh_cast_before_completion_portal").GetBoolean());

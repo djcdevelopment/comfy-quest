@@ -10,8 +10,15 @@
       "text_marker": "First Portal tutorial",
       "relative_plan_position": { "x": 3.5, "y": 1.7, "z": 6, "yaw": 180 },
       "targeting": "fixed_center_crosshair",
+      "backtick_requires_f9_drawer_open": true,
       "ui_mouse_cursor_selects_world_target": false,
-      "must_be_immediately_visible_from_hub_arrival": true
+      "must_be_immediately_visible_from_hub_arrival": true,
+      "beacon": {
+        "prefab": "piece_groundtorch_blue",
+        "count": 2,
+        "light_school": "social",
+        "infinite_fuel": true
+      }
     },
     "unavoidable_ascent_portal": {
       "from": "ground welcome camp",
@@ -21,8 +28,9 @@
       "imported_fork_state": "unbound_no_progress"
     },
     "tutorial_completion_portal": {
-      "role": "World school paired portal",
+      "role": "nearest obvious portal",
       "after_cast": true,
+      "any_portal_is_valid": true,
       "event_name": "player_teleported",
       "event_target": null
     }
@@ -41,11 +49,11 @@
         "matching_prebound_save_is_live_proven": false
       },
       {
-        "id": "portable_cast_then_world_portal",
+        "id": "portable_cast_then_any_portal",
         "ascent_without_matching_binding": "unbound_no_progress",
         "fresh_cast_before_completion_portal": true,
         "cast_receipt": { "operation": "bind", "status": "inscribed" },
-        "completion_portal": "World school paired portal"
+        "completion_portal": "nearest obvious portal"
       }
     ]
   },

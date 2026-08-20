@@ -27,13 +27,13 @@
     "expected_behavior": {
       "path": "expected.json",
       "schema": "comfy-quest-demo-world-expectations/v1",
-      "byte_count": 3687,
-      "sha256": "72256497b71670922bbcfeb0e466a7a8e5faeca1ccbd626611e2cce6838dec6f"
+      "byte_count": 3915,
+      "sha256": "7eab882fd2beca6a3ae0dde21c2ff0c4e119504b864ed89047d41f393bf6023d"
     },
     "documentation": {
       "path": "README.md",
-      "byte_count": 4696,
-      "sha256": "e9da7439c8606bd9b8bce0de5e6e138c53eaba0cf5651d2b45e200e28320b8cf"
+      "byte_count": 4883,
+      "sha256": "0bab924ebe4bfd444967d7580de852c525cb2cdda51fc8449a05a27e8ec8ed60"
     }
   }
 }

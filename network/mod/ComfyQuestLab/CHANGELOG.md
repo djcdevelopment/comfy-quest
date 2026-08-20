@@ -1,5 +1,14 @@
 # Changelog
 
+**r26 zero-lift First Portal beacon.** The r25 live lap proved exact activation,
+unbound ascent, CHECK/CAST on the intended sign, targetless portal completion,
+and the durable workflow receipt chain. It also exposed two remaining onboarding
+costs: the arrival-side sign did not pull the eye until the player approached it,
+and backtick does nothing while the F9 drawer is closed. R26 brackets the sign
+with two infinite-fuel blue iron torches carrying the Social school's unnatural
+magenta light, adds `open F9` to the sign and Runtime copy, and makes the nearest
+obvious portal the documented completion path because the trigger is targetless.
+
 **r25 immediate Demo World target.** The compact `marble-grand` hub now labels its
 single standalone tutorial sign `CAST HERE`, names the First Portal tutorial, and
 states that world targeting uses the fixed center crosshair. A live cold-drop lap

@@ -10,7 +10,7 @@ using System;
 
 /// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>
 public static class LabGalleryPlan {
-  public const int PlanVersion = 8;
+  public const int PlanVersion = 9;
   public const string DefaultProfileId = "marble-grand";
 
   public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }
@@ -27,7 +27,8 @@ public static class LabGalleryPlan {
   public struct CeilingFixture { public string Prefab; public float X, Y, Z, Yaw;
                                  public bool InfiniteFuel; }
   public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;
-                          public string Orient, Text, LightSchool, TextGlowSchool; }
+                          public string Orient, Text, LightSchool, TextGlowSchool;
+                          public bool InfiniteFuel; }
 
   public sealed class Profile {
     public string Id, Name, Description;
@@ -3918,7 +3919,7 @@ public static class LabGalleryPlan {
       FootprintRadius = 48f,
       SolidMarbleFloor = true,
       PruneNaturalTrees = true,
-      EstimatedPlacedObjects = 1912,
+      EstimatedPlacedObjects = 1914,
       RuneNameHeaders = 8,
       RuneNameSigns = 60,
       RuneNameLights = 8,
@@ -4093,7 +4094,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Social,
           Angle = 315f, Cx = -24.042f, Cz = 24.042f,
           R = 1f, G = 0.7f, B = 0.85f,
-          Station = new Station { Prefab = "sign", Kind = "piece", Note = "the hub tutorial sign says CAST HERE", Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\nFirst Portal tutorial\n<color=#8fdc8f>use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f, Yaw = 180f, AtGround = false },
+          Station = new Station { Prefab = "sign", Kind = "piece", Note = "the hub tutorial sign says CAST HERE between two blue-magenta beacon torches", Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\nFirst Portal tutorial\n<color=#8fdc8f>open F9 · use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f, Yaw = 180f, AtGround = false },
           Beams = new[] {
             new Beam { X = -27.506f, Y = 15.62f, Z = 20.577f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = -27.506f, Y = 13.58f, Z = 20.577f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -5824,7 +5825,7 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "sign", X = -6.1f, Y = 1.2f, Z = -15f, Yaw = 0f, Orient = "", Text = "<size=28><b><color=#8cccff>CRAFTING</color></b></size>\ncoal directly in front of the smelter\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -14.92f, Y = 1.2f, Z = -6.293f, Yaw = 45f, Orient = "", Text = "<size=28><b><color=#cc80ff>PROGRESSION</color></b></size>\nnearby course actions raise skills\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -15f, Y = 1.2f, Z = 6.1f, Yaw = 90f, Orient = "", Text = "<size=28><b><color=#59e6e6>WORLD</color></b></size>\na paired portal and world-state practice\n<color=#8fdc8f>safe events can bind here</color>" },
-        new Fixture { Prefab = "sign", X = -6.293f, Y = 1.2f, Z = 14.92f, Yaw = 135f, Orient = "", Text = "<size=28><b><color=#ffb2d9>SOCIAL</color></b></size>\nthe hub tutorial sign says CAST HERE\n<color=#8fdc8f>safe events can bind here</color>" },
+        new Fixture { Prefab = "sign", X = -6.293f, Y = 1.2f, Z = 14.92f, Yaw = 135f, Orient = "", Text = "<size=28><b><color=#ffb2d9>SOCIAL</color></b></size>\nthe hub tutorial sign says CAST HERE between two blue-magenta beacon torches\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -3.25f, Y = 6.75f, Z = 18.95f, Yaw = 180f, Orient = "rune-name", Text = "<size=44><b><color=#ff4738>C</color></b></size>", TextGlowSchool = "combat" },
         new Fixture { Prefab = "sign", X = -1.95f, Y = 6.75f, Z = 18.95f, Yaw = 180f, Orient = "rune-name", Text = "<size=44><b><color=#ff4738>O</color></b></size>", TextGlowSchool = "combat" },
         new Fixture { Prefab = "sign", X = -0.65f, Y = 6.75f, Z = 18.95f, Yaw = 180f, Orient = "rune-name", Text = "<size=44><b><color=#ff4738>M</color></b></size>", TextGlowSchool = "combat" },
@@ -5886,6 +5887,8 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "sign", X = -12.021f, Y = 6.75f, Z = 14.779f, Yaw = 135f, Orient = "rune-name", Text = "<size=44><b><color=#ffb2d9>A</color></b></size>", TextGlowSchool = "social" },
         new Fixture { Prefab = "sign", X = -11.102f, Y = 6.75f, Z = 15.698f, Yaw = 135f, Orient = "rune-name", Text = "<size=44><b><color=#ffb2d9>L</color></b></size>", TextGlowSchool = "social" },
         new Fixture { Prefab = "wood_pole2", X = 3.5f, Y = 0f, Z = 6f, Yaw = 0f, Orient = "sign-post", Text = "" },
+        new Fixture { Prefab = "piece_groundtorch_blue", X = 2f, Y = 0f, Z = 6f, Yaw = 0f, Orient = "tutorial-beacon", Text = "", LightSchool = "social", InfiniteFuel = true },
+        new Fixture { Prefab = "piece_groundtorch_blue", X = 5f, Y = 0f, Z = 6f, Yaw = 0f, Orient = "tutorial-beacon", Text = "", LightSchool = "social", InfiniteFuel = true },
       },
       CourseDrops = new[] {
         new CourseDrop { Prefab = "AxeBronze", Note = "bronze axe beside the ground welcome Birch", X = 5.5f, Y = 0.4f, Z = 0.8f, Stack = 1, AtGround = true },

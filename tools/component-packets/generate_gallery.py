@@ -61,7 +61,7 @@ COMPACT_STATION_NOTES = {
     "Building": "hammer and wood directly in front of the bench",
     "Crafting": "coal directly in front of the smelter",
     "Progression": "nearby course actions raise skills",
-    "Social": "the hub tutorial sign says CAST HERE",
+    "Social": "the hub tutorial sign says CAST HERE between two blue-magenta beacon torches",
 }
 
 SCHOOL_COLOURS = {
@@ -294,7 +294,7 @@ def build_monuments(spec: dict, segments: dict):
             station_text = (
                 "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\n"
                 "First Portal tutorial\n"
-                "<color=#8fdc8f>use the fixed center crosshair</color>"
+                "<color=#8fdc8f>open F9 · use the fixed center crosshair</color>"
             )
             station_light = category.lower()
         monuments.append(
@@ -684,6 +684,7 @@ def fixture(
     text="",
     light_school="",
     text_glow_school="",
+    infinite_fuel=False,
 ):
     return {
         "prefab": prefab,
@@ -695,6 +696,7 @@ def fixture(
         "text": text,
         "lightSchool": light_school,
         "textGlowSchool": text_glow_school,
+        "infiniteFuel": infinite_fuel,
     }
 
 
@@ -710,16 +712,38 @@ def build_profile(spec: dict, segments: dict):
         + rune_name_signs(spec, monuments)
     )
     if spec.get("compact_course"):
-        fixtures.append(
-            fixture(
-                "wood_pole2",
-                3.5,
-                0.0,
-                6.0,
-                0.0,
-                orient="sign-post",
-                text="",
-            )
+        fixtures.extend(
+            [
+                fixture(
+                    "wood_pole2",
+                    3.5,
+                    0.0,
+                    6.0,
+                    0.0,
+                    orient="sign-post",
+                    text="",
+                ),
+                fixture(
+                    "piece_groundtorch_blue",
+                    2.0,
+                    0.0,
+                    6.0,
+                    0.0,
+                    orient="tutorial-beacon",
+                    light_school="social",
+                    infinite_fuel=True,
+                ),
+                fixture(
+                    "piece_groundtorch_blue",
+                    5.0,
+                    0.0,
+                    6.0,
+                    0.0,
+                    orient="tutorial-beacon",
+                    light_school="social",
+                    infinite_fuel=True,
+                ),
+            ]
         )
     course_drops = build_course_drops(spec)
     welcome_fixtures = build_welcome_fixtures(spec)
@@ -774,7 +798,9 @@ def build_profile(spec: dict, segments: dict):
             "runeNameSigns": sum(
                 fixture["orient"].startswith("rune-name") for fixture in fixtures
             ),
-            "runeNameLights": sum(bool(fixture["lightSchool"]) for fixture in fixtures),
+            "runeNameLights": sum(
+                fixture["orient"] == "rune-name-lit" for fixture in fixtures
+            ),
             "courseDrops": len(course_drops),
             "welcomeFixtures": len(welcome_fixtures),
             "estimatedPlacedObjects": (
@@ -911,7 +937,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "",
         "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
         "public static class LabGalleryPlan {",
-        "  public const int PlanVersion = 8;",
+        "  public const int PlanVersion = 9;",
         f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
         "",
         "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",
@@ -928,7 +954,8 @@ def render_csharp(profiles: list[dict]) -> str:
         "  public struct CeilingFixture { public string Prefab; public float X, Y, Z, Yaw;",
         "                                 public bool InfiniteFuel; }",
         "  public struct Fixture { public string Prefab; public float X, Y, Z, Yaw;",
-        "                          public string Orient, Text, LightSchool, TextGlowSchool; }",
+        "                          public string Orient, Text, LightSchool, TextGlowSchool;",
+        "                          public bool InfiniteFuel; }",
         "",
         "  public sealed class Profile {",
         "    public string Id, Name, Description;",
@@ -1033,11 +1060,12 @@ def render_csharp(profiles: list[dict]) -> str:
                 if item["textGlowSchool"]
                 else ""
             )
+            infinite_fuel = ", InfiniteFuel = true" if item["infiniteFuel"] else ""
             lines.append(
                 "        new Fixture { "
                 f"Prefab = {cs(item['prefab'])}, X = {f(item['x'])}, Y = {f(item['y'])}, "
                 f"Z = {f(item['z'])}, Yaw = {f(item['yaw'])}, "
-                f"Orient = {cs(item['orient'])}, Text = {cs(item['text'])}{light}{text_glow} }},"
+                f"Orient = {cs(item['orient'])}, Text = {cs(item['text'])}{light}{text_glow}{infinite_fuel} }},"
             )
         lines.extend(["      },", "      CourseDrops = new[] {"])
         for item in profile["courseDrops"]:

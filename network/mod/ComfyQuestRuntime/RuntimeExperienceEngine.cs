@@ -403,7 +403,7 @@ sealed class RuntimeExperienceEngine {
       unboundReported = active.ContentHash;
     }
     return (string.IsNullOrWhiteSpace(active.Document?.Title) ? "This quest" : active.Document.Title)
-        + " has no Charm yet — aim the fixed center crosshair at an allowed sign or player-built object, press ` to CHECK, then ` again to CAST.";
+        + " has no Charm yet — open F9, aim the fixed center crosshair at an allowed sign or player-built object, press ` to CHECK, then ` again to CAST.";
   }
 
   bool IsDuplicate(RuntimeEvent evt) {
@@ -856,7 +856,7 @@ sealed class RuntimeExperienceEngine {
             + Describe(transition?.When) + count + DescribeStageElapsed(progress.StageEnteredUtc)
             + (string.IsNullOrWhiteSpace(running) ? "" : " - " + running);
       }
-      return "No Charm cast yet - aim the fixed center crosshair at an allowed sign or player-built object, press ` to CHECK, then ` again to CAST.";
+      return "No Charm cast yet - open F9, aim the fixed center crosshair at an allowed sign or player-built object, press ` to CHECK, then ` again to CAST.";
     } catch {
       return "unavailable";
     }
