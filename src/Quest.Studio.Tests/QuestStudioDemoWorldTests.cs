@@ -229,8 +229,12 @@ public sealed class QuestStudioDemoWorldTests : IDisposable
         var root = expected.RootElement;
         var world = root.GetProperty("demo_world");
         Assert.Equal("marble-grand", world.GetProperty("profile").GetString());
-        Assert.Equal("generated_world_school_sign", world.GetProperty("binding_target").GetProperty("role").GetString());
-        Assert.Equal("WORLD", world.GetProperty("binding_target").GetProperty("text_heading").GetString());
+        var target = world.GetProperty("binding_target");
+        Assert.Equal("generated_cast_here_tutorial_sign", target.GetProperty("role").GetString());
+        Assert.Equal("CAST HERE", target.GetProperty("text_heading").GetString());
+        Assert.Equal("fixed_center_crosshair", target.GetProperty("targeting").GetString());
+        Assert.False(target.GetProperty("ui_mouse_cursor_selects_world_target").GetBoolean());
+        Assert.True(target.GetProperty("must_be_immediately_visible_from_hub_arrival").GetBoolean());
         Assert.Equal("ground welcome camp", world.GetProperty("unavoidable_ascent_portal").GetProperty("from").GetString());
         Assert.Equal("Creator Hub ascent portal", world.GetProperty("unavoidable_ascent_portal").GetProperty("to").GetString());
         Assert.Equal("unbound_no_progress", world.GetProperty("unavoidable_ascent_portal").GetProperty("imported_fork_state").GetString());

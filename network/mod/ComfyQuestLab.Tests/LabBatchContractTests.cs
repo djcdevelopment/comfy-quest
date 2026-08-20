@@ -37,7 +37,7 @@ public class LabBatchContractTests {
     Assert.Contains(suite.Expectations, x => x.EventName == "station_fuel_added"
         && x.Instruction.Contains("Coal directly in front of the crafting smelter", StringComparison.Ordinal));
     Assert.Contains(suite.Expectations, x => x.EventName == "sign_written"
-        && x.Instruction.Contains("hub sign that says sign here", StringComparison.Ordinal));
+        && x.Instruction.Contains("hub tutorial sign that says CAST HERE", StringComparison.Ordinal));
   }
 
   [Fact]

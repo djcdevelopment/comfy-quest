@@ -41,7 +41,12 @@ class DemoWorldFirstPortalTests(unittest.TestCase):
         self.assertIsNone(route["target"])
         self.assertEqual("complete", route["outcome"])
         self.assertEqual(expected["behavior"]["message"], route["actions"][0]["text"])
-        self.assertEqual("generated_world_school_sign", expected["demo_world"]["binding_target"]["role"])
+        target = expected["demo_world"]["binding_target"]
+        self.assertEqual("generated_cast_here_tutorial_sign", target["role"])
+        self.assertEqual("CAST HERE", target["text_heading"])
+        self.assertEqual("fixed_center_crosshair", target["targeting"])
+        self.assertFalse(target["ui_mouse_cursor_selects_world_target"])
+        self.assertTrue(target["must_be_immediately_visible_from_hub_arrival"])
         self.assertEqual("Creator Hub ascent portal", expected["demo_world"]["unavoidable_ascent_portal"]["to"])
         self.assertEqual("unbound_no_progress", expected["demo_world"]["unavoidable_ascent_portal"]["imported_fork_state"])
         self.assertEqual("World school paired portal", expected["demo_world"]["tutorial_completion_portal"]["role"])

@@ -36,7 +36,7 @@ public static class LabBatchContract {
       Expect(LabCategory.Progression, "skill_raised",
           "The bow, axe, or building lap normally raises a skill; otherwise use any skill once."),
       Expect(LabCategory.World, "player_teleported", "Take either paired gallery portal."),
-      Expect(LabCategory.Social, "sign_written", "Edit the hub sign that says sign here."),
+      Expect(LabCategory.Social, "sign_written", "Edit the hub tutorial sign that says CAST HERE."),
     },
   };
 

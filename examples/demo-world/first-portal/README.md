@@ -23,12 +23,12 @@ constitute a successful lap.
 5. Import intentionally creates new project, pack, and experience IDs. That makes
    the draft safe to edit without overwriting the canonical artifact, but it also
    means an existing canonical Demo World Charm cannot auto-rebind to the fork.
-   Aim at the generated `marble-grand` **WORLD** school sign - the sign whose text
-   includes "a paired portal and world-state practice" - and press backtick once to
-   CHECK, then again to CAST the active fork onto that sign before taking the
-   World school's paired portal.
-   In the generated plan it is at relative `(x=-15, y=1.2, z=6.1, yaw=90)` from
-   the gallery floor origin. Expect
+   Use the immediately visible illuminated **CAST HERE** First Portal tutorial sign
+   on the hub's inner arrival edge. Close F9, aim Valheim's fixed center crosshair
+   at the sign face, reopen F9 without moving the camera, and press backtick once
+   to CHECK, then again to CAST the active fork. The drawer's movable mouse cursor
+   does not select world targets. In the generated plan the sign is at relative
+   `(x=3.5, y=1.7, z=6, yaw=180)` from the gallery floor origin. Expect
    `bind/inscribed` after the initial
    `dev_rebind/skipped` receipt with `no_loaded_binding`.
 6. Take the paired portal at the World school. This is the first portal after the
@@ -56,8 +56,8 @@ maintenance list to select and load the exact `demo-world-first-portal` pack at
 semantic version and a nonempty inbox may contain another pack. Confirm the active
 pack and experience IDs are both exactly `demo-world-first-portal`. If no exact
 canonical binding is already present, the ascent is unbound; once upstairs, CHECK
-and CAST the canonical experience onto the generated `marble-grand` WORLD school
-sign identified above before taking the World school's paired portal.
+and CAST the canonical experience onto the generated `marble-grand` **CAST HERE**
+tutorial sign identified above before taking the World school's paired portal.
 For editing, use the Studio import-and-Play loop above; its fork needs
 one fresh CAST, and subsequent same-fork revisions auto-rebind.
 

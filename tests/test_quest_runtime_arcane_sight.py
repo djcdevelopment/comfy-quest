@@ -544,6 +544,8 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         # An unbound quest says so once, at player altitude, instead of ignoring input in silence.
         self.assertIn("string UnboundLine(Active active)", engine)
         self.assertIn("has no Charm yet", engine)
+        self.assertIn("aim the fixed center crosshair", engine)
+        self.assertNotIn("aim at something you built", engine)
         self.assertIn("UnboundLine(active), CreatorEvidenceKind.Warning", engine)
         # The status card owns the title; the experience row speaks state and the player's outcome.
         self.assertIn('static string Outcome(string value)', engine)
@@ -558,6 +560,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("Localization.instance.Localize(token)", binding)
         self.assertIn("public string Landed=>landed;", binding)
         self.assertIn('settled?"LANDED":"CHECK"', plugin)
+        self.assertIn("Aim with the fixed center crosshair", plugin)
         self.assertIn("charms?.Release();", plugin)
         # The pre-cast mark restores exactly what it borrowed, and writes nothing to the world.
         mark = binding[

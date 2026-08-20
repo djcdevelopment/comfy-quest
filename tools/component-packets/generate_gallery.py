@@ -61,7 +61,7 @@ COMPACT_STATION_NOTES = {
     "Building": "hammer and wood directly in front of the bench",
     "Crafting": "coal directly in front of the smelter",
     "Progression": "nearby course actions raise skills",
-    "Social": "the hub sign says sign here",
+    "Social": "the hub tutorial sign says CAST HERE",
 }
 
 SCHOOL_COLOURS = {
@@ -291,7 +291,11 @@ def build_monuments(spec: dict, segments: dict):
         elif spec.get("compact_course") and category == "Social":
             station_x, station_z, station_yaw = 3.5, 6.0, 180.0
             station_y = 1.7
-            station_text = "sign here"
+            station_text = (
+                "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\n"
+                "First Portal tutorial\n"
+                "<color=#8fdc8f>use the fixed center crosshair</color>"
+            )
             station_light = category.lower()
         monuments.append(
             {

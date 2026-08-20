@@ -1,5 +1,12 @@
 # Changelog
 
+**r25 immediate Demo World target.** The compact `marble-grand` hub now labels its
+single standalone tutorial sign `CAST HERE`, names the First Portal tutorial, and
+states that world targeting uses the fixed center crosshair. A live cold-drop lap
+showed that the former `sign here` copy plus instructions to find a WORLD sign sent
+the player to the allowlist-rejected portal arch. The eight-school gallery remains
+the advanced playground; the first binding target now removes that scavenger hunt.
+
 **r24 durable creator-event archive.** Every accepted, deduplicated canonical row now also
 enters a bounded background writer; quest matching and the live ring remain unchanged and never
 wait for disk. Each session gets a descriptive UTC/release/profile JSONL name, a self-describing

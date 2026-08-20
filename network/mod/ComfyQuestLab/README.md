@@ -58,6 +58,17 @@ retains weather-coverage and fresh-prefab warnings as honest follow-up evidence.
 non-mutating compare request was delivered after acceptance but OMEN exited before its receipt
 returned; automated compare coverage is green.
 
+## R25 Demo World target update (2026-08-20)
+
+An ordinary cold-drop lap proved the Runtime package, Charm binding, paired portal,
+message, and terminal receipt chain, but failed the zero-lift onboarding bar. The
+generic `sign here` copy and a runbook that said WORLD sign sent the player to the
+allowlist-rejected WORLD portal; the drawer's movable cursor also obscured that world
+selection comes from Valheim's fixed center crosshair. R25 makes the existing
+arrival-side tutorial sign say `CAST HERE`, names the First Portal tutorial, and puts
+the crosshair instruction on the object itself. Exact r25 visual acceptance remains
+pending until the rebuilt gallery is viewed in ordinary Valheim.
+
 ## Why this exists
 
 Authoring a quest today means guessing, and guessing fails *silently*.
@@ -327,8 +338,10 @@ on real horizontal item stands atop a picnic table. Each display carries a gener
 checked fallback list because not every food has Valheim's required `attach` child in every game
 build. Combat leaves a bow and 100 wood arrows
 on the player's side with its Greyling at the rune. Building pairs its hammer and wood,
-Crafting puts coal directly in front of the smelter, and Social raises its illuminated
-`sign here` sign on a two-metre post in the hub. Every consumable is recreated by `lab_setup`
+Crafting puts coal directly in front of the smelter, and Social raises an illuminated
+`CAST HERE` First Portal tutorial sign on a two-metre post in the hub. Its copy explicitly
+names the fixed center crosshair because the Runtime drawer's movable mouse cursor does not
+select world targets. Every consumable is recreated by `lab_setup`
 or batch `prepare`, so a creator never needs prior inventory or a scavenger hunt.
 
 Before placing anything, the grand profile scans only loaded `TreeBase` roots whose trunks

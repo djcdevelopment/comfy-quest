@@ -37,7 +37,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260809-r24";
+  public const string ReleaseId = "questlab-v0.2.0-20260820-r25";
 
   public static ComfyQuestLab Instance { get; private set; }
 

@@ -4,11 +4,14 @@
   "demo_world": {
     "profile": "marble-grand",
     "binding_target": {
-      "role": "generated_world_school_sign",
+      "role": "generated_cast_here_tutorial_sign",
       "prefab": "sign",
-      "text_heading": "WORLD",
-      "text_marker": "a paired portal and world-state practice",
-      "relative_plan_position": { "x": -15, "y": 1.2, "z": 6.1, "yaw": 90 }
+      "text_heading": "CAST HERE",
+      "text_marker": "First Portal tutorial",
+      "relative_plan_position": { "x": 3.5, "y": 1.7, "z": 6, "yaw": 180 },
+      "targeting": "fixed_center_crosshair",
+      "ui_mouse_cursor_selects_world_target": false,
+      "must_be_immediately_visible_from_hub_arrival": true
     },
     "unavoidable_ascent_portal": {
       "from": "ground welcome camp",

@@ -4093,7 +4093,7 @@ public static class LabGalleryPlan {
           Category = LabCategory.Social,
           Angle = 315f, Cx = -24.042f, Cz = 24.042f,
           R = 1f, G = 0.7f, B = 0.85f,
-          Station = new Station { Prefab = "sign", Kind = "piece", Note = "the hub sign says sign here", Text = "sign here", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f, Yaw = 180f, AtGround = false },
+          Station = new Station { Prefab = "sign", Kind = "piece", Note = "the hub tutorial sign says CAST HERE", Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\nFirst Portal tutorial\n<color=#8fdc8f>use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f, Yaw = 180f, AtGround = false },
           Beams = new[] {
             new Beam { X = -27.506f, Y = 15.62f, Z = 20.577f, Dx = 0f, Dy = -1f, Dz = 0f },
             new Beam { X = -27.506f, Y = 13.58f, Z = 20.577f, Dx = 0f, Dy = -1f, Dz = 0f },
@@ -5824,7 +5824,7 @@ public static class LabGalleryPlan {
         new Fixture { Prefab = "sign", X = -6.1f, Y = 1.2f, Z = -15f, Yaw = 0f, Orient = "", Text = "<size=28><b><color=#8cccff>CRAFTING</color></b></size>\ncoal directly in front of the smelter\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -14.92f, Y = 1.2f, Z = -6.293f, Yaw = 45f, Orient = "", Text = "<size=28><b><color=#cc80ff>PROGRESSION</color></b></size>\nnearby course actions raise skills\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -15f, Y = 1.2f, Z = 6.1f, Yaw = 90f, Orient = "", Text = "<size=28><b><color=#59e6e6>WORLD</color></b></size>\na paired portal and world-state practice\n<color=#8fdc8f>safe events can bind here</color>" },
-        new Fixture { Prefab = "sign", X = -6.293f, Y = 1.2f, Z = 14.92f, Yaw = 135f, Orient = "", Text = "<size=28><b><color=#ffb2d9>SOCIAL</color></b></size>\nthe hub sign says sign here\n<color=#8fdc8f>safe events can bind here</color>" },
+        new Fixture { Prefab = "sign", X = -6.293f, Y = 1.2f, Z = 14.92f, Yaw = 135f, Orient = "", Text = "<size=28><b><color=#ffb2d9>SOCIAL</color></b></size>\nthe hub tutorial sign says CAST HERE\n<color=#8fdc8f>safe events can bind here</color>" },
         new Fixture { Prefab = "sign", X = -3.25f, Y = 6.75f, Z = 18.95f, Yaw = 180f, Orient = "rune-name", Text = "<size=44><b><color=#ff4738>C</color></b></size>", TextGlowSchool = "combat" },
         new Fixture { Prefab = "sign", X = -1.95f, Y = 6.75f, Z = 18.95f, Yaw = 180f, Orient = "rune-name", Text = "<size=44><b><color=#ff4738>O</color></b></size>", TextGlowSchool = "combat" },
         new Fixture { Prefab = "sign", X = -0.65f, Y = 6.75f, Z = 18.95f, Yaw = 180f, Orient = "rune-name", Text = "<size=44><b><color=#ff4738>M</color></b></size>", TextGlowSchool = "combat" },

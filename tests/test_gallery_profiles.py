@@ -155,7 +155,7 @@ class GalleryProfileTests(unittest.TestCase):
         grand = plan[plan.index('Id = "marble-grand"') :]
         builder = BUILDER.read_text(encoding="utf-8")
         for marker in (
-            'Text = "sign here", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f',
+            'Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\\nFirst Portal tutorial\\n<color=#8fdc8f>use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f',
             'Prefab = "wood_pole2", X = 3.5f, Y = 0f, Z = 6f',
             'Prefab = "Birch1", Kind = "prop", Note = "ground Birch and bronze axe before the ascent portal"',
             'X = 5f, Y = 0f, Z = 2.5f, Yaw = 0f, AtGround = true',
