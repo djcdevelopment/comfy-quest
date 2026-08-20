@@ -7,7 +7,12 @@ ledger rows open and a set of seat directions. This document sequences the work.
 Root causes below are researched, not conjectured — evidence lives in the run
 capture (`captures/five-intent-slice1/phase3-exit-2026-08-20-s2/`) and the ADRs.
 
-## W1 — The kill tally races destruction (exit blocker)
+**Status, 2026-08-20: W1, W2, W3 and W4 have landed.** What remains is session 3
+and the W5 packet. Two things changed after this document was first written, and
+both are recorded in place below: reading the run's receipts turned W1's root
+cause from a ranked hypothesis into a proof, and disproved one W3 item outright.
+
+## W1 — The kill tally races destruction (exit blocker) — **landed**
 
 **Root cause.** Spawn records were perfect (8 rows, `action_id: wave`, real ZDO
 ids under the right owner). Kill events carry no ZDO correlation *by design* —
@@ -15,9 +20,17 @@ the tally is a live `ZDOMan.GetZDO` poll per spawned record
 (`RuntimeObservation.Facts`). But `kill` is emitted by a Harmony postfix inside
 `Character.OnDeath()` and evaluated synchronously in that call stack, before the
 dying creature's ZDO leaves `ZDOMan` — so the eighth kill read "cleared ≤ 7", and
-with no idle re-evaluation anywhere in the engine, the wrong answer stood until
-the overrun timer fired. (`LabGalleryBuilder.DestroySettleTimeout = 5f` is the
-repo's own prior proof that destroys don't settle same-frame.)
+with no idle re-evaluation anywhere in the engine, the wrong answer stood for nine
+minutes. (`LabGalleryBuilder.DestroySettleTimeout = 5f` is the repo's own prior
+proof that destroys don't settle same-frame.)
+
+**The run proves this against itself.** At 12:17:17 the `timer_elapsed` event
+re-evaluated the same `hold` stage and the route that matched was `held` — the
+victory route, priority 40, outranking `overrun` — because the corpses were gone by
+then, the tally read 8 cleared, and the eight kills were still in history. The
+receipts read `event/matched` on `timer_elapsed`, the victory message, the reward,
+`transition/complete` on `held`. The tally was never broken; it was stale at the
+only instants anything read it, and nothing read it twice.
 
 **Fix (ADR 0006), two parts:**
 1. **Bounded recheck** (`RuntimeExperienceEngine`): when a subscribed event
@@ -32,14 +45,18 @@ repo's own prior proof that destroys don't settle same-frame.)
    ignored path the way the matched path already does, so the receipt carries the
    THRESHOLD's actual current/required (e.g. `7/8`) and its unmet clause.
 
-**Proof.** Pure-Contracts xUnit: `Matches` flips false→true when the
-`SpawnsByAction` tally changes between two evaluations of the same route; the
-ignored-receipt evidence carries the THRESHOLD trace. Python pins for the recheck
-scheduling and evidence wiring. What only session 3 can confirm: the live
-settle-race actually closing (the recheck firing `held` within seconds of the
-final kill).
+**Proof.** Landed with `WorkflowStateStore.Recheck`, `AdaptiveEvaluator.ReadsWorldTally`,
+and the engine's five-tick arming. xUnit walks session 2's exact shape: a kill
+evaluated at 8 staged / 1 live is ignored, a recheck at the same tally still
+decides nothing and writes nothing, and one tick later at 8/0 the same history wins
+`held` — with the history still exactly one event, because a recheck fabricates
+none. Python pins hold the arming, the bound, and the ignored-receipt wiring. What
+only session 3 can confirm: the live settle-race closing (the recheck firing `held`
+within seconds of the final kill). The lap's new `kill_partial` and `wave_cleared`
+expectations are the machine form of that verdict — session 2 would have failed
+both.
 
-## W2 — The deadline was invisible by presentation, not code (exit blocker)
+## W2 — The deadline was invisible by presentation, not code (exit blocker) — **landed**
 
 **Root cause.** The banner rendered "594 seconds remaining" once a second for the
 full ten minutes — `DurableTimerStore.Pending` has no proximity cap, nothing
@@ -64,19 +81,29 @@ behavioral coverage — only source-text pins.
    behavioral xUnit for `Countdown(594, null)` and `Pending` with far-future
    timers.
 
-**Proof.** All copy/`Pending` behavior is game-free testable. What only session 3
-answers: does the pill carry tension in combat (verdict 3a, still the product
-question).
+**Proof.** Landed: `TriggerCountdown.Seconds` reads `9:54` past a minute and keeps
+the seconds form below it; the banner is a bordered nine-sliced pill sized to its
+own copy, scaled through `GUI.matrix`, and anchored by the player-set
+`Presentation/DeadlineAnchor` fraction rather than any fixed y; the swallowed read
+writes one `deadline_unreadable` receipt per distinct failure. xUnit now covers the
+clock copy (including 594 verbatim), the composed label across a 600-second window,
+and `Pending` with a far-future timer — cover this path never had. What only
+session 3 answers: does the pill carry tension in combat (verdict 3a, still the
+product question).
 
-## W3 — Copy and legibility fixes (small, high-confidence, ride along)
+## W3 — Copy and legibility fixes — **landed**
 
 - **Same-pack update copy**: `CreatorLoopNotice.Check`/`Card` count distinct pack
   ids, not candidates — one quest in two versions composes the update sentence
   ("〈title〉 〈version〉 is ready. Press F11 to play it.") and `UpdateReady` card
   state; "choose" is reserved for genuinely distinct quests. Re-pin xUnit copy
   matrix + python.
-- **Outcome, not machinery**: the EXPERIENCE row (`DescribeProgress`) surfaces
-  the authored outcome — a `fail` ending never reads "complete".
+- ~~**Outcome, not machinery**: a `fail` ending never reads "complete".~~ **Dropped:
+  the defect did not exist.** The receipts show no overrun fired; the victory route
+  won and "complete" was truthful. What was actually wrong — the row printing a raw outcome
+  token, under a card already showing the title — is fixed instead: the EXPERIENCE
+  row drops the title and reads "Completed." / "Failed.", and says plainly when no
+  Charm is cast.
 - **Story history**: authored `message` actions also land in chat scrollback
   ("history of it not just the glimpse") — Center stays the moment, chat becomes
   the memory.
@@ -89,13 +116,20 @@ question).
   ("this quest needs a charm cast on an object") — the card or a notice, not
   silence.
 
-## W4 — Harness generalization (unblocks future laps, not session 3)
+## W4 — Harness generalization — **landed** (and session 3 needs it)
 
-`ValidateRevision`/`ConfirmActivation` assert Woodbound structure by name
-(`Assert-WoodboundCandidate`). Generalize to content profiles (expected title /
-stage-shape per lap, Woodbound as one profile, desperate-defense as another) so
-non-Woodbound laps get the machine gates session 2 had to prove by hand. Extend
-the self-test with a second profile.
+`ValidateRevision`/`ConfirmActivation` asserted Woodbound structure by name, so a
+defense lap got no machine gate at all. They are now keyed to a content profile
+(ADR 0007): title, stage count, routes in priority order, and per route the trigger
+shape, the effects, the destination, the ending and the copy — with ids left
+unpinned because Studio generates them. `Prepare` records the profile and later
+steps resolve it from the run, so content cannot be switched mid-lap. The self-test
+gained three checks: the defense profile validating, a refused profile switch, and
+refused content drift (a six-Greyling wave cannot answer a verdict about eight).
+
+This was scoped as "unblocks future laps, not session 3" and that was wrong —
+session 3 *is* a defense lap, so without it the staging gate would again be proved
+by hand at the keyboard.
 
 ## W5 — Phase 4 scoping packet (no code)
 
@@ -106,14 +140,22 @@ Nothing from this list is implemented piecemeal beforehand.
 
 ## Sequence and session 3
 
-1. W1 + W2 (the blockers), W3 riding the same Runtime/Contracts build; one
-   interim-package refresh at the end.
-2. W4 next (harness only; no game bytes).
-3. **Session 3** — short, targeted: fresh Prepare, cast, one honest defense run to
-   take the three exit verdicts with a working tally and a visible clock. Entry
-   criteria: W1+W2 landed and gated; runbook updated with the CAST beat (done)
-   and the recheck expectation. Exit: the three verdicts answered, both ledger
-   rows closed with live observations, Phase 3 exits.
+1. ~~W1 + W2, W3 riding the same build; one interim-package refresh at the end.~~
+   **Done 2026-08-20**, in one Runtime/Contracts build with the package refreshed.
+2. ~~W4 next (harness only; no game bytes).~~ **Done the same day**, once it became
+   clear session 3 depends on it.
+3. **Session 3 — the next thing that happens.** Short and targeted: fresh Prepare
+   on the `defense` profile, cast the ward's anchor, one honest ten-minute defense
+   run. Entry criteria are met: the blockers are landed and gated, the runbook
+   carries the CAST beat, and the lap can gate defense content by machine. Exit:
+   the three verdicts answered, both ledger rows closed by live observation, Phase
+   3 exits.
+   - What the machine takes: `kill_partial` (a counted kill reports the count the
+     player is working on — session 2's read 0/1) and `wave_cleared` (the win is
+     carried by the kills, not by the deadline — session 2's was carried by the
+     deadline nine minutes late).
+   - What only the seat can take: verdict 3a, whether the clock carries tension in
+     combat; escalation and mercy, both unreachable last time behind the tally.
 4. W5 packet review with Derek → Phase 4 scope decision.
 
 ## Verification (every landing)

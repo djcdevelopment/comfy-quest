@@ -43,11 +43,38 @@ function Test-ChildPathSafe([string] $Parent, [string] $Child) {
         (Test-Path -LiteralPath (Join-Path $childFull 'Valheim-normal\.comfy-quest-validation-fixture'))
 }
 
-function New-WoodboundPack([string] $RuntimeRoot, [string] $Version, [string] $FinalMessage) {
+function New-FixturePack([string] $RuntimeRoot, [string] $PackId, [string] $Version, [object] $Experience) {
     $jsonDll = Join-Path $repoRoot 'network\mod\ComfyQuestRuntime\bin\Release\net48\Newtonsoft.Json.dll'
     $contractsDll = Join-Path $repoRoot 'network\mod\ComfyQuestContracts\bin\Release\netstandard2.0\ComfyQuestContracts.dll'
     if (-not ('Newtonsoft.Json.JsonConvert' -as [type])) { Add-Type -Path $jsonDll }
     if (-not ('ComfyQuestContracts.QuestPackContent' -as [type])) { Add-Type -Path $contractsDll }
+    $entryName = "experiences/$PackId.json"
+    $experienceBytes = [Text.Encoding]::UTF8.GetBytes(($Experience | ConvertTo-Json -Depth 30))
+    $pair = [System.Collections.Generic.KeyValuePair[string,byte[]]]::new($entryName,$experienceBytes)
+    $listType = [System.Collections.Generic.List[System.Collections.Generic.KeyValuePair[string,byte[]]]]
+    $content = [Activator]::CreateInstance($listType)
+    $content.Add($pair)
+    $contentHash = [ComfyQuestContracts.QuestPackContent]::ComputeHash($content)
+    $manifestJson = ([ordered]@{schema='comfy-quest-pack/v2';pack_id=$PackId;version=$Version;content_hash=$contentHash} | ConvertTo-Json -Depth 5)
+    $inbox = Join-Path $RuntimeRoot 'inbox'
+    New-Item -ItemType Directory -Force -Path $inbox | Out-Null
+    $pack = Join-Path $inbox ("$PackId-$Version.questpack")
+    Add-Type -AssemblyName System.IO.Compression
+    $output = [IO.File]::Open($pack,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+    $archive = [IO.Compression.ZipArchive]::new($output,[IO.Compression.ZipArchiveMode]::Create,$false)
+    try {
+        foreach ($item in @(
+            [pscustomobject]@{Name='manifest.json';Bytes=[Text.Encoding]::UTF8.GetBytes($manifestJson)},
+            [pscustomobject]@{Name=$entryName;Bytes=$experienceBytes})) {
+            $entry = $archive.CreateEntry($item.Name,[IO.Compression.CompressionLevel]::Optimal)
+            $entryStream = $entry.Open()
+            try { $entryStream.Write($item.Bytes,0,$item.Bytes.Length) } finally { $entryStream.Dispose() }
+        }
+    } finally { $archive.Dispose(); $output.Dispose() }
+    return $pack
+}
+
+function New-WoodboundPack([string] $RuntimeRoot, [string] $Version, [string] $FinalMessage) {
     $message1 = 'The charm wakes. Two offerings of wood, before the moment passes.'
     $message2 = 'The offering is heard. Reclaim one piece to seal the rite.'
     $experience = [ordered]@{
@@ -65,30 +92,69 @@ function New-WoodboundPack([string] $RuntimeRoot, [string] $Version, [string] $F
         )
         bindings=@([ordered]@{id='default';experience_id='woodbound-selftest';target_kinds=@('sign','player_built_piece','item_stand','dedicated_charm')})
     }
-    $experienceJson = ($experience | ConvertTo-Json -Depth 30)
-    $experienceBytes = [Text.Encoding]::UTF8.GetBytes($experienceJson)
-    $pair = [System.Collections.Generic.KeyValuePair[string,byte[]]]::new('experiences/woodbound.json',$experienceBytes)
-    $listType = [System.Collections.Generic.List[System.Collections.Generic.KeyValuePair[string,byte[]]]]
-    $content = [Activator]::CreateInstance($listType)
-    $content.Add($pair)
-    $contentHash = [ComfyQuestContracts.QuestPackContent]::ComputeHash($content)
-    $manifestJson = ([ordered]@{schema='comfy-quest-pack/v2';pack_id='woodbound-selftest';version=$Version;content_hash=$contentHash} | ConvertTo-Json -Depth 5)
-    $inbox = Join-Path $RuntimeRoot 'inbox'
-    New-Item -ItemType Directory -Force -Path $inbox | Out-Null
-    $pack = Join-Path $inbox ("woodbound-selftest-$Version.questpack")
-    Add-Type -AssemblyName System.IO.Compression
-    $output = [IO.File]::Open($pack,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
-    $archive = [IO.Compression.ZipArchive]::new($output,[IO.Compression.ZipArchiveMode]::Create,$false)
-    try {
-        foreach ($item in @(
-            [pscustomobject]@{Name='manifest.json';Bytes=[Text.Encoding]::UTF8.GetBytes($manifestJson)},
-            [pscustomobject]@{Name='experiences/woodbound.json';Bytes=$experienceBytes})) {
-            $entry = $archive.CreateEntry($item.Name,[IO.Compression.CompressionLevel]::Optimal)
-            $entryStream = $entry.Open()
-            try { $entryStream.Write($item.Bytes,0,$item.Bytes.Length) } finally { $entryStream.Dispose() }
-        }
-    } finally { $archive.Dispose(); $output.Dispose() }
-    return $pack
+    return New-FixturePack $RuntimeRoot 'woodbound-selftest' $Version $experience
+}
+
+# The second content profile the gates must serve. Session 2's defense lap ran with the machine
+# gates keyed to the Woodbound Signal by name, so its staging proof was assembled by hand.
+function New-DefensePack([string] $RuntimeRoot, [string] $Version, [int] $WaveCount) {
+    $experience = [ordered]@{
+        schema='comfy-quest-experience/v1';id='defense-selftest';title='Ten-Minute Desperate Defense';entry_stage='muster'
+        stages=@(
+            [ordered]@{id='muster';entry_actions=@();transitions=@([ordered]@{
+                id='call-the-ward';priority=100;when=[ordered]@{op='EVENT';event='chat_sent';target='normal'}
+                actions=@(
+                    [ordered]@{id='message-muster';type='message';text='The ward wakes. Hold this ground.'},
+                    [ordered]@{id='wave';type='spawn';kind='creature';prefab='Greyling';count=$WaveCount;radius=12},
+                    [ordered]@{id='start-defense';type='timer_start';timer_id='defense';seconds=600})
+                next_stage='hold';outcome=$null})},
+            [ordered]@{id='hold';entry_actions=@();transitions=@(
+                [ordered]@{id='held';priority=40;when=[ordered]@{op='ALL';children=@(
+                        [ordered]@{op='EVENT';event='kill'},
+                        [ordered]@{op='THRESHOLD';measure='spawned_enemies_cleared';comparison='gte';value=8;action_id='wave'})}
+                    actions=@(
+                        [ordered]@{id='message-held';type='message';text='The last of them falls. The ground is yours.'},
+                        [ordered]@{id='reward-held';type='grant_item';item='Wood';quantity=10},
+                        [ordered]@{id='stop-defense';type='timer_cancel';timer_id='defense'})
+                    next_stage=$null;outcome='complete'},
+                [ordered]@{id='overrun';priority=30;when=[ordered]@{op='ALL';children=@(
+                        [ordered]@{op='EVENT';event='timer_elapsed';where=[ordered]@{timer_id='defense'}},
+                        [ordered]@{op='THRESHOLD';measure='spawned_enemies_remaining';comparison='gte';value=1;action_id='wave'})}
+                    actions=@([ordered]@{id='message-overrun';type='message';text='The ten minutes burn away. They still stand. The ward breaks.'})
+                    next_stage=$null;outcome='fail'},
+                [ordered]@{id='reinforce';priority=20;when=[ordered]@{op='ALL';children=@(
+                        [ordered]@{op='EVENT';event='kill'},
+                        [ordered]@{op='THRESHOLD';measure='time_since_stage_entered';comparison='gte';value=180},
+                        [ordered]@{op='THRESHOLD';measure='spawned_enemies_remaining';comparison='gte';value=6;action_id='wave'})}
+                    actions=@(
+                        [ordered]@{id='message-reinforce';type='message';text='Three minutes gone and the pack is barely thinned. More come.'},
+                        [ordered]@{id='reinforcements';type='spawn';kind='creature';prefab='Greyling';count=4;radius=14})
+                    next_stage='besieged';outcome=$null},
+                [ordered]@{id='mercy';priority=10;when=[ordered]@{op='ALL';children=@(
+                        [ordered]@{op='EVENT';event='player_died'},
+                        [ordered]@{op='THRESHOLD';measure='player_deaths_in_stage';comparison='gte';value=2})}
+                    actions=@(
+                        [ordered]@{id='message-mercy';type='message';text='Twice you have fallen. The ward releases you rather than watch a third.'},
+                        [ordered]@{id='clear-mercy';type='clear_spawned';action_id='wave'})
+                    next_stage=$null;outcome='complete'})},
+            [ordered]@{id='besieged';entry_actions=@();transitions=@(
+                [ordered]@{id='endured';priority=40;when=[ordered]@{op='ALL';children=@(
+                        [ordered]@{op='EVENT';event='kill'},
+                        [ordered]@{op='THRESHOLD';measure='spawned_enemies_cleared';comparison='gte';value=4;action_id='reinforcements'})}
+                    actions=@(
+                        [ordered]@{id='message-endured';type='message';text='Even the second wave breaks on you. The ward holds.'},
+                        [ordered]@{id='reward-endured';type='grant_item';item='Wood';quantity=20},
+                        [ordered]@{id='stop-siege';type='timer_cancel';timer_id='defense'})
+                    next_stage=$null;outcome='complete'},
+                [ordered]@{id='fell';priority=30;when=[ordered]@{op='ALL';children=@(
+                        [ordered]@{op='EVENT';event='timer_elapsed';where=[ordered]@{timer_id='defense'}},
+                        [ordered]@{op='THRESHOLD';measure='spawned_enemies_remaining';comparison='gte';value=1;action_id='reinforcements'})}
+                    actions=@([ordered]@{id='message-fell';type='message';text='The ward gutters out with the last of the time.'})
+                    next_stage=$null;outcome='fail'})}
+        )
+        bindings=@([ordered]@{id='default';experience_id='defense-selftest';target_kinds=@('sign','player_built_piece','item_stand','dedicated_charm')})
+    }
+    return New-FixturePack $RuntimeRoot 'defense-selftest' $Version $experience
 }
 
 function New-Fixture([string] $Name) {
@@ -249,6 +315,33 @@ try {
     Assert-True ($cleanup.verdict -eq 'restored') 'Fixture Cleanup did not pass.'
     Assert-Restored $normal
 
+    # A second content profile: the revision gate serves the lap's content, not one named quest.
+    $defense = New-Fixture 'Valheim-defense'
+    $defenseRun = 'defense'
+    $defensePrepared = & $harness -Action Prepare -RunId $defenseRun -ValheimRoot $defense.Valheim -EvidenceRoot $evidenceRoot -FixtureMode -ContentProfile defense | ConvertFrom-Json
+    Assert-True ($defensePrepared.verdict -eq 'prepared') 'Defense-profile Prepare did not pass.'
+    $defensePack = New-DefensePack $defense.Runtime '1.0.0' 8
+    $defenseR1 = & $harness -Action ValidateRevision -RunId $defenseRun -ValheimRoot $defense.Valheim -EvidenceRoot $evidenceRoot -FixtureMode -ExpectedVersion 1.0.0 | ConvertFrom-Json
+    Assert-True ($defenseR1.verdict -eq 'valid' -and $defenseR1.identity.content_profile -eq 'defense') 'Defense content did not pass its own profile gate.'
+    # The profile is recorded by Prepare, so a later step cannot quietly gate the wrong content.
+    $switched = $false
+    try {
+        & $harness -Action ValidateRevision -RunId $defenseRun -ValheimRoot $defense.Valheim -EvidenceRoot $evidenceRoot -FixtureMode -ExpectedVersion 1.0.0 -ContentProfile woodbound | Out-Null
+    } catch { $switched = $_.Exception.Message -match 'cannot validate woodbound' }
+    Assert-True $switched 'A prepared run allowed its content profile to be switched mid-lap.'
+    # Drift in the effects the lap depends on is refused by the machine, not found at the keyboard:
+    # a six-Greyling wave cannot answer a verdict about clearing eight.
+    Remove-Item -LiteralPath $defensePack -Force
+    New-DefensePack $defense.Runtime '1.0.0' 6 | Out-Null
+    $drifted = $false
+    try {
+        & $harness -Action ValidateRevision -RunId $defenseRun -ValheimRoot $defense.Valheim -EvidenceRoot $evidenceRoot -FixtureMode -ExpectedVersion 1.0.0 | Out-Null
+    } catch { $drifted = $_.Exception.Message -like '*expected message|spawn:creature:Greyling:8:12|timer_start:defense:600*' }
+    Assert-True $drifted 'The profile gate accepted content whose staged wave had drifted.'
+    $defenseCleanup = & $harness -Action Cleanup -RunId $defenseRun -ValheimRoot $defense.Valheim -EvidenceRoot $evidenceRoot -FixtureMode | ConvertFrom-Json
+    Assert-True ($defenseCleanup.verdict -eq 'restored') 'Defense-profile Cleanup did not pass.'
+    Assert-Restored $defense
+
     $interrupted = New-Fixture 'Valheim-interrupted'
     $faultStopped = $false
     try {
@@ -270,7 +363,7 @@ try {
     $succeeded = $true
     [ordered]@{
         schema='comfy-quest-validation-lap-self-test/v1';result='passed'
-        checks=@('parser','plan','running-game refusal','quarantine','state quarantine','inbox-dev quarantine','deployed hashes','safety false','exact r1 contract','private-world arm','staging gate','activation confirm','r2-only final message','human pacing','valid receipt object','strict JSON','machine timeout','shared live log','interrupted cleanup','byte-exact restore')
+        checks=@('parser','plan','running-game refusal','quarantine','state quarantine','inbox-dev quarantine','deployed hashes','safety false','exact r1 contract','private-world arm','staging gate','activation confirm','r2-only final message','second content profile','profile switch refusal','content drift refusal','human pacing','valid receipt object','strict JSON','machine timeout','shared live log','interrupted cleanup','byte-exact restore')
     } | ConvertTo-Json -Depth 6
 } finally {
     if ($succeeded -and (Test-ChildPathSafe $captures $fixtureRoot)) {

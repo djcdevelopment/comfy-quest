@@ -27,6 +27,10 @@ not invent new fixed positions that the anchor will have to unwind.
 
 - Phase 4 scoping receives this beside the seat's composition direction (a
   horizontal top bar that minimizes to four dots) and the F9 switch-cost brief.
+- The W2 interim (landed 2026-08-20) honours this by not choosing a position at
+  all: the deadline pill's vertical anchor is a player-set fraction of screen
+  height (`Presentation/DeadlineAnchor`). It is a down payment on the anchor's
+  configurability, not a competitor to it, and the real anchor subsumes it.
 - Until the anchor exists, every new surface decision must answer "where does the
   player already look?" before choosing a position.
 - Combat is the design's hardest case and its acceptance test: an alert scheme

@@ -287,8 +287,16 @@ ledger: the THRESHOLD spawn tally raced object destruction (8-for-8 kills counte
 zero; fix strategy = bounded recheck + explaining ignored receipts), and the running
 deadline carried no perceived tension (presentation, not code). The close-out
 strategy lives at `docs/phase-3-close-strategy.md`; decisions are recorded in
-`docs/adr/`. Session 3 (short, targeted) takes the three exit verdicts once W1/W2
-land.
+`docs/adr/`.
+
+Both blockers were fixed the same day, along with the session's copy and legibility
+findings and the harness generalization session 3 turned out to need (strategy W1–W4;
+ADRs 0006 and 0007). Reading the run's own receipts during that work proved the tally
+diagnosis outright — the victory route matched at the deadline event, so the tally was
+stale rather than broken — and disproved one recorded finding, which is corrected in
+place in the backlog. **Phase 3 now waits on one thing: lap session 3**
+(`docs/runbooks/OMEN-LAP-PHASE3-EXIT-S3.md`), a short defense run that takes the three
+exit verdicts with a tally that counts and a clock that reads.
 
 ## Phase 4 — Quest Lab spellbook (02)
 

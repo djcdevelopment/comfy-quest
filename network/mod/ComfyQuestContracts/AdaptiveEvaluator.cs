@@ -34,6 +34,21 @@ public sealed class AdaptiveObservation {
 public static class AdaptiveEvaluator {
   public static bool Satisfied(TriggerExpression expression,TriggerEvaluationContext context)=>Observe(expression,context).Satisfied;
 
+  /// <summary>True when this expression reads a tally the world supplies fresh at evaluation time.
+  /// Those are the only measures that can change between an event and the moment the event's own
+  /// consequences settle: the spawn tally is re-polled per evaluation, while deaths come from
+  /// persisted state and the elapsed measures from the clock. A route gated on one of them is a
+  /// route worth re-reading shortly after the event that should have satisfied it.</summary>
+  public static bool ReadsWorldTally(TriggerExpression expression) {
+    if(expression==null)return false;
+    if(string.Equals(expression.Op,"THRESHOLD",StringComparison.OrdinalIgnoreCase)
+        &&AdaptiveMeasureCatalog.TryGet(expression.Measure,out var definition)
+        &&definition.RequiresSpawnAction)return true;
+    foreach(var child in expression.Children??new List<TriggerExpression>())
+      if(ReadsWorldTally(child))return true;
+    return false;
+  }
+
   public static TriggerProgress Progress(TriggerExpression expression,TriggerEvaluationContext context){var observation=Observe(expression,context);return new TriggerProgress{Current=observation.Current,Required=observation.Required};}
 
   public static AdaptiveObservation Observe(TriggerExpression expression,TriggerEvaluationContext context) {

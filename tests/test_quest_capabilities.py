@@ -173,9 +173,15 @@ class QuestCapabilityManifestTests(unittest.TestCase):
         self.assertIn("RuntimePatching.TryPatch", runtime_source)
 
         engine = (RUNTIME / "RuntimeExperienceEngine.cs").read_text(encoding="utf-8")
-        reject = engine.index("!active.Subscriptions.Contains(evt.Name)")
-        bindings = engine.index("foreach (var wear in Bindings(active))")
-        self.assertLess(reject, bindings)
+        # The high-frequency lane rejects an unsubscribed event before any scene walk. Scoped to
+        # the event path: the bounded recheck (ADR 0006) also walks bindings, but it runs on the
+        # once-a-second tick and only while a binding is armed, never per witnessed event.
+        on_event = engine[engine.index("public void OnEvent("):engine.index("void Apply(")]
+        self.assertLess(
+            on_event.index("!active.Subscriptions.Contains(evt.Name)"),
+            on_event.index("foreach (var wear in Bindings(active))"),
+        )
+        self.assertIn("if (rechecks.Count == 0) return;", engine)
         self.assertIn("ExperienceCompiler.CompileProductionJson", engine)
         self.assertIn("cachedActive", engine)
 

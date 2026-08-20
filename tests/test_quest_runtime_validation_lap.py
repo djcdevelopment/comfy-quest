@@ -49,11 +49,48 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
             "The offering is heard. Reclaim one piece to seal the rite.",
             "The circuit closes. The charm remembers this telling.",
             "The circuit closes. The Charm remembers a new telling.",
-            "Stage 2 must drop Wood twice within 30 seconds.",
-            "Stage 3 must pick up Wood.",
+            "COUNT:2:30:[EVENT:item_dropped:Wood]",
+            "EVENT:item_picked_up:Wood",
             "normalized_experience_sha256",
         ):
             self.assertIn(expected, source)
+
+    def test_the_revision_gate_serves_the_laps_content_not_one_named_quest(self) -> None:
+        # Phase 3 exit session 2 ran the desperate-defense content through gates that asserted
+        # the Woodbound Signal by name, so the staging proof had to be assembled by hand at the
+        # keyboard while the seat waited. A profile pins what must be true and nothing Studio is
+        # free to generate: stage and route ids stay unpinned, shape and copy do not.
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("$contentProfiles = @{", source)
+        self.assertIn("function Assert-ProfileCandidate(", source)
+        self.assertNotIn("Assert-WoodboundCandidate", source)
+        self.assertIn("function Resolve-ContentProfile(", source)
+        self.assertIn("content_profile=(Resolve-ContentProfile $null)", source)
+        self.assertIn("cannot validate $profileName", source)
+        # The defense profile pins the numbers session 3's verdicts depend on.
+        for expected in (
+            "'Ten-Minute Desperate Defense'",
+            "spawn:creature:Greyling:8:12",
+            "timer_start:defense:600",
+            "ALL:[EVENT:kill:|THRESHOLD:spawned_enemies_cleared:gte:8:wave]",
+            "ALL:[EVENT:timer_elapsed:{timer_id=defense}|THRESHOLD:spawned_enemies_remaining:gte:1:wave]",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, source)
+        # Both open ledger rows have a machine form now: a counted kill must report its count,
+        # and the win must be carried by the kills rather than by the deadline event.
+        self.assertIn("'kill_partial'", source)
+        self.assertIn("'wave_cleared'", source)
+        self.assertIn("$_.EventName -eq 'kill' -and $_.RequiredCount -ge 2 -and $_.CurrentCount -ge 1", source)
+        self.assertIn(
+            "$_.Operation -eq 'transition' -and $_.Status -eq 'complete' -and $_.EventName -eq 'kill'",
+            source,
+        )
+        selftest = (HARNESS.parent / "Test-QuestRuntimeValidationLap.ps1").read_text(encoding="utf-8")
+        self.assertIn("function New-DefensePack(", selftest)
+        self.assertIn("'second content profile'", selftest)
+        self.assertIn("'profile switch refusal'", selftest)
+        self.assertIn("'content drift refusal'", selftest)
 
     def test_monitor_separates_human_pacing_from_machine_timeout(self) -> None:
         source = HARNESS.read_text(encoding="utf-8")
@@ -202,6 +239,29 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         self.assertIn("The Woodbound Signal", source)
         self.assertIn("player experience", source.lower())
         self.assertIn("ArmPrivateWorld", source)
+
+    def test_the_session_three_runbook_carries_the_beats_session_two_lost(self) -> None:
+        # A runbook edit that changes sequencing gets the same review a code change gets:
+        # session 2's defense script omitted the CAST beat entirely and the quest ignored
+        # the player until a receipt explained why. This lap's script leads with it, gates
+        # the defense content by profile, and takes both open ledger rows by machine.
+        source = (ROOT / "docs" / "runbooks" / "OMEN-LAP-PHASE3-EXIT-S3.md").read_text(
+            encoding="utf-8"
+        )
+        for expected in (
+            "Prepare -ContentProfile defense",
+            "Cast the ward's anchor",
+            "do not skip",
+            "kill_partial",
+            "wave_cleared",
+            "DeadlineAnchor",
+            "ArmPrivateWorld",
+            "No second revision",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, source)
+        # The CAST beat comes before the beat that needs it.
+        self.assertLess(source.index("Cast the ward's anchor"), source.index("Start the defense"))
 
 
 if __name__ == "__main__":

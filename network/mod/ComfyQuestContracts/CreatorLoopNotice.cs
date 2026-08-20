@@ -62,7 +62,12 @@ public sealed class CreatorLoopNotice {
   public bool Idle { get; set; }
 
   /// <summary>What a check proved. Never activation language: activating is the load
-  /// step's verb, and the validation lap recorded "loaded" here as the ambiguity.</summary>
+  /// step's verb, and the validation lap recorded "loaded" here as the ambiguity.
+  ///
+  /// "Choose" counts quests, not candidates. Session 2 of the Phase 3 exit lap had one quest
+  /// staged in two versions and was told "2 quests are ready. Open F9 to choose." — the player
+  /// hunted for a chooser that does not exist, because two versions of one quest offer exactly
+  /// one action. A player-facing count must count the noun the player can see.</summary>
   public static CreatorLoopNotice Check(
       IReadOnlyList<PackCandidate> candidates, ActiveSet active,
       string loadKey = "F11", string drawerKey = "F9") {
@@ -90,14 +95,15 @@ public sealed class CreatorLoopNotice {
         Detail = detail,
         Idle = rejected == 0,
       };
-    if (valid.Length == 1)
+    var quests = Quests(valid);
+    if (quests == 1)
       return new() {
         Headline = Title(latest) + " " + latest.Manifest.Version
             + " is ready. Press " + loadKey + " to play it." + rejectedSuffix,
         Detail = detail,
       };
     return new() {
-      Headline = valid.Length.ToString(CultureInfo.InvariantCulture)
+      Headline = quests.ToString(CultureInfo.InvariantCulture)
           + " quests are ready. Open " + drawerKey + " to choose." + rejectedSuffix,
       Detail = detail,
     };
@@ -163,11 +169,12 @@ public sealed class CreatorLoopNotice {
         .ThenBy(value => value.Manifest.PackId, StringComparer.Ordinal)
         .ToArray();
     var latest = valid.Length == 0 ? null : valid[0];
+    var quests = Quests(valid);
     if (latest != null && !Matches(active, latest))
-      return valid.Length > 1
+      return quests > 1
           ? new() {
               State = QuestCardState.Choice,
-              Line = valid.Length.ToString(CultureInfo.InvariantCulture)
+              Line = quests.ToString(CultureInfo.InvariantCulture)
                   + " quests ready — choose",
             }
           : new() {
@@ -190,6 +197,12 @@ public sealed class CreatorLoopNotice {
                 .ToString("HH:mm", CultureInfo.InvariantCulture))
         + (string.IsNullOrWhiteSpace(active.ActivationId) ? ""
             : " · activation " + Tail(active.ActivationId));
+
+  /// <summary>How many distinct quests these candidates offer. Versions of one quest are one
+  /// quest: they share a pack id, and the loop's only action on them is "play the newest".</summary>
+  static int Quests(IReadOnlyList<PackCandidate> valid) =>
+      valid.Select(value => value.Manifest?.PackId ?? "")
+          .Distinct(StringComparer.Ordinal).Count();
 
   static bool Matches(ActiveSet active, PackCandidate candidate) =>
       active != null && candidate?.Manifest != null

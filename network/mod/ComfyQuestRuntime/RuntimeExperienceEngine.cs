@@ -12,6 +12,8 @@ sealed class RuntimeExperienceEngine {
   const string Prefix = "comfyQuestRuntime.";
   const int MaxRecentEvidence = 8;
   const int MaxIdenticalRejections = 3;
+  const int RecheckTicks = 5;
+  const int MaxArmedRechecks = 32;
   readonly string root;
   readonly RuntimeReceiptStore receipts;
   readonly ActionExecutionLedger ledger;
@@ -21,13 +23,19 @@ sealed class RuntimeExperienceEngine {
   readonly Func<bool> privateConfirmed;
   readonly Dictionary<string, DateTimeOffset> recentEventKeys =
       new(StringComparer.Ordinal);
+  /// <summary>Bindings owed a bounded re-read, and how many ticks each is still owed (ADR 0006).</summary>
+  readonly Dictionary<string, int> rechecks = new(StringComparer.Ordinal);
   readonly object evidenceGate = new();
   readonly List<CreatorEvidenceLine> recentEvidence = new();
   string deadlineLine;
   bool deadlineUrgent;
+  string deadlineError;
   int lastOrphanCount;
   string rejectionKey;
   int rejectionRepeats;
+  string countedKey;
+  int countedCurrent;
+  string unboundReported;
   DateTimeOffset nextTimerPoll;
   Active cachedActive;
   DateTime cachedActiveWriteUtc;
@@ -79,8 +87,94 @@ sealed class RuntimeExperienceEngine {
       OnEvent(elapsed);
       timers.Acknowledge(timer.Key);
     }
+    RunRechecks(now);
     RefreshDeadline(now);
   }
+
+  /// <summary>The bounded catch-up (ADR 0006). Evaluation is event-driven, but a route gated on a
+  /// tally the world supplies fresh can turn true just after the event that should have satisfied
+  /// it: session 2's eighth kill was evaluated inside Character.OnDeath's own call stack, a frame
+  /// before ZDOMan let the corpse go, so the wave read "7 cleared" and — with nothing to re-read it —
+  /// the win only landed nine minutes later, when the deadline event happened to evaluate the same
+  /// route again. Each armed binding re-runs the same observation pass against the same routes for a
+  /// few ticks and then goes quiet; no event is fabricated and no fact gains a second source.</summary>
+  void RunRechecks(DateTimeOffset now) {
+    if (rechecks.Count == 0) return;
+    try {
+      if (!TryLoad(out var active, out _)) { rechecks.Clear(); return; }
+      foreach (var wear in Bindings(active)) {
+        if (rechecks.Count == 0) break;
+        var view = wear == null ? null : wear.GetComponent<ZNetView>();
+        var zdo = view == null ? null : view.GetZDO();
+        if (zdo == null || !view.IsOwner()) continue;
+        var reference = Read(zdo);
+        if (reference == null || reference.ContentHash != active.ContentHash) continue;
+        var identity = Identity(zdo, active);
+        if (!rechecks.TryGetValue(identity.Key, out var remaining)) continue;
+        var observed = RuntimeObservation.Facts(
+            zdo, spawned, identity.Key, active.ContentHash);
+        var decision = workflows.Recheck(
+            identity, active.Document, now, observed.Spatial, observed.Encounter);
+        if (decision != null) {
+          rechecks.Remove(identity.Key);
+          Apply(active, zdo, decision, LastEvent(identity), NewRecheckId());
+          continue;
+        }
+        if (remaining > 1) { rechecks[identity.Key] = remaining - 1; continue; }
+        rechecks.Remove(identity.Key);
+        ReportRecheckExpired(active, zdo, identity, observed, now);
+      }
+    } catch (Exception e) {
+      Write("action", "runtime_recheck_failed", null, null, e.Message, null);
+    }
+  }
+
+  /// <summary>One receipt when an armed window closes with the route still unmet, carrying what the
+  /// last read actually saw. Session 2's ledger row existed because nothing ever said "still 7 of 8".</summary>
+  void ReportRecheckExpired(
+      Active active, ZDO zdo, WorkflowIdentity identity, ObservedFacts observed, DateTimeOffset now) {
+    var state = workflows.Get(identity);
+    var stage = active.Document.Stages.FirstOrDefault(value => value.Id == state?.StageId);
+    var route = stage?.Transitions?.OrderByDescending(value => value.Priority)
+        .ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault();
+    var context = Context(active.Document, state, observed, now);
+    var trace = TriggerEvaluator.Explain(route?.When, state?.History, context);
+    WriteReceipt(EventReceipt(
+        "recheck_expired", active, zdo.m_uid.ToString(), state?.History?.LastOrDefault(),
+        state?.StageId, state?.StageId,
+        Counted(trace, TriggerEvaluator.Measure(route?.When, state?.History, context)),
+        NewRecheckId(), trace));
+  }
+
+  /// <summary>Arm a binding for the bounded re-read. Re-arming on every ignored event is deliberate:
+  /// the window a settle needs starts at the last event, not the first.</summary>
+  void Arm(string ownerKey) {
+    if (string.IsNullOrWhiteSpace(ownerKey)) return;
+    if (rechecks.Count >= MaxArmedRechecks && !rechecks.ContainsKey(ownerKey)) return;
+    rechecks[ownerKey] = RecheckTicks;
+  }
+
+  /// <summary>A stage worth re-reading after its own event: one whose routes are gated on a tally the
+  /// world supplies fresh at evaluation time. Deaths and elapsed time do not race their own event.</summary>
+  static bool Rechecks(ExperienceStage stage) =>
+      (stage?.Transitions ?? new()).Any(value => AdaptiveEvaluator.ReadsWorldTally(value?.When));
+
+  RuntimeEvent LastEvent(WorkflowIdentity identity) {
+    try { return workflows.Get(identity)?.History?.LastOrDefault(); }
+    catch { return null; }
+  }
+
+  TriggerEvaluationContext Context(
+      ExperienceDocument document, WorkflowProgress state, ObservedFacts observed, DateTimeOffset at) => new() {
+    At = at,
+    StageEnteredUtc = state?.StageEnteredUtc,
+    LastProgressUtc = state?.LastProgressUtc,
+    BindingPosition = observed?.Spatial?.BindingPosition,
+    SpawnedPositions = observed?.Spatial?.SpawnedPositions,
+    AuthoredAnchors = SpatialEvaluator.AnchorMap(document),
+    DeathsInStage = state?.DeathsInStage,
+    SpawnsByAction = observed?.Encounter?.SpawnsByAction,
+  };
 
   /// <summary>The authored deadline a player is currently racing, or null. Recomputed once a second
   /// beside the timer poll and cached, because the surface that draws it runs every frame.</summary>
@@ -176,74 +270,140 @@ sealed class RuntimeExperienceEngine {
           var stage = active.Document.Stages.FirstOrDefault(value => value.Id == state?.StageId);
           var route = stage?.Transitions?.OrderByDescending(value => value.Priority)
               .ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault();
-          var progress = TriggerEvaluator.Measure(route?.When, state?.History, evaluationContext);
+          // An ignored event now says why it was ignored. Session 2's eight kills every one read
+          // "0/1" — the top-level ALL's bare pass/fail — while the wave stood at seven of eight.
+          var trace = TriggerEvaluator.Explain(route?.When, state?.History, evaluationContext);
+          var progress = Counted(
+              trace, TriggerEvaluator.Measure(route?.When, state?.History, evaluationContext));
+          var line = ProgressLine(identity.Key, state?.StageId, route, progress);
           WriteReceipt(EventReceipt(
               "ignored", active, zdo.m_uid.ToString(), evt, state?.StageId,
-              state?.StageId, progress, correlationId));
+              state?.StageId, progress, correlationId, trace,
+              UnmetRoutes(stage, null, state?.History, evaluationContext)),
+              line, CreatorEvidenceKind.Story);
+          if (Rechecks(stage)) Arm(identity.Key);
           continue;
         }
-
-        var currentStage = active.Document.Stages.FirstOrDefault(value => value.Id == decision.StageId);
-        if (currentStage == null) continue;
-        var currentState = workflows.Get(identity);
-        var matchedProgress = TriggerEvaluator.Measure(decision.Transition.When, currentState?.History, decision.EvaluationContext);
-        var evidence = decision.IsPendingReplay
-            ? null : TriggerEvaluator.Explain(decision.Transition.When, currentState?.History, decision.EvaluationContext);
-        var rejectedEvidence = decision.IsPendingReplay
-            ? null : ExplainRejected(currentStage, decision.Transition, currentState?.History, decision.EvaluationContext);
-        WriteReceipt(EventReceipt(
-            "matched", active, zdo.m_uid.ToString(), evt, currentStage.Id,
-            decision.Transition.NextStage, matchedProgress, correlationId,
-            evidence, rejectedEvidence),
-            MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence),
-            CreatorEvidenceKind.Story);
-
-        var succeeded = true;
-        foreach (var action in decision.Transition.Actions ?? new())
-          succeeded &= Execute(
-              active, zdo, currentStage.Id, decision.Transition.Id, action, correlationId);
-        if (succeeded && !string.IsNullOrWhiteSpace(decision.Transition.NextStage)) {
-          var next = active.Document.Stages.FirstOrDefault(
-              value => value.Id == decision.Transition.NextStage);
-          foreach (var action in next?.EntryActions ?? new())
-            succeeded &= Execute(active, zdo, next.Id, "entry", action, correlationId);
-        }
-        if (!succeeded) continue;
-        if (workflows.Complete(decision)) {
-          WriteReceipt(new RuntimeReceipt {
-            Operation = "transition",
-            Status = string.IsNullOrWhiteSpace(decision.Transition.Outcome)
-                ? "advanced" : decision.Transition.Outcome,
-            PackId = active.PackId,
-            Version = active.Version,
-            ContentHash = active.ContentHash,
-            ActivationId = active.ActivationId,
-            CorrelationId = correlationId,
-            BindingZdo = zdo.m_uid.ToString(),
-            StageId = currentStage.Id,
-            TransitionId = decision.Transition.Id,
-            EventName = evt.Name,
-            EventTarget = evt.Target,
-            ActorRole = CooperativeEventContract.ActorRole(evt),
-            CurrentStageId = currentStage.Id,
-            NextStageId = decision.Transition.NextStage,
-            CurrentCount = matchedProgress.Current,
-            RequiredCount = matchedProgress.Required,
-            StageEnteredUtc = currentState?.StageEnteredUtc,
-            Evidence = evidence,
-            RejectedEvidence = rejectedEvidence,
-            Diagnostics = Array.Empty<ContractDiagnostic>(),
-          }, TransitionLine(currentStage.Id, decision.Transition), CreatorEvidenceKind.Story);
-        }
+        rechecks.Remove(identity.Key);
+        Apply(active, zdo, decision, evt, correlationId);
       }
 
       if (!foundBinding) {
         WriteReceipt(EventReceipt("unbound", active, null, evt, null, null,
-            new TriggerProgress { Current = 0, Required = 1 }, correlationId));
+            new TriggerProgress { Current = 0, Required = 1 }, correlationId),
+            UnboundLine(active), CreatorEvidenceKind.Warning);
       }
     } catch (Exception e) {
       Write("action", "runtime_event_failed", active, null, e.Message, correlationId);
     }
+  }
+
+  /// <summary>Everything a matched route does: the matched receipt with its evidence, the transition's
+  /// actions, the next stage's entry actions, and the transition receipt. Shared by the event path and
+  /// the bounded recheck, so an arriving event and a settled tally advance a stage the same way and
+  /// leave the same trail. The cause is the event that earned the match — for a recheck, the last one
+  /// in history, because a recheck never invents an event of its own.</summary>
+  void Apply(
+      Active active, ZDO zdo, WorkflowDecision decision, RuntimeEvent cause, string correlationId) {
+    var currentStage = active.Document.Stages.FirstOrDefault(value => value.Id == decision.StageId);
+    if (currentStage == null) return;
+    var currentState = workflows.Get(decision.Identity);
+    var matchedProgress = TriggerEvaluator.Measure(decision.Transition.When, currentState?.History, decision.EvaluationContext);
+    var evidence = decision.IsPendingReplay
+        ? null : TriggerEvaluator.Explain(decision.Transition.When, currentState?.History, decision.EvaluationContext);
+    var rejectedEvidence = decision.IsPendingReplay
+        ? null : ExplainRejected(currentStage, decision.Transition, currentState?.History, decision.EvaluationContext);
+    WriteReceipt(EventReceipt(
+        "matched", active, zdo.m_uid.ToString(), cause, currentStage.Id,
+        decision.Transition.NextStage, matchedProgress, correlationId,
+        evidence, rejectedEvidence),
+        MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence),
+        CreatorEvidenceKind.Story);
+
+    var succeeded = true;
+    foreach (var action in decision.Transition.Actions ?? new())
+      succeeded &= Execute(
+          active, zdo, currentStage.Id, decision.Transition.Id, action, correlationId);
+    if (succeeded && !string.IsNullOrWhiteSpace(decision.Transition.NextStage)) {
+      var next = active.Document.Stages.FirstOrDefault(
+          value => value.Id == decision.Transition.NextStage);
+      foreach (var action in next?.EntryActions ?? new())
+        succeeded &= Execute(active, zdo, next.Id, "entry", action, correlationId);
+    }
+    if (!succeeded) return;
+    if (workflows.Complete(decision)) {
+      WriteReceipt(new RuntimeReceipt {
+        Operation = "transition",
+        Status = string.IsNullOrWhiteSpace(decision.Transition.Outcome)
+            ? "advanced" : decision.Transition.Outcome,
+        PackId = active.PackId,
+        Version = active.Version,
+        ContentHash = active.ContentHash,
+        ActivationId = active.ActivationId,
+        CorrelationId = correlationId,
+        BindingZdo = zdo.m_uid.ToString(),
+        StageId = currentStage.Id,
+        TransitionId = decision.Transition.Id,
+        EventName = cause?.Name,
+        EventTarget = cause?.Target,
+        ActorRole = cause == null ? null : CooperativeEventContract.ActorRole(cause),
+        CurrentStageId = currentStage.Id,
+        NextStageId = decision.Transition.NextStage,
+        CurrentCount = matchedProgress.Current,
+        RequiredCount = matchedProgress.Required,
+        StageEnteredUtc = currentState?.StageEnteredUtc,
+        Evidence = evidence,
+        RejectedEvidence = rejectedEvidence,
+        Diagnostics = Array.Empty<ContractDiagnostic>(),
+      }, TransitionLine(currentStage.Id, decision.Transition), CreatorEvidenceKind.Story);
+    }
+  }
+
+  /// <summary>The counted clause the player is actually working on: the unmet node with the most left
+  /// to do. Without this an ignored receipt reports the top-level ALL's pass/fail, which is 0/1 no
+  /// matter how close the beat is.</summary>
+  static TriggerProgress Counted(TriggerClauseTrace trace, TriggerProgress fallback) {
+    var counted = Nodes(trace)
+        .Where(value => !value.Satisfied && value.Required > 1)
+        .OrderByDescending(value => value.Required)
+        .ThenByDescending(value => value.Current).FirstOrDefault();
+    return counted == null ? fallback
+        : new TriggerProgress { Current = counted.Current, Required = counted.Required };
+  }
+
+  static IEnumerable<TriggerClauseTrace> Nodes(TriggerClauseTrace trace) {
+    if (trace == null) yield break;
+    yield return trace;
+    foreach (var child in trace.Children ?? new List<TriggerClauseTrace>())
+      foreach (var found in Nodes(child)) yield return found;
+  }
+
+  /// <summary>The one line a player needs while a counted beat is still open — the beat, and how far
+  /// along it is — written only when the count actually moves. Session 2 killed eight of eight and the
+  /// screen said nothing at all: the receipts knew, no surface did.</summary>
+  string ProgressLine(
+      string ownerKey, string stage, ExperienceTransition route, TriggerProgress progress) {
+    if (progress == null || progress.Required <= 1 || progress.Current <= 0) return null;
+    var key = string.Join("|", ownerKey, stage, route?.Id);
+    lock (evidenceGate) {
+      if (string.Equals(countedKey, key, StringComparison.Ordinal)
+          && countedCurrent == progress.Current) return null;
+      countedKey = key;
+      countedCurrent = progress.Current;
+    }
+    return Describe(route?.When) + " — " + progress.Current + "/" + progress.Required + ".";
+  }
+
+  /// <summary>Said once per activation, at player altitude. Session 2 spoke in chat to start a quest,
+  /// the event arrived and matched the running content, and nothing answered because no Charm had been
+  /// cast. event/unbound is honest machinery; silence is what the player got.</summary>
+  string UnboundLine(Active active) {
+    lock (evidenceGate) {
+      if (string.Equals(unboundReported, active.ContentHash, StringComparison.Ordinal)) return null;
+      unboundReported = active.ContentHash;
+    }
+    return (string.IsNullOrWhiteSpace(active.Document?.Title) ? "This quest" : active.Document.Title)
+        + " has no Charm yet — aim at something you built and press ` to check it, then ` again to cast.";
   }
 
   bool IsDuplicate(RuntimeEvent evt) {
@@ -262,6 +422,11 @@ sealed class RuntimeExperienceEngine {
 
   static string NewCorrelationId() =>
       "evt-" + Guid.NewGuid().ToString("N").Substring(0, 12);
+
+  /// <summary>A recheck's own correlation prefix, so a receipt says plainly whether an arriving
+  /// event or a settled tally advanced the stage.</summary>
+  static string NewRecheckId() =>
+      "rck-" + Guid.NewGuid().ToString("N").Substring(0, 12);
 
   IReadOnlyList<WearNTear> Bindings(Active active) {
     var now = UnityEngine.Time.realtimeSinceStartup;
@@ -293,9 +458,9 @@ sealed class RuntimeExperienceEngine {
     ActivationId = active.ActivationId,
     CorrelationId = correlationId,
     BindingZdo = bindingZdo,
-    EventName = evt.Name,
-    EventTarget = evt.Target,
-    ActorRole = CooperativeEventContract.ActorRole(evt),
+    EventName = evt?.Name,
+    EventTarget = evt?.Target,
+    ActorRole = evt == null ? null : CooperativeEventContract.ActorRole(evt),
     CurrentStageId = currentStage,
     NextStageId = nextStage,
     CurrentCount = progress?.Current,
@@ -337,8 +502,16 @@ sealed class RuntimeExperienceEngine {
           }
         }
       }
-    } catch {
+      deadlineError = null;
+    } catch (Exception e) {
+      // Session 2 could not tell "no deadline is running" from "reading the deadline threw":
+      // this branch was silent. One receipt per distinct failure, then quiet until it changes.
       line = null;
+      if (!string.Equals(deadlineError, e.Message, StringComparison.Ordinal)) {
+        deadlineError = e.Message;
+        try { Write("transition", "deadline_unreadable", null, null, e.Message, null); }
+        catch { }
+      }
     }
     lock (evidenceGate) {
       deadlineLine = line;
@@ -355,10 +528,20 @@ sealed class RuntimeExperienceEngine {
       ExperienceStage stage,
       ExperienceTransition selected,
       IReadOnlyList<RuntimeEvent> history,
+      TriggerEvaluationContext context) =>
+      UnmetRoutes(stage, selected.Priority, history, context);
+
+  /// <summary>Why branches did not take this event, in their own words. With a rank, only the branches
+  /// that outrank the winner; without one, every branch — nothing was chosen, so nothing outranks.</summary>
+  static IReadOnlyList<RejectedTransitionEvidence> UnmetRoutes(
+      ExperienceStage stage,
+      int? abovePriority,
+      IReadOnlyList<RuntimeEvent> history,
       TriggerEvaluationContext context) {
     var rejected = new List<RejectedTransitionEvidence>();
     foreach (var candidate in (stage?.Transitions ?? new())
-        .Where(value => value != null && value.Priority > selected.Priority)
+        .Where(value => value != null
+            && (!abovePriority.HasValue || value.Priority > abovePriority.Value))
         .OrderByDescending(value => value.Priority)
         .ThenBy(value => value.Id, StringComparer.Ordinal)) {
       var trace = TriggerEvaluator.Explain(candidate.When, history, context);
@@ -449,7 +632,7 @@ sealed class RuntimeExperienceEngine {
       }
       switch (action.Type) {
         case "message":
-          MessageHud.instance?.ShowMessage(MessageHud.MessageType.Center, Param(action, "text"));
+          Say(Param(action, "text"));
           break;
         case "timer_start":
           timers.Start(identity, Param(action, "timer_id"),
@@ -481,6 +664,16 @@ sealed class RuntimeExperienceEngine {
           correlationId), ActionLine(action, "failed: " + e.Message), CreatorEvidenceKind.Warning);
       return false;
     }
+  }
+
+  /// <summary>The authored story speaks twice: Center carries the moment, the chat log keeps it.
+  /// Session 2 praised the story text and named the gap in the same breath — "we should also post it
+  /// in chat … so there's history of it not just the glimpse". The chat write is client-local; a
+  /// missing or unavailable chat window costs the moment nothing.</summary>
+  static void Say(string text) {
+    if (string.IsNullOrWhiteSpace(text)) return;
+    MessageHud.instance?.ShowMessage(MessageHud.MessageType.Center, text);
+    try { Chat.instance?.AddString(text); } catch { }
   }
 
   static string Param(ExperienceAction action, string name) =>
@@ -620,6 +813,9 @@ sealed class RuntimeExperienceEngine {
     ContentHash = active.ContentHash,
   };
 
+  /// <summary>What the running telling is doing right now, without re-announcing its name: the status
+  /// card owns the title, and session 2 read the same title stacked in three places as a loss of
+  /// section boundaries. An ending is reported as the player's outcome, never the raw token.</summary>
   public string DescribeProgress() {
     try {
       if (!TryLoad(out var active, out _)) return "not ready";
@@ -633,11 +829,11 @@ sealed class RuntimeExperienceEngine {
         if (progress == null) {
           var first = active.Document.Stages.FirstOrDefault(
               value => value.Id == active.Document.EntryStage);
-          return active.Document.Title + ": not started - "
+          return "Not started - "
               + Describe(first?.Transitions?.FirstOrDefault()?.When);
         }
         if (!string.IsNullOrWhiteSpace(progress.Outcome))
-          return active.Document.Title + ": " + progress.Outcome;
+          return Outcome(progress.Outcome);
         var stage = active.Document.Stages.FirstOrDefault(value => value.Id == progress.StageId);
         var transition = stage?.Transitions?.OrderByDescending(value => value.Priority)
             .ThenBy(value => value.Id, StringComparer.Ordinal).FirstOrDefault();
@@ -656,15 +852,22 @@ sealed class RuntimeExperienceEngine {
         var count = measured.Required > 1
             ? " - " + measured.Current + "/" + measured.Required : "";
         var running = Deadline();
-        return active.Document.Title + ": " + progress.StageId + " - "
+        return progress.StageId + " - "
             + Describe(transition?.When) + count + DescribeStageElapsed(progress.StageEnteredUtc)
             + (string.IsNullOrWhiteSpace(running) ? "" : " - " + running);
       }
-      return active.Document.Title + ": not started";
+      return "No Charm cast yet - aim at something you built and press ` to check it, then ` again to cast.";
     } catch {
       return "unavailable";
     }
   }
+
+  /// <summary>The authored ending in the player's words. "complete" and "fail" are the contract's
+  /// closed outcome vocabulary; a row that prints the token is showing machinery.</summary>
+  static string Outcome(string value) =>
+      string.Equals(value, "complete", StringComparison.OrdinalIgnoreCase) ? "Completed."
+      : string.Equals(value, "fail", StringComparison.OrdinalIgnoreCase) ? "Failed."
+      : value;
 
   public string CurrentStageId() {
     try {
@@ -835,6 +1038,8 @@ sealed class RuntimeExperienceEngine {
     cachedBindings = Array.Empty<WearNTear>();
     cachedBindingContentHash = null;
     recentEventKeys.Clear();
+    rechecks.Clear();
+    lock (evidenceGate) { countedKey = null; countedCurrent = 0; unboundReported = null; }
   }
 
   void ReportOrphanedBindings(Active active) {

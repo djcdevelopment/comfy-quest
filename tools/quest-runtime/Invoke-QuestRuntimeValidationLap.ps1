@@ -15,10 +15,14 @@ param(
     [string] $RunId = '',
     [string] $ValheimRoot = '',
     [string] $EvidenceRoot = '',
-    [ValidateSet('','startup','check_r1','load_r1','charm_ready','bind_r1','chat_advance','drop_partial','drop_advance','pickup_complete','check_r2','load_r2','orphan_r2')]
+    [ValidateSet('','startup','check_r1','load_r1','charm_ready','bind_r1','chat_advance','drop_partial','drop_advance','pickup_complete','kill_partial','wave_cleared','check_r2','load_r2','orphan_r2')]
     [string] $Expectation = '',
     [ValidateSet('','1.0.0','1.0.1')]
     [string] $ExpectedVersion = '',
+    # Which authored content this lap gates against. Empty resolves to the run's recorded profile,
+    # then to woodbound.
+    [ValidateSet('','woodbound','defense')]
+    [string] $ContentProfile = '',
     [ValidateRange(1,120)]
     [int] $MachineTimeoutSeconds = 15,
     [switch] $ActionObserved,
@@ -55,12 +59,63 @@ $logPath = Join-Path $ValheimRoot 'BepInEx\LogOutput.log'
 $runtimeDll = Join-Path $repoRoot 'network\mod\ComfyQuestRuntime\bin\Release\net48\ComfyQuestRuntime.dll'
 $contractsDll = Join-Path $repoRoot 'network\mod\ComfyQuestContracts\bin\Release\netstandard2.0\ComfyQuestContracts.dll'
 $jsonDll = Join-Path $repoRoot 'network\mod\ComfyQuestRuntime\bin\Release\net48\Newtonsoft.Json.dll'
-$expectedMessages = @(
-    'The charm wakes. Two offerings of wood, before the moment passes.',
-    'The offering is heard. Reclaim one piece to seal the rite.',
-    'The circuit closes. The charm remembers this telling.'
-)
-$expectedR2FinalMessage = 'The circuit closes. The Charm remembers a new telling.'
+# Content profiles: the authored shape a lap gates against, as data.
+#
+# Phase 3 exit session 2 ran the desperate-defense content through a harness whose revision and
+# activation gates asserted the Woodbound Signal by name, so the seat had to prove the staging gate
+# by hand at the keyboard. A gate that only trusts one quest cannot gate the next lap. A profile
+# pins what actually has to be true — title, stage and route shape in priority order, the exact
+# effects each route runs, its destination, its ending, and its copy — and nothing that Studio is
+# free to generate, so stage and route ids stay unpinned.
+$contentProfiles = @{
+    woodbound = @{
+        title = 'The Woodbound Signal'
+        stages = @(
+            @{ routes = @(
+                @{ shape='EVENT:chat_sent:normal'; actions=@('message'); next='@next'; outcome=''
+                   message='The charm wakes. Two offerings of wood, before the moment passes.' }) },
+            @{ routes = @(
+                @{ shape='COUNT:2:30:[EVENT:item_dropped:Wood]'; actions=@('message'); next='@next'; outcome=''
+                   message='The offering is heard. Reclaim one piece to seal the rite.' }) },
+            @{ routes = @(
+                @{ shape='EVENT:item_picked_up:Wood'; actions=@('message'); next=''; outcome='complete'
+                   message='The circuit closes. The charm remembers this telling.'
+                   r2_message='The circuit closes. The Charm remembers a new telling.' }) }
+        )
+    }
+    defense = @{
+        title = 'Ten-Minute Desperate Defense'
+        stages = @(
+            @{ routes = @(
+                @{ shape='EVENT:chat_sent:normal'
+                   actions=@('message','spawn:creature:Greyling:8:12','timer_start:defense:600')
+                   next='@next'; outcome=''
+                   message='The ward wakes. Hold this ground.' }) },
+            @{ routes = @(
+                @{ shape='ALL:[EVENT:kill:|THRESHOLD:spawned_enemies_cleared:gte:8:wave]'
+                   actions=@('message','grant_item:Wood:10','timer_cancel:defense')
+                   next=''; outcome='complete'
+                   message='The last of them falls. The ground is yours.' },
+                @{ shape='ALL:[EVENT:timer_elapsed:{timer_id=defense}|THRESHOLD:spawned_enemies_remaining:gte:1:wave]'
+                   actions=@('message'); next=''; outcome='fail'
+                   message='The ten minutes burn away. They still stand. The ward breaks.' },
+                @{ shape='ALL:[EVENT:kill:|THRESHOLD:time_since_stage_entered:gte:180:|THRESHOLD:spawned_enemies_remaining:gte:6:wave]'
+                   actions=@('message','spawn:creature:Greyling:4:14'); next='@next'; outcome=''
+                   message='Three minutes gone and the pack is barely thinned. More come.' },
+                @{ shape='ALL:[EVENT:player_died:|THRESHOLD:player_deaths_in_stage:gte:2:]'
+                   actions=@('message','clear_spawned:wave'); next=''; outcome='complete'
+                   message='Twice you have fallen. The ward releases you rather than watch a third.' }) },
+            @{ routes = @(
+                @{ shape='ALL:[EVENT:kill:|THRESHOLD:spawned_enemies_cleared:gte:4:reinforcements]'
+                   actions=@('message','grant_item:Wood:20','timer_cancel:defense')
+                   next=''; outcome='complete'
+                   message='Even the second wave breaks on you. The ward holds.' },
+                @{ shape='ALL:[EVENT:timer_elapsed:{timer_id=defense}|THRESHOLD:spawned_enemies_remaining:gte:1:reinforcements]'
+                   actions=@('message'); next=''; outcome='fail'
+                   message='The ward gutters out with the last of the time.' }) }
+        )
+    }
+}
 
 function Test-ChildPath([string] $Parent, [string] $Child) {
     $parentFull = [IO.Path]::GetFullPath($Parent).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
@@ -248,16 +303,71 @@ function Get-TokenSha256([Newtonsoft.Json.Linq.JToken] $Token) {
 
 function Get-MessageText([object] $Transition) {
     $messages = @($Transition.Actions | Where-Object { $_.Type -eq 'message' })
-    if ($messages.Count -ne 1 -or @($Transition.Actions).Count -ne 1) {
-        throw "Each Woodbound transition must carry exactly one message action: $($Transition.Id)"
+    if ($messages.Count -gt 1) {
+        throw "A transition may carry at most one message action: $($Transition.Id)"
     }
+    if ($messages.Count -eq 0) { return '' }
     if ($null -eq $messages[0].Parameters -or $null -eq $messages[0].Parameters['text']) {
         throw "Message action text is missing: $($Transition.Id)"
     }
     return [string]$messages[0].Parameters['text'].ToString()
 }
 
-function Assert-WoodboundCandidate([object] $Candidate, [string] $Version) {
+# One comparable descriptor per authored trigger, so a profile can pin the shape a lap depends on
+# without restating the compiler's schema. Copy travels separately; ids are never pinned.
+function Get-TriggerShape([object] $When) {
+    if ($null -eq $When) { return '' }
+    $op = [string]$When.Op
+    if ($op -eq 'EVENT') {
+        $where = ''
+        if ($null -ne $When.Where -and @($When.Where.Keys).Count -gt 0) {
+            $pairs = @($When.Where.Keys | Sort-Object | ForEach-Object { "$_=$($When.Where[$_])" })
+            $where = '{' + ($pairs -join ',') + '}'
+        }
+        return "EVENT:$([string]$When.Event):$([string]$When.Target)$where"
+    }
+    if ($op -eq 'THRESHOLD') {
+        return "THRESHOLD:$([string]$When.Measure):$([string]$When.Comparison):$([string]$When.Value):$([string]$When.ActionId)"
+    }
+    $children = @(@($When.Children) | ForEach-Object { Get-TriggerShape $_ }) -join '|'
+    if ($op -eq 'COUNT') { return "COUNT:$([string]$When.Count):$([string]$When.WithinSeconds):[$children]" }
+    return "${op}:[$children]"
+}
+
+function Get-ActionParameter([object] $Action, [string] $Name) {
+    if ($null -eq $Action.Parameters -or $null -eq $Action.Parameters[$Name]) { return '' }
+    return [string]$Action.Parameters[$Name].ToString()
+}
+
+# The same idea for effects: a lap that depends on eight Greylings and a 600-second ward should
+# fail the gate — not the seat — when the content stops saying so.
+function Get-ActionShape([object] $Action) {
+    $type = [string]$Action.Type
+    switch ($type) {
+        'message' { return 'message' }
+        'spawn' { return "spawn:$(Get-ActionParameter $Action 'kind'):$(Get-ActionParameter $Action 'prefab'):$(Get-ActionParameter $Action 'count'):$(Get-ActionParameter $Action 'radius')" }
+        'timer_start' { return "timer_start:$(Get-ActionParameter $Action 'timer_id'):$(Get-ActionParameter $Action 'seconds')" }
+        'timer_cancel' { return "timer_cancel:$(Get-ActionParameter $Action 'timer_id')" }
+        'grant_item' { return "grant_item:$(Get-ActionParameter $Action 'item'):$(Get-ActionParameter $Action 'quantity')" }
+        'clear_spawned' { return "clear_spawned:$(Get-ActionParameter $Action 'action_id')" }
+        default { return $type }
+    }
+}
+
+function Resolve-ContentProfile([object] $Context) {
+    if (-not [string]::IsNullOrWhiteSpace($ContentProfile)) { return $ContentProfile }
+    if ($null -ne $Context) {
+        $recorded = $Context.PSObject.Properties['content_profile']
+        if ($null -ne $recorded -and -not [string]::IsNullOrWhiteSpace([string]$recorded.Value)) {
+            return [string]$recorded.Value
+        }
+    }
+    return 'woodbound'
+}
+
+function Assert-ProfileCandidate([object] $Candidate, [string] $Version, [string] $ProfileName) {
+    $profile = $contentProfiles[$ProfileName]
+    if ($null -eq $profile) { throw "Unknown content profile: $ProfileName" }
     if (-not $Candidate.IsValid) {
         $detail = @($Candidate.Diagnostics | ForEach-Object { $_.Code + ': ' + $_.Message }) -join '; '
         throw "Questpack contract rejected $($Candidate.Path): $detail"
@@ -266,7 +376,7 @@ function Assert-WoodboundCandidate([object] $Candidate, [string] $Version) {
     $archive = [IO.Compression.ZipFile]::OpenRead($Candidate.Path)
     try {
         $entries = @($archive.Entries | Where-Object { $_.FullName.StartsWith('experiences/') -and $_.FullName.EndsWith('.json') })
-        if ($entries.Count -ne 1) { throw 'Woodbound Signal must contain exactly one experience document.' }
+        if ($entries.Count -ne 1) { throw "$($profile.title) must contain exactly one experience document." }
         $stream = $entries[0].Open()
         $reader = [IO.StreamReader]::new($stream)
         try { $json = $reader.ReadToEnd() } finally { $reader.Dispose(); $stream.Dispose() }
@@ -278,48 +388,71 @@ function Assert-WoodboundCandidate([object] $Candidate, [string] $Version) {
     try { $token = [Newtonsoft.Json.Linq.JToken]::ReadFrom($tokenReader, $settings) }
     finally { $tokenReader.Dispose() }
     $document = [Newtonsoft.Json.JsonConvert]::DeserializeObject($json, [ComfyQuestContracts.ExperienceDocument])
-    if ($document.Title -ne 'The Woodbound Signal') { throw 'Quest title must be The Woodbound Signal.' }
+    if ($document.Title -cne $profile.title) { throw "Quest title must be $($profile.title), found $($document.Title)." }
     if ($Candidate.Manifest.Version -ne $Version) { throw "Expected version $Version, found $($Candidate.Manifest.Version)." }
+    $wantedStages = @($profile.stages)
     $stages = @($document.Stages)
-    if ($stages.Count -ne 3) { throw "Woodbound Signal must have exactly three stages, found $($stages.Count)." }
-    $transitions = @($stages | ForEach-Object {
-        if (@($_.Transitions).Count -ne 1) { throw "Stage $($_.Id) must have exactly one transition." }
-        $_.Transitions[0]
-    })
-    $first = $transitions[0].When
-    $second = $transitions[1].When
-    $third = $transitions[2].When
-    if ($first.Op -ne 'EVENT' -or $first.Event -ne 'chat_sent' -or $first.Target -ne 'normal') {
-        throw 'Stage 1 must be normal local chat.'
+    if ($stages.Count -ne $wantedStages.Count) {
+        throw "$($profile.title) must have exactly $($wantedStages.Count) stages, found $($stages.Count)."
     }
-    if ($second.Op -ne 'COUNT' -or $second.Count -ne 2 -or $second.WithinSeconds -ne 30 -or @($second.Children).Count -ne 1 -or
-        $second.Children[0].Event -ne 'item_dropped' -or $second.Children[0].Target -ne 'Wood') {
-        throw 'Stage 2 must drop Wood twice within 30 seconds.'
-    }
-    if ($third.Op -ne 'EVENT' -or $third.Event -ne 'item_picked_up' -or $third.Target -ne 'Wood') {
-        throw 'Stage 3 must pick up Wood.'
-    }
-    if ($transitions[0].NextStage -ne $stages[1].Id -or $transitions[1].NextStage -ne $stages[2].Id -or
-        $transitions[2].Outcome -ne 'complete' -or -not [string]::IsNullOrWhiteSpace($transitions[2].NextStage)) {
-        throw 'Woodbound Signal stage order or completion outcome is invalid.'
-    }
-    $wantedFinal = if ($Version -eq '1.0.1') { $expectedR2FinalMessage } else { $expectedMessages[2] }
-    $actualMessages = @(
-        (Get-MessageText $transitions[0]),
-        (Get-MessageText $transitions[1]),
-        (Get-MessageText $transitions[2]))
-    $wantedMessages = @($expectedMessages[0],$expectedMessages[1],$wantedFinal)
-    for ($index = 0; $index -lt 3; $index++) {
-        if ($actualMessages[$index] -cne $wantedMessages[$index]) {
-            throw "Stage $($index + 1) message differs from the validated lap copy."
+    $secondRevision = ($Version -eq '1.0.1')
+    $actualMessages = @()
+    for ($stageIndex = 0; $stageIndex -lt $stages.Count; $stageIndex++) {
+        $stage = $stages[$stageIndex]
+        $wantedRoutes = @($wantedStages[$stageIndex].routes)
+        # Priority order, ties broken by ordinal id: exactly how the engine picks a winner.
+        $routes = @(@($stage.Transitions) | Sort-Object @{Expression={$_.Priority};Descending=$true},@{Expression={$_.Id}})
+        if ($routes.Count -ne $wantedRoutes.Count) {
+            throw "Stage $($stage.Id) must have exactly $($wantedRoutes.Count) route(s), found $($routes.Count)."
+        }
+        for ($routeIndex = 0; $routeIndex -lt $routes.Count; $routeIndex++) {
+            $route = $routes[$routeIndex]
+            $wanted = $wantedRoutes[$routeIndex]
+            $shape = Get-TriggerShape $route.When
+            if ($shape -cne [string]$wanted.shape) {
+                throw "Stage $($stage.Id) route $($route.Id) triggers on $shape, expected $($wanted.shape)."
+            }
+            $actions = @(@($route.Actions) | ForEach-Object { Get-ActionShape $_ }) -join '|'
+            $wantedActions = @($wanted.actions) -join '|'
+            if ($actions -cne $wantedActions) {
+                throw "Stage $($stage.Id) route $($route.Id) runs $actions, expected $wantedActions."
+            }
+            $wantedNext = ''
+            if ([string]$wanted.next -eq '@next') {
+                if ($stageIndex + 1 -ge $stages.Count) { throw "Stage $($stage.Id) has no following stage to advance into." }
+                $wantedNext = [string]$stages[$stageIndex + 1].Id
+            }
+            if ([string]$route.NextStage -ne $wantedNext) {
+                throw "Stage $($stage.Id) route $($route.Id) advances to '$([string]$route.NextStage)', expected '$wantedNext'."
+            }
+            if ([string]$route.Outcome -ne [string]$wanted.outcome) {
+                throw "Stage $($stage.Id) route $($route.Id) ends '$([string]$route.Outcome)', expected '$([string]$wanted.outcome)'."
+            }
+            $wantedMessage = [string]$wanted.message
+            if ($secondRevision -and $wanted.ContainsKey('r2_message')) { $wantedMessage = [string]$wanted.r2_message }
+            $actualMessage = Get-MessageText $route
+            if ($actualMessage -cne $wantedMessage) {
+                throw "Stage $($stage.Id) route $($route.Id) copy differs from the validated lap copy."
+            }
+            if (-not [string]::IsNullOrEmpty($actualMessage)) { $actualMessages += $actualMessage }
         }
     }
 
+    # Every message text is blanked, so the normalized hash answers exactly one question across
+    # revisions: did anything but the copy and the version change?
     $clone = $token.DeepClone()
-    $finalActions = $clone['stages'][2]['transitions'][0]['actions']
-    $finalMessage = @($finalActions | Where-Object { [string]$_['type'] -eq 'message' })
-    if ($finalMessage.Count -ne 1) { throw 'Compiled JSON final message shape is invalid.' }
-    $finalMessage[0]['text'] = [Newtonsoft.Json.Linq.JValue]::new('__WOODBOUND_FINAL_MESSAGE__')
+    $blanked = 0
+    foreach ($stage in @($clone['stages'])) {
+        foreach ($transition in @($stage['transitions'])) {
+            foreach ($action in @($transition['actions'])) {
+                if ([string]$action['type'] -eq 'message') {
+                    $action['text'] = [Newtonsoft.Json.Linq.JValue]::new('__MESSAGE__')
+                    $blanked++
+                }
+            }
+        }
+    }
+    if ($blanked -ne $actualMessages.Count) { throw 'Compiled JSON message shape disagrees with the contract document.' }
     return [ordered]@{
         pack_id = $Candidate.Manifest.PackId
         version = $Candidate.Manifest.Version
@@ -327,8 +460,9 @@ function Assert-WoodboundCandidate([object] $Candidate, [string] $Version) {
         package_sha256 = $Candidate.Sha256
         filename = [IO.Path]::GetFileName($Candidate.Path)
         experience_id = $document.Id
+        content_profile = $ProfileName
         normalized_experience_sha256 = Get-TokenSha256 $clone
-        final_message = $actualMessages[2]
+        final_message = $actualMessages[$actualMessages.Count - 1]
     }
 }
 
@@ -420,6 +554,12 @@ function Find-Expectation([string] $Name, [object] $Context, [object[]] $Rows) {
         'drop_partial' { $match = @($receipts | Where-Object { $_.Operation -eq 'event' -and $_.Status -eq 'ignored' -and $_.EventName -eq 'item_dropped' -and $_.CurrentCount -eq 1 -and $_.RequiredCount -eq 2 -and (Test-ReceiptIdentity $_ $revision) }) | Select-Object -Last 1 }
         'drop_advance' { $match = @($receipts | Where-Object { $_.Operation -eq 'transition' -and $_.Status -eq 'advanced' -and $_.EventName -eq 'item_dropped' -and $_.CurrentCount -eq 2 -and $_.RequiredCount -eq 2 -and (Test-ReceiptIdentity $_ $revision) }) | Select-Object -Last 1 }
         'pickup_complete' { $match = @($receipts | Where-Object { $_.Operation -eq 'transition' -and $_.Status -eq 'complete' -and $_.EventName -eq 'item_picked_up' -and (Test-ReceiptIdentity $_ $revision) }) | Select-Object -Last 1 }
+        # The machine form of session 2's two open ledger rows. A kill that leaves a counted beat
+        # unmet must now report the count the player is working on — every one of session 2's
+        # eight read 0/1 — and the win must be carried by the kills, not by the deadline event
+        # that happened to re-evaluate the same route nine minutes later.
+        'kill_partial' { $match = @($receipts | Where-Object { $_.Operation -eq 'event' -and $_.Status -eq 'ignored' -and $_.EventName -eq 'kill' -and $_.RequiredCount -ge 2 -and $_.CurrentCount -ge 1 -and (Test-ReceiptIdentity $_ $revision) }) | Select-Object -Last 1 }
+        'wave_cleared' { $match = @($receipts | Where-Object { $_.Operation -eq 'transition' -and $_.Status -eq 'complete' -and $_.EventName -eq 'kill' -and (Test-ReceiptIdentity $_ $revision) }) | Select-Object -Last 1 }
         'orphan_r2' { $match = @($receipts | Where-Object { $_.Operation -eq 'activation' -and $_.Status -eq 'orphaned_bindings' -and $_.CandidateCount -ge 1 -and (Test-ReceiptIdentity $_ $revision) }) | Select-Object -Last 1 }
         default { throw "Unsupported expectation: $Name" }
     }
@@ -710,6 +850,7 @@ function Invoke-Prepare {
         created_utc=[DateTimeOffset]::UtcNow.ToString('o'); updated_utc=$null
         prepared_utc=$null; armed_utc=$null; cleanup_utc=$null
         config=[ordered]@{existed=$configExisted; backup=$configBackup; original_sha256=$(if($configExisted){Get-Sha256 $configPath}else{$null})}
+        content_profile=(Resolve-ContentProfile $null)
         install=$install; active=$active; inbox=$inbox; state_files=$state; 'inbox-dev'=$inboxDev; receipt_baseline=$receiptBaseline
         log_baseline_sha256=$logHash; revisions=[pscustomobject]@{}; activations=[pscustomobject]@{}
         cleanup_errors=@()
@@ -760,7 +901,13 @@ function Invoke-ValidateRevision {
     if (@($candidates | Where-Object { -not $_.IsValid }).Count) { throw 'At least one isolated questpack failed Contracts inspection.' }
     $candidate = @($candidates | Where-Object { $_.Manifest.Version -eq $ExpectedVersion })
     if ($candidate.Count -ne 1) { throw "Expected exactly one $ExpectedVersion candidate, found $($candidate.Count)." }
-    $identity = Assert-WoodboundCandidate $candidate[0] $ExpectedVersion
+    $profileName = Resolve-ContentProfile $context
+    $recordedProfile = $context.PSObject.Properties['content_profile']
+    if ($null -ne $recordedProfile -and -not [string]::IsNullOrWhiteSpace([string]$recordedProfile.Value) -and
+        [string]$recordedProfile.Value -ne $profileName) {
+        throw "This run was prepared against the $([string]$recordedProfile.Value) content profile; it cannot validate $profileName."
+    }
+    $identity = Assert-ProfileCandidate $candidate[0] $ExpectedVersion $profileName
     $label = if ($ExpectedVersion -eq '1.0.0') { 'r1' } else { 'r2' }
     if ($label -eq 'r2') {
         # Session 1 of the Phase 3 exit lap staged 1.0.1 before 1.0.0 had ever been
@@ -778,7 +925,7 @@ function Invoke-ValidateRevision {
         }
         if ($identity.content_hash -ieq $r1.content_hash) { throw 'r2 did not produce a fresh content hash.' }
         if ($identity.normalized_experience_sha256 -ne $r1.normalized_experience_sha256) {
-            throw 'r2 changed more than the final message and version.'
+            throw 'r2 changed more than its message copy and version.'
         }
     }
     $context.revisions | Add-Member -NotePropertyName $label -NotePropertyValue ([pscustomobject]$identity) -Force

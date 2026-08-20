@@ -51,8 +51,19 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, engine)
-        self.assertLess(engine.index("workflows.Begin"), engine.index("TriggerEvaluator.Explain"))
-        self.assertLess(engine.index("TriggerEvaluator.Explain"), engine.index("workflows.Complete"))
+        # One place applies a matched route, and it explains before it completes. Both the event
+        # path and the bounded recheck go through it, so a settled tally and an arriving event
+        # leave the same trail.
+        apply_body = engine[
+            engine.index("void Apply("):engine.index("static TriggerProgress Counted(")
+        ]
+        self.assertLess(
+            apply_body.index("TriggerEvaluator.Explain"), apply_body.index("workflows.Complete")
+        )
+        self.assertLess(
+            engine.index("workflows.Begin"),
+            engine.index("Apply(active, zdo, decision, evt, correlationId);"),
+        )
 
     def test_activation_change_reports_one_bounded_orphan_scan(self) -> None:
         engine = ENGINE.read_text(encoding="utf-8")
@@ -187,10 +198,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("void OnGUI(){EnsureStyles();DrawDeadline();if(!drawerVisible)return;", plugin)
         # Urgency is a fact beside the line, never parsed back out of the rendered copy —
         # a wording change must not be able to kill the red state.
-        self.assertIn(
-            "UnityEngine.GUI.Label(rect,line,engine.DeadlineUrgent()?deadlineUrgentStyle:deadlineStyle)",
-            plugin,
-        )
+        self.assertIn("engine.DeadlineUrgent()?deadlineUrgentStyle:deadlineStyle", plugin)
         self.assertNotIn('" second"', plugin)
         self.assertIn("public bool DeadlineUrgent() {", engine)
         self.assertIn("engine?.Deadline()", plugin)
@@ -200,7 +208,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         for texture in ("deadlineBackground", "deadlineUrgentBackground"):
             with self.subTest(texture=texture):
                 self.assertIn(f"Destroy(ref {texture});", plugin)
-                self.assertIn(f'{texture}=Solid("runtime-deadline', plugin)
+                self.assertIn(f'{texture}=Framed("runtime-deadline', plugin)
         # The countdown is cached once a second, never recomputed per frame.
         self.assertIn("RefreshDeadline(now);", engine)
         self.assertIn("public string Deadline() {", engine)
@@ -209,6 +217,39 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         # The existing stage-elapsed line keeps its exact shape; remaining time is appended.
         self.assertIn('return " - in stage "', engine)
         self.assertIn('+ (string.IsNullOrWhiteSpace(running) ? "" : " - " + running)', engine)
+
+    def test_the_deadline_pill_cannot_be_read_as_someone_elses_hud_band(self) -> None:
+        # Phase 3 exit session 2: a live 600-second deadline rendered every second of its length
+        # and was never perceived. The read was never the problem — the presentation was. A flat
+        # 320x30 strip pinned at y=64 sat four pixels under a host HUD band in the same dark-strip
+        # treatment, and its fixed-pixel geometry shrank at high resolution. It is now a bordered
+        # pill sized to its copy, scaled with the screen, anchored where the player puts it, and
+        # its copy is a clock (TriggerCountdown.Seconds) rather than a count of seconds.
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        engine = ENGINE.read_text(encoding="utf-8")
+        countdown = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "TriggerCountdown.cs"
+        ).read_text(encoding="utf-8")
+        banner = plugin[plugin.index("void DrawDeadline()"):plugin.index("void DrawStatusCard()")]
+        # No fixed rect survives: the pill measures its own copy and scales with the screen.
+        self.assertNotIn("64f", banner)
+        self.assertIn("style.CalcSize(new UnityEngine.GUIContent(line))", banner)
+        self.assertIn("UnityEngine.GUI.matrix=UnityEngine.Matrix4x4.TRS", banner)
+        self.assertIn("UnityEngine.GUI.matrix=matrix;", banner)
+        self.assertIn("UnityEngine.Mathf.Clamp(deadlineAnchor.Value,.05f,.85f)", banner)
+        # The anchor is the player's, which is how this interim stays subordinate to ADR 0005
+        # rather than inventing one more fixed position for the alert anchor to unwind.
+        self.assertIn('deadlineAnchor=Config.Bind("Presentation","DeadlineAnchor"', plugin)
+        # A bordered pill, nine-sliced, in the drawer's own palette.
+        self.assertIn("static UnityEngine.Texture2D Framed(", plugin)
+        self.assertIn("static UnityEngine.GUIStyle PillStyle(", plugin)
+        self.assertIn("border=new UnityEngine.RectOffset(4,4,4,4)", plugin)
+        # Copy: a clock past a minute, seconds below it, composed only in Contracts.
+        self.assertIn("value<60?value.ToString(CultureInfo.InvariantCulture)", countdown)
+        self.assertIn("static string Clock(int value)", countdown)
+        # The swallowed read can no longer hide: one receipt per distinct failure, then quiet.
+        self.assertIn('Write("transition", "deadline_unreadable"', engine)
+        self.assertIn("deadlineError = null;", engine)
 
     def test_rejected_branches_explain_themselves_in_runtime_evidence(self) -> None:
         engine = ENGINE.read_text(encoding="utf-8")
@@ -296,7 +337,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             "public enum CreatorEvidenceKind { Plumbing, Story, Cast, Warning }", notice
         )
         self.assertIn(
-            "MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence),\n            CreatorEvidenceKind.Story);",
+            "MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence),\n        CreatorEvidenceKind.Story);",
             engine,
         )
         self.assertIn(
@@ -327,7 +368,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         # The two load-bearing design tokens: bright amber primary (dark ink) and the
         # urgent red; and the new textures are released like every other.
         self.assertIn('Solid("runtime-primary",new UnityEngine.Color(.914f,.659f,.247f,1f))', plugin)
-        self.assertIn('Solid("runtime-deadline-urgent",new UnityEngine.Color(.561f,.086f,.086f,.92f))', plugin)
+        self.assertIn('Framed("runtime-deadline-urgent",new UnityEngine.Color(.482f,.075f,.075f,.96f)', plugin)
         for texture in ("primaryBackground", "castRowBackground"):
             with self.subTest(texture=texture):
                 self.assertIn(f"Destroy(ref {texture});", plugin)
@@ -439,6 +480,92 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             engine.index("rejectionKey = null;"),
             engine.index("active.Subscriptions.Contains"),
         )
+
+    def test_a_settle_race_gets_a_bounded_recheck_instead_of_a_lost_win(self) -> None:
+        # Phase 3 exit session 2, the exit blocker: eight of eight spawned Greylings died and the
+        # wave counted none of them. Each kill was evaluated inside Character.OnDeath's own call
+        # stack, a frame before ZDOMan released the corpse, so the live tally still resolved the
+        # dying record — and nothing ever re-read it. The win only landed nine minutes later, when
+        # the deadline event happened to evaluate the same route again (receipts: eight
+        # event/ignored 12:07:21-12:08:14, then transition/complete on "held" at 12:17:17).
+        engine = ENGINE.read_text(encoding="utf-8")
+        workflow = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "WorkflowRuntime.cs"
+        ).read_text(encoding="utf-8")
+        adaptive = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "AdaptiveEvaluator.cs"
+        ).read_text(encoding="utf-8")
+        # The catch-up rides the existing once-a-second tick and is bounded, not a poll.
+        self.assertIn("const int RecheckTicks = 5;", engine)
+        self.assertIn("RunRechecks(now);", engine)
+        self.assertLess(engine.index("RunRechecks(now);"), engine.index("RefreshDeadline(now);"))
+        self.assertIn("rechecks[identity.Key] = remaining - 1;", engine)
+        self.assertIn("const int MaxArmedRechecks = 32;", engine)
+        # Only routes reading a tally the world supplies fresh are armed: deaths come from
+        # persisted state and elapsed time from the clock, and neither races its own event.
+        self.assertIn("AdaptiveEvaluator.ReadsWorldTally(value?.When)", engine)
+        self.assertIn("public static bool ReadsWorldTally(TriggerExpression expression)", adaptive)
+        self.assertIn("definition.RequiresSpawnAction", adaptive)
+        self.assertIn("if (Rechecks(stage)) Arm(identity.Key);", engine)
+        # The recheck re-reads; it never fabricates an event, and it writes nothing on a miss.
+        self.assertIn("public WorkflowDecision Recheck(", workflow)
+        self.assertIn("if(transition==null)return null;", workflow)
+        self.assertNotIn("state.History.Add", workflow[workflow.index("public WorkflowDecision Recheck("):])
+        # A receipt says which one advanced the stage, and one more says an armed window closed.
+        self.assertIn('"rck-" + Guid.NewGuid()', engine)
+        self.assertIn('"recheck_expired"', engine)
+
+    def test_an_ignored_event_says_what_it_was_still_waiting_for(self) -> None:
+        # Every one of session 2's eight ignored kills reported "0/1" — the top-level ALL's bare
+        # pass/fail — while the wave stood at seven of eight. The receipt now carries the clause
+        # trace and the count the player is actually working on, and the feed says so once per
+        # real step rather than once per event.
+        engine = ENGINE.read_text(encoding="utf-8")
+        ignored = engine[
+            engine.index("if (decision == null) {"):
+            engine.index("Apply(active, zdo, decision, evt, correlationId);")
+        ]
+        self.assertIn("TriggerEvaluator.Explain(route?.When, state?.History, evaluationContext)", ignored)
+        self.assertIn("UnmetRoutes(stage, null, state?.History, evaluationContext)", ignored)
+        self.assertIn("static TriggerProgress Counted(", engine)
+        self.assertIn("value.Required > 1", engine)
+        self.assertIn("string ProgressLine(", engine)
+        self.assertIn("countedCurrent == progress.Current) return null;", engine)
+
+    def test_the_player_altitude_answers_session_two_never_got(self) -> None:
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        engine = ENGINE.read_text(encoding="utf-8")
+        binding = BINDING.read_text(encoding="utf-8")
+        # Story text is said once and kept: Center carries the moment, chat keeps the history.
+        # "we should also post it in chat … so there's history of it not just the glimpse".
+        self.assertIn("static void Say(string text)", engine)
+        self.assertIn("Chat.instance?.AddString(text)", engine)
+        self.assertEqual(1, engine.count("MessageHud.MessageType.Center"))
+        # An unbound quest says so once, at player altitude, instead of ignoring input in silence.
+        self.assertIn("string UnboundLine(Active active)", engine)
+        self.assertIn("has no Charm yet", engine)
+        self.assertIn("UnboundLine(active), CreatorEvidenceKind.Warning", engine)
+        # The status card owns the title; the experience row speaks state and the player's outcome.
+        self.assertIn('static string Outcome(string value)', engine)
+        self.assertIn('? "Completed."', engine)
+        self.assertIn('? "Failed."', engine)
+        self.assertNotIn('active.Document.Title + ": "', engine)
+        # CHECK marks what it captured, names it, and the strip keeps a landed state after a cast.
+        self.assertIn("void Mark(GameObject host)", binding)
+        self.assertIn("void ClearMark()", binding)
+        self.assertIn("public void Release()", binding)
+        self.assertIn("static string Named(Piece piece,string fallback)", binding)
+        self.assertIn("Localization.instance.Localize(token)", binding)
+        self.assertIn("public string Landed=>landed;", binding)
+        self.assertIn('settled?"LANDED":"CHECK"', plugin)
+        self.assertIn("charms?.Release();", plugin)
+        # The pre-cast mark restores exactly what it borrowed, and writes nothing to the world.
+        mark = binding[
+            binding.index("void Mark(GameObject host)"):binding.index("public string Inscribe(")
+        ]
+        self.assertIn("pair.Key.SetPropertyBlock(pair.Value)", mark)
+        self.assertIn("UnityEngine.Object.Destroy(lamp.gameObject)", mark)
+        self.assertNotIn("zdo.Set(", mark)
 
     def test_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
         observation = (RUNTIME / "RuntimeObservation.cs").read_text(encoding="utf-8")

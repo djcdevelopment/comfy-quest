@@ -61,8 +61,18 @@ while the verbatims were fresh.
    choose." counted valid candidates; the player saw two *versions* of one quest
    and hunted for a chooser that doesn't exist. *Lesson: player-facing counts
    must count player-visible nouns; pin the copy against the noun, not the
-   collection size.* (Same family: a failed ending labeled "complete" — the
-   machinery's terminal state, not the authored outcome.)
+   collection size.*
+5. **We wrote a finding we had not checked against the receipts.** This retro's
+   first version reported that the defense's overrun labeled a failed ending
+   "complete". It did not: no overrun ever fired. The victory route won at the
+   deadline event, the engine recorded the win correctly, and the yellow text the
+   seat praised was the victory line arriving nine minutes late. The receipts were
+   sitting in the run capture the whole time and settled it in one pass — and in
+   settling it, they proved the tally defect outright. *Lesson: a finding written
+   from what the seat felt is a hypothesis; promote it only after the evidence the
+   lap already preserved has been read. The wrong write-up cost a workstream item
+   aimed at a bug that did not exist, and nearly buried the cleanest proof of the
+   one that did.*
 4. **A cue executed against unverified state.** Session 1's collapsed beat came
    from staging on cue rather than on evidence. Now a standing guardrail (any
    cue/state disagreement gets a one-line hold, never silent execution) *and* a
@@ -87,5 +97,8 @@ Added by this retro:
   world-derived facts requires a bounded catch-up; never assume same-frame settle.
 - **Copy pins name nouns:** new player-facing counts get a pin asserting what is
   being counted, not just the sentence.
+- **Read the capture before writing the finding:** a lap record's rows carry the
+  receipt that supports them, or they are marked as the seat's reading rather than
+  the run's.
 - **Runbook sequencing changes ride the harness self-test** where a machine gate
   exists (as the staging gate now demonstrates).

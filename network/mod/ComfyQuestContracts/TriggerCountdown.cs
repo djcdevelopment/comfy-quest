@@ -54,9 +54,22 @@ public static class TriggerCountdown {
     return deadline;
   }
 
-  /// <summary>Whole seconds with the unit a player reads, singular at one.</summary>
+  /// <summary>Whole seconds with the unit a player reads, singular at one — and a clock once more than
+  /// a minute is left. Phase 3 exit session 2 ran a real ten-minute deadline that rendered
+  /// "594 seconds remaining" once a second for its whole length and was never read as a countdown:
+  /// past a minute, a number of seconds is a log line, and only a clock is tension.</summary>
   public static string Seconds(int value)=>
-      value.ToString(CultureInfo.InvariantCulture)+(value==1?" second":" seconds");
+      value<60?value.ToString(CultureInfo.InvariantCulture)+(value==1?" second":" seconds")
+      :Clock(value);
+
+  /// <summary>m:ss, and h:mm:ss for the deadlines long enough to need it.</summary>
+  static string Clock(int value) {
+    var hours=value/3600;var minutes=value%3600/60;
+    return (hours>0
+            ?hours.ToString(CultureInfo.InvariantCulture)+":"+minutes.ToString("00",CultureInfo.InvariantCulture)
+            :minutes.ToString(CultureInfo.InvariantCulture))
+        +":"+(value%60).ToString("00",CultureInfo.InvariantCulture);
+  }
 
   static TriggerExpression Windowed(TriggerExpression expression) {
     if(expression==null)return null;
