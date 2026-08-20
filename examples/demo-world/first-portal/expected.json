@@ -13,16 +13,22 @@
       "backtick_requires_f9_drawer_open": true,
       "ui_mouse_cursor_selects_world_target": false,
       "must_be_immediately_visible_from_hub_arrival": true,
-      "beacon": {
-        "prefab": "piece_groundtorch_blue",
-        "count": 2,
+      "guidance_path": {
+        "breadcrumb_prefab": "itemstandh",
+        "breadcrumb_count": 3,
+        "breadcrumb_visual": "arcane_sight_only",
+        "destination_prefab": "piece_groundtorch",
+        "destination_light_style": "restrained_school_colour",
         "light_school": "social",
-        "infinite_fuel": true
+        "infinite_fuel": true,
+        "walking_lane_remains_clear": true
       }
     },
     "unavoidable_ascent_portal": {
       "from": "ground welcome camp",
       "to": "Creator Hub ascent portal",
+      "upper_portal_yaw": 0,
+      "arrival_faces_binding_target": true,
       "event_name": "player_teleported",
       "event_target": null,
       "imported_fork_state": "unbound_no_progress"

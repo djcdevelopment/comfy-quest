@@ -57,11 +57,11 @@ STATIONS = {
 
 COMPACT_STATION_NOTES = {
     "Combat": "Greyling at the rune; bow and arrows at the spoke mouth",
-    "Harvest": "ground Birch and bronze axe before the ascent portal",
+    "Harvest": "bronze axe beside the raised Harvest Birch",
     "Building": "hammer and wood directly in front of the bench",
     "Crafting": "coal directly in front of the smelter",
     "Progression": "nearby course actions raise skills",
-    "Social": "the hub tutorial sign says CAST HERE between two blue-magenta beacon torches",
+    "Social": "the hub tutorial sign says CAST HERE at the end of the pink Arcane Sight path",
 }
 
 SCHOOL_COLOURS = {
@@ -285,10 +285,7 @@ def build_monuments(spec: dict, segments: dict):
         station_at_ground = False
         station_text = ""
         station_light = ""
-        if spec.get("compact_course") and category == "Harvest":
-            station_x, station_z, station_yaw = 5.0, 2.5, 0.0
-            station_at_ground = True
-        elif spec.get("compact_course") and category == "Social":
+        if spec.get("compact_course") and category == "Social":
             station_x, station_z, station_yaw = 3.5, 6.0, 180.0
             station_y = 1.7
             station_text = (
@@ -358,15 +355,8 @@ def build_course_drops(spec: dict):
     hammer_x, hammer_z = spoke("Building", building_ready, -1.2)
     wood_x, wood_z = spoke("Building", building_ready, 1.2)
     coal_x, coal_z = spoke("Crafting", crafting_ready)
-    axe_x, axe_z = (5.5, 0.8) if spec.get("compact_course") else spoke(
-        "Harvest", station_radius - 3.0
-    )
-
-    axe_note = (
-        "bronze axe beside the ground welcome Birch"
-        if spec.get("compact_course")
-        else "bronze axe beside the Harvest Birch"
-    )
+    axe_x, axe_z = spoke("Harvest", station_radius - 3.0)
+    axe_note = "bronze axe beside the Harvest Birch"
     drops = [
         item(
             "AxeBronze",
@@ -374,7 +364,7 @@ def build_course_drops(spec: dict):
             axe_z,
             1,
             axe_note,
-            at_ground=bool(spec.get("compact_course")),
+            at_ground=False,
         ),
         item("Bow", bow_x, bow_z, 1, "bow on the player side of the combat spoke"),
         item("ArrowWood", arrow_x, arrow_z, 100, "arrows beside the combat bow"),
@@ -723,24 +713,27 @@ def build_profile(spec: dict, segments: dict):
                     orient="sign-post",
                     text="",
                 ),
+                # Small breadcrumbs carry Arcane Sight's tight halo without putting a
+                # broad realtime wash on the marble. They sit to the player's left so
+                # the portal-to-sign walking lane remains physically clear.
                 fixture(
-                    "piece_groundtorch_blue",
-                    2.0,
-                    0.0,
-                    6.0,
-                    0.0,
-                    orient="tutorial-beacon",
-                    light_school="social",
-                    infinite_fuel=True,
+                    "itemstandh", 2.35, 0.0, 1.25, 0.0,
+                    orient="tutorial-breadcrumb", light_school="social",
                 ),
                 fixture(
-                    "piece_groundtorch_blue",
-                    5.0,
-                    0.0,
-                    6.0,
-                    0.0,
-                    orient="tutorial-beacon",
-                    light_school="social",
+                    "itemstandh", 2.35, 0.0, 2.75, 0.0,
+                    orient="tutorial-breadcrumb", light_school="social",
+                ),
+                fixture(
+                    "itemstandh", 2.35, 0.0, 4.25, 0.0,
+                    orient="tutorial-breadcrumb", light_school="social",
+                ),
+                # One familiar vanilla iron torch terminates the trail. Its native
+                # flame stays recognizable; the restrained school-colour light ties it
+                # to the pink breadcrumbs and tutorial rune.
+                fixture(
+                    "piece_groundtorch", 2.35, 0.0, 5.75, 0.0,
+                    orient="tutorial-destination", light_school="social",
                     infinite_fuel=True,
                 ),
             ]
@@ -937,7 +930,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "",
         "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
         "public static class LabGalleryPlan {",
-        "  public const int PlanVersion = 9;",
+        "  public const int PlanVersion = 10;",
         f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
         "",
         "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",

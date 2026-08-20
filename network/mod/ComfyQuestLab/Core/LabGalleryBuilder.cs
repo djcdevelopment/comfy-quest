@@ -502,7 +502,9 @@ public sealed class LabGalleryBuilder {
     if (PlacePortal(arrival, GalleryTag, 0f)) {
       placed++;
     }
-    if (PlacePortal(new Vector3(origin.x + 3.5f, floorY, origin.z), GalleryTag, 180f)) {
+    // Face the upper portal toward the CAST HERE sign at +Z. The r26 arrival frame
+    // proved yaw 180 turned the player's first view away from the tutorial target.
+    if (PlacePortal(new Vector3(origin.x + 3.5f, floorY, origin.z), GalleryTag, 0f)) {
       placed++;
     }
     // The far end of the World school's own portal, so "take a portal" is a thing a
@@ -576,8 +578,14 @@ public sealed class LabGalleryBuilder {
         // school names were dark vertical threads over otherwise readable runes. The
         // generator now uses one sign per letter and marks only the central letter, so
         // each word gets one coloured light rather than one costly light per character.
-        LightPiece(built, fixture.LightSchool,
-            fixture.Orient == "rune-name-lit" ? LabRuneLight.BannerFaceStyle : null);
+        string lightStyle = fixture.Orient == "rune-name-lit"
+            ? LabRuneLight.BannerFaceStyle
+            : fixture.Orient == "tutorial-breadcrumb"
+                ? LabRuneLight.ArcaneSightOnlyStyle
+                : fixture.Orient == "tutorial-destination"
+                    ? LabRuneLight.TutorialDestinationStyle
+                    : null;
+        LightPiece(built, fixture.LightSchool, lightStyle);
       }
       if (fixture.InfiniteFuel) {
         GalleryStructurePatches.MarkAndLight(built, true);

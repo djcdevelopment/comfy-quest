@@ -23,12 +23,12 @@ constitute a successful lap.
 5. Import intentionally creates new project, pack, and experience IDs. That makes
    the draft safe to edit without overwriting the canonical artifact, but it also
    means an existing canonical Demo World Charm cannot auto-rebind to the fork.
-   Use the immediately visible **CAST HERE** First Portal tutorial sign between
-   the two blue-magenta iron beacon torches on the hub's inner arrival edge. Close
-   F9, aim Valheim's fixed center crosshair at the sign face, reopen F9 without
-   moving the camera, and press backtick once to CHECK, then again to CAST the
-   active fork. Backtick is a drawer hotkey and is ignored while F9 is closed; the
-   drawer's movable mouse cursor does not select world targets. In the generated
+   Keep F9 open and follow the three small pink Arcane Sight item-stand markers to
+   the ordinary iron torch and immediately visible **CAST HERE** First Portal
+   tutorial sign on the hub's inner arrival edge. Aim Valheim's fixed center
+   crosshair at the sign face and press backtick once to CHECK, then again to CAST
+   the active fork. Backtick is a drawer hotkey and is ignored while F9 is closed;
+   the drawer's movable mouse cursor does not select world targets. In the generated
    plan the sign is at relative
    `(x=3.5, y=1.7, z=6, yaw=180)` from the gallery floor origin. Expect
    `bind/inscribed` after the initial

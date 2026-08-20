@@ -39,6 +39,8 @@ public static class LabRuneLight {
   public const string SignTextGlowMark = "comfyQuestLabSignTextGlow";
   public const string SignFaceStyle = "sign-face";
   public const string BannerFaceStyle = "banner-face";
+  public const string ArcaneSightOnlyStyle = "arcane-sight-only";
+  public const string TutorialDestinationStyle = "tutorial-destination";
 
   const string LampChildName = "comfy-quest-lab-rune-lamp";
 
@@ -313,6 +315,19 @@ public static class LabRuneLight {
         return;
       }
 
+      bool arcaneSightOnly = string.Equals(
+          style, ArcaneSightOnlyStyle, StringComparison.Ordinal);
+      if (arcaneSightOnly) {
+        // The persisted school mark is intentionally retained: Arcane Sight reads it
+        // and supplies its tight emissive halo plus a four-metre local light while the
+        // creator drawer is open. Do not also hang the gallery's broad 11 m rune lamp
+        // on every breadcrumb; repeated wide lights turn rain and mist into white haze.
+        if (existing != null) {
+          UnityEngine.Object.Destroy(existing.gameObject);
+        }
+        return;
+      }
+
       GameObject lamp;
       if (existing != null) {
         lamp = existing.gameObject;
@@ -337,8 +352,14 @@ public static class LabRuneLight {
       light.color = ColourFor(school);
       float configuredIntensity = Intensity != null ? Intensity.Value : 6f;
       float configuredRange = Range != null ? Range.Value : 22f;
-      light.intensity = bannerFace ? Mathf.Min(configuredIntensity, 2.5f) : configuredIntensity;
-      light.range = bannerFace ? Mathf.Min(configuredRange, 5.5f) : configuredRange;
+      bool tutorialDestination = string.Equals(
+          style, TutorialDestinationStyle, StringComparison.Ordinal);
+      light.intensity = tutorialDestination
+          ? Mathf.Min(configuredIntensity, 1.25f)
+          : bannerFace ? Mathf.Min(configuredIntensity, 2.5f) : configuredIntensity;
+      light.range = tutorialDestination
+          ? Mathf.Min(configuredRange, 5f)
+          : bannerFace ? Mathf.Min(configuredRange, 5.5f) : configuredRange;
       // No shadows on purpose: eight shadow-casting point lights across a 76 m gallery is
       // a real frame cost, and a rune reads by its own glow rather than by what it casts.
       light.shadows = LightShadows.None;

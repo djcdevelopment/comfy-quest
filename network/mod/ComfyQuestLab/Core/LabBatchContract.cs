@@ -26,7 +26,7 @@ public static class LabBatchContract {
       Expect(LabCategory.Combat, "kill",
           "Pick up the bow and arrows at the combat spoke mouth; shoot the Greyling at its rune."),
       Expect(LabCategory.Harvest, "resource_damaged",
-          "Pick up the bronze axe beside the arrival portal and strike the adjacent birch."),
+          "Pick up the bronze axe beside the raised Harvest Birch and strike it."),
       Expect(LabCategory.Inventory, "item_picked_up",
           "Pick up any staged tool, supply, fuel, or food."),
       Expect(LabCategory.Building, "piece_placed",
@@ -36,7 +36,7 @@ public static class LabBatchContract {
       Expect(LabCategory.Progression, "skill_raised",
           "The bow, axe, or building lap normally raises a skill; otherwise use any skill once."),
       Expect(LabCategory.World, "player_teleported", "Take either paired gallery portal."),
-      Expect(LabCategory.Social, "sign_written", "Edit the hub tutorial sign that says CAST HERE between two blue-magenta beacon torches."),
+      Expect(LabCategory.Social, "sign_written", "Edit the hub tutorial sign that says CAST HERE at the end of the pink Arcane Sight path."),
     },
   };
 

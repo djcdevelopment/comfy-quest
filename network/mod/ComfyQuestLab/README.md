@@ -73,12 +73,20 @@ completion chain, and durable `outcome=complete`. The sign copy was readable at
 interaction distance, but Derek's arrival review still found it visually blended
 into the hall and discovered that backtick is ignored while F9 is closed.
 
-R26 responds directly: two infinite-fuel blue iron torches flank the sign and carry
-the Social school's bright magenta light; both the sign and Runtime drawer say to
-open/keep F9 open; and the portable tutorial says to take the nearest obvious portal
-because `player_teleported` is targetless. Exact r26 beacon appearance remains
-pending an ordinary-Valheim frame; the r25 mechanics evidence is historical and is
-not relabelled as r26 visual proof.
+R26 responded with two infinite-fuel blue iron torches carrying the Social school's
+magenta light; both the sign and Runtime drawer say to open/keep F9 open; and the
+portable tutorial says to take the nearest obvious portal because
+`player_teleported` is targetless. The ordinary-Valheim frame showed that broad light
+on large fixtures washes the marble and mist instead of providing a clean route.
+
+The first r26 frame found two more spatial defects before acceptance: the compact
+course's ground Harvest Birch pierced the raised hub in front of the beacon, and the
+upper ascent portal's yaw 180 turned the arrival view away from it. R27 moves the
+Birch and bronze axe back to the raised Harvest station, flips only that upper portal
+to yaw 0, and replaces the broad beacon pair with three low item-stand breadcrumbs.
+Those pieces carry only Arcane Sight's tight Social-pink halo while F9 is open; one
+ordinary infinite-fuel iron torch at the sign adds a restrained matching destination
+light. Exact r27 arrival appearance remains pending ordinary-Valheim review.
 
 ## Why this exists
 

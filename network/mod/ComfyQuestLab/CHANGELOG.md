@@ -1,5 +1,16 @@
 # Changelog
 
+**r27 clean arrival sightline.** The first r26 live frame proved the beacon existed
+but also showed the compact course's ground-level Harvest birch growing through the
+raised hub directly in front of it. The same frame showed the upper ascent portal at
+yaw 180, turning the arrival view away from `CAST HERE`. R27 returns the Birch and
+bronze axe to the raised Harvest station and flips only the upper ascent portal to
+yaw 0 so the player arrives facing the tutorial target. It also replaces the two
+broad beacon lights with three low item-stand breadcrumbs carrying Arcane Sight's
+tight Social-pink treatment and one ordinary iron torch with a restrained matching
+destination light. The walking lane stays clear, and the welcome camp keeps its food
+and seating; no tall practice object remains below the hub.
+
 **r26 zero-lift First Portal beacon.** The r25 live lap proved exact activation,
 unbound ascent, CHECK/CAST on the intended sign, targetless portal completion,
 and the durable workflow receipt chain. It also exposed two remaining onboarding

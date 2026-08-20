@@ -128,7 +128,7 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 9;", source)
+        self.assertIn("public const int PlanVersion = 10;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
         self.assertIn(
             "public float PlatformClearance, RoofClearance, GroundPortalX, GroundPortalZ;",
@@ -158,12 +158,14 @@ class GalleryProfileTests(unittest.TestCase):
         for marker in (
             'Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\\nFirst Portal tutorial\\n<color=#8fdc8f>open F9 · use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f',
             'Prefab = "wood_pole2", X = 3.5f, Y = 0f, Z = 6f',
-            'Prefab = "piece_groundtorch_blue", X = 2f, Y = 0f, Z = 6f, Yaw = 0f, Orient = "tutorial-beacon", Text = "", LightSchool = "social", InfiniteFuel = true',
-            'Prefab = "piece_groundtorch_blue", X = 5f, Y = 0f, Z = 6f, Yaw = 0f, Orient = "tutorial-beacon", Text = "", LightSchool = "social", InfiniteFuel = true',
-            'Prefab = "Birch1", Kind = "prop", Note = "ground Birch and bronze axe before the ascent portal"',
-            'X = 5f, Y = 0f, Z = 2.5f, Yaw = 0f, AtGround = true',
-            'Prefab = "AxeBronze", Note = "bronze axe beside the ground welcome Birch", X = 5.5f',
-            'Stack = 1, AtGround = true',
+            'Prefab = "itemstandh", X = 2.35f, Y = 0f, Z = 1.25f, Yaw = 0f, Orient = "tutorial-breadcrumb", Text = "", LightSchool = "social"',
+            'Prefab = "itemstandh", X = 2.35f, Y = 0f, Z = 2.75f, Yaw = 0f, Orient = "tutorial-breadcrumb", Text = "", LightSchool = "social"',
+            'Prefab = "itemstandh", X = 2.35f, Y = 0f, Z = 4.25f, Yaw = 0f, Orient = "tutorial-breadcrumb", Text = "", LightSchool = "social"',
+            'Prefab = "piece_groundtorch", X = 2.35f, Y = 0f, Z = 5.75f, Yaw = 0f, Orient = "tutorial-destination", Text = "", LightSchool = "social", InfiniteFuel = true',
+            'Prefab = "Birch1", Kind = "prop", Note = "bronze axe beside the raised Harvest Birch"',
+            'X = 16.971f, Y = 0f, Z = 16.971f, Yaw = 225f, AtGround = false',
+            'Prefab = "AxeBronze", Note = "bronze axe beside the Harvest Birch", X = 14.849f',
+            'Stack = 1, AtGround = false',
             'Prefab = "Bow", Note = "bow on the player side of the combat spoke"',
             'Prefab = "ArrowWood", Note = "arrows beside the combat bow"',
             'Prefab = "Hammer", Note = "hammer in front of the building bench"',
@@ -180,8 +182,12 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("foreach (LabGalleryPlan.WelcomeFixture fixture", builder)
         self.assertIn("AttachDisplayItem(built, fixture.AttachedItem)", builder)
         self.assertIn("SetStack(drop, item.Stack)", builder)
+        self.assertIn(
+            "PlacePortal(new Vector3(origin.x + 3.5f, floorY, origin.z), GalleryTag, 0f)",
+            builder,
+        )
         self.assertEqual(self.profiles["marble-grand"]["counts"]["welcomeFixtures"], 6)
-        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1914)
+        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1916)
 
     def test_runtime_reports_clearance_and_horizontal_headers(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")
@@ -192,6 +198,10 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn('+ " horizontal rune headers ("', source)
         self.assertIn('fixture.Orient == "rune-name-lit"', source)
         self.assertIn("LabRuneLight.BannerFaceStyle", source)
+        self.assertIn('fixture.Orient == "tutorial-breadcrumb"', source)
+        self.assertIn("LabRuneLight.ArcaneSightOnlyStyle", source)
+        self.assertIn('fixture.Orient == "tutorial-destination"', source)
+        self.assertIn("LabRuneLight.TutorialDestinationStyle", source)
         self.assertIn("GlowSignText(built, fixture.TextGlowSchool)", source)
         self.assertIn(
             "LightPiece(station, monument.Station.LightSchool, LabRuneLight.SignFaceStyle)",
@@ -200,6 +210,8 @@ class GalleryProfileTests(unittest.TestCase):
         light = (MOD / "Core" / "LabRuneLight.cs").read_text(encoding="utf-8")
         self.assertIn('public const string SignFaceStyle = "sign-face";', light)
         self.assertIn('public const string BannerFaceStyle = "banner-face";', light)
+        self.assertIn('public const string ArcaneSightOnlyStyle = "arcane-sight-only";', light)
+        self.assertIn('public const string TutorialDestinationStyle = "tutorial-destination";', light)
         self.assertIn('public const string SignTextGlowMark = "comfyQuestLabSignTextGlow";', light)
         self.assertIn("material.EnableKeyword(ShaderUtilities.Keyword_Glow)", light)
         self.assertIn("colour.r * 2.2f", light)
@@ -213,6 +225,9 @@ class GalleryProfileTests(unittest.TestCase):
         )
         self.assertNotIn("Mathf.Min(configuredRange, 1.6f)", light)
         self.assertIn("Mathf.Min(configuredRange, 5.5f)", light)
+        self.assertIn("Mathf.Min(configuredIntensity, 1.25f)", light)
+        self.assertIn("Mathf.Min(configuredRange, 5f)", light)
+        self.assertIn("if (arcaneSightOnly)", light)
 
     def test_roof_is_real_marked_geometry_with_durable_braziers(self) -> None:
         builder = BUILDER.read_text(encoding="utf-8")
