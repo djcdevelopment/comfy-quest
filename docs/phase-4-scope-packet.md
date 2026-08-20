@@ -2,7 +2,15 @@
 
 Strategy workstream W5. This is a decision document, not a work order: it puts the
 four parked inputs, the Lab ownership map, and three shapes of Phase 4 in front of
-one call. Nothing in it is implemented before that call is made.
+one call.
+
+> **Correction, 2026-08-20.** Input A below — the top bar minimising to four dots — should
+> never have arrived here. It was a design decision Derek made in the seat, and turning it
+> into a scoping question (on the strength of a deferral clause I had written into ADR 0005
+> and then quoted back at him) is how it went a day unbuilt while seven ADRs, a retro, a
+> strategy and this packet shipped instead. **The composition is being built.** It is not
+> waiting on this call, and its presence here is context for the Phase 4 shape, not a gate
+> on the work.
 
 ## The decision
 

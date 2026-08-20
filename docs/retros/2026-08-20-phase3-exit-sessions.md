@@ -50,7 +50,12 @@ while the verbatims were fresh.
    declaring loss, and re-check before rebuilding.*
 2. **Both harnesses fed the tally they existed to measure.** xUnit constructs
    `SpawnTally(8,0)` by hand; Studio rehearsal decrements a dictionary on request
-   and says so in its own comments ("rehearsal has no ZDOs"). The live
+   and says so **in its own machine output, on every run** — `limitations[]` from
+   `QuestStudioWorkspace.BuildGuidedSteps` prints "Route held waits for staged objects to
+   be cleared; rehearsal removes 8 of them on request, while play removes one when the
+   object itself is gone." That sentence named this defect before it was ever played, and
+   Studio rendered it on screen. Nobody read it; this lesson was re-derived overnight from
+   receipts instead. The live
    `kill → destroy → re-poll` cycle was structurally untestable in either, so its
    race shipped straight to the player. The Lab even already knew destroys don't
    settle same-frame (`DestroySettleTimeout`) — gallery-local knowledge that never
@@ -96,8 +101,16 @@ machine-enforced staging (ADR 0001); quarantine of all runtime state (ADR 0004);
 paid for itself twice tonight.
 
 Added by this retro:
-- **Injected-fact inventory:** every rehearsal/synthetic proof must enumerate the
-  facts it injects; the lap runbook lists them as live-unproven seams.
+- ~~**Injected-fact inventory:** every rehearsal/synthetic proof must enumerate the
+  facts it injects; the lap runbook lists them as live-unproven seams.~~
+  **Withdrawn 2026-08-20 — the product already does this.** Studio's guided rehearsal
+  returns a per-run `limitations[]` naming every gap between rehearsal and play, plus a
+  `proof_level` and a `disclaimer`, and `QuestStudioPage.renderRehearsal()` already draws
+  them as a "Coverage limits" card. Prescribing a hand-written inventory duplicated a
+  shipped feature — and contradicted the house rule two files over
+  (`network/mod/ComfyQuestLab/README.md`: "not a checklist somebody can forget to
+  update"). Replacement rule: **consume `limitations`, cite it, never re-enumerate by
+  hand.**
 - **Bounded recheck as doctrine** (ADR 0006): event-driven evaluation plus
   world-derived facts requires a bounded catch-up; never assume same-frame settle.
 - **Copy pins name nouns:** new player-facing counts get a pin asserting what is

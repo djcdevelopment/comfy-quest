@@ -16,6 +16,13 @@ evaluated in that same call stack, before the dying creature's ZDO has left
 unmet, and — with no further subscribed events arriving — the wrong answer stood
 for nine minutes at a player standing on eight corpses.
 
+**The product said this first.** Studio's guided rehearsal emits a per-run `limitations[]`
+(`QuestStudioWorkspace.BuildGuidedSteps`) and for this quest it prints: "Route held waits
+for staged objects to be cleared; rehearsal removes 8 of them on request, while play
+removes one when the object itself is gone." That is this defect, named by the machine,
+before the lap that found it — and already rendered in Studio as a "Coverage limits" card.
+The evidence below was gathered the expensive way after the fact.
+
 The run proves it against itself. At 12:17:17 the `timer_elapsed` event evaluated
 that same `hold` stage, and the route that matched was not `overrun` — it was
 `held`, the victory route, because by then the corpses were gone, the tally read

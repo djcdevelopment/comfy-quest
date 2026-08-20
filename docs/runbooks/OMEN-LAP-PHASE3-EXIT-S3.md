@@ -1,93 +1,84 @@
 # OMEN lap runbook — session 3, the Phase 3 exit verdicts
 
-Short and targeted. Session 2 ran clean and still could not exit Phase 3: the wave
-counted none of eight kills, and a real ten-minute deadline was never perceived.
-Both causes are fixed and gated (`docs/phase-3-close-strategy.md`, ADR 0006). This
-lap exists to answer the three defense questions with a tally that counts and a
-clock that reads — nothing else. Budget: about fifteen minutes in the seat.
+**Derived, not written.** The beat order below comes from three machine sources, and no
+step is here because someone remembered it:
 
-Record Derek's words verbatim, positive reactions included. Anything that produces a
-"can't answer why" stops the lap and goes to the ledger; do not fill a gap with
-repeated input.
+- `docs/runbooks/I2-QUESTPACK-OMEN.md` — the order already proven in a completed lap:
+  Preflight → Prepare → publish → ValidateRevision → ArmPrivateWorld → launch and enter the
+  world → F10 → F11 → CHECK → CAST → play.
+- **A Studio rehearsal of the exact project being played** (`POST
+  /api/v2/quest-studio/projects/{id}/rehearse`). Its `trace`, `transcript`,
+  `available_paths` and `limitations[]` define the beat spine and — more importantly —
+  define what the seat is *for*.
+- **The precondition chain in the code.** `active/active-set.json` is written only by F11
+  (`LoadLatest → ActivateCandidate`); F10 only inspects the inbox. Without it,
+  `RuntimeCharmBinding.TryActive` returns `active_set_missing`, which is what both the
+  CHECK preview and the CAST commit fail with. Without a cast charm,
+  `RuntimeExperienceEngine.OnEvent` finds no binding and every action writes
+  `event/unbound`. Session 3's first script skipped F11 and died on its first beat.
 
-## Preparation (before entering the world)
+`tests/test_quest_runtime_validation_lap.py` now enforces this ordering over every live
+runbook, so the omission cannot recur silently.
 
-1. Build the deployable bytes in Release (`ComfyQuestRuntime`, `ComfyQuestContracts`)
-   — `Prepare` deploys by SHA-256 and a stale Release DLL deploys stale behaviour.
-2. `Prepare -ContentProfile defense`. The profile is recorded in the run context, so
-   every later step gates the defense content by machine (ADR 0007); no step needs a
-   hand-assembled proof the way session 2 did.
-3. Publish **Ten-Minute Desperate Defense** 1.0.0 from Studio. **No second revision
-   this lap** — the update beat and its staging gate were proven live in session 2
-   and are not on trial again.
-4. `ValidateRevision -ExpectedVersion 1.0.0`, then `ArmPrivateWorld`.
-5. Optional, before the fight: set `Presentation/DeadlineAnchor` in the runtime
-   config if 0.16 puts the pill somewhere the seat dislikes. Moving it is a supported
-   answer, and where it ends up is itself a finding for the Phase 4 alert anchor.
+## What the seat is for
+
+Rehearsal already walks the quest and reports `proof_level: rehearsal` with the
+disclaimer *"Synthetic rehearsal only; this does not prove a Valheim adapter or live
+mutation."* It also declares, per run, exactly where it diverges from play:
+
+> Stage hold has 4 routes; this run followed highest priority route held.
+> Route held waits for staged objects to be cleared; rehearsal removes 8 of them on
+> request, while play removes one when the object itself is gone.
+
+**Everything rehearsal proves, the seat is not asked to check.** Three judgments remain,
+and they are the whole session. Do not add a fourth.
+
+## Preparation (I run this; Derek does nothing)
+
+Release-build the mod, `Preflight`, `Prepare -ContentProfile defense`, publish 1.0.0 alone
+from Studio, `ValidateRevision -ExpectedVersion 1.0.0`, `ArmPrivateWorld`. No second
+revision this lap — the update beat and its staging gate were proven live in session 2.
+Optionally set `Presentation/DeadlineAnchor` before launch.
 
 ## Sequence
 
-### 1. Drawer pre-check (1 min)
-Open F9 before any beat.
-- [ ] The EXPERIENCE row no longer repeats the quest's title. Does the section
-      boundary read better than session 2's stacked names?
-- [ ] With nothing cast, the row says the quest has no Charm and how to cast one.
-      Does that read as an instruction you would follow?
+1. **Launch Valheim and enter the private solo world.** Arming only flips the safety
+   config; it does not start the game.
+2. **Press F10**, then **press F11**. F11 is what activates the quest — the card should
+   read *Now playing: Ten-Minute Desperate Defense — 1.0.0*. Nothing below works before
+   this.
+3. **Open F9, aim at something you built, and press `` ` `` once** to CHECK. The captured
+   object should light up and be named. **Press `` ` `` once more** to CAST. The strip
+   should settle on LANDED.
+4. **Say anything in normal local chat.** The ward wakes; eight Greylings spawn; a
+   ten-minute clock starts.
+5. **Play it once, honestly.**
 
-### 2. Cast the ward's anchor (2 min) — **do not skip**
-Session 2's script omitted this beat entirely and the quest ignored the player until
-a receipt explained why.
-- [ ] Aim at something you built and press **`** once. Does the captured object light
-      up in the world, and does the summary name the *thing* (e.g. "Wood wall") rather
-      than only a ZDO id?
-- [ ] Press **`** again to cast. Does the strip settle into LANDED and stay there,
-      instead of snapping back to READY?
-- Machine: `Monitor -Expectation bind_r1`.
+## The three verdicts
 
-### 3. Start the defense (1 min)
-Say anything in normal local chat.
-- [ ] The ward-wakes line appears on Center **and** in chat scrollback. Does the chat
-      copy make the moment re-readable, or is it clutter?
-- Machine: `Monitor -Expectation chat_advance`.
+- **Does the clock carry tension in combat?** Rehearsal cannot answer this at all — it has
+  no screen. If the pill is in the wrong place, say where you want it; the anchor is a
+  config fraction.
+- **When the last Greyling falls, does the win arrive within a second or two?** This is
+  rehearsal's declared limitation, verbatim: it despawns eight on request, play removes one
+  at a time as they die. Session 2 lost this and the win arrived nine minutes late.
+- **Do escalation and mercy read as intended, if they happen?** Rehearsal can walk all four
+  `hold` routes and proves the mechanics; only whether they *feel* like escalation and
+  mercy is yours.
 
-### 4. The fight (10 min) — the three exit questions
-Play it once, honestly.
-- [ ] **Does the countdown pill carry tension during actual combat?** It reads as a
-      clock now (`9:54`), in a bordered amber pill, scaled to the screen, at the anchor
-      you chose. Noticed at all? Glanced at mid-swing? Still fighting another overlay?
-- [ ] **Does the reinforcement beat read as escalation rather than punishment?**
-      (Three minutes in, six or more still standing → a second wave.)
-- [ ] **Does mercy read as mercy rather than failure?** (Two deaths → the ward
-      releases you.)
-- [ ] And the one session 2 could not reach: **when the last Greyling falls, does the
-      win arrive?** Within seconds, not minutes — and as the victory line, not as a
-      deadline that happened to notice.
-- Also watch, unprompted: is the drawer irrelevant during the fight (it should be —
-  the pill and the story channel carry everything player-side)?
+Stop and record the moment anything produces a "can't answer why". Record Derek's words
+verbatim, positive reactions included.
 
-### 5. Machine verdicts (1 min)
-Two of session 2's open questions have a machine form now. Both would have failed
-last time.
-- `Monitor -Expectation kill_partial` — a kill that leaves the beat unmet reports the
-  count the player is working on (session 2: eight kills, every one `0/1`).
-- `Monitor -Expectation wave_cleared` — the completion is carried by a `kill`
-  (session 2: carried by `timer_elapsed`, nine minutes late).
-Then read the last few receipts: a `rck-` correlation id on the winning transition is
-the settle-race being caught rather than lost.
+## Machine verdicts (I run these; no seat time)
 
-## Exit criteria
-
-Phase 3 exits when the three defense questions have answers — any answers, including
-"the pill is wallpaper", which is a finding and not a failure — and both ledger rows
-in `docs/five-intent-validation-lap-backlog.md` close on live observation. Findings
-land in the backlog; the composition and alert-anchor directions travel on to the W5
-Phase 4 packet rather than being fixed piecemeal here.
+`Monitor -Expectation kill_partial` — a kill that leaves the beat unmet reports the count
+the player is working on (session 2: eight kills, every one `0/1`).
+`Monitor -Expectation wave_cleared` — the completion is carried by a `kill`, not by
+`timer_elapsed`. A `rck-` correlation id on the winning transition is the settle race being
+caught rather than lost.
 
 ## Cleanup
 
-`Cleanup` restores the install byte-for-byte (packs, active set, `state/`,
-`inbox-dev/`, config safety back to false) and sweeps lap-created files to
-`post-run/`. Write the findings from what the seat said and what the receipts show —
-in that order. Session 2's record set the player's own "i slaughtered them" aside in
-favour of an inference about the engine, and carried a defect that never existed while
-missing the proof of the one that did.
+`Cleanup` restores the install byte-exact and closes the safety window. Write findings from
+what the seat said and what the receipts show, in that order — and read the rehearsal's
+`limitations` before claiming anything was newly discovered.
