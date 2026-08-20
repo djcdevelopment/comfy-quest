@@ -265,9 +265,13 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             plugin.index("checkHotkey.Value.IsDown()"),
         )
         # Discoverability: one session-scoped hint, and the drawer buttons teach their keys.
+        # Button copy is sentence case per the canvas (03); ALL CAPS belongs to the dim
+        # overline captions alone.
         self.assertIn('"Comfy Quest ready. Press "+drawerHotkey.Value', plugin)
-        self.assertIn('"CHECK FOR UPDATES · "+checkHotkey.Value', plugin)
-        self.assertIn('"LOAD VALIDATED UPDATE · "+loadHotkey.Value', plugin)
+        self.assertIn('"Check for updates · "+checkHotkey.Value', plugin)
+        self.assertIn('"Load validated update · "+loadHotkey.Value', plugin)
+        self.assertNotIn('"CHECK FOR UPDATES', plugin)
+        self.assertNotIn('"LOAD VALIDATED UPDATE', plugin)
         # The notice type carries both altitudes; the xUnit matrix proves the headline
         # never leaks identity, and Detail is where identity is allowed to live.
         self.assertIn("public string Headline", notice)
@@ -308,6 +312,18 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn('AddOutcome(CreatorEvidenceKind.Cast,"CAST · "+status)', plugin)
         self.assertNotIn('Contains("CAST', plugin)
         self.assertNotIn('StartsWith("Matched', plugin)
+        # The feed's time gutter (canvas 05): the stamp is its own fact beside the text,
+        # composed at the emission site, and only the CAST row's group carries the tint.
+        self.assertIn('line.Stamp??""', plugin)
+        self.assertIn('Stamp=DateTime.Now.ToString("HH:mm:ss")', plugin)
+        self.assertIn(
+            'Stamp = receipt.AtUtc.ToLocalTime().ToString("HH:mm:ss")', engine
+        )
+        self.assertIn(
+            "line.Kind==CreatorEvidenceKind.Cast?castRowStyle:UnityEngine.GUIStyle.none",
+            plugin,
+        )
+        self.assertIn("public string Stamp { get; set; }", notice)
         # The two load-bearing design tokens: bright amber primary (dark ink) and the
         # urgent red; and the new textures are released like every other.
         self.assertIn('Solid("runtime-primary",new UnityEngine.Color(.914f,.659f,.247f,1f))', plugin)
@@ -352,6 +368,9 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn(
             "ShowMessage(MessageHud.MessageType.TopLeft,message,reassert?1:0)", plugin
         )
+        # Emission evidence: the log distinguishes "HUD not live" from "shown and missed",
+        # because session 1's captures could not tell those apart.
+        self.assertIn('" · hud_absent"', plugin)
         self.assertIn("statusIdle=notice.Idle", plugin)
         self.assertIn("Report(status,statusIdle)", plugin)
         self.assertIn("public bool Idle { get; set; }", notice)
@@ -369,6 +388,57 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertLess(plugin.index("DrawStatusCard();"), plugin.index("DrawUpdateWorkflow();"))
         self.assertLess(plugin.index("DrawUpdateWorkflow();"), plugin.index("DrawRecentEvidence();"))
         self.assertIn("if(showMaintenance){DrawOutcomes();", plugin)
+        # The header rail renders the hotkey as its own keycap chip beside the overline.
+        self.assertIn("drawerHotkey.Value.ToString(),chipStyle", plugin)
+        # The ladder is circles joined by rails (canvas 03), not filled bars: done fills
+        # Ready green, current fills solid amber, waiting stays a hollow ring, and a rail
+        # takes the color of the rung it leaves. Every new texture is released.
+        self.assertIn("void Rung(string name,bool done,bool current,string detail)", plugin)
+        self.assertIn("void Rail(bool done)", plugin)
+        for texture_name in ("rung-done", "rung-current", "rung-waiting"):
+            with self.subTest(ring=texture_name):
+                self.assertIn(f'Ring("runtime-{texture_name}"', plugin)
+        self.assertIn('Solid("runtime-rail-done"', plugin)
+        self.assertIn('Solid("runtime-rail-waiting"', plugin)
+        for texture in (
+            "circleDoneBackground",
+            "circleCurrentBackground",
+            "circleWaitingBackground",
+            "railDoneBackground",
+            "railWaitingBackground",
+        ):
+            with self.subTest(texture=texture):
+                self.assertIn(f"Destroy(ref {texture});", plugin)
+        # The current rung is the one solid-amber moment; the done glyph is decoration on
+        # top of the fill, so a missing game-font glyph cannot erase the done state.
+        self.assertIn(
+            'circleCurrentBackground=Ring("runtime-rung-current",'
+            "new UnityEngine.Color(.914f,.659f,.247f,1f)",
+            plugin,
+        )
+        self.assertIn('done?"✓":""', plugin)
+
+    def test_pre_subscription_rejections_are_bounded_per_error(self) -> None:
+        # Phase 3 exit session 1: with the active set quarantined, every world event wrote
+        # an identical transition/rejected · active_set_missing receipt before the first
+        # check — 47 in the startup minutes, 39 in one second — because this branch sits
+        # before the subscription filter and the duplicate window. The diagnostic is worth
+        # a bounded handful; one more receipt names the suppression, and the counter
+        # clears when the active set loads (or the error changes).
+        engine = ENGINE.read_text(encoding="utf-8")
+        self.assertIn("const int MaxIdenticalRejections = 3;", engine)
+        self.assertIn("rejectionRepeats <= MaxIdenticalRejections", engine)
+        self.assertIn("rejectionRepeats == MaxIdenticalRejections + 1", engine)
+        self.assertIn('"suppressed_after_"', engine)
+        # The bound guards the pre-subscription branch specifically, and success resets it.
+        self.assertLess(
+            engine.index("rejectionRepeats++"),
+            engine.index("active.Subscriptions.Contains"),
+        )
+        self.assertLess(
+            engine.index("rejectionKey = null;"),
+            engine.index("active.Subscriptions.Contains"),
+        )
 
     def test_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
         observation = (RUNTIME / "RuntimeObservation.cs").read_text(encoding="utf-8")

@@ -16,6 +16,10 @@ public sealed class CreatorEvidenceLine {
   public CreatorEvidenceKind Kind { get; set; }
   public string Text { get; set; }
 
+  /// <summary>Local HH:mm:ss when the row was composed — the feed's time gutter from the
+  /// design canvas (05). Display-only beside the text; receipts keep their own AtUtc.</summary>
+  public string Stamp { get; set; }
+
   /// <summary>The wire name a receipt carries for a kind. Unknown or null fails closed
   /// to plumbing — the quiet voice, never the loud one.</summary>
   public static string KindName(CreatorEvidenceKind kind) => kind switch {

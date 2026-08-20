@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 sealed class RuntimeExperienceEngine {
   const string Prefix = "comfyQuestRuntime.";
   const int MaxRecentEvidence = 8;
+  const int MaxIdenticalRejections = 3;
   readonly string root;
   readonly RuntimeReceiptStore receipts;
   readonly ActionExecutionLedger ledger;
@@ -25,6 +26,8 @@ sealed class RuntimeExperienceEngine {
   string deadlineLine;
   bool deadlineUrgent;
   int lastOrphanCount;
+  string rejectionKey;
+  int rejectionRepeats;
   DateTimeOffset nextTimerPoll;
   Active cachedActive;
   DateTime cachedActiveWriteUtc;
@@ -107,9 +110,26 @@ sealed class RuntimeExperienceEngine {
     string correlationId = null;
     try {
       if (!TryLoad(out active, out var diagnostic)) {
-        Write("transition", diagnostic, null, null, null, null);
+        // With no active set, every world event lands here before the subscription filter
+        // and duplicate window — session 1 of the Phase 3 exit lap wrote 47 identical
+        // active_set_missing receipts before the first check, 39 of them in one second.
+        // The diagnostic is worth MaxIdenticalRejections receipts; one more names the
+        // suppression, then the series stays quiet until the error changes or clears.
+        if (!string.Equals(diagnostic, rejectionKey, StringComparison.Ordinal)) {
+          rejectionKey = diagnostic;
+          rejectionRepeats = 0;
+        }
+        rejectionRepeats++;
+        if (rejectionRepeats <= MaxIdenticalRejections)
+          Write("transition", diagnostic, null, null, null, null);
+        else if (rejectionRepeats == MaxIdenticalRejections + 1)
+          Write("transition", diagnostic, null, null, "suppressed_after_"
+              + MaxIdenticalRejections.ToString(
+                  System.Globalization.CultureInfo.InvariantCulture), null);
         return;
       }
+      rejectionKey = null;
+      rejectionRepeats = 0;
       // The high-frequency lane stops here: no scene walk, receipt, or workflow write.
       if (!active.Subscriptions.Contains(evt.Name) || IsDuplicate(evt)) return;
       correlationId = NewCorrelationId();
@@ -869,7 +889,8 @@ sealed class RuntimeExperienceEngine {
     if (evidenceLine.Length > 220) evidenceLine = evidenceLine.Substring(0, 219) + "…";
     var line = new CreatorEvidenceLine {
       Kind = kind,
-      Text = receipt.AtUtc.ToLocalTime().ToString("HH:mm:ss") + "  " + evidenceLine,
+      Stamp = receipt.AtUtc.ToLocalTime().ToString("HH:mm:ss"),
+      Text = evidenceLine,
     };
     lock (evidenceGate) {
       recentEvidence.Add(line);
