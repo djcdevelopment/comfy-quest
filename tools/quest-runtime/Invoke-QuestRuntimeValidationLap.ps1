@@ -10,7 +10,7 @@ times out; -ActionObserved starts a short wait only after the player says an act
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Plan','Preflight','Prepare','ValidateRevision','ArmPrivateWorld','Monitor','Status','Cleanup')]
+    [ValidateSet('Plan','Preflight','Prepare','ValidateRevision','ArmPrivateWorld','Monitor','ConfirmActivation','Status','Cleanup')]
     [string] $Action = 'Status',
     [string] $RunId = '',
     [string] $ValheimRoot = '',
@@ -578,12 +578,15 @@ function Restore-Run([object] $Paths, [object] $Context, [bool] $PrepareFailure 
         } catch { $errors.Add("install_restore:$($_.Exception.Message)") }
     }
 
-    foreach ($kind in @('active','inbox')) {
+    foreach ($kind in @('active','inbox','state','inbox-dev')) {
         try {
-            $liveRoot = if ($kind -eq 'active') { Join-Path $runtimeRoot 'active' } else { Join-Path $runtimeRoot 'inbox' }
+            $liveRoot = Join-Path $runtimeRoot $kind
             $postRoot = Join-Path $Paths.Post $kind
             $filter = if ($kind -eq 'inbox') { '*.questpack' } else { '*' }
-            $baseline = @($Context.$kind)
+            # 'state' is the run's own lifecycle field, so its manifest rides 'state_files';
+            # a pre-state/inbox-dev context simply has no manifest for the new kinds.
+            $manifestKey = if ($kind -eq 'state') { 'state_files' } else { $kind }
+            $baseline = @($Context.$manifestKey | Where-Object { $_ })
             if (Test-Path -LiteralPath $liveRoot) {
                 foreach ($file in Get-ChildItem -LiteralPath $liveRoot -Filter $filter -File -Recurse) {
                     $relative = Get-Relative $liveRoot $file.FullName
@@ -679,6 +682,25 @@ function Invoke-Prepare {
             $inbox += New-FileManifest $file.FullName (Join-Path $paths.Quarantine 'inbox') $inboxRoot
         }
     }
+    # state/ holds pending workflow transitions, timers, spawn and action ledgers — plus the
+    # atomic writer's .previous and .tmp siblings, so the sweep is recursive and unfiltered.
+    # Session 1 of the Phase 3 exit lap left historical pending transitions in place and they
+    # replayed against the quarantined active set.
+    $state = @()
+    $stateRoot = Join-Path $runtimeRoot 'state'
+    if (Test-Path -LiteralPath $stateRoot) {
+        foreach ($file in Get-ChildItem -LiteralPath $stateRoot -File -Recurse) {
+            $state += New-FileManifest $file.FullName (Join-Path $paths.Quarantine 'state') $stateRoot
+        }
+    }
+    # The dev lane is a second inbox; the Phase 3 exit runbook publishes the defense through it.
+    $inboxDev = @()
+    $inboxDevRoot = Join-Path $runtimeRoot 'inbox-dev'
+    if (Test-Path -LiteralPath $inboxDevRoot) {
+        foreach ($file in Get-ChildItem -LiteralPath $inboxDevRoot -File -Recurse) {
+            $inboxDev += New-FileManifest $file.FullName (Join-Path $paths.Quarantine 'inbox-dev') $inboxDevRoot
+        }
+    }
     $receiptsRoot = Join-Path $runtimeRoot 'receipts'
     $receiptBaseline = if (Test-Path -LiteralPath $receiptsRoot) { @(Get-ChildItem -LiteralPath $receiptsRoot -Filter *.json -File | ForEach-Object Name) } else { @() }
     $logHash = Get-Sha256 $logPath
@@ -688,7 +710,7 @@ function Invoke-Prepare {
         created_utc=[DateTimeOffset]::UtcNow.ToString('o'); updated_utc=$null
         prepared_utc=$null; armed_utc=$null; cleanup_utc=$null
         config=[ordered]@{existed=$configExisted; backup=$configBackup; original_sha256=$(if($configExisted){Get-Sha256 $configPath}else{$null})}
-        install=$install; active=$active; inbox=$inbox; receipt_baseline=$receiptBaseline
+        install=$install; active=$active; inbox=$inbox; state_files=$state; 'inbox-dev'=$inboxDev; receipt_baseline=$receiptBaseline
         log_baseline_sha256=$logHash; revisions=[pscustomobject]@{}; activations=[pscustomobject]@{}
         cleanup_errors=@()
     }
@@ -697,6 +719,8 @@ function Invoke-Prepare {
         Set-PrivateConfirmation $configPath $false
         foreach ($item in @($active)) { Move-OwnedFile $item.original $item.quarantine }
         foreach ($item in @($inbox)) { Move-OwnedFile $item.original $item.quarantine }
+        foreach ($item in @($state)) { Move-OwnedFile $item.original $item.quarantine }
+        foreach ($item in @($inboxDev)) { Move-OwnedFile $item.original $item.quarantine }
         if ($TestFaultAfter -eq 'Quarantine') { throw 'fixture_fault_after_quarantine' }
         foreach ($item in @($install)) { Copy-Atomic $item.source $item.target }
         if ($TestFaultAfter -eq 'Deploy') { throw 'fixture_fault_after_deploy' }
@@ -710,6 +734,8 @@ function Invoke-Prepare {
             schema='comfy-quest-validation-lap-prepare/v1'; run_id=$RunId; verdict='prepared'
             private_world_confirmed=$false; quarantined_inbox_count=@($inbox).Count
             quarantined_active_file_count=@($active).Count
+            quarantined_state_file_count=@($state).Count
+            quarantined_inbox_dev_count=@($inboxDev).Count
             deployment=@($install | ForEach-Object { [ordered]@{name=$_.name;sha256=$_.deployed_sha256} })
         }
     } catch {
@@ -737,6 +763,15 @@ function Invoke-ValidateRevision {
     $identity = Assert-WoodboundCandidate $candidate[0] $ExpectedVersion
     $label = if ($ExpectedVersion -eq '1.0.0') { 'r1' } else { 'r2' }
     if ($label -eq 'r2') {
+        # Session 1 of the Phase 3 exit lap staged 1.0.1 before 1.0.0 had ever been
+        # activated; the runtime loaded the highest version directly and the first-load
+        # and update beats collapsed into one press. An update beat only exists when the
+        # newer version arrives after the older one is playing, so r2 waits on machine
+        # evidence of the r1 activation, never on a cue alone.
+        $r1ActivationProperty = $context.activations.PSObject.Properties['r1']
+        if ($null -eq $r1ActivationProperty -or [string]::IsNullOrWhiteSpace([string]$r1ActivationProperty.Value)) {
+            throw 'r2 staging waits on r1 activation evidence: prove the load with ConfirmActivation (or Monitor -Expectation load_r1) before publishing the second revision.'
+        }
         $r1 = Get-Revision $context 'r1'
         if ($identity.pack_id -ne $r1.pack_id -or $identity.experience_id -ne $r1.experience_id) {
             throw 'r2 changed the pack or experience identity.'
@@ -808,6 +843,28 @@ function Invoke-Monitor {
     throw "Machine receipt timeout after $MachineTimeoutSeconds seconds for $Expectation. Stop; do not repeat the player action."
 }
 
+# The go/no-go answer for mid-session staging: is the r1 activation proven by receipt and
+# active-set agreement? Read-only — it never advances run state, so the workbook can ask it
+# as often as it likes before cueing the second Publish.
+function Invoke-ConfirmActivation {
+    $paths = Get-RunPaths
+    $context = Read-Context $paths
+    $rows = @(Read-NewReceipts $context)
+    $proof = Find-Expectation 'load_r1' $context $rows
+    if ($null -eq $proof) {
+        return [ordered]@{
+            schema='comfy-quest-validation-lap-confirm/v1';run_id=$RunId;verdict='no_activation'
+            stage_second_revision=$false
+            note='No load/activated receipt agrees with the r1 active set yet. Do not publish the second revision; play r1 first.'
+        }
+    }
+    return [ordered]@{
+        schema='comfy-quest-validation-lap-confirm/v1';run_id=$RunId;verdict='activation_confirmed'
+        stage_second_revision=$true;activation_id=$proof.activation_id
+        note='r1 is active by receipt and active-set agreement. Publishing the second revision now preserves the update beat.'
+    }
+}
+
 function Invoke-Status {
     $paths = Get-RunPaths
     $context = Read-Context $paths
@@ -818,6 +875,7 @@ function Invoke-Status {
         schema='comfy-quest-validation-lap-status/v1';run_id=$RunId;state=$context.state
         valheim_running=(Test-ValheimRunning);private_world_confirmed=(Get-PrivateConfirmation $configPath)
         inbox=@(if(Test-Path (Join-Path $runtimeRoot 'inbox')){Get-ChildItem (Join-Path $runtimeRoot 'inbox') -Filter *.questpack -File | ForEach-Object Name}else{@()})
+        inbox_dev=@(if(Test-Path (Join-Path $runtimeRoot 'inbox-dev')){Get-ChildItem (Join-Path $runtimeRoot 'inbox-dev') -Filter *.questpack -File | ForEach-Object Name}else{@()})
         new_receipt_count=$receiptCount;strict_parse_error=$parseError
         revisions=$context.revisions;activations=$context.activations
     }
@@ -828,7 +886,7 @@ Assert-FixtureSeams
 if ($PlanOnly -or $Action -eq 'Plan') {
     [ordered]@{
         schema='comfy-quest-validation-lap-plan/v1';topology='omen_private_solo'
-        actions=@('Preflight','Prepare','ValidateRevision','ArmPrivateWorld','Monitor','Status','Cleanup')
+        actions=@('Preflight','Prepare','ValidateRevision','ArmPrivateWorld','Monitor','ConfirmActivation','Status','Cleanup')
         safety='PrivateWorldConfirmed stays false through preparation and returns false on cleanup.'
         player='No keyboard action is requested until the preceding machine proof passes.'
         experience='Speak to wake the Charm, offer Wood twice within 30 seconds, then reclaim Wood to seal the rite.'
@@ -845,6 +903,7 @@ $result = switch ($Action) {
     'ValidateRevision' { Invoke-ValidateRevision }
     'ArmPrivateWorld' { Invoke-ArmPrivateWorld }
     'Monitor' { Invoke-Monitor }
+    'ConfirmActivation' { Invoke-ConfirmActivation }
     'Status' { Invoke-Status }
     'Cleanup' {
         $paths = Get-RunPaths

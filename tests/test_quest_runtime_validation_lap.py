@@ -112,6 +112,10 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         for expected in (
             "running-game refusal",
             "quarantine",
+            "state quarantine",
+            "inbox-dev quarantine",
+            "staging gate",
+            "activation confirm",
             "strict JSON",
             "valid receipt object",
             "machine timeout",
@@ -121,6 +125,52 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
             "TestFaultAfter Quarantine",
         ):
             self.assertIn(expected, source)
+
+    def test_prepare_quarantines_state_and_dev_lane_recoverably(self) -> None:
+        # Phase 3 exit session 1: Prepare quarantined active/ and inbox/ but left state/
+        # in place, so historical pending transitions replayed against the missing active
+        # set; and the dev lane the defense publishes through was never swept at all.
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("$stateRoot = Join-Path $runtimeRoot 'state'", source)
+        self.assertIn("$inboxDevRoot = Join-Path $runtimeRoot 'inbox-dev'", source)
+        self.assertIn("state_files=$state", source)
+        self.assertIn("'inbox-dev'=$inboxDev", source)
+        self.assertIn("quarantined_state_file_count=@($state).Count", source)
+        self.assertIn("quarantined_inbox_dev_count=@($inboxDev).Count", source)
+        self.assertIn("@('active','inbox','state','inbox-dev')", source)
+        # Manifests persist before any move, and every move precedes the fault seam, so
+        # an interrupted Prepare stays recoverable for the new kinds too.
+        self.assertLess(
+            source.index("state_files=$state"),
+            source.index("foreach ($item in @($state)) { Move-OwnedFile"),
+        )
+        self.assertLess(
+            source.index("foreach ($item in @($state)) { Move-OwnedFile"),
+            source.index("if ($TestFaultAfter -eq 'Quarantine')"),
+        )
+        self.assertLess(
+            source.index("foreach ($item in @($inboxDev)) { Move-OwnedFile"),
+            source.index("if ($TestFaultAfter -eq 'Quarantine')"),
+        )
+
+    def test_second_revision_staging_waits_on_activation_evidence(self) -> None:
+        # Phase 3 exit session 1 staged 1.0.1 before 1.0.0 was ever activated; the runtime
+        # loaded the highest version directly and the first-load and update beats
+        # collapsed into one press. The machine now carries the sequencing: r2 validation
+        # refuses until the r1 activation is proven, and ConfirmActivation is the
+        # read-only go/no-go the workbook cues before the second Publish.
+        source = HARNESS.read_text(encoding="utf-8")
+        self.assertIn("'ConfirmActivation' { Invoke-ConfirmActivation }", source)
+        self.assertIn("r2 staging waits on r1 activation evidence", source)
+        self.assertIn("Find-Expectation 'load_r1' $context $rows", source)
+        self.assertIn("stage_second_revision=$false", source)
+        self.assertIn("stage_second_revision=$true", source)
+        self.assertIn("comfy-quest-validation-lap-confirm/v1", source)
+        # The refusal sits inside the r2 branch, before the identity comparisons.
+        self.assertLess(
+            source.index("r2 staging waits on r1 activation evidence"),
+            source.index("r2 changed the pack or experience identity."),
+        )
 
     def test_strict_json_reader_does_not_enumerate_valid_objects(self) -> None:
         source = HARNESS.read_text(encoding="utf-8")

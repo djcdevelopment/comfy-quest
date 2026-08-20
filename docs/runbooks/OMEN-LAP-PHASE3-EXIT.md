@@ -11,10 +11,15 @@ mechanism-only diagnosis.
 1. Deploy the gate-tested payload by SHA-256 (`Prepare` lane from the slice-1.4
    harness); quarantine historical questpacks recoverably; force
    `PrivateWorldConfirmed=false` until arming.
-2. Publish **Ten-Minute Desperate Defense** (`desperate-defense` template) from Studio
-   as a dev revision. Do not rehearse it again first — the browser proof exists; the
-   lap buys only the in-world read.
-3. Have a second authored quest version staged in the inbox for the F10/F11 beat below.
+2. Publish **Ten-Minute Desperate Defense** (`desperate-defense` template) 1.0.0 from
+   Studio. Do not rehearse it again first — the browser proof exists; the lap buys only
+   the in-world read.
+3. Hold the second version (1.0.1) as a Studio draft only: press **Start new iteration**
+   so the version is bumped, but do **not** press Publish. Publish is the atomic staging
+   act — session 1 pre-staged 1.0.1 into the inbox, the runtime loaded the highest
+   version at the first check, and the first-load and update beats collapsed into one
+   press. The harness enforces the order: `ValidateRevision -ExpectedVersion 1.0.1`
+   refuses until the r1 activation is proven.
 
 ## Sequence — twenty minutes, five verdicts
 
@@ -24,18 +29,29 @@ Enter the world cold, drawer closed.
       register, or vanish unread? (TopLeft channel, fires once per session.)
 - [ ] Open F9: does the status card answer "which revision is running?" **before any
       scrolling or reading** — title, version, Now playing?
-- [ ] Gut reaction to the retoken: does the drawer still read as a "kernel system
-      information panel," or as a product surface? (This is the F9 cognitive-switch
-      observation's follow-up measurement.)
+- [ ] Two-minute visual pre-check **before any beat**: does the drawer read as the
+      design canvas's composition (status card leading, circle-and-rail ladder, time-
+      guttered evidence feed, machinery behind one disclosure) — or still as a "kernel
+      system information panel"? Session 1 answered "still kernel" after tokens alone;
+      this is the full composition's follow-up measurement, and a repeat verdict costs
+      two minutes here instead of the session.
 
 ### 2. The update loop in situ (3 min) — creator-loop copy
-With the second version staged:
+First play onto 1.0.0 (F10, F11), then stage the update in the proven order:
+1. Run `ConfirmActivation`. It answers go/no-go from the load receipt and the active
+   set — **stage the second revision only on `activation_confirmed`**. A cue that
+   disagrees with observed state gets a one-line hold, never silent execution.
+2. Press Publish in Studio for 1.0.1, then `ValidateRevision -ExpectedVersion 1.0.1`.
+
+Then take the beat:
 - [ ] Press F10 with the drawer **closed**: does the TopLeft copy
       (`…is ready. Press F11 to play it.`) read at a glance without the drawer open?
 - [ ] Press F11: does `Now playing: <title> — <version>` land as confirmation rather
       than log output? If charms orphan, does the appended consequence read as an
       instruction you'd actually follow?
-- [ ] Press F11 again idle: `…is already playing.` — noise, or reassuring?
+- [ ] Press F11 again idle: `…is already playing.` — and on repeat presses the HUD line
+      should re-assert itself as `… x2`, `… x3`. Noise, or reassuring? (Session 1's
+      invisible idle responses are the finding this verifies.)
 - [ ] Does creator plumbing ever collide with story text on the center channel? (It
       must not — Center is authored-story-only now.)
 
