@@ -475,8 +475,24 @@ function Invoke-SourceGates {
     Invoke-CommandGate 'Lab patch coverage' { python tools/component-packets/check_lab_patches.py }
     Invoke-CommandGate 'interim package pin' { python tools/nuget/repin_public.py --check-interim }
     Invoke-CommandGate 'release verifier self-test' { python tools/release/verify_quest_release.py --self-test }
-    Invoke-CommandGate 'Studio build' { & $dotnet9 build src/Quest.Studio/Quest.Studio.csproj -c Release }
-    Invoke-CommandGate 'Studio xUnit' { & $dotnet9 test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release }
+    # The interim Contracts package keeps a fixed version while its bytes evolve. A cache
+    # keyed by the package hash (same defense as Test-QuestStudioE2E.ps1) keeps NuGet's
+    # immutable-version global cache from feeding the Studio gates stale bytes after a refresh.
+    $contractsPackage = Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.6.0-local.nupkg'
+    $packageCacheKey = if (Test-Path -LiteralPath $contractsPackage -PathType Leaf) {
+        (Get-FileHash -LiteralPath $contractsPackage -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0, 16)
+    } else {
+        'public-packages'
+    }
+    $studioGateCache = Join-Path $repoRoot ('artifacts\quest-runtime-validation\nuget-cache\studio-gates-' + $packageCacheKey)
+    $previousNugetPackages = [Environment]::GetEnvironmentVariable('NUGET_PACKAGES', 'Process')
+    try {
+        [Environment]::SetEnvironmentVariable('NUGET_PACKAGES', $studioGateCache, 'Process')
+        Invoke-CommandGate 'Studio build' { & $dotnet9 build src/Quest.Studio/Quest.Studio.csproj -c Release }
+        Invoke-CommandGate 'Studio xUnit' { & $dotnet9 test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release }
+    } finally {
+        [Environment]::SetEnvironmentVariable('NUGET_PACKAGES', $previousNugetPackages, 'Process')
+    }
     Invoke-CommandGate 'Studio browser E2E' { & tools/quest-studio/Test-QuestStudioE2E.ps1 -SkipBrowserInstall }
     Invoke-CommandGate 'licensed Runtime build' { dotnet build network/mod/ComfyQuestRuntime/ComfyQuestRuntime.csproj -c Release --no-restore }
     Invoke-CommandGate 'validation harness self-test' { & tools/quest-runtime/Test-QuestRuntimeValidationLap.ps1 }
