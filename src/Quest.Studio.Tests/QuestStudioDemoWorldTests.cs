@@ -154,6 +154,25 @@ public sealed class QuestStudioDemoWorldTests : IDisposable
     }
 
     [Fact]
+    public void Create_only_atomic_write_never_overwrites_an_existing_draft()
+    {
+        var directory = Directory.CreateDirectory(Path.Combine(_root, "atomic-write-collision"));
+        var target = Path.Combine(directory.FullName, "draft.json");
+        File.WriteAllText(target, "original");
+        var workspace = typeof(QuestStudioService).Assembly.GetType("Comfy.Quest.Studio.QuestStudioWorkspace");
+        var atomicWrite = workspace!.GetMethod(
+            "AtomicWrite",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        var thrown = Assert.Throws<System.Reflection.TargetInvocationException>(
+            () => atomicWrite!.Invoke(null, new object[] { target, "replacement", true }));
+
+        Assert.IsType<IOException>(thrown.InnerException);
+        Assert.Equal("original", File.ReadAllText(target));
+        Assert.Empty(Directory.GetFiles(directory.FullName, "draft.json.tmp-*"));
+    }
+
+    [Fact]
     public void Built_in_minimal_tutorial_source_compiled_artifact_and_runtime_v2_pack_do_not_drift()
     {
         var bundle = BundleRoot();

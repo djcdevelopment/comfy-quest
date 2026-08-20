@@ -1065,8 +1065,7 @@ internal sealed class QuestStudioWorkspace
         File.WriteAllText(temporary, content, new UTF8Encoding(false));
         try
         {
-            if (create && !File.Exists(target)) File.Move(temporary, target);
-            else File.Move(temporary, target, true);
+            File.Move(temporary, target, overwrite: !create);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
