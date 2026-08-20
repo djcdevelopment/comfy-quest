@@ -17,6 +17,7 @@ SUMMARY = TOOLS / "samples" / "gallery-profiles.json"
 GENERATOR = TOOLS / "generate_gallery.py"
 PLAN = MOD / "Core" / "LabGalleryPlan.g.cs"
 BUILDER = MOD / "Core" / "LabGalleryBuilder.cs"
+ORIGIN_CONTRACT = MOD / "Core" / "LabGalleryOriginContract.cs"
 TREE_RECOVERY = MOD / "Core" / "LabTreeRecovery.cs"
 TREE_CONTRACT = MOD / "Core" / "LabTreeRecoveryContract.cs"
 CONTROLLER = MOD / "Core" / "LabBatchController.cs"
@@ -382,12 +383,25 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_setup_and_batch_prepare_reset_one_fresh_course(self) -> None:
         builder = BUILDER.read_text(encoding="utf-8")
+        origin_contract = ORIGIN_CONTRACT.read_text(encoding="utf-8")
         controller = CONTROLLER.read_text(encoding="utf-8")
         plugin = PLUGIN.read_text(encoding="utf-8")
         self.assertIn("public IEnumerator ResetSite", builder)
         self.assertIn('IEnumerator clear = ClearSafely("all", false)', builder)
         self.assertIn("_gallery.ResetSite(host, LabGalleryPlan.DefaultProfileId)", controller)
         self.assertIn("_gallery.ResetSite(this, LabGalleryPlan.DefaultProfileId)", plugin)
+        self.assertIn("TryCaptureReusableOrigin", builder)
+        self.assertIn('prefab.name, "portal_wood"', builder)
+        self.assertIn('zdo.GetString("tag", string.Empty), GalleryTag', builder)
+        self.assertIn("LabGalleryOriginContract.Decide", builder)
+        self.assertIn("pair.Count != 2", origin_contract)
+        self.assertIn("raised.Y - ground.Y < 0.5f", origin_contract)
+        self.assertIn("rebuild stopped before clear", builder)
+        self.assertIn("lab reset stopped before clear", builder)
+        self.assertLess(
+            builder.index("TryCaptureReusableOrigin"),
+            builder.index('IEnumerator clear = ClearSafely(profile.Id, false)'),
+        )
         self.assertNotIn("PrepareBatchTargets", controller)
         self.assertNotIn("PrepareBatchSupplies", controller)
 

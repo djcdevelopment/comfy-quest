@@ -1,5 +1,13 @@
 # Changelog
 
+**r28 reusable-site preparation.** Rebuild and all-schools prepare now capture the
+existing Gallery's lower ascent portal before clear and raise the replacement at that
+same absolute world origin. The player no longer has to stand on the original build
+pixel for every visual iteration. The capture requires exactly one build with a complete
+two-portal ascent pair and, for full reset, no second profile; ambiguity or partial state
+stops before any marked object is deleted. First build still intentionally uses the
+player's current position.
+
 **r27 clean arrival sightline.** The first r26 live frame proved the beacon existed
 but also showed the compact course's ground-level Harvest birch growing through the
 raised hub directly in front of it. The same frame showed the upper ascent portal at

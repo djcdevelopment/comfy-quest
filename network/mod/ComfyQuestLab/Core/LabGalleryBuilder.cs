@@ -765,6 +765,14 @@ public sealed class LabGalleryBuilder {
       Report(UnknownProfile(profileId));
       yield break;
     }
+    Vector3 reusableOrigin;
+    bool hasReusableOrigin;
+    string originError;
+    if (!TryCaptureReusableOrigin(
+            profile, false, out reusableOrigin, out hasReusableOrigin, out originError)) {
+      Report("rebuild stopped before clear: " + originError);
+      yield break;
+    }
     IEnumerator clear = ClearSafely(profile.Id, false);
     while (clear.MoveNext()) {
       yield return clear.Current;
@@ -773,7 +781,10 @@ public sealed class LabGalleryBuilder {
       Report("rebuild stopped because the old " + profile.Id + " gallery could not be cleared safely.");
       yield break;
     }
-    IEnumerator build = Build(host, profile.Id);
+    Vector3? offset = hasReusableOrigin && Player.m_localPlayer != null
+        ? (Vector3?)(reusableOrigin - Player.m_localPlayer.transform.position)
+        : null;
+    IEnumerator build = Build(host, profile.Id, offset);
     while (build.MoveNext()) {
       yield return build.Current;
     }
@@ -793,6 +804,14 @@ public sealed class LabGalleryBuilder {
       Report(UnknownProfile(profileId));
       yield break;
     }
+    Vector3 reusableOrigin;
+    bool hasReusableOrigin;
+    string originError;
+    if (!TryCaptureReusableOrigin(
+            profile, true, out reusableOrigin, out hasReusableOrigin, out originError)) {
+      Report("lab reset stopped before clear: " + originError);
+      yield break;
+    }
     IEnumerator clear = ClearSafely("all", false);
     while (clear.MoveNext()) {
       yield return clear.Current;
@@ -801,10 +820,86 @@ public sealed class LabGalleryBuilder {
       Report("lab reset stopped because the old marked Gallery could not be cleared safely.");
       yield break;
     }
-    IEnumerator build = Build(host, profile.Id);
+    Vector3? offset = hasReusableOrigin && Player.m_localPlayer != null
+        ? (Vector3?)(reusableOrigin - Player.m_localPlayer.transform.position)
+        : null;
+    IEnumerator build = Build(host, profile.Id, offset);
     while (build.MoveNext()) {
       yield return build.Current;
     }
+  }
+
+  /// <summary>Recover the existing site's absolute origin before clear retires its ZDOs.
+  ///
+  /// A normal build has exactly two same-tag ascent portals: the terrain portal and the
+  /// raised hub portal. The lower one is the durable anchor at
+  /// (origin + GroundPortalX/Z). This avoids making the player stand on a magic pixel for
+  /// every rebuild. Ambiguous, partial, or mixed sites fail before deletion; a world with
+  /// no Gallery at all remains the intentional first-build case and uses the player's feet.</summary>
+  bool TryCaptureReusableOrigin(
+      LabGalleryPlan.Profile profile,
+      bool requireOnlyRequestedProfile,
+      out Vector3 origin,
+      out bool found,
+      out string error) {
+    origin = Vector3.zero;
+    found = false;
+    error = string.Empty;
+    if (profile == null || ZDOMan.instance == null || ZNetScene.instance == null) {
+      error = "world object table is unavailable";
+      return false;
+    }
+
+    var portals = new List<LabGalleryOriginContract.Portal>();
+    bool anyGallery = false;
+    bool otherProfile = false;
+    try {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        if (!IsGalleryPiece(zdo)) {
+          continue;
+        }
+        anyGallery = true;
+        if (!string.Equals(
+                GalleryProfile(zdo), profile.Id, StringComparison.OrdinalIgnoreCase)) {
+          otherProfile = true;
+          continue;
+        }
+        GameObject prefab = ZNetScene.instance.GetPrefab(zdo.GetPrefab());
+        if (prefab == null
+            || !string.Equals(prefab.name, "portal_wood", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(
+                zdo.GetString("tag", string.Empty), GalleryTag, StringComparison.Ordinal)) {
+          continue;
+        }
+        Vector3 at = zdo.GetPosition();
+        portals.Add(new LabGalleryOriginContract.Portal {
+          BuildId = GalleryBuild(zdo),
+          X = at.x,
+          Y = at.y,
+          Z = at.z,
+        });
+      }
+    } catch (Exception ex) {
+      error = "could not inspect the existing site: " + ex.Message;
+      return false;
+    }
+
+    LabGalleryOriginContract.Decision decision = LabGalleryOriginContract.Decide(
+        anyGallery,
+        otherProfile,
+        requireOnlyRequestedProfile,
+        profile.GroundPortalX,
+        profile.GroundPortalZ,
+        portals);
+    if (!decision.Succeeded) {
+      error = decision.Error;
+      return false;
+    }
+    found = decision.Found;
+    if (found) {
+      origin = new Vector3(decision.X, decision.Y, decision.Z);
+    }
+    return true;
   }
 
   /// <summary>Instantiate one piece and remember it.

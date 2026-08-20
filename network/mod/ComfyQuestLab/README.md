@@ -88,6 +88,12 @@ Those pieces carry only Arcane Sight's tight Social-pink halo while F9 is open; 
 ordinary infinite-fuel iron torch at the sign adds a restrained matching destination
 light. Exact r27 arrival appearance remains pending ordinary-Valheim review.
 
+R28 removes the repeated human-positioning tax from that review loop. If one complete
+Gallery site already exists, rebuild and all-schools preparation capture its lower
+ascent portal before clear and reuse the same absolute origin after clear. Multiple
+builds, mixed profiles, or an incomplete ascent pair fail before deletion. Only the
+first build in an empty world takes its origin from the player's feet.
+
 ## Why this exists
 
 Authoring a quest today means guessing, and guessing fails *silently*.
