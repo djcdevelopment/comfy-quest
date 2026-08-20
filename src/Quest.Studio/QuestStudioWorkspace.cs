@@ -518,6 +518,12 @@ internal sealed class QuestStudioWorkspace
             currentStageId, currentCount, requiredCount, orderedReceipts.Take(20).ToArray(), compiled.Diagnostics)
         {
             ActiveRelation = activeRelation,
+            // The one shared title fact: whatever revision is actually running, by content
+            // hash. The compiled draft's title is an equally honest fallback only when the
+            // active content IS this draft; an other_version revision has no provable title.
+            ActiveTitle = CreatorLoopNotice.ActiveTitle(
+                new[] { devPublished, published }.Where(value => value is not null).ToArray()!, active)
+                ?? (isActive ? compiled.Document!.Title : null),
             RouteLabels = RuntimeRouteLabels(compiled.Document!),
             EffectLabels = RuntimeEffectLabels(compiled.Document!),
             DevConnected = devConnected,
@@ -1849,6 +1855,7 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
     IReadOnlyList<RuntimeReceipt> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics)
 {
     public string ActiveRelation { get; init; } = "none";
+    public string? ActiveTitle { get; init; }
     public bool DevConnected { get; init; }
     public bool DevPublished { get; init; }
     public RuntimeDevChannelStatus? DevStatus { get; init; }
@@ -1865,7 +1872,8 @@ public sealed record StudioRuntimeReceiptSummary(
     string? Operation, string? Status, string? StageId, string? EventName,
     int? CurrentCount, int? RequiredCount, DateTimeOffset AtUtc,
     string? TransitionId, string? ActionId, string? ActivationId, string? CorrelationId, string? Error,
-    string? RouteLabel, string? EffectLabel, string? Unmet = null, string? NotTaken = null);
+    string? RouteLabel, string? EffectLabel, string? Unmet = null, string? NotTaken = null,
+    string? Kind = null);
 
 public sealed record StudioRuntimePassLine(string Kind, string Status, string Message,
     string? ActivationId, string? CorrelationId, DateTimeOffset? AtUtc);
@@ -1877,6 +1885,7 @@ public sealed record StudioRuntimeStatusView(int SchemaVersion, bool Available, 
     string? CurrentStageId, int? CurrentCount, int? RequiredCount,
     IReadOnlyList<StudioRuntimeReceiptSummary> Receipts, IReadOnlyList<ContractDiagnostic> Diagnostics)
 {
+    public string? ActiveTitle { get; init; }
     public bool DevConnected { get; init; }
     public bool DevArmed { get; init; }
     public bool DevPublished { get; init; }

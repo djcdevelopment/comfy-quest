@@ -593,6 +593,7 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal("none", none.ActiveRelation);
         Assert.Null(none.ActivePackId);
         Assert.Null(none.ActiveActivationId);
+        Assert.Null(none.ActiveTitle);
 
         var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
         new QuestPackStore(runtimeRoot).LoadLatest();
@@ -604,6 +605,8 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal(current.ContentHash, current.ActiveContentHash);
         Assert.Matches("^act-[0-9]{8}T[0-9]{9}Z-[0-9a-f]{8}$", current.ActiveActivationId!);
         Assert.NotNull(current.ActivatedUtc);
+        // Title-first status: the running revision is named by the shared contract fact.
+        Assert.Equal("New Quest", current.ActiveTitle);
 
         var bumped = service.BumpPatch(project.ProjectId, project.Revision);
         Assert.True(bumped.Ok, bumped.Error);
@@ -612,6 +615,8 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal("other_version", other.ActiveRelation);
         Assert.Equal(project.Version, other.ActiveVersion);
         Assert.Equal(current.ActiveActivationId, other.ActiveActivationId);
+        // An other_version revision's pack is no longer provably titled — honest null.
+        Assert.Null(other.ActiveTitle);
     }
 
     [Fact]
@@ -711,6 +716,20 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal("corr-labels", receipt.CorrelationId);
         Assert.Equal("Say something in normal chat.", receipt.RouteLabel);
         Assert.Equal("Give 2 Wood", receipt.EffectLabel);
+        // A receipt without a kind (every pre-taxonomy receipt) fails closed to plumbing;
+        // a stamped kind is projected verbatim, never re-derived.
+        Assert.Equal("plumbing", receipt.Kind);
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Operation = "event", Status = "matched", StageId = "start",
+            PackId = candidate.Manifest.PackId, Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash,
+            TransitionId = route.Id, CorrelationId = "corr-kind",
+            EvidenceKind = CreatorEvidenceLine.KindName(CreatorEvidenceKind.Story),
+            Diagnostics = Array.Empty<ContractDiagnostic>()
+        });
+        var story = service.RuntimeStatusView(project.ProjectId).Receipts
+            .Single(value => value.CorrelationId == "corr-kind");
+        Assert.Equal("story", story.Kind);
     }
 
     [Fact]

@@ -58,17 +58,24 @@ identically in Unity IMGUI. No gradient or shadow ever carries meaning."*
 
 ## Typography
 
-Three faces in the design; two translate, one degrades deliberately:
+Three faces in the design; both renderers degrade deliberately — **Studio is 100%
+offline and loads no font over the network.** The design faces lead the CSS stacks and
+resolve only if locally installed, exactly the pattern the page always used for `Inter`:
 
-- **UI — Source Sans 3, 400/600/700.** Web: load from Google Fonts in Studio. IMGUI:
-  stays the Unity default face; the 400/600/700 ladder becomes regular/bold + size steps.
-- **Data — JetBrains Mono.** Hashes, timestamps, hotkeys, versions. Web: Google Fonts.
-  IMGUI: optional `Font.CreateDynamicFontFromOSFont("Consolas", size)` (present on every
-  Windows install) — or accept the default face; the *rule* that data never dresses as
-  prose still holds through size and color (Faint/Dim).
-- **Display — Grenze 600, quest titles only.** Web only. IMGUI: title = largest bold
-  size in the drawer (30 → `fontSize=24+` bold); the face does not translate and nothing
-  else earns display treatment, so hierarchy survives.
+- **UI — `--sans:'Source Sans 3',Inter,ui-sans-serif,system-ui,sans-serif`.** IMGUI:
+  the Unity default face; the 400/600/700 ladder becomes regular/bold + size steps.
+- **Data — `--mono:'JetBrains Mono',ui-monospace,'Cascadia Mono',Consolas,monospace`.**
+  Hashes, timestamps, hotkeys, versions. IMGUI: optionally
+  `Font.CreateDynamicFontFromOSFont("Consolas", size)` — or the default face; the *rule*
+  that data never dresses as prose still holds through size and color (Faint/Dim).
+- **Display — `--serif:Grenze,Georgia,'Times New Roman',serif`, quest titles only.**
+  IMGUI: title = largest bold size in the drawer; the face does not translate and
+  nothing else earns display treatment, so hierarchy survives.
+
+One Studio-specific token adjustment: `--dim` is `#7d87a0`, not the design's `#6b7488`,
+because the design value fails Studio's pinned WCAG 4.5:1 contrast matrix on the new
+surfaces; the drawer keeps the design Dim for its plumbing rows, whose small size is not
+under the same pin.
 
 ## Component semantics worth keeping exactly
 

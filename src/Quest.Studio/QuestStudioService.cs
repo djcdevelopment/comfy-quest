@@ -112,9 +112,11 @@ public sealed class QuestStudioService
                 receipt.TransitionId is not null && status.RouteLabels.TryGetValue(receipt.TransitionId, out var routeLabel) ? routeLabel : null,
                 receipt.ActionId is not null && status.EffectLabels.TryGetValue(receipt.ActionId, out var effectLabel) ? effectLabel : null,
                 StudioRehearsal.UnmetPhrase(receipt.Evidence),
-                StudioRehearsal.NotTakenPhrase(receipt.RejectedEvidence, status.RouteLabels))).ToArray(),
+                StudioRehearsal.NotTakenPhrase(receipt.RejectedEvidence, status.RouteLabels),
+                receipt.EvidenceKind ?? "plumbing")).ToArray(),
             status.Diagnostics)
         {
+            ActiveTitle = status.ActiveTitle,
             DevConnected = status.DevConnected,
             DevArmed = status.DevConnected && status.DevStatus?.Armed == true,
             DevPublished = status.DevPublished,

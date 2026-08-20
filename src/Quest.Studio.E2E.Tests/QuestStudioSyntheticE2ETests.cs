@@ -180,6 +180,9 @@ public sealed class QuestStudioSyntheticE2ETests
             fixture.WriteAdvanced("item_dropped");
             await RefreshRuntimeAsync(page);
             await WaitForExactTextAsync(page.Locator("#runtime-next"), "Pick up any item from the ground.", "advanced live beat");
+            await WaitForCountAsync(page.Locator("#runtime-receipts .receipt-row.kind-story"), 1, "story-kind receipt row");
+            await WaitForExactTextAsync(page.Locator("#quest-status-state"), "Now playing", "status card state");
+            await WaitForExactTextAsync(page.Locator("#quest-status-title"), "Synthetic Signal Circuit", "status card title");
 
             fixture.WriteComplete();
             await RefreshRuntimeAsync(page);
@@ -827,7 +830,8 @@ public sealed class QuestStudioSyntheticE2ETests
             {
                 Operation = "event", Status = "matched", StageId = stage.Id, CurrentStageId = stage.Id,
                 NextStageId = transition.NextStage, EventName = eventName, TransitionId = transition.Id,
-                CorrelationId = correlationId, Evidence = evidence
+                CorrelationId = correlationId, Evidence = evidence,
+                EvidenceKind = CreatorEvidenceLine.KindName(CreatorEvidenceKind.Story)
             });
             foreach (var action in transition.Actions ?? [])
                 WriteForPack(new RuntimeReceipt

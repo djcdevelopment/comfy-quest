@@ -88,10 +88,50 @@ class QuestStudioVNextTests(unittest.TestCase):
 
         for surface in ("bg", "panel", "panel-raised"):
             self.assertGreaterEqual(contrast(colors["dim"], colors[surface]), 4.5)
+        # The creator-loop insets: --inset and the raised chip surface. The design's own
+        # #6b7488 dim failed this matrix, which is why the Studio token is #7d87a0.
         for tone in ("ink-soft", "green", "amber"):
-            for runtime_surface in ("#0f1417", "#101619"):
+            for runtime_surface in (colors["inset"], colors["panel-raised"]):
                 self.assertGreaterEqual(contrast(colors[tone], runtime_surface), 4.5)
         self.assertIn(".preview-keys{margin-top:22px;font-size:11.5px;color:var(--dim)}", css)
+
+    def test_status_card_and_receipt_kinds_speak_the_design_language(self) -> None:
+        html = raw_constant("Html")
+        css = raw_constant("Css")
+        script = raw_constant("Js")
+        service = SERVICE.read_text(encoding="utf-8")
+        workspace = WORKSPACE.read_text(encoding="utf-8")
+        # The status card answers "which revision is running?" title-first, from the one
+        # shared CreatorLoopNotice.ActiveTitle contract fact.
+        for element_id in ("quest-status-title", "quest-status-version", "quest-status-state"):
+            with self.subTest(element_id=element_id):
+                self.assertIn(f'id="{element_id}"', html)
+        for marker in (
+            "d?.active_title||d?.active_pack_id",
+            "'Now playing'",
+            "'An earlier telling is playing'",
+            "'Nothing is playing yet'",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, script)
+        body = script[script.index("function renderStatusCard"):]
+        self.assertIn("}", body[: body.index("\n")])
+        self.assertIn("CreatorLoopNotice.ActiveTitle(", workspace)
+        self.assertIn("ActiveTitle = status.ActiveTitle", service)
+        # Receipt rows carry their kind from the receipt itself and fail closed to
+        # plumbing; the page renders the kind, it never re-derives one from copy.
+        self.assertIn('receipt.EvidenceKind ?? "plumbing"', service)
+        self.assertIn("kind=r.kind||'plumbing'", script)
+        for kind_class in ("kind-story", "kind-cast", "kind-warning", "kind-plumbing"):
+            with self.subTest(kind_class=kind_class):
+                self.assertIn(f".receipt-row.{kind_class}", css)
+        # Fonts stay local-first: the design faces lead the stacks, nothing loads over
+        # the network, and the page keeps exactly its two local link tags.
+        self.assertIn("--sans:'Source Sans 3',Inter,ui-sans-serif", css)
+        self.assertIn("--serif:Grenze,Georgia", css)
+        self.assertIn("--mono:'JetBrains Mono',ui-monospace", css)
+        self.assertNotIn("https://", css)
+        self.assertNotIn("@import", css)
 
     def test_creator_lane_hides_implementation_plumbing(self) -> None:
         html = raw_constant("Html")
