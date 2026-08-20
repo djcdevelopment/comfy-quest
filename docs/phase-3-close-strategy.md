@@ -99,8 +99,9 @@ product question).
   state; "choose" is reserved for genuinely distinct quests. Re-pin xUnit copy
   matrix + python.
 - ~~**Outcome, not machinery**: a `fail` ending never reads "complete".~~ **Dropped:
-  the defect did not exist.** The receipts show no overrun fired; the victory route
-  won and "complete" was truthful. What was actually wrong — the row printing a raw outcome
+  the defect did not exist.** The seat had already said so at the keyboard ("i
+  slaughtered them"); the receipts confirm it. No overrun fired, the victory route
+  won, and "complete" was truthful. What was actually wrong — the row printing a raw outcome
   token, under a card already showing the title — is fixed instead: the EXPERIENCE
   row drops the title and reads "Completed." / "Failed.", and says plainly when no
   Charm is cast.

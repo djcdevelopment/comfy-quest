@@ -87,6 +87,7 @@ Phase 4 packet rather than being fixed piecemeal here.
 
 `Cleanup` restores the install byte-for-byte (packs, active set, `state/`,
 `inbox-dev/`, config safety back to false) and sweeps lap-created files to
-`post-run/`. Read the run capture's receipts before writing any finding down — the
-one time we skipped that, session 2's record carried a defect that never existed and
-missed the proof of the one that did.
+`post-run/`. Write the findings from what the seat said and what the receipts show —
+in that order. Session 2's record set the player's own "i slaughtered them" aside in
+favour of an inference about the engine, and carried a defect that never existed while
+missing the proof of the one that did.

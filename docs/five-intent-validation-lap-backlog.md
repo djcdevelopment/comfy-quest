@@ -209,8 +209,13 @@ remains open so the defense verdicts can still be taken on the same preparation.
 - ~~After the overrun (authored outcome `fail`), the EXPERIENCE row read
   "Ten-Minute Desperate Defense: **complete**" — a failed ending labeled with the
   workflow's terminal state instead of the authored outcome.~~ **Corrected
-  2026-08-20 against the run's receipts: this observation was wrong, and its being
-  wrong is the more useful finding.** No overrun ever fired. At 12:17:17 the
+  2026-08-20: this observation was wrong, and its being wrong is the more useful
+  finding.** The first thing it contradicted was the seat's own report, recorded in
+  this same document an hour earlier — "ahh well i slaughtered them, but it was fun
+  :]" — which said plainly that the fight had been won. The write-up set that aside
+  in favour of an inference (if the tally counted zero, the ten-minute mark can only
+  be the overrun) and recorded the inference as fact. The receipts agree with the
+  player, not the inference. No overrun ever fired. At 12:17:17 the
   `timer_elapsed` event re-evaluated the `hold` stage, and the route that matched was
   `held` (priority 40, outranking `overrun` at 30): by then the corpses were long
   gone, `spawned_enemies_cleared` read 8, and the eight kills still sitting in history

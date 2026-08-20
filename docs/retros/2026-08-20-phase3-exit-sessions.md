@@ -62,22 +62,27 @@ while the verbatims were fresh.
    and hunted for a chooser that doesn't exist. *Lesson: player-facing counts
    must count player-visible nouns; pin the copy against the noun, not the
    collection size.*
-5. **We wrote a finding we had not checked against the receipts.** This retro's
-   first version reported that the defense's overrun labeled a failed ending
-   "complete". It did not: no overrun ever fired. The victory route won at the
-   deadline event, the engine recorded the win correctly, and the yellow text the
-   seat praised was the victory line arriving nine minutes late. The receipts were
-   sitting in the run capture the whole time and settled it in one pass — and in
-   settling it, they proved the tally defect outright. *Lesson: a finding written
-   from what the seat felt is a hypothesis; promote it only after the evidence the
-   lap already preserved has been read. The wrong write-up cost a workstream item
-   aimed at a bug that did not exist, and nearly buried the cleanest proof of the
-   one that did.*
-4. **A cue executed against unverified state.** Session 1's collapsed beat came
+4. **We overrode the player's account with a mechanism theory.** The seat said
+   "ahh well i slaughtered them, but it was fun :]" — an unambiguous report that
+   the wave was dead and the fight was won. The ledger row recorded it faithfully.
+   Then the same write-up reached the 12:17:17 moment, reasoned *from a belief*
+   ("the tally counted zero, so the only route that can fire at the ten-minute
+   mark is the overrun"), and wrote that inference down as fact — an inference
+   that required the player to have lost. Both halves sat in the same document,
+   contradicting each other, unreconciled: a recorded victory and an invented
+   defeat. The receipts settled it in one pass the next day (the *victory* route
+   matched at the deadline event, outranking the overrun) and in settling it
+   proved the tally defect outright. *Lesson: the player's account of what
+   happened to them is evidence, and a mechanism inference is not. When the two
+   disagree, the account stands and the inference is the thing under suspicion —
+   the seat is not a witness to be corrected by a theory about the engine.* The
+   inverted write-up cost a workstream item aimed at a bug that never existed and
+   nearly buried the cleanest proof of the one that did.
+5. **A cue executed against unverified state.** Session 1's collapsed beat came
    from staging on cue rather than on evidence. Now a standing guardrail (any
    cue/state disagreement gets a one-line hold, never silent execution) *and* a
    machine gate — belt and suspenders, both used in session 2.
-5. **Runbooks drift like code but weren't reviewed like code.** The defense
+6. **Runbooks drift like code but weren't reviewed like code.** The defense
    script omitted the CAST beat entirely (the quest ignored the player until a
    receipt revealed why) and instructed the pre-staging that sank session 1.
    *Lesson: a runbook edit that changes sequencing gets the same review and — where
@@ -97,8 +102,10 @@ Added by this retro:
   world-derived facts requires a bounded catch-up; never assume same-frame settle.
 - **Copy pins name nouns:** new player-facing counts get a pin asserting what is
   being counted, not just the sentence.
-- **Read the capture before writing the finding:** a lap record's rows carry the
-  receipt that supports them, or they are marked as the seat's reading rather than
-  the run's.
+- **The seat's account outranks an inference about the engine.** A lap row states
+  what the player reported and what the receipts show; where a write-up needs a
+  mechanism story to connect them, that story is labelled as one and checked
+  against the capture before it is promoted. A row that contradicts the seat's own
+  words is wrong until the evidence says otherwise.
 - **Runbook sequencing changes ride the harness self-test** where a machine gate
   exists (as the staging gate now demonstrates).
