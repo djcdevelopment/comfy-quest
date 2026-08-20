@@ -70,6 +70,14 @@ Recorded so they are not mistaken for coverage. Generalise when next touched:
 - **Repeatable no-ops** — the idle-HUD test pins F10/F11. The rule: any repeatable action
   with no state change still yields visibly distinct feedback.
 
+## Published write-up
+
+The public version of this day lives in the writing workspace, not here:
+`C:\work\writing\product-already-told-us-linkedin-2026-08-20.md` with its feed post
+alongside. It follows that workspace's house rules (payoff first, evidence-first, zero em
+dashes), which an earlier in-repo draft did not. This retro is the record; that is the
+article.
+
 ## The cost, recorded plainly
 
 Three sessions, each ending in the first few steps, each costing a full context switch
