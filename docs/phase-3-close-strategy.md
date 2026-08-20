@@ -132,12 +132,19 @@ This was scoped as "unblocks future laps, not session 3" and that was wrong —
 session 3 *is* a defense lap, so without it the staging gate would again be proved
 by hand at the keyboard.
 
-## W5 — Phase 4 scoping packet (no code)
+## W5 — Phase 4 scoping packet (no code) — **written, awaiting the call**
 
 The seat's composition thesis (horizontal top bar minimizing to four dots), the
 alert-anchor requirement (ADR 0005), the Studio reading-order direction, and the
 existing F9 switch-cost brief travel together into the Phase 4 scope decision.
 Nothing from this list is implemented piecemeal beforehand.
+
+Landed 2026-08-20 as `docs/phase-4-scope-packet.md`: the four inputs with their
+evidence, the Lab ownership map the notebook forces, three priced shapes of Phase 4
+(notebook as planned / presentation first / notebook shipped on the new composition),
+a recommendation, and the three answers the call needs. Written before session 3
+deliberately — session 3's verdicts aim the composition work inside whichever shape
+is chosen, they do not change which shape is right.
 
 ## Sequence and session 3
 
