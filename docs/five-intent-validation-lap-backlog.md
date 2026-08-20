@@ -160,3 +160,46 @@ Built before the first lap because these paths can damage or confuse the OMEN in
 Deferred until a lap demonstrates need: broad malformed-receipt matrices, multiple
 stale-hash variants, and additional inbox-precedence permutations. Each future case
 must cite the observation that earned the new surface.
+
+## Phase 3 exit — Ten-Minute Desperate Defense (session 1, paused)
+
+Intended experience: the creator loop should feel like one product from cold entry
+through an in-place content update, and the ten-minute defense should answer whether
+the countdown carries tension, reinforcement reads as escalation, and mercy reads as
+mercy. Session 1 reached the update loop and paused before the defense began; the run
+remains open so the defense verdicts can still be taken on the same preparation.
+
+### Pre-lap findings with known causes
+
+| Observation | Why it happened | Resolution |
+| --- | --- | --- |
+| Preflight's Studio gates failed with missing-symbol errors against current source. | The interim Contracts package keeps a fixed version while its bytes evolve; the gates restored from NuGet's immutable-version global cache, which still held pre-refresh bytes. | The lap ran Preflight with the E2E-style hash-keyed `NUGET_PACKAGES`; the harness now keys its own Studio-gate cache the same way (landed as "Key Preflight's Studio gates to the interim package bytes"). |
+| The staged 1.0.1 was published before 1.0.0 had ever been activated, so the first check found two versions and loaded 1.0.1 directly — the first-load and update beats collapsed into one pass, and later loop presses had nothing new to announce. | The runtime always loads the highest valid version, so an update beat only exists if the newer version arrives after the older one is playing. The mid-session staging cue was executed without first confirming an activation receipt existed. | Process rule for future laps: mid-session staging waits on receipt evidence of an activation, not on the cue alone; the seat workbook should carry the sequencing explicitly instead of presuming a pre-staged second version. |
+
+### Findings
+
+| Observation | Evidence | Disposition |
+| --- | --- | --- |
+| The retokened drawer still reads as a kernel panel. Verbatim: "kernel UI on f9 press looks the same. i thought we updated the UI?" — after roughly a day of design-system adoption work, the seat could not tell the surface had changed. | Seat workbook verdict 1 note; the drawer screenshot shows the new tokens (title-first status card, amber arming action, four-step content-update strip) are live. | This is the follow-up measurement the lap was held for: token adoption alone does not cross the product threshold. Decides the composition question — the drawer needs the full status-card composition and/or a Phase 4 scope move, per the switch-cost decision brief. |
+| Orphaned workflow state spammed rejected transitions at startup: 47 `transition/rejected · active_set_missing` receipts between world load and first check, including a 39-receipt burst in one second. | Receipt series in the run's captures. | Preparation quarantines `active/` and inbox packs but not `state/`, so historical pending transitions replayed against a missing active set. Fix candidates: quarantine `state/` recoverably in `Prepare`, and/or the runtime retires pending transitions after bounded rejection (same family as the 3.4 replay-forever fix). |
+
+### "Can't answer why" ledger
+
+| UTC phase | Player-visible symptom | Evidence preserved | Why still unknown | Bounded next investigation |
+| --- | --- | --- | --- | --- |
+| Update loop, after 1.0.1 was active | Five F10 presses and three F11 presses over seven seconds appeared to do nothing; the player concluded the keys were broken and ended the session. | Receipts show every press was accepted (`check/accepted` for both versions ×5, `load/already_active` ×3). `CreatorLoopNotice` composes copy for both branches ("… is already playing. Nothing new to load." / "… is already playing.") and the notices are wired to the top-left channel. | The copy exists and fires, yet nothing legible reached the player — unknown whether the message HUD queued/deduplicated repeats, the line's duration was too short, or attention was on the second monitor at emission time. | Inspect the top-left emission path for queue and duplicate behavior under rapid repeat presses; if the channel drops or delays repeats, make the idle response re-assert visibly. Do not add new channels before that answer. |
+
+### Player-experience observations
+
+- The status card passed its first test: title, version chip, and Now playing were
+  ticked as answering "which revision is running?" without scrolling.
+- The four-step content-update strip (LOOK 2 found → VALIDATE 2 valid → LOAD 1.0.1 →
+  CONFIRM active) rendered a fully honest machine story — but the moment the loop had
+  nothing new to say, the surface went silent, and silence read as breakage. The idle
+  state needs to be as legible as the busy state.
+- A version-only bump (identical content hash) was accepted as a real update with a
+  fresh activation epoch — convenient for staging, but worth an explicit product
+  decision on whether "nothing changed" updates deserve their own copy.
+- Defense verdicts (countdown tension, escalation, mercy), evidence read-back, and
+  the Studio round-trip were not reached; the experience never started. They remain
+  the open Phase 3 exit questions for session 2.
