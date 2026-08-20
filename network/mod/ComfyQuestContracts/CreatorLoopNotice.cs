@@ -26,6 +26,19 @@ public sealed class CreatorEvidenceLine {
   };
 }
 
+/// <summary>The status card's state grammar. The state is a fact for the renderer's color
+/// choice — Ready green for playing/up to date, Amber for the one pending action, Steel for
+/// an informational choice — never re-derived by parsing the state line (the DeadlineUrgent
+/// rule).</summary>
+public enum QuestCardState { Playing, UpToDate, UpdateReady, Choice }
+
+/// <summary>The status card's one state line beside the running quest's title, with the
+/// state that colors it.</summary>
+public sealed class QuestCardStatus {
+  public QuestCardState State { get; set; }
+  public string Line { get; set; }
+}
+
 /// <summary>One creator-facing sentence about the check/load loop.
 ///
 /// A pure fact type, mirroring TriggerCountdown: the plugin renders, it never composes
@@ -36,6 +49,13 @@ public sealed class CreatorEvidenceLine {
 public sealed class CreatorLoopNotice {
   public string Headline { get; set; }
   public string Detail { get; set; }
+
+  /// <summary>True when the loop had nothing new to say — already playing, empty inbox,
+  /// nothing to load. Session 1 of the Phase 3 exit lap showed these responses merging
+  /// invisibly into the HUD line already on screen; the renderer uses this fact to make an
+  /// idle repeat re-assert itself. Tagged where the sentence is composed, never inferred
+  /// from the rendered copy.</summary>
+  public bool Idle { get; set; }
 
   /// <summary>What a check proved. Never activation language: activating is the load
   /// step's verb, and the validation lap recorded "loaded" here as the ambiguity.</summary>
@@ -51,7 +71,7 @@ public sealed class CreatorLoopNotice {
     var rejectedSuffix = rejected == 0 ? ""
         : " " + RejectedSentence(rejected, candidates.Count, drawerKey);
     if (candidates.Count == 0)
-      return new() { Headline = "No new quests in your inbox." };
+      return new() { Headline = "No new quests in your inbox.", Idle = true };
     if (valid.Length == 0)
       return new() {
         Headline = RejectedSentence(rejected, candidates.Count, drawerKey),
@@ -64,6 +84,7 @@ public sealed class CreatorLoopNotice {
         Headline = Title(latest) + " " + latest.Manifest.Version
             + " is already playing. Nothing new to load." + rejectedSuffix,
         Detail = detail,
+        Idle = rejected == 0,
       };
     if (valid.Length == 1)
       return new() {
@@ -99,10 +120,14 @@ public sealed class CreatorLoopNotice {
         Headline = Title(candidate) + " " + candidate?.Manifest?.Version
             + " is already playing.",
         Detail = Identity(candidate),
+        Idle = true,
       };
 
   public static CreatorLoopNotice NothingToLoad(string checkKey = "F10") =>
-      new() { Headline = "Nothing to load. Press " + checkKey + " to check your inbox." };
+      new() {
+        Headline = "Nothing to load. Press " + checkKey + " to check your inbox.",
+        Idle = true,
+      };
 
   public static CreatorLoopNotice LoadFailed(string error, string drawerKey = "F9") =>
       new() {
@@ -120,6 +145,47 @@ public sealed class CreatorLoopNotice {
         string.Equals(value?.ContentHash, active.ContentHash, StringComparison.OrdinalIgnoreCase));
     return match?.Titles?.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
   }
+
+  /// <summary>The status card's state line, composed from the same candidate ordering the
+  /// check uses. UpToDate exists because session 1 of the Phase 3 exit lap read the loop's
+  /// idle silence as broken keys: once a check this session has proved the inbox holds
+  /// nothing newer, the card says so instead of staying quiet. Null when nothing is
+  /// playing — the renderer keeps its own empty state.</summary>
+  public static QuestCardStatus Card(
+      IReadOnlyList<PackCandidate> candidates, ActiveSet active, bool checkedThisSession) {
+    if (active == null) return null;
+    var valid = (candidates ?? Array.Empty<PackCandidate>()).Where(value => value.IsValid)
+        .OrderByDescending(value => SemanticVersion.Parse(value.Manifest.Version))
+        .ThenBy(value => value.Manifest.PackId, StringComparer.Ordinal)
+        .ToArray();
+    var latest = valid.Length == 0 ? null : valid[0];
+    if (latest != null && !Matches(active, latest))
+      return valid.Length > 1
+          ? new() {
+              State = QuestCardState.Choice,
+              Line = valid.Length.ToString(CultureInfo.InvariantCulture)
+                  + " quests ready — choose",
+            }
+          : new() {
+              State = QuestCardState.UpdateReady,
+              Line = latest.Manifest.Version + " is ready — play it",
+            };
+    return checkedThisSession
+        ? new() { State = QuestCardState.UpToDate, Line = "Now playing — up to date" }
+        : new() { State = QuestCardState.Playing, Line = "Now playing" };
+  }
+
+  /// <summary>Maintainer identity for the card's Details disclosure — pack id, short hash,
+  /// local activation time, activation tail. The card's face stays creator altitude; this
+  /// line is the proof one click below it.</summary>
+  public static string CardDetail(ActiveSet active) =>
+      active == null ? null
+      : (active.PackId ?? "unknown") + " · " + ShortHash(active.ContentHash)
+        + (active.ActivatedUtc == default ? ""
+            : " · " + active.ActivatedUtc.ToLocalTime()
+                .ToString("HH:mm", CultureInfo.InvariantCulture))
+        + (string.IsNullOrWhiteSpace(active.ActivationId) ? ""
+            : " · activation " + Tail(active.ActivationId));
 
   static bool Matches(ActiveSet active, PackCandidate candidate) =>
       active != null && candidate?.Manifest != null

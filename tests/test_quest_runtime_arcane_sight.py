@@ -335,6 +335,41 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn('"Nothing is playing yet."', plugin)
         self.assertIn('"Now playing"', plugin)
 
+    def test_idle_loop_responses_reassert_and_the_card_owns_the_idle_state(self) -> None:
+        # Phase 3 exit session 1: five idle F10 and three idle F11 presses were accepted
+        # (check/accepted, load/already_active) yet nothing legible reached the player,
+        # who concluded the keys were broken. Valheim's MessageHud.UpdateMessage merges a
+        # repeated TopLeft text into the line already on screen and only renders its "xN"
+        # counter when the summed message amounts exceed one — an amount of 0 made every
+        # idle repeat invisible. The idle response now rides that native counter (amount
+        # 1), idleness is a contract fact tagged where the sentence is composed, and the
+        # drawer's status card makes "up to date" a first-class state instead of silence.
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        notice = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "CreatorLoopNotice.cs"
+        ).read_text(encoding="utf-8")
+        self.assertIn("void Report(string message,bool reassert=false)", plugin)
+        self.assertIn(
+            "ShowMessage(MessageHud.MessageType.TopLeft,message,reassert?1:0)", plugin
+        )
+        self.assertIn("statusIdle=notice.Idle", plugin)
+        self.assertIn("Report(status,statusIdle)", plugin)
+        self.assertIn("public bool Idle { get; set; }", notice)
+        # The card's state colors ride the QuestCardState fact, never the rendered line.
+        self.assertIn("CreatorLoopNotice.Card(TitleSource(),active,inboxChecked)", plugin)
+        self.assertIn("QuestCardState.UpdateReady=>stateReadyStyle", plugin)
+        self.assertIn('"Now playing — up to date"', notice)
+
+    def test_drawer_composition_leads_with_the_status_card_and_recedes_machinery(self) -> None:
+        # Session 1's verdict — "kernel UI on f9 press looks the same" — held the lap
+        # open for the design canvas's composition, not just its tokens: status card
+        # first, content-update ladder and creator actions next, evidence feed last,
+        # with captures, arcane sight, and rollback machinery behind one disclosure.
+        plugin = PLUGIN.read_text(encoding="utf-8")
+        self.assertLess(plugin.index("DrawStatusCard();"), plugin.index("DrawUpdateWorkflow();"))
+        self.assertLess(plugin.index("DrawUpdateWorkflow();"), plugin.index("DrawRecentEvidence();"))
+        self.assertIn("if(showMaintenance){DrawOutcomes();", plugin)
+
     def test_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
         observation = (RUNTIME / "RuntimeObservation.cs").read_text(encoding="utf-8")
         binding = BINDING.read_text(encoding="utf-8")
