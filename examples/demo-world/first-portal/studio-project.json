@@ -1,0 +1,52 @@
+{
+  "schema_version": 3,
+  "project_id": "demo-world-first-portal-source",
+  "revision": 1,
+  "updated_utc": "2026-08-20T00:00:00+00:00",
+  "pack_id": "demo-world-first-portal",
+  "version": "1.0.0",
+  "experience_id": "demo-world-first-portal",
+  "title": "Demo World: First Portal",
+  "binding_target_kind": "sign",
+  "binding_target_kinds": [],
+  "entry_node_id": "start",
+  "nodes": [
+    {
+      "id": "start",
+      "label": "Take the World portal",
+      "x": 120,
+      "y": 160,
+      "routes": [
+        {
+          "id": "portal-arrival",
+          "priority": 100,
+          "event": "player_teleported",
+          "target": null,
+          "where": {},
+          "repeat_count": 1,
+          "within_seconds": null,
+          "destination_node_id": null,
+          "outcome": "complete",
+          "actions": [
+            {
+              "id": "message-arrival",
+              "type": "message",
+              "text": "The First Portal answers. Your quest is complete.",
+              "timer_id": null,
+              "seconds": 5,
+              "item": null,
+              "quantity": 1,
+              "kind": null,
+              "prefab": null,
+              "count": 1,
+              "radius": 3,
+              "action_id": null
+            }
+          ],
+          "adaptive_conditions": [],
+          "spatial_conditions": []
+        }
+      ]
+    }
+  ]
+}

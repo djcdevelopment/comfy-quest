@@ -42,9 +42,15 @@ public sealed class QuestStudioService
     public StudioProjectDocument CreateProject(string? templateId)
     {
         var project = _workspace.CreateProject(templateId);
-        var effectiveTemplate = templateId is "signal-circuit" or "cooperative-ritual" or "reward-cleanup" or "desperate-defense" ? templateId : "blank";
+        var effectiveTemplate = templateId is "demo-world-first-portal" or "signal-circuit" or "cooperative-ritual" or "reward-cleanup" or "desperate-defense" ? templateId : "blank";
         _usage.RecordProject("create", "accepted", project, effectiveTemplate);
         return project;
+    }
+    public StudioImportResult ImportProject(StudioImportRequest? request)
+    {
+        var result = _workspace.Import(request);
+        _usage.RecordProject("import", result.Ok ? "accepted" : "rejected", result.Project);
+        return result;
     }
     public StudioProjectDocument? DuplicateProject(string projectId)
     {

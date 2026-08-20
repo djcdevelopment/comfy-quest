@@ -1,0 +1,45 @@
+{
+  "schema": "comfy-quest-experience/v1",
+  "id": "demo-world-first-portal",
+  "title": "Demo World: First Portal",
+  "entry_stage": "start",
+  "stages": [
+    {
+      "id": "start",
+      "entry_actions": [],
+      "transitions": [
+        {
+          "id": "portal-arrival",
+          "priority": 100,
+          "when": {
+            "op": "EVENT",
+            "event": "player_teleported",
+            "target": null,
+            "where": null,
+            "count": null,
+            "within_seconds": null,
+            "children": null
+          },
+          "actions": [
+            {
+              "id": "message-arrival",
+              "type": "message",
+              "text": "The First Portal answers. Your quest is complete."
+            }
+          ],
+          "next_stage": null,
+          "outcome": "complete"
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "id": "default",
+      "experience_id": "demo-world-first-portal",
+      "target_kinds": [
+        "sign"
+      ]
+    }
+  ]
+}

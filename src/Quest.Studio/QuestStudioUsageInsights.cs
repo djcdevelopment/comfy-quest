@@ -14,7 +14,7 @@ internal sealed class QuestStudioUsageInsights
 {
     const int RetentionWeeks = 13;
     static readonly HashSet<string> Templates = new(StringComparer.Ordinal)
-        { "blank", "signal-circuit", "cooperative-ritual", "reward-cleanup", "duplicate" };
+        { "blank", "demo-world-first-portal", "signal-circuit", "cooperative-ritual", "reward-cleanup", "desperate-defense", "duplicate" };
     static readonly HashSet<string> Events = new(
         CreatorEventCatalog.All.Select(value => value.Name)
             .Concat(RuntimeProductionEventCatalog.EngineEvents.Select(value => value.Name)),
@@ -26,7 +26,7 @@ internal sealed class QuestStudioUsageInsights
     static readonly HashSet<string> SpawnPrefabs = new(StringComparer.Ordinal) { "Greyling", "Boar", "Wood", "Stone", "Resin", "sign", "wood_floor" };
     static readonly HashSet<string> BindingTargets = new(StringComparer.Ordinal) { "sign", "player_built_piece", "item_stand", "dedicated_charm" };
     static readonly HashSet<string> Operations = new(StringComparer.Ordinal)
-        { "create", "duplicate", "save", "bump_patch", "validate", "certify", "rehearse", "publish", "bundle_export", "questpack_download" };
+        { "create", "import", "duplicate", "save", "bump_patch", "validate", "certify", "rehearse", "publish", "bundle_export", "questpack_download" };
     static readonly HashSet<string> Outcomes = new(StringComparer.Ordinal)
         { "accepted", "rejected", "conflict", "missing" };
 

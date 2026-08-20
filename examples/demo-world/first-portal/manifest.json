@@ -1,0 +1,39 @@
+{
+  "schema": "comfy-quest-tutorial-bundle/v1",
+  "tutorial_id": "demo-world-first-portal",
+  "role": "minimal-event",
+  "title": "Demo World: First Portal",
+  "files": {
+    "studio_project": {
+      "path": "studio-project.json",
+      "schema_version": 3,
+      "byte_count": 1374,
+      "sha256": "9e9526c7d26c7466fe2d8b08b8370f2189cbad0817e1a985d53af41a9d338d42"
+    },
+    "compiled_experience": {
+      "path": "experience.json",
+      "schema": "comfy-quest-experience/v1",
+      "byte_count": 1009,
+      "sha256": "222028e0bd1af5f8331770fe9802293c771833f96223f709e1f9fb772468b08f"
+    },
+    "runtime_questpack": {
+      "path": "demo-world-first-portal-1.0.0.questpack",
+      "schema": "comfy-quest-pack/v2",
+      "pack_id": "demo-world-first-portal",
+      "version": "1.0.0",
+      "byte_count": 1475,
+      "sha256": "e038fa46da521875583ea8e1fb300e27cb2d358d02aa9bfe6eb66d1eba715e5f"
+    },
+    "expected_behavior": {
+      "path": "expected.json",
+      "schema": "comfy-quest-demo-world-expectations/v1",
+      "byte_count": 3539,
+      "sha256": "9518d8da3fd4b47bc696e6c3cef3ccdbdf54d651718825cfe9441d9b8dac8f70"
+    },
+    "documentation": {
+      "path": "README.md",
+      "byte_count": 4596,
+      "sha256": "9693dfa1367d142f27e72d22cb5e11b6dc8c91eecd05f1ad87350fb729f2a0a6"
+    }
+  }
+}

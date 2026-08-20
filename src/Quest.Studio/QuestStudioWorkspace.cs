@@ -173,6 +173,7 @@ internal sealed class QuestStudioWorkspace
         actions = effects,
         templates = new object[]
         {
+            new { id = "demo-world-first-portal", label = "Demo World: First Portal", note = "Minimal tutorial: take one portal, see one message, and complete.", minimal_tutorial = true },
             new { id = "blank", label = "Blank local quest", note = "One low-friction local beat." },
             new { id = "signal-circuit", label = "R&D Signal Circuit", note = "One compact lap across chat, timing, inventory, healing, and reward." },
             new { id = "cooperative-ritual", label = "Two Voices, One Rune", note = "Captured 1.6 peer Shout then listen-host sign placement." },
@@ -262,6 +263,7 @@ internal sealed class QuestStudioWorkspace
             var suffix = projectId[^6..];
             var project = (templateId ?? "blank") switch
             {
+                "demo-world-first-portal" => DemoWorldFirstPortalTemplate(projectId, suffix),
                 "signal-circuit" => SignalCircuitTemplate(projectId, suffix),
                 "cooperative-ritual" => CooperativeTemplate(projectId, suffix),
                 "reward-cleanup" => RewardTemplate(projectId, suffix),
@@ -289,6 +291,69 @@ internal sealed class QuestStudioWorkspace
             clone.UpdatedUtc = DateTimeOffset.UtcNow;
             WriteProject(clone, create: true);
             return clone;
+        }
+    }
+
+    public StudioImportResult Import(StudioImportRequest? request)
+    {
+        if (request?.Project is not System.Text.Json.JsonElement element
+            || element.ValueKind != System.Text.Json.JsonValueKind.Object)
+            return StudioImportResult.Fail("project_required");
+        var raw = element.GetRawText();
+        if (Encoding.UTF8.GetByteCount(raw) > MaxDraftBytes)
+            return StudioImportResult.Fail("draft_too_large");
+        if (!element.TryGetProperty("schema_version", out var schema)
+            || schema.ValueKind != System.Text.Json.JsonValueKind.Number
+            || !schema.TryGetInt32(out var schemaVersion)
+            || schemaVersion != StudioProjectDocument.CurrentSchemaVersion)
+            return StudioImportResult.Fail("project_schema_unsupported");
+
+        StudioProjectDocument source;
+        try
+        {
+            var options = new System.Text.Json.JsonSerializerOptions(_host.Json)
+            {
+                UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow
+            };
+            source = System.Text.Json.JsonSerializer.Deserialize<StudioProjectDocument>(raw, options)!;
+            if (source is null) return StudioImportResult.Fail("project_required");
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return StudioImportResult.Fail("project_schema_invalid");
+        }
+        if (!NormalizeDocument(source)) return StudioImportResult.Fail("project_schema_or_where_invalid");
+        var envelopeError = ValidateDraftEnvelope(source);
+        if (envelopeError is not null) return StudioImportResult.Fail(envelopeError);
+        var sourceCertification = StudioGraphCompiler.Compile(source);
+        if (!sourceCertification.Ok)
+            return StudioImportResult.Fail(sourceCertification.Error ?? "graph_invalid", sourceCertification.Diagnostics);
+
+        lock (_gate)
+        {
+            StudioProjectDocument fork;
+            do
+            {
+                var projectId = "project-" + Guid.NewGuid().ToString("N")[..12];
+                var suffix = projectId[^6..];
+                fork = Clone(source);
+                fork.ProjectId = projectId;
+                fork.PackId = ForkId(source.PackId, suffix);
+                fork.ExperienceId = ForkId(source.ExperienceId, suffix);
+                fork.Revision = 1;
+                fork.UpdatedUtc = DateTimeOffset.UtcNow;
+            }
+            while (File.Exists(DraftPath(fork.ProjectId))
+                || Directory.GetDirectories(_projectsRoot)
+                    .Select(path => ReadDocument(Path.Combine(path, "draft.json")))
+                    .Any(project => project is not null
+                        && (project.PackId == fork.PackId || project.ExperienceId == fork.ExperienceId)));
+
+            var forkCertification = StudioGraphCompiler.Compile(fork);
+            if (!forkCertification.Ok)
+                return StudioImportResult.Fail(forkCertification.Error ?? "graph_invalid", forkCertification.Diagnostics);
+            WriteProject(fork, create: true);
+            return StudioImportResult.Success(fork);
         }
     }
 
@@ -665,6 +730,22 @@ internal sealed class QuestStudioWorkspace
         }
     };
 
+    internal static StudioProjectDocument DemoWorldFirstPortalTemplate(string projectId, string suffix) => new()
+    {
+        ProjectId = projectId, Revision = 1, UpdatedUtc = DateTimeOffset.UtcNow,
+        PackId = "demo-world-first-portal-" + suffix, Version = "1.0.0",
+        ExperienceId = "demo-world-first-portal-" + suffix,
+        Title = "Demo World: First Portal", BindingTargetKind = "sign", EntryNodeId = "start",
+        Nodes = new()
+        {
+            new StudioNode { Id = "start", Label = "Take the World portal", X = 120, Y = 160, Routes = new()
+            {
+                new StudioRoute { Id = "portal-arrival", Priority = 100, Event = "player_teleported", Target = null, Outcome = "complete",
+                    Actions = new() { new StudioAction { Id = "message-arrival", Type = "message", Text = "The First Portal answers. Your quest is complete." } } }
+            } }
+        }
+    };
+
     static StudioProjectDocument CooperativeTemplate(string projectId, string suffix)
     {
         var legacy = QuestStudioProject.Starter() with { PackId = "two-voices-" + suffix, ExperienceId = "two-voices-" + suffix };
@@ -997,6 +1078,12 @@ internal sealed class QuestStudioWorkspace
     StudioProjectDocument Clone(StudioProjectDocument project) => System.Text.Json.JsonSerializer.Deserialize<StudioProjectDocument>(System.Text.Json.JsonSerializer.Serialize(project, _host.Json), _host.Json)!;
     static bool SafeLocalId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 80 && value.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_');
     static string BoundedId(string value) => value.Length <= 64 ? value : value[..64];
+    static string ForkId(string value, string suffix)
+    {
+        var tail = "-fork-" + suffix;
+        var head = value[..Math.Min(value.Length, 64 - tail.Length)].TrimEnd('-', '_', '$');
+        return (head.Length == 0 ? "quest" : head) + tail;
+    }
     static string Humanize(string value) => string.Join(' ', (value ?? string.Empty).Split('-', '_').Where(part => part.Length > 0).Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
 }
 
@@ -1793,6 +1880,7 @@ public sealed record StudioProjectSummary(string ProjectId, string PackId, strin
 public sealed record StudioProjectSnapshot(int SchemaVersion, string ContentHash, DateTimeOffset SavedUtc, StudioProjectDocument Project);
 public sealed record StudioSaveRequest(int ExpectedRevision, StudioProjectDocument Project);
 public sealed record StudioCreateRequest(string? TemplateId);
+public sealed record StudioImportRequest(System.Text.Json.JsonElement? Project);
 public sealed record StudioBumpRequest(int ExpectedRevision);
 public sealed record StudioPublishRequest(int ExpectedRevision);
 public sealed record StudioSaveResult(bool Ok, bool Conflict, string? Error, StudioProjectDocument? Project)
@@ -1800,6 +1888,13 @@ public sealed record StudioSaveResult(bool Ok, bool Conflict, string? Error, Stu
     public static StudioSaveResult Success(StudioProjectDocument project) => new(true, false, null, project);
     public static StudioSaveResult RevisionConflict(StudioProjectDocument project) => new(false, true, "revision_conflict", project);
     public static StudioSaveResult Fail(string error) => new(false, false, error, null);
+}
+
+public sealed record StudioImportResult(bool Ok, string? Error, StudioProjectDocument? Project, IReadOnlyList<ContractDiagnostic> Diagnostics)
+{
+    public static StudioImportResult Success(StudioProjectDocument project) => new(true, null, project, Array.Empty<ContractDiagnostic>());
+    public static StudioImportResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
+        new(false, error, null, diagnostics ?? Array.Empty<ContractDiagnostic>());
 }
 
 public sealed record StudioCertificationResult(bool Ok, string Status, string? Error, string? ExperienceJson, string? ContentHash, ExperienceDocument? Document, IReadOnlyList<ContractDiagnostic> Diagnostics)

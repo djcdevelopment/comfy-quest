@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Comfy.Quest.Studio;
 
@@ -14,6 +15,8 @@ namespace Comfy.Quest.Studio;
 /// </summary>
 public static class QuestStudioEndpoints
 {
+    const long MaxImportRequestBytes = 1024 * 1024 + 1024;
+
     public static void Map(WebApplication app, IQuestStudioHost host)
     {
         app.MapGet("/quest-studio", () => Results.Text(QuestStudioPage.Html, "text/html", Encoding.UTF8));
@@ -34,6 +37,13 @@ public static class QuestStudioEndpoints
             if (!host.Authorize(request)) return Forbidden(host);
             return Results.Json(studio.CreateProject(body?.TemplateId), host.Json, statusCode: StatusCodes.Status201Created);
         });
+        app.MapPost("/api/v2/quest-studio/projects/import", (HttpRequest request, HttpResponse response, StudioImportRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.ImportProject(body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status201Created : StatusCodes.Status400BadRequest);
+        }).WithMetadata(new RequestSizeLimitAttribute(MaxImportRequestBytes));
         app.MapGet("/api/v2/quest-studio/projects/{projectId}", (string projectId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
         {
             NoStore(response);

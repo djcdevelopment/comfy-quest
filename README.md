@@ -20,6 +20,7 @@ checkout.
 - NuGet publication runbook: docs/runbooks/NUGET-PUBLICATION.md
 - Split-proof release runbook: docs/runbooks/QUEST-RELEASE.md
 - OMEN Studio-to-Runtime acceptance: docs/runbooks/I2-QUESTPACK-OMEN.md
+- Demo World minimal tutorial: examples/demo-world/first-portal
 - R&D opportunity matrix: docs/quest-rd-opportunity-matrix.md
 - Repository boundary: BOUNDARY.md
 - Extraction record: PROVENANCE.md
@@ -33,8 +34,15 @@ installation. Do not set ComfyCopyToPlugins during verification.
     dotnet test network/mod/ComfyQuestLab.Tests/ComfyQuestLab.Tests.csproj -c Release
     python -m unittest discover -s tests
     python tools/component-packets/render_quest_lab.py --check
+    python tools/quest-studio/build_demo_world_first_portal.py --check
+    $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.6.0-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
+    $env:NUGET_PACKAGES = Join-Path $env:TEMP ("comfy-quest-verify-" + $contractsHash)
     dotnet build src/Quest.Studio/Quest.Studio.csproj -c Release
     dotnet test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release
+
+The interim Contracts package keeps a fixed local version while its bytes evolve.
+The package-hash-keyed cache above prevents NuGet from silently compiling Studio
+against older bytes from another `0.6.0-local` run.
 
 Run the sovereign, loopback-only Studio on its own port (the retired Baseline
 Workbench may still occupy 8080):
@@ -54,6 +62,9 @@ low-level assembly seams never become authoring choices.
 Studio lowers production beats into bounded acyclic Runtime graphs and certifies them
 against the shared contract. **Play this revision** writes an isolated dev artifact;
 an explicitly armed Runtime session pulls, validates, activates, and rebinds it.
+**Import project JSON** accepts a bounded Studio schema-v3 document and opens it as
+a new local fork with fresh project, pack, and experience IDs; it never accepts a
+server filesystem path.
 **Publish immutable version** remains an independent production action. Contextual targets and event fields appear only when useful. Route IDs,
 the full-width graph editor, certified JSON, and event-time adaptive conditions stay
 under **Advanced tools**. Adaptive conditions currently expose only persisted time in

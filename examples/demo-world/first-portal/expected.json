@@ -1,0 +1,86 @@
+{
+  "schema": "comfy-quest-demo-world-expectations/v1",
+  "tutorial_id": "demo-world-first-portal",
+  "demo_world": {
+    "profile": "marble-grand",
+    "binding_target": {
+      "role": "generated_world_school_sign",
+      "prefab": "sign",
+      "text_heading": "WORLD",
+      "text_marker": "a paired portal and world-state practice",
+      "relative_plan_position": { "x": -15, "y": 1.2, "z": 6.1, "yaw": 90 }
+    },
+    "unavoidable_ascent_portal": {
+      "from": "ground welcome camp",
+      "to": "Creator Hub ascent portal",
+      "event_name": "player_teleported",
+      "event_target": null,
+      "imported_fork_state": "unbound_no_progress"
+    },
+    "tutorial_completion_portal": {
+      "role": "World school paired portal",
+      "after_cast": true,
+      "event_name": "player_teleported",
+      "event_target": null
+    }
+  },
+  "canonical_artifact": {
+    "required_pack_id": "demo-world-first-portal",
+    "required_experience_id": "demo-world-first-portal",
+    "required_version": "1.0.0",
+    "activate_exact_pack": true,
+    "activation_receipt": { "operation": "load_selected", "status": "activated" },
+    "accepted_paths": [
+      {
+        "id": "matching_prebound_ascent",
+        "requires_exact_prebound_ids": true,
+        "may_complete_on_unavoidable_ascent": true,
+        "matching_prebound_save_is_live_proven": false
+      },
+      {
+        "id": "portable_cast_then_world_portal",
+        "ascent_without_matching_binding": "unbound_no_progress",
+        "fresh_cast_before_completion_portal": true,
+        "cast_receipt": { "operation": "bind", "status": "inscribed" },
+        "completion_portal": "World school paired portal"
+      }
+    ]
+  },
+  "imported_fork": {
+    "target_kind": "sign",
+    "import_creates_new_project_id": true,
+    "import_creates_new_pack_id": true,
+    "import_creates_new_experience_id": true,
+    "ascend_unbound_before_cast": true,
+    "fresh_cast_before_completion_portal": true,
+    "first_revision_receipts": [
+      { "operation": "dev_transfer", "status": "accepted" },
+      { "operation": "dev_validation", "status": "accepted" },
+      { "operation": "dev_activation", "status": "activated" },
+      { "operation": "dev_rebind", "status": "skipped", "error": "no_loaded_binding" },
+      { "operation": "bind", "status": "inscribed" }
+    ],
+    "later_same_fork_revision": {
+      "pack_and_experience_ids_are_preserved": true,
+      "changed_content_receipt": { "operation": "dev_rebind", "status": "rebound" },
+      "unchanged_content_receipt": { "operation": "dev_rebind", "status": "skipped", "error": "already_current" }
+    }
+  },
+  "behavior": {
+    "event_name": "player_teleported",
+    "event_target": null,
+    "message": "The First Portal answers. Your quest is complete.",
+    "outcome": "complete",
+    "receipt_assertions": [
+      { "operation": "event", "status": "matched", "event_name": "player_teleported", "event_target": null, "transition_id": "portal-arrival" },
+      { "operation": "action", "status": "executed", "action_id": "message-arrival", "transition_id": "portal-arrival" },
+      { "operation": "transition", "status": "complete", "event_name": "player_teleported", "event_target": null, "transition_id": "portal-arrival" }
+    ]
+  },
+  "replay_precondition": {
+    "runtime_state_path": "BepInEx/config/comfy-quest-runtime/state/workflow-states.json",
+    "world_restore_alone_resets_completion": false,
+    "requires_fresh_world_character_binding_content_identity": true,
+    "scoped_reset_is_live_proven": false
+  }
+}
