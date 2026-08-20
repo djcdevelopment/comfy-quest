@@ -863,6 +863,7 @@ sealed class RuntimeExperienceEngine {
 
   void WriteReceipt(RuntimeReceipt receipt, string evidenceLine = null,
       CreatorEvidenceKind kind = CreatorEvidenceKind.Plumbing) {
+    receipt.EvidenceKind = CreatorEvidenceLine.KindName(kind);
     receipts.Write(receipt);
     if (string.IsNullOrWhiteSpace(evidenceLine)) return;
     if (evidenceLine.Length > 220) evidenceLine = evidenceLine.Substring(0, 219) + "…";

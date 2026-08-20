@@ -317,6 +317,23 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
                 self.assertIn(f"Destroy(ref {texture});", plugin)
         # Grammar: green is state, never a button — the primary action is amber.
         self.assertIn("primaryStyle=ButtonStyle(primaryBackground", plugin)
+        # Kinds travel WITH receipts (additive nullable v1 field), stamped at the writer:
+        # the engine stamps every receipt, a successful CAST is the cast row, and failed
+        # charm work is a warning. No reader ever re-derives a kind from rendered copy.
+        receipts_contract = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "RuntimeReceipts.cs"
+        ).read_text(encoding="utf-8")
+        binding = BINDING.read_text(encoding="utf-8")
+        self.assertIn('[JsonProperty("evidence_kind", NullValueHandling=NullValueHandling.Ignore)]', receipts_contract)
+        self.assertIn("receipt.EvidenceKind = CreatorEvidenceLine.KindName(kind);", engine)
+        self.assertIn('Status="inscribed"', binding)
+        self.assertIn("EvidenceKind=CreatorEvidenceLine.KindName(CreatorEvidenceKind.Cast)", binding)
+        self.assertIn("EvidenceKind=CreatorEvidenceLine.KindName(CreatorEvidenceKind.Warning)", binding)
+        # The drawer's status card answers "which revision is running?" title-first, from
+        # the one shared ActiveTitle fact; the quiet inbox probe is a display read only.
+        self.assertIn("CreatorLoopNotice.ActiveTitle(TitleSource(),active)", plugin)
+        self.assertIn('"Nothing is playing yet."', plugin)
+        self.assertIn('"Now playing"', plugin)
 
     def test_observation_is_one_seam_and_binding_discovery_keeps_no_radius(self) -> None:
         observation = (RUNTIME / "RuntimeObservation.cs").read_text(encoding="utf-8")

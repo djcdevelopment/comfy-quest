@@ -33,6 +33,9 @@ public sealed class RuntimeReceipt {
   [JsonProperty("activation_id", NullValueHandling=NullValueHandling.Ignore)] public string ActivationId { get; set; }
   [JsonProperty("correlation_id", NullValueHandling=NullValueHandling.Ignore)] public string CorrelationId { get; set; }
   [JsonProperty("stage_entered_utc", NullValueHandling=NullValueHandling.Ignore)] public DateTimeOffset? StageEnteredUtc { get; set; }
+  // The creator-loop row taxonomy, stamped where the receipt is written so no reader ever
+  // re-derives it from rendered copy. Null (all pre-taxonomy receipts) fails closed to plumbing.
+  [JsonProperty("evidence_kind", NullValueHandling=NullValueHandling.Ignore)] public string EvidenceKind { get; set; }
   [JsonProperty("evidence", NullValueHandling=NullValueHandling.Ignore)] public TriggerClauseTrace Evidence { get; set; }
   [JsonProperty("rejected_evidence", NullValueHandling=NullValueHandling.Ignore)] public IReadOnlyList<RejectedTransitionEvidence> RejectedEvidence { get; set; }
   [JsonProperty("diagnostics")] public IReadOnlyList<ContractDiagnostic> Diagnostics { get; set; }

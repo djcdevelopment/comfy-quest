@@ -15,6 +15,15 @@ public enum CreatorEvidenceKind { Plumbing, Story, Cast, Warning }
 public sealed class CreatorEvidenceLine {
   public CreatorEvidenceKind Kind { get; set; }
   public string Text { get; set; }
+
+  /// <summary>The wire name a receipt carries for a kind. Unknown or null fails closed
+  /// to plumbing — the quiet voice, never the loud one.</summary>
+  public static string KindName(CreatorEvidenceKind kind) => kind switch {
+    CreatorEvidenceKind.Story => "story",
+    CreatorEvidenceKind.Cast => "cast",
+    CreatorEvidenceKind.Warning => "warning",
+    _ => "plumbing",
+  };
 }
 
 /// <summary>One creator-facing sentence about the check/load loop.
@@ -100,6 +109,17 @@ public sealed class CreatorLoopNotice {
         Headline = "That quest couldn't be loaded. Open " + drawerKey + " for the reason.",
         Detail = error,
       };
+
+  /// <summary>The authored title of whatever is actually running: the title of the candidate
+  /// whose content hash matches the active set. Null when the running revision's pack is no
+  /// longer inspectable — there is honestly no title then, and surfaces fall back to pack id.
+  /// One shared fact so the drawer and Studio can never disagree about the quest's name.</summary>
+  public static string ActiveTitle(IReadOnlyList<PackCandidate> candidates, ActiveSet active) {
+    if (active == null || string.IsNullOrWhiteSpace(active.ContentHash)) return null;
+    var match = candidates?.FirstOrDefault(value =>
+        string.Equals(value?.ContentHash, active.ContentHash, StringComparison.OrdinalIgnoreCase));
+    return match?.Titles?.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+  }
 
   static bool Matches(ActiveSet active, PackCandidate candidate) =>
       active != null && candidate?.Manifest != null
