@@ -159,13 +159,27 @@ public sealed class QuestStudioService
             if (receipt is null) return;
             var failed = receipt.Status == "rejected";
             var skipped = receipt.Status == "skipped";
-            var message = failed ? $"{kind} stopped: {receipt.Error ?? "rejected"}."
+            var message = failed ? $"{kind} stopped: {receipt.Error ?? "rejected"}.{Itemized(receipt)}"
                 : skipped ? receipt.Error == "no_loaded_binding"
                     ? "No loaded Charm binding needed rebinding."
                     : $"Rebind not needed: {receipt.Error ?? "already current"}."
                 : success;
             result.Add(new(kind, failed ? "FAIL" : "PASS", message,
                 receipt.ActivationId, receipt.CorrelationId, receipt.AtUtc));
+        }
+
+        // A rejection receipt already carries the itemized reason (ContractDiagnostic code,
+        // path and message). Showing only the coarse Error string — "pack_invalid" — wrote
+        // the real answer to disk and never rendered it, leaving the creator to go and find
+        // it. Bounded to three so a proof line stays one line.
+        static string Itemized(RuntimeReceipt receipt)
+        {
+            var diagnostics = (receipt.Diagnostics ?? Array.Empty<ContractDiagnostic>())
+                .Where(value => value is not null).ToArray();
+            if (diagnostics.Length == 0) return string.Empty;
+            var shown = diagnostics.Take(3).Select(value => $"{value.Code}: {value.Message}");
+            var more = diagnostics.Length - Math.Min(3, diagnostics.Length);
+            return " " + string.Join(" ", shown) + (more > 0 ? $" (+{more} more)" : string.Empty);
         }
     }
     public object ProjectHistory(string projectId) => _workspace.History(projectId);

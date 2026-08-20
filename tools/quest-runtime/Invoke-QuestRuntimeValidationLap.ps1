@@ -585,12 +585,35 @@ function Invoke-CommandGate([string] $Name, [scriptblock] $Command) {
     if ($gateExit -ne 0) { throw "$Name failed with exit code $gateExit." }
 }
 
+# A sibling toolchain is found from the repository's own context, not from the parent of
+# whatever directory this checkout happens to sit in. A git worktree lives at
+# .claude/worktrees/<name>, whose parent is not the workspace — resolving from there sent
+# the lap looking for dotnet9 inside the worktrees directory and refused to run. Git's
+# common dir points back at the main checkout, so both roots are considered.
+# (AGENTS.md: "scripts derive locations from their own repository context. They do not
+# assume a host checkout root.")
+function Get-RepositoryHostRoots {
+    $roots = @($repoRoot)
+    try {
+        $common = & git -C $repoRoot rev-parse --git-common-dir 2>$null
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($common)) {
+            $commonPath = $common.Trim()
+            if (-not [IO.Path]::IsPathRooted($commonPath)) { $commonPath = Join-Path $repoRoot $commonPath }
+            $mainCheckout = Split-Path -Parent ([IO.Path]::GetFullPath($commonPath))
+            if ($mainCheckout) { $roots += $mainCheckout }
+        }
+    } catch { }
+    return @($roots | Where-Object { $_ } | Select-Object -Unique)
+}
+
 function Get-DotNet9Executable {
-    $workspaceToolchain = Join-Path (Split-Path -Parent $repoRoot) 'dotnet9\dotnet.exe'
+    $workspaceToolchains = @(Get-RepositoryHostRoots | ForEach-Object {
+        Join-Path (Split-Path -Parent $_) 'dotnet9\dotnet.exe'
+    })
     $candidates = @(
         $env:COMFY_QUEST_DOTNET,
         $(if ($env:DOTNET_ROOT) { Join-Path $env:DOTNET_ROOT 'dotnet.exe' }),
-        $(if (Test-Path -LiteralPath $workspaceToolchain) { $workspaceToolchain }),
+        $($workspaceToolchains | Where-Object { Test-Path -LiteralPath $_ }),
         $(if (Get-Command dotnet -ErrorAction SilentlyContinue) { (Get-Command dotnet).Source })
     ) | Where-Object { $_ } | Select-Object -Unique
     foreach ($candidate in $candidates) {

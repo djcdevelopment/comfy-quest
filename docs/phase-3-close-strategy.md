@@ -24,6 +24,11 @@ with no idle re-evaluation anywhere in the engine, the wrong answer stood for ni
 minutes. (`LabGalleryBuilder.DestroySettleTimeout = 5f` is the repo's own prior
 proof that destroys don't settle same-frame.)
 
+**The machine said it first.** Studio's guided rehearsal `limitations[]` prints, per run,
+"Route held waits for staged objects to be cleared; rehearsal removes 8 of them on
+request, while play removes one when the object itself is gone." That named the seam
+before the lap did; the research below re-derived it from receipts afterwards.
+
 **The run proves this against itself.** At 12:17:17 the `timer_elapsed` event
 re-evaluated the same `hold` stage and the route that matched was `held` — the
 victory route, priority 40, outranking `overrun` — because the corpses were gone by

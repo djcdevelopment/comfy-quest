@@ -447,6 +447,16 @@ mercy, and that non-firing is asserted too.
 
 ### What still needs the game
 
+> **Falsified 2026-08-20 by lap session 2; left in place as the record of a wrong
+> assumption.** The paragraph below declares adapter behaviour "settled" and consigns it to
+> the synthetic suite. It was not settled: the kill witness feeds a spawn tally polled
+> inside `Character.OnDeath`'s own call stack, and the resulting destroy-settle race
+> counted eight of eight kills as none (ADR 0006). No synthetic harness covered it —
+> both hand-fed the tally — and Studio's rehearsal `limitations[]` had already printed the
+> gap on every run. **A plan may not declare behaviour proven on the strength of a suite
+> that supplies the fact in question.** See `docs/phase-3-close-strategy.md` and
+> `docs/five-intent-validation-lap-backlog.md` for what the lap actually found.
+
 Only steps 1, 3, and 6, and they are deliberately short now that behavior is settled:
 publish the template as a dev revision, play it once, and answer the questions synthetic
 proof cannot — whether the countdown banner carries tension during actual combat, whether

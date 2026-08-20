@@ -1,10 +1,26 @@
 # OMEN lap runbook — Phase 3 exit + creator-loop design verdicts
 
-One bounded session on OMEN. Everything mechanical is synthetically proven; this lap
-exists only for judgments a test cannot make. Stop and record the moment anything
-produces a "can't answer why" — do not fill gaps with repeated input. Record Derek's
-words verbatim, including positive reactions; do not translate a player reaction into a
-mechanism-only diagnosis.
+> **HISTORICAL — session 2's script. Do not run it.** Superseded by
+> `OMEN-LAP-PHASE3-EXIT-S3.md`. Kept because the lap record and the retro cite it, and
+> because its two defects are the evidence for how this class of failure works.
+>
+> **Defect 1 — it omits the CAST beat entirely.** The player sequence goes from loading
+> straight to playing the fight, so no charm is ever bound to an anchor object. Under
+> `RuntimeExperienceEngine.OnEvent` no matching binding means every player action produces
+> an `event/unbound` receipt and the quest ignores the player — which is exactly what
+> happened live, and was only explained by reading a receipt mid-session.
+>
+> **Defect 2 — the premise below was false when written.** "Everything mechanical is
+> synthetically proven" was untrue: the kill-tally race was a mechanical defect that no
+> synthetic harness covered, and Studio's own rehearsal `limitations[]` had already said so
+> ("rehearsal removes 8 of them on request, while play removes one when the object itself
+> is gone"). A lap script may not assert that machinery is proven; it may only cite what a
+> named proof actually covered, and what that proof declares it does not.
+
+One bounded session on OMEN. This lap exists for judgments a test cannot make. Stop and
+record the moment anything produces a "can't answer why" — do not fill gaps with repeated
+input. Record Derek's words verbatim, including positive reactions; do not translate a
+player reaction into a mechanism-only diagnosis.
 
 ## Preparation (before entering the world)
 

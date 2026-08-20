@@ -1,5 +1,55 @@
 from pathlib import Path
+import re
 import unittest
+
+
+# Runbook choreography, traced from the shipping code rather than remembered.
+#
+#   loaded  active/active-set.json exists ... established by F11 (LoadLatest ->
+#           ActivateCandidate). F10 only inspects the inbox and never activates.
+#           Absent, RuntimeCharmBinding.TryActive returns `active_set_missing`, which is
+#           what BOTH the CHECK preview (BindingAllows) and the CAST commit (InscribeAim)
+#           fail with — so a cast beat before a load beat cannot succeed.
+#   cast    a charm is bound to an object ... established by the ` CHECK then ` CAST
+#           gesture. Absent, RuntimeExperienceEngine.OnEvent finds no matching binding and
+#           every player action writes an `event/unbound` receipt: the quest ignores the
+#           player.
+#   played  authored events do something ... requires both of the above.
+#
+# Sessions 1, 2 and 3 each shipped a seat script that skipped one of these. The previous
+# test pinned the exact phrase that broke in session 2, which is why it did not notice
+# that session 3's runbook never mentioned F11 at all. This checks the rule instead.
+SEAT_BEATS = (
+    ("loaded", r"\bF11\b"),
+    ("cast", r"[Pp]ress[^.\n]{0,24}(?:`|backtick)"),
+    ("played", r"[Pp]lay it once|Play one proven beat|Send one normal chat message"
+               r"|[Ss]ay anything in normal"),
+)
+
+
+def seat_beat_problems(text: str) -> list:
+    """Beats a sequence reaches without an earlier step establishing what they require."""
+    names = [name for name, _ in SEAT_BEATS]
+    first = {}
+    for name, pattern in SEAT_BEATS:
+        found = re.search(pattern, text)
+        if found:
+            first[name] = found.start()
+    if not first:
+        return []
+    deepest = max(names.index(name) for name in first)
+    problems = [
+        "reaches '%s' without establishing '%s'" % (names[deepest], names[index])
+        for index in range(deepest)
+        if names[index] not in first
+    ]
+    ordered = [name for name in names if name in first]
+    problems.extend(
+        "'%s' appears before '%s'" % (later, earlier)
+        for earlier, later in zip(ordered, ordered[1:])
+        if first[earlier] > first[later]
+    )
+    return problems
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -240,28 +290,39 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         self.assertIn("player experience", source.lower())
         self.assertIn("ArmPrivateWorld", source)
 
-    def test_the_session_three_runbook_carries_the_beats_session_two_lost(self) -> None:
-        # A runbook edit that changes sequencing gets the same review a code change gets:
-        # session 2's defense script omitted the CAST beat entirely and the quest ignored
-        # the player until a receipt explained why. This lap's script leads with it, gates
-        # the defense content by profile, and takes both open ledger rows by machine.
-        source = (ROOT / "docs" / "runbooks" / "OMEN-LAP-PHASE3-EXIT-S3.md").read_text(
-            encoding="utf-8"
+    def test_the_beat_checker_actually_catches_the_three_shipped_defects(self) -> None:
+        # A checker that never fails is not a checker. These fixtures are the three seat
+        # scripts we actually shipped, reduced to their beats.
+        session_two = "Prepare the lap. Press F11 once. Play it once, honestly."
+        session_three = "Run ArmPrivateWorld. Aim and press ` once, then press ` again. Say anything in normal chat."
+        cast_only = "Run ArmPrivateWorld. Aim and press ` once, then press ` again to cast."
+        inverted = "Press ` once to check. Press F11. Play it once."
+        correct = "Press F10, then press F11 once. Open F9 and press backtick once for CAST. Play it once."
+        self.assertIn(
+            "reaches 'played' without establishing 'cast'", seat_beat_problems(session_two)
         )
-        for expected in (
-            "Prepare -ContentProfile defense",
-            "Cast the ward's anchor",
-            "do not skip",
-            "kill_partial",
-            "wave_cleared",
-            "DeadlineAnchor",
-            "ArmPrivateWorld",
-            "No second revision",
-        ):
-            with self.subTest(expected=expected):
-                self.assertIn(expected, source)
-        # The CAST beat comes before the beat that needs it.
-        self.assertLess(source.index("Cast the ward's anchor"), source.index("Start the defense"))
+        self.assertIn(
+            "reaches 'played' without establishing 'loaded'", seat_beat_problems(session_three)
+        )
+        self.assertIn(
+            "reaches 'cast' without establishing 'loaded'", seat_beat_problems(cast_only)
+        )
+        self.assertIn("'cast' appears before 'loaded'", seat_beat_problems(inverted))
+        self.assertEqual([], seat_beat_problems(correct))
+
+    def test_every_live_runbook_establishes_each_beats_preconditions(self) -> None:
+        # The class-level rule. A seat script may not reach a step whose runtime
+        # precondition no earlier step establishes — checked against the code's own
+        # precondition chain (see SEAT_BEATS), not against a phrase that broke once.
+        for path in sorted((ROOT / "docs" / "runbooks").glob("*.md")):
+            source = path.read_text(encoding="utf-8")
+            if "HISTORICAL" in source[:2000]:
+                # Quarantined scripts are exempt, but must say plainly they are not to be run.
+                with self.subTest(historical=path.name):
+                    self.assertIn("Do not run it", source[:2000])
+                continue
+            with self.subTest(runbook=path.name):
+                self.assertEqual([], seat_beat_problems(source))
 
 
 if __name__ == "__main__":

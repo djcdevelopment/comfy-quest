@@ -12,12 +12,26 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 & (Join-Path $repoRoot 'tools\Assert-RepoIdentity.ps1') | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Repository identity check failed.' }
 
-$workspaceToolchain = Join-Path (Split-Path -Parent $repoRoot) 'dotnet9\dotnet.exe'
+# A sibling toolchain is found from the repository's own context, never from the parent of
+# whatever directory this checkout sits in: a git worktree lives at .claude/worktrees/<name>
+# and its parent is not the workspace. Git's common dir points back at the main checkout.
+# (AGENTS.md: "scripts derive locations from their own repository context.")
+$hostRoots = @($repoRoot)
+try {
+    $commonDir = & git -C $repoRoot rev-parse --git-common-dir 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($commonDir)) {
+        $commonPath = $commonDir.Trim()
+        if (-not [IO.Path]::IsPathRooted($commonPath)) { $commonPath = Join-Path $repoRoot $commonPath }
+        $hostRoots += (Split-Path -Parent ([IO.Path]::GetFullPath($commonPath)))
+    }
+} catch { }
+$workspaceToolchains = @($hostRoots | Where-Object { $_ } | Select-Object -Unique |
+    ForEach-Object { Join-Path (Split-Path -Parent $_) 'dotnet9\dotnet.exe' })
 $candidates = @(
     $DotNet,
     $env:COMFY_QUEST_DOTNET,
     $(if ($env:DOTNET_ROOT) { Join-Path $env:DOTNET_ROOT 'dotnet.exe' }),
-    $(if (Test-Path $workspaceToolchain) { $workspaceToolchain }),
+    $($workspaceToolchains | Where-Object { Test-Path -LiteralPath $_ }),
     $(if (Get-Command dotnet -ErrorAction SilentlyContinue) { (Get-Command dotnet).Source })
 ) | Where-Object { $_ } | Select-Object -Unique
 $dotnetExe = $null
