@@ -5,8 +5,8 @@
     "title": "Quest Creator OS",
     "subtitle": "Automate the machine loop. Spend the seat on design, spacing, and play feel.",
     "observed_on": "2026-08-24",
-    "program_commit": "c1ec660",
-    "program_commit_label": "Automate private Godbuild mode"
+    "program_commit": "a07cb62",
+    "program_commit_label": "Build guild portfolio and scoped reruns"
   },
   "machines": [
     {
@@ -39,7 +39,7 @@
       "id": "env.repo",
       "label": "Repository baseline",
       "state": "confirmed",
-      "detail": "Creator OS, safe-top Runtime composition, and bounded private Godbuild control are committed through c1ec660. This status snapshot adds the guild-dogfood requirements and first human-spaced capture.",
+      "detail": "The bounded portfolio/guild hierarchy and exact run reset/rerun foundation are committed in a07cb62. Their proof is automated and the live adapter acceptance remains deliberately unclaimed.",
       "fact_kind": "git-observed"
     },
     {
@@ -62,6 +62,13 @@
       "state": "confirmed",
       "detail": "The first live human-spaced module contains 12 basic pieces with source hash e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd. Capture and plan agree. Its declared terrain and portal exclusions make the saved world the playable release authority; replay remains fixture-proven and awaits use only when a reusable module needs cloning.",
       "fact_kind": "live-and-fixture"
+    },
+    {
+      "id": "env.portfolio-run",
+      "label": "Guild and rerun foundation",
+      "state": "automated",
+      "detail": "Studio now persists a portfolio of versioned guilds, questlines, quests and events with transactional placement and deep-fork import/export. Runtime now owns exact run identity, previewed scoped reset, resumable spawn cleanup, retained prior state, and a fresh per-run successor. Contract, Studio, browser, and net48 build checks pass; no live Valheim proof is claimed yet.",
+      "fact_kind": "contract-and-test-observed"
     }
   ],
   "phases": [
@@ -97,7 +104,7 @@
       "number": 4,
       "title": "Dogfood creator portfolio",
       "state": "active",
-      "summary": "The live creator controls and first spatial capture pass. Portfolio hierarchy, world anchors and bundles, scoped rerun, and multi-experience guild authoring are now the adoption path; notebook and generation work are optional accelerators.",
+      "summary": "The live creator controls and first spatial capture pass. Portfolio hierarchy and scoped rerun are now automated; named anchors and saved-world bundling are the next 4A leverage, followed by multi-experience guild authoring. Live acceptance is batched rather than interrupting construction.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "The adoption gate is not another generated tutorial"
     },
@@ -114,7 +121,7 @@
   "recovery": {
     "id": "creator-os-active",
     "title": "Guild dogfood operating lane",
-    "summary": "Build the portfolio, reset, anchor, and world-release leverage first. One leased session then owns deployment, identity, requests, capture transport, proof, and rollback; Derek enters only where authored judgment is the product.",
+    "summary": "Portfolio and exact rerun foundations are implemented without a seat turn. Build named anchors and world-release leverage next. One later leased session owns deployment, identity, requests, capture transport, proof, and rollback; Derek enters only where authored judgment is the product.",
     "cold_load": {
       "id": "recovery.cold-load",
       "title": "Prepare one pinned Creator Session",
@@ -138,7 +145,7 @@
       "source_contains": "The broader dogfood order is",
       "edit_source": "docs/creator-portfolio-requirements.md",
       "edit_source_contains": "### 4A — Dogfood foundation",
-      "suggested_edit": "Build portfolio hierarchy, named live anchors, scoped reset/rerun, and saved-world bundling before asking for another seat lap; then use the uphill clearing as First Portal stage two."
+      "suggested_edit": "Build named live anchors and saved-world bundling before asking for the batched 4A acceptance lap; then use the real guild slice and authored world to exercise portfolio placement and exact rerun."
     },
     "expectations": "docs/creator-os-expected.json"
   },
@@ -176,19 +183,27 @@
     },
     {
       "id": "queue.portfolio",
-      "state": "ready",
-      "title": "Build the portfolio and anchor foundation",
-      "detail": "Replace the flat one-project view with guild/questline/quest/event organization, then capture named world anchors into the same authored context.",
+      "state": "complete",
+      "title": "Build the portfolio foundation",
+      "detail": "Studio now presents versioned guilds, questlines, standalone quests, repeatable events, progression bands, search/archive, transactional placement, and deep-fork import/export while project schema 3 remains intact.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### Portfolio and progression"
     },
     {
       "id": "queue.reset",
-      "state": "ready",
+      "state": "complete",
       "title": "Make clean reruns a product operation",
-      "detail": "Add previewed, receipt-backed reset across workflow state, timers, action claims, spawned ownership, cleanup, notices, and reward policy so terminal content can rerun under a new run identity.",
+      "detail": "Studio and Runtime now preview the exact workflow, timer, action-claim, spawn, notice, reward, world, binding, participant, content, and run scope; confirmed cleanup is resumable and starts a linked successor while prior durable state and rewards remain recoverable.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "FR-RESET-001"
+    },
+    {
+      "id": "queue.anchors",
+      "state": "ready",
+      "title": "Capture named world anchors",
+      "detail": "Add the bounded game-owned capture contract and fixture-driven Studio integration. Only final adapter acceptance needs a loaded private world.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "FR-WORLD-001"
     },
     {
       "id": "queue.world-bundle",
@@ -318,7 +333,7 @@
       "id": "command.studio",
       "label": "Start Quest Studio",
       "command": "tools\\quest-studio\\Start-QuestStudio.ps1",
-      "detail": "Open the four-stage Author, Rehearse, Play, Observe cockpit on the second display."
+      "detail": "Open the four-stage Author, Rehearse, Play, Observe cockpit with the portfolio hierarchy and exact run reset controls on the second display."
     }
   ],
   "cautions": [
@@ -326,6 +341,6 @@
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
     "Close -Restore restores prior install bytes, not the authored world. Treat the backed-up world pair as recovery material until the world-bundle lifecycle is implemented.",
-    "The live control plane, y=92 compact bar, private BuildOn/BuildOff, and first capture are proven. Reserve the next seat session for guild authorship after the machine-owned foundation is ready."
+    "Portfolio and reset/rerun are automated, not yet live accepted. Do not spend a seat turn on them until named anchors and world bundling let one batched 4A lap exercise the complete creator loop."
   ]
 }

@@ -77,7 +77,10 @@ class QuestMissionControlTests(unittest.TestCase):
     def test_generated_page_is_current(self):
         self.assertEqual(self.rendered, self.committed)
         self.assertIn('meta name="quest-mission-control-schema"', self.committed)
-        self.assertIn("Program reconciled through c1ec660", self.committed)
+        self.assertIn(
+            f"Program reconciled through {self.manifest['page']['program_commit']}",
+            self.committed,
+        )
         self.assertIn("Automate the machine loop. Spend the seat on design.", self.committed)
         self.assertIn("Safe-top overhead bar verified live", self.committed)
         self.assertIn("First human-spaced module captured", self.committed)
