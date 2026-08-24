@@ -357,6 +357,20 @@ internal sealed class QuestStudioWorkspace
         }
     }
 
+    internal string? ValidateForkSource(StudioProjectDocument? source)
+    {
+        if (source is null) return "project_required";
+        if (source.SchemaVersion != StudioProjectDocument.CurrentSchemaVersion) return "project_schema_unsupported";
+        var clone = Clone(source);
+        var raw = System.Text.Json.JsonSerializer.Serialize(clone, _host.Json);
+        if (Encoding.UTF8.GetByteCount(raw) > MaxDraftBytes) return "draft_too_large";
+        if (!NormalizeDocument(clone)) return "project_schema_or_where_invalid";
+        var envelopeError = ValidateDraftEnvelope(clone);
+        if (envelopeError is not null) return envelopeError;
+        var certification = StudioGraphCompiler.Compile(clone);
+        return certification.Ok ? null : certification.Error ?? "graph_invalid";
+    }
+
     public StudioSaveResult SaveDraft(string projectId, StudioSaveRequest? request)
     {
         if (!SafeLocalId(projectId) || request?.Project is null || request.Project.ProjectId != projectId)
@@ -1967,7 +1981,7 @@ public sealed record StudioRuntimeReceiptSummary(
     int? CurrentCount, int? RequiredCount, DateTimeOffset AtUtc,
     string? TransitionId, string? ActionId, string? ActivationId, string? CorrelationId, string? Error,
     string? RouteLabel, string? EffectLabel, string? Unmet = null, string? NotTaken = null,
-    string? Kind = null);
+    string? Kind = null, string? RunId = null, string? ExperienceId = null, string? WorldId = null);
 
 public sealed record StudioRuntimePassLine(string Kind, string Status, string Message,
     string? ActivationId, string? CorrelationId, DateTimeOffset? AtUtc);

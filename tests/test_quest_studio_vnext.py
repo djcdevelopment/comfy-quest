@@ -11,6 +11,12 @@ PAGE = ROOT / "src" / "Quest.Studio" / "QuestStudioPage.cs"
 WORKSPACE = ROOT / "src" / "Quest.Studio" / "QuestStudioWorkspace.cs"
 SERVICE = ROOT / "src" / "Quest.Studio" / "QuestStudioService.cs"
 ENDPOINTS = ROOT / "src" / "Quest.Studio" / "QuestStudioEndpoints.cs"
+PORTFOLIO = ROOT / "src" / "Quest.Studio" / "QuestStudioPortfolio.cs"
+RUN_CONTROL = ROOT / "src" / "Quest.Studio" / "QuestStudioRunControl.cs"
+RUNTIME_RUNS = ROOT / "network" / "mod" / "ComfyQuestContracts" / "RuntimeRuns.cs"
+RUNTIME_RUN_CONTROL = (
+    ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeRunControlController.cs"
+)
 PUBLISHER = ROOT / "src" / "Quest.Studio" / "QuestPackPublisher.cs"
 EASY_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeEasyEventPatches.cs"
 CORE_ACTION_PATCHES = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeCoreActionPatches.cs"
@@ -42,6 +48,46 @@ class QuestStudioVNextTests(unittest.TestCase):
                 ["node", "--check", str(path)], capture_output=True, text=True, check=False
             )
         self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_portfolio_hierarchy_and_scoped_rerun_are_creator_facing(self) -> None:
+        html = raw_constant("Html")
+        script = raw_constant("Js")
+        endpoints = ENDPOINTS.read_text(encoding="utf-8")
+        portfolio = PORTFOLIO.read_text(encoding="utf-8")
+        run_control = RUN_CONTROL.read_text(encoding="utf-8")
+        runtime_runs = RUNTIME_RUNS.read_text(encoding="utf-8")
+        runtime_controller = RUNTIME_RUN_CONTROL.read_text(encoding="utf-8")
+        for element_id in (
+            "create-guild",
+            "import-guild",
+            "guild-editor",
+            "project-placement",
+            "project-band",
+            "preview-reset",
+            "confirm-reset",
+        ):
+            self.assertIn(f'id="{element_id}"', html)
+        for function in (
+            "renderLibrary",
+            "saveGuildDetails",
+            "importGuildJson",
+            "previewRunReset",
+            "confirmRunReset",
+        ):
+            self.assertIn(f"function {function}", script)
+        self.assertIn('/api/v2/quest-studio/portfolio', endpoints)
+        self.assertIn('/runs/reset-preview', endpoints)
+        self.assertIn('/runs/reset', endpoints)
+        self.assertIn("StudioGuildDocument", portfolio)
+        self.assertIn("ExpectedMachine", run_control)
+        self.assertIn("ExpectedWorldUid", run_control)
+        self.assertIn("RuntimeRunCoordinator", runtime_runs)
+        self.assertIn('SuccessorRewardPolicy {get;set;}="per_run"', runtime_runs)
+        self.assertIn('Path.Combine(root,"requests","run-control.json")', runtime_controller)
+        self.assertIn("spawn_marker_mismatch", runtime_controller)
+        self.assertIn("spawn_not_locally_owned", runtime_controller)
+        self.assertIn("private_world_confirmation_required", runtime_controller)
+        self.assertIn("runtime_world_mismatch", runtime_controller)
 
     def test_page_guides_creators_through_four_soft_stages(self) -> None:
         html = raw_constant("Html")
@@ -394,7 +440,7 @@ class QuestStudioVNextTests(unittest.TestCase):
         script = raw_constant("Js")
         self.assertIn("function requestContext()", script)
         self.assertIn("function isCurrentContext(context)", script)
-        self.assertIn("operationSequences={rehearsal:0,certify:0,runtime:0,project:0}", script)
+        self.assertIn("operationSequences={rehearsal:0,certify:0,runtime:0,runs:0,project:0}", script)
         self.assertIn("function beginOperation(name)", script)
         self.assertIn("function isLatestOperation(name,sequence)", script)
         for function_name in ("runRehearsal", "certify", "refreshRuntime"):
@@ -420,7 +466,7 @@ class QuestStudioVNextTests(unittest.TestCase):
             self.assertIn("!isSameDraftContext(context)||dirty", body, function_name)
         load = script[script.index("async function loadProjects") :]
         load = load[: load.index("\n")]
-        self.assertIn("openProject(target)", load)
+        self.assertIn("openProject(target,keepLibrary)", load)
         self.assertNotIn("openProject(target,true)", load)
         for marker in ("#create-project", "#duplicate-project", "#bump-version"):
             at = script.index(marker)

@@ -229,7 +229,10 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("RefreshDeadline(now);", engine)
         self.assertIn("public string Deadline() {", engine)
         self.assertIn("TriggerCountdown.Read(transition.When, progress.History, now)", engine)
-        self.assertIn("timers.Pending(now, 1)", engine)
+        self.assertIn(
+            "timers.Pending(now, identity => IsCurrentRun(identity, active), 1)",
+            engine,
+        )
         # The existing stage-elapsed line keeps its exact shape; remaining time is appended.
         self.assertIn('return " - in stage "', engine)
         self.assertIn('+ (string.IsNullOrWhiteSpace(running) ? "" : " - " + running)', engine)

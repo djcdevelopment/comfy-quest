@@ -24,6 +24,83 @@ public static class QuestStudioEndpoints
         app.MapGet("/quest-studio/studio.js", () => Results.Text(QuestStudioPage.Js, "text/javascript", Encoding.UTF8));
 
         app.MapGet("/api/v2/quest-studio/catalog", (QuestStudioService studio) => Results.Json(studio.WorkspaceCatalog(), host.Json));
+        app.MapGet("/api/v2/quest-studio/portfolio", (HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            return !host.Authorize(request) ? Forbidden(host) : Results.Json(studio.PortfolioView(), host.Json);
+        });
+        app.MapPut("/api/v2/quest-studio/portfolio", (HttpRequest request, HttpResponse response, StudioPortfolioSaveRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.SavePortfolio(body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+        });
+        app.MapGet("/api/v2/quest-studio/guilds", (HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            return !host.Authorize(request) ? Forbidden(host) : Results.Json(new { schema_version = 1, guilds = studio.ListGuilds() }, host.Json);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds", (HttpRequest request, HttpResponse response, StudioGuildCreateRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            try { return Results.Json(studio.CreateGuild(body), host.Json, statusCode: StatusCodes.Status201Created); }
+            catch (InvalidOperationException exception) { return Results.Json(new { error = exception.Message }, host.Json, statusCode: StatusCodes.Status400BadRequest); }
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/import", (HttpRequest request, HttpResponse response, StudioGuildImportRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.ImportGuild(body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status201Created : StatusCodes.Status400BadRequest);
+        }).WithMetadata(new RequestSizeLimitAttribute(MaxImportRequestBytes));
+        app.MapGet("/api/v2/quest-studio/guilds/{guildId}", (string guildId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var guild = studio.ReadGuild(guildId);
+            return guild is null ? Results.NotFound() : Results.Json(guild, host.Json);
+        });
+        app.MapPut("/api/v2/quest-studio/guilds/{guildId}", (string guildId, HttpRequest request, HttpResponse response, StudioGuildSaveRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.SaveGuild(guildId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict : result.Error == "guild_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/archive", (string guildId, HttpRequest request, HttpResponse response, StudioGuildArchiveRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.ArchiveGuild(guildId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/place", (string guildId, HttpRequest request, HttpResponse response, StudioGuildPlacementRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.PlaceProject(guildId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/duplicate", (string guildId, HttpRequest request, HttpResponse response, StudioGuildDuplicateRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.DuplicateGuild(guildId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status201Created
+                : result.Error == "revision_conflict" ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/export", (string guildId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            return Download(response, studio.ExportGuild(guildId), host);
+        });
         app.MapGet("/api/v2/quest-studio/projects", (HttpRequest request, HttpResponse response, QuestStudioService studio) =>
         {
             NoStore(response);
@@ -120,6 +197,32 @@ public static class QuestStudioEndpoints
         {
             NoStore(response);
             return !host.Authorize(request) ? Forbidden(host) : Results.Json(studio.RuntimeStatusView(projectId), host.Json);
+        });
+        app.MapGet("/api/v2/quest-studio/projects/{projectId}/runs", (string projectId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            return !host.Authorize(request) ? Forbidden(host) : Results.Json(studio.RunStatus(projectId), host.Json);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/reset-preview", async (string projectId, HttpRequest request, HttpResponse response, StudioRunResetRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.PreviewResetAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/reset", async (string projectId, HttpRequest request, HttpResponse response, StudioRunResetRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.ApplyResetAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+        });
+        app.MapGet("/api/v2/quest-studio/projects/{projectId}/runs/control/{requestId}", (string projectId, string requestId, string? runId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.RunControlReceipt(projectId, requestId, runId);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
         });
         app.MapPost("/api/v2/quest-studio/projects/{projectId}/export", (string projectId, HttpRequest request, HttpResponse response, StudioExportRequest? body, QuestStudioService studio) =>
         {

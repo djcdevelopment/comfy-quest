@@ -20,6 +20,8 @@ public sealed class QuestStudioService
     readonly QuestPackPublisher _publisher;
     readonly IQuestStudioHost _host;
     readonly QuestStudioWorkspace _workspace;
+    readonly QuestStudioPortfolioStore _portfolio;
+    readonly QuestStudioRunControl _runControl;
     readonly QuestStudioDataExport _dataExport;
     readonly QuestStudioUsageInsights _usage;
 
@@ -32,11 +34,131 @@ public sealed class QuestStudioService
         _publisher = publisher;
         _host = host;
         _workspace = new QuestStudioWorkspace(host, publisher);
+        _portfolio = new QuestStudioPortfolioStore(host);
+        _runControl = new QuestStudioRunControl(host, _workspace);
         _dataExport = new QuestStudioDataExport(host);
         _usage = new QuestStudioUsageInsights(host);
     }
 
     public object WorkspaceCatalog() => _workspace.Catalog();
+    public StudioPortfolioDocument Portfolio() => _portfolio.ReadPortfolio();
+    public StudioPortfolioSaveResult SavePortfolio(StudioPortfolioSaveRequest? request) => _portfolio.SavePortfolio(request);
+    public IReadOnlyList<StudioGuildSummary> ListGuilds() => _portfolio.ListGuilds();
+    public StudioGuildDocument? ReadGuild(string guildId) => _portfolio.ReadGuild(guildId);
+    public StudioGuildDocument CreateGuild(StudioGuildCreateRequest? request) => _portfolio.CreateGuild(request);
+    public StudioGuildSaveResult SaveGuild(string guildId, StudioGuildSaveRequest? request) => _portfolio.SaveGuild(guildId, request);
+    public StudioGuildSaveResult ArchiveGuild(string guildId, StudioGuildArchiveRequest? request) => _portfolio.SetArchived(guildId, request);
+    public StudioGuildSaveResult PlaceProject(string guildId, StudioGuildPlacementRequest? request) =>
+        _portfolio.Place(guildId, request, projectId => _workspace.ReadProject(projectId) is not null);
+    public object PortfolioView()
+    {
+        var projects = _workspace.ListProjects();
+        var placements = _portfolio.Placements();
+        var assigned = placements.Select(value => value.ProjectId).ToHashSet(StringComparer.Ordinal);
+        return new
+        {
+            schema_version = 1,
+            portfolio = _portfolio.ReadPortfolio(),
+            guilds = _portfolio.ListGuilds(),
+            projects,
+            placements,
+            unfiled = projects.Where(value => !assigned.Contains(value.ProjectId)).ToArray(),
+            limits = new
+            {
+                guilds = QuestStudioPortfolioStore.MaxGuilds,
+                projects = QuestStudioPortfolioStore.MaxProjects,
+                artifacts_per_guild = QuestStudioPortfolioStore.MaxArtifactsPerGuild,
+                questlines_per_guild = QuestStudioPortfolioStore.MaxQuestlinesPerGuild,
+                progression_bands_per_guild = QuestStudioPortfolioStore.MaxBandsPerGuild,
+            },
+        };
+    }
+    public StudioGuildImportResult DuplicateGuild(string guildId, StudioGuildDuplicateRequest? request)
+    {
+        var source = _portfolio.ReadGuild(guildId);
+        if (source is null) return new(false, "guild_missing", null, Array.Empty<StudioProjectDocument>());
+        if (request is null || request.ExpectedRevision != source.Revision)
+            return new(false, "revision_conflict", source, Array.Empty<StudioProjectDocument>());
+        var sourceError = ValidateForkSource(source, sourceProjectId => _workspace.ReadProject(sourceProjectId));
+        if (sourceError is not null) return new(false, sourceError, null, Array.Empty<StudioProjectDocument>());
+        return ForkGuild(source, sourceProjectId => _workspace.Duplicate(sourceProjectId), "duplicate");
+    }
+    public StudioGuildImportResult ImportGuild(StudioGuildImportRequest? request)
+    {
+        var bundle = request?.Bundle;
+        if (bundle is null || bundle.SchemaVersion != 1 || bundle.Guild is null || bundle.Projects is null)
+            return new(false, "guild_bundle_invalid", null, Array.Empty<StudioProjectDocument>());
+        if (bundle.Projects.Count > QuestStudioPortfolioStore.MaxProjects || bundle.Projects.Any(value => value is null || string.IsNullOrWhiteSpace(value.ProjectId)))
+            return new(false, "guild_bundle_invalid", null, Array.Empty<StudioProjectDocument>());
+        var groups = bundle.Projects.GroupBy(value => value.ProjectId, StringComparer.Ordinal).ToArray();
+        if (groups.Any(value => value.Count() != 1)) return new(false, "guild_bundle_project_duplicate", null, Array.Empty<StudioProjectDocument>());
+        var sourceProjects = groups.ToDictionary(value => value.Key, value => value.Single(), StringComparer.Ordinal);
+        var sourceError = ValidateForkSource(bundle.Guild, sourceProjectId => sourceProjects.TryGetValue(sourceProjectId, out var source) ? source : null);
+        if (sourceError is not null) return new(false, sourceError, null, Array.Empty<StudioProjectDocument>());
+        return ForkGuild(bundle.Guild, sourceProjectId =>
+        {
+            if (!sourceProjects.TryGetValue(sourceProjectId, out var source)) return null;
+            using var json = JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(source, _host.Json));
+            return _workspace.Import(new StudioImportRequest(json.RootElement.Clone())).Project;
+        }, "import");
+    }
+
+    string? ValidateForkSource(StudioGuildDocument source, Func<string, StudioProjectDocument?> findProject)
+    {
+        var guildError = _portfolio.ValidateForkSource(source);
+        if (guildError is not null) return guildError;
+        foreach (var sourceId in source.StandaloneQuests.Concat(source.Events).Concat(source.Questlines.SelectMany(value => value.Quests))
+                     .Select(value => value.ProjectId).Distinct(StringComparer.Ordinal))
+        {
+            var project = findProject(sourceId);
+            if (project is null) return "guild_project_missing";
+            var projectError = _workspace.ValidateForkSource(project);
+            if (projectError is not null) return projectError;
+        }
+        return null;
+    }
+    public StudioDownloadResult ExportGuild(string guildId)
+    {
+        var guild = _portfolio.ReadGuild(guildId);
+        if (guild is null) return StudioDownloadResult.Fail("guild_missing");
+        var projects = _portfolio.Placements().Where(value => value.GuildId == guildId)
+            .Select(value => _workspace.ReadProject(value.ProjectId)).Where(value => value is not null)
+            .Cast<StudioProjectDocument>().ToArray();
+        var bundle = new StudioGuildBundleDocument(1, guild, projects);
+        var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(bundle, _host.Json);
+        return StudioDownloadResult.Success(guild.GuildId + ".questguild.json", "application/vnd.comfy.questguild+json", bytes);
+    }
+    public StudioRunStatusView RunStatus(string projectId) => _runControl.Status(projectId);
+    public Task<StudioRunControlResult> PreviewResetAsync(string projectId, StudioRunResetRequest? request, CancellationToken cancellationToken) =>
+        _runControl.PreviewAsync(projectId, request, cancellationToken);
+    public Task<StudioRunControlResult> ApplyResetAsync(string projectId, StudioRunResetRequest? request, CancellationToken cancellationToken) =>
+        _runControl.ApplyAsync(projectId, request, cancellationToken);
+    public StudioRunControlResult RunControlReceipt(string projectId, string? requestId, string? runId) =>
+        _runControl.Receipt(projectId, requestId, runId);
+
+    StudioGuildImportResult ForkGuild(StudioGuildDocument source, Func<string, StudioProjectDocument?> forkProject, string origin)
+    {
+        var sourceIds = source.StandaloneQuests.Concat(source.Events).Concat(source.Questlines.SelectMany(value => value.Quests))
+            .Select(value => value.ProjectId).Distinct(StringComparer.Ordinal).ToArray();
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        var projects = new List<StudioProjectDocument>();
+        foreach (var sourceId in sourceIds)
+        {
+            var project = forkProject(sourceId);
+            if (project is null) return new(false, "guild_project_missing", null, projects);
+            map[sourceId] = project.ProjectId;
+            projects.Add(project);
+        }
+        try
+        {
+            var guild = _portfolio.CreateFork(source, map, origin);
+            return new(true, null, guild, projects);
+        }
+        catch (Exception exception) when (exception is InvalidDataException or InvalidOperationException)
+        {
+            return new(false, exception.Message, null, projects);
+        }
+    }
     public IReadOnlyList<StudioProjectSummary> ListProjects() => _workspace.ListProjects();
     public StudioProjectDocument? ReadProject(string projectId) => _workspace.ReadProject(projectId);
     public StudioProjectDocument CreateProject(string? templateId)
@@ -119,7 +241,7 @@ public sealed class QuestStudioService
                 receipt.ActionId is not null && status.EffectLabels.TryGetValue(receipt.ActionId, out var effectLabel) ? effectLabel : null,
                 StudioRehearsal.UnmetPhrase(receipt.Evidence),
                 StudioRehearsal.NotTakenPhrase(receipt.RejectedEvidence, status.RouteLabels),
-                receipt.EvidenceKind ?? "plumbing")).ToArray(),
+                receipt.EvidenceKind ?? "plumbing", receipt.RunId, receipt.ExperienceId, receipt.WorldId)).ToArray(),
             status.Diagnostics)
         {
             ActiveTitle = status.ActiveTitle,

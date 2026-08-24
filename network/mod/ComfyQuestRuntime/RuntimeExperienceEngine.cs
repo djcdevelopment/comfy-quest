@@ -20,6 +20,7 @@ sealed class RuntimeExperienceEngine {
   readonly SpawnExecutionStore spawned;
   readonly WorkflowStateStore workflows;
   readonly DurableTimerStore timers;
+  readonly RuntimeRunCoordinator runs;
   readonly Func<bool> privateConfirmed;
   readonly Dictionary<string, DateTimeOffset> recentEventKeys =
       new(StringComparer.Ordinal);
@@ -33,6 +34,7 @@ sealed class RuntimeExperienceEngine {
   string deadlineLine;
   bool deadlineUrgent;
   string deadlineError;
+  string timerPollError;
   int lastOrphanCount;
   string rejectionKey;
   int rejectionRepeats;
@@ -58,6 +60,7 @@ sealed class RuntimeExperienceEngine {
     spawned = new SpawnExecutionStore(root);
     workflows = new WorkflowStateStore(root);
     timers = new DurableTimerStore(root);
+    runs = new RuntimeRunCoordinator(root);
     privateConfirmed = isPrivateConfirmed;
   }
 
@@ -100,16 +103,26 @@ sealed class RuntimeExperienceEngine {
     var now = DateTimeOffset.UtcNow;
     if (now < nextTimerPoll) return;
     nextTimerPoll = now.AddSeconds(1);
-    foreach (var timer in timers.Due(now)) {
-      var elapsed = new RuntimeEvent {
-        Name = ExperienceSchema.TimerElapsedEvent,
-        SourceId = timer.Identity.BindingZdo,
-        At = now,
-        Fields = new Dictionary<string, string> { ["timer_id"] = timer.TimerId },
-      };
-      RuntimeObservation.StampLocalPlayer(elapsed);
-      OnEvent(elapsed);
-      timers.Acknowledge(timer.Key);
+    try {
+      TryLoad(out var loaded, out _);
+      foreach (var timer in timers.Due(now, identity => IsCurrentRun(identity, loaded))) {
+        var elapsed = new RuntimeEvent {
+          Name = ExperienceSchema.TimerElapsedEvent,
+          SourceId = timer.Identity.BindingZdo,
+          At = now,
+          Fields = new Dictionary<string, string> { ["timer_id"] = timer.TimerId },
+        };
+        RuntimeObservation.StampLocalPlayer(elapsed);
+        OnEvent(elapsed);
+        timers.Acknowledge(timer.Key);
+      }
+      timerPollError = null;
+    } catch (Exception e) {
+      if (!string.Equals(timerPollError, e.Message, StringComparison.Ordinal)) {
+        timerPollError = e.Message;
+        try { Write("transition", "runtime_timer_failed", null, null, e.Message, null); }
+        catch { }
+      }
     }
     RunRechecks(now);
     RefreshDeadline(now);
@@ -167,7 +180,7 @@ sealed class RuntimeExperienceEngine {
         "recheck_expired", active, zdo.m_uid.ToString(), state?.History?.LastOrDefault(),
         state?.StageId, state?.StageId,
         Counted(trace, TriggerEvaluator.Measure(route?.When, state?.History, context)),
-        NewRecheckId(), trace));
+        NewRecheckId(), trace, null, identity));
   }
 
   /// <summary>Arm a binding for the bounded re-read. Re-arming on every ignored event is deliberate:
@@ -303,7 +316,7 @@ sealed class RuntimeExperienceEngine {
           WriteReceipt(EventReceipt(
               "ignored", active, zdo.m_uid.ToString(), evt, state?.StageId,
               state?.StageId, progress, correlationId, trace,
-              UnmetRoutes(stage, null, state?.History, evaluationContext)),
+              UnmetRoutes(stage, null, state?.History, evaluationContext), identity),
               line, CreatorEvidenceKind.Story);
           if (Rechecks(stage)) Arm(identity.Key);
           continue;
@@ -340,7 +353,7 @@ sealed class RuntimeExperienceEngine {
     WriteReceipt(EventReceipt(
         "matched", active, zdo.m_uid.ToString(), cause, currentStage.Id,
         decision.Transition.NextStage, matchedProgress, correlationId,
-        evidence, rejectedEvidence),
+        evidence, rejectedEvidence, decision.Identity),
         MatchedLine(currentStage.Id, decision.Transition, matchedProgress, rejectedEvidence),
         CreatorEvidenceKind.Story);
 
@@ -363,6 +376,9 @@ sealed class RuntimeExperienceEngine {
         PackId = active.PackId,
         Version = active.Version,
         ContentHash = active.ContentHash,
+        ExperienceId = active.Document.Id,
+        RunId = decision.Identity.RunId,
+        WorldId = decision.Identity.WorldId,
         ActivationId = active.ActivationId,
         CorrelationId = correlationId,
         BindingZdo = zdo.m_uid.ToString(),
@@ -380,6 +396,8 @@ sealed class RuntimeExperienceEngine {
         RejectedEvidence = rejectedEvidence,
         Diagnostics = Array.Empty<ContractDiagnostic>(),
       }, TransitionLine(currentStage.Id, decision.Transition), CreatorEvidenceKind.Story);
+      if (!string.IsNullOrWhiteSpace(decision.Transition.Outcome))
+        runs.Registry.MarkOutcome(decision.Identity.RunId, decision.Transition.Outcome, DateTimeOffset.UtcNow);
     }
   }
 
@@ -473,7 +491,8 @@ sealed class RuntimeExperienceEngine {
       TriggerProgress progress,
       string correlationId,
       TriggerClauseTrace evidence = null,
-      IReadOnlyList<RejectedTransitionEvidence> rejectedEvidence = null) => new() {
+      IReadOnlyList<RejectedTransitionEvidence> rejectedEvidence = null,
+      WorkflowIdentity identity = null) => new() {
     Operation = "event",
     Status = status,
     PackId = active.PackId,
@@ -482,6 +501,9 @@ sealed class RuntimeExperienceEngine {
     ActivationId = active.ActivationId,
     CorrelationId = correlationId,
     BindingZdo = bindingZdo,
+    ExperienceId = identity?.ExperienceId ?? active.Document.Id,
+    RunId = identity?.RunId,
+    WorldId = identity?.WorldId,
     EventName = evt?.Name,
     EventTarget = evt?.Target,
     ActorRole = evt == null ? null : CooperativeEventContract.ActorRole(evt),
@@ -500,7 +522,7 @@ sealed class RuntimeExperienceEngine {
     var seconds = -1;
     try {
       if (TryLoad(out var active, out _)) {
-        var soonest = timers.Pending(now, 1).FirstOrDefault();
+        var soonest = timers.Pending(now, identity => IsCurrentRun(identity, active), 1).FirstOrDefault();
         if (soonest != null) {
           seconds = (int)Math.Ceiling((soonest.DueUtc - now).TotalSeconds);
           line = Countdown(seconds, null);
@@ -644,14 +666,15 @@ sealed class RuntimeExperienceEngine {
       string transition,
       ExperienceAction action,
       string correlationId) {
+    WorkflowIdentity identity = null;
     var zdoId = zdo.m_uid.ToString();
     try {
-      var identity = Identity(zdo, active);
+      identity = Identity(zdo, active);
       var key = string.Join("|", identity.Key, stage, transition, action.Id);
       if (!ledger.TryClaim(key)) {
         WriteReceipt(ActionReceipt(
             "suppressed", "duplicate_suppressed", active, zdoId, stage,
-            transition, action.Id, correlationId), ActionLine(action, "duplicate suppressed"));
+            transition, action.Id, correlationId, identity), ActionLine(action, "duplicate suppressed"));
         return true;
       }
       switch (action.Type) {
@@ -669,7 +692,7 @@ sealed class RuntimeExperienceEngine {
           if (!Grant(action)) throw new InvalidOperationException("grant_failed");
           break;
         case "spawn":
-          if (!Spawn(active, zdo, action, key))
+          if (!Spawn(active, zdo, action, key, identity))
             throw new InvalidOperationException("spawn_failed");
           break;
         case "clear_spawned":
@@ -680,12 +703,12 @@ sealed class RuntimeExperienceEngine {
       }
       WriteReceipt(ActionReceipt(
           "executed", null, active, zdoId, stage, transition, action.Id,
-          correlationId), ActionLine(action, "executed"));
+          correlationId, identity), ActionLine(action, "executed"));
       return true;
     } catch (Exception e) {
       WriteReceipt(ActionReceipt(
           "rejected", e.Message, active, zdoId, stage, transition, action?.Id,
-          correlationId), ActionLine(action, "failed: " + e.Message), CreatorEvidenceKind.Warning);
+          correlationId, identity), ActionLine(action, "failed: " + e.Message), CreatorEvidenceKind.Warning);
       return false;
     }
   }
@@ -718,7 +741,7 @@ sealed class RuntimeExperienceEngine {
     return Player.m_localPlayer.GetInventory().AddItem(prefab, count);
   }
 
-  bool Spawn(Active active, ZDO binding, ExperienceAction action, string key) {
+  bool Spawn(Active active, ZDO binding, ExperienceAction action, string key, WorkflowIdentity identity) {
     var kind = Param(action, "kind");
     var prefabName = Param(action, "prefab");
     var count = IntParam(action, "count");
@@ -746,8 +769,16 @@ sealed class RuntimeExperienceEngine {
         piece.SetCreator(Player.m_localPlayer.GetPlayerID());
       spawned.Record(new SpawnedObject {
         ActionKey = key,
+        RunId = identity.RunId,
+        WorldId = identity.WorldId,
+        ExperienceId = active.Document.Id,
         ContentHash = active.ContentHash,
         ActionId = action.Id,
+        Kind = kind,
+        Prefab = prefabName,
+        X = position.x,
+        Y = position.y,
+        Z = position.z,
         UserId = zdo.m_uid.UserID,
         ObjectId = zdo.m_uid.ID,
       });
@@ -801,7 +832,8 @@ sealed class RuntimeExperienceEngine {
       string stage,
       string transition,
       string action,
-      string correlationId) => new() {
+      string correlationId,
+      WorkflowIdentity identity = null) => new() {
     Operation = "action",
     Status = status,
     Error = error,
@@ -811,6 +843,9 @@ sealed class RuntimeExperienceEngine {
     ActivationId = active.ActivationId,
     CorrelationId = correlationId,
     BindingZdo = zdo,
+    ExperienceId = identity?.ExperienceId ?? active.Document.Id,
+    RunId = identity?.RunId,
+    WorldId = identity?.WorldId,
     StageId = stage,
     CurrentStageId = stage,
     TransitionId = transition,
@@ -829,13 +864,29 @@ sealed class RuntimeExperienceEngine {
     return CharmPolicy.ValidateReference(reference).Allowed ? reference : null;
   }
 
-  WorkflowIdentity Identity(ZDO zdo, Active active) => new() {
-    WorldId = ZNet.instance.GetWorldUID().ToString(),
-    CharacterId = Player.m_localPlayer == null
-        ? "0" : Player.m_localPlayer.GetPlayerID().ToString(),
-    BindingZdo = zdo.m_uid.ToString(),
-    ContentHash = active.ContentHash,
-  };
+  WorkflowIdentity Identity(ZDO zdo, Active active) {
+    var participant = Player.m_localPlayer == null
+        ? "0" : Player.m_localPlayer.GetPlayerID().ToString();
+    var scope = new RuntimeRunScope {
+      WorldId = ZNet.instance.GetWorldUID().ToString(),
+      ExperienceId = active.Document.Id,
+      BindingZdo = zdo.m_uid.ToString(),
+      ContentHash = active.ContentHash,
+      ParticipantIds = new List<string> { participant },
+    };
+    return runs.Resolve(scope, DateTimeOffset.UtcNow).Identity();
+  }
+
+  bool IsCurrentRun(WorkflowIdentity identity, Active active) {
+    if (identity == null || active == null || !runs.Registry.IsActive(identity)
+        || !string.Equals(identity.ContentHash, active.ContentHash, StringComparison.OrdinalIgnoreCase)
+        || !string.IsNullOrWhiteSpace(identity.ExperienceId)
+            && !string.Equals(identity.ExperienceId, active.Document.Id, StringComparison.Ordinal)) return false;
+    try {
+      return ZNet.instance != null
+          && string.Equals(identity.WorldId, ZNet.instance.GetWorldUID().ToString(), StringComparison.Ordinal);
+    } catch { return false; }
+  }
 
   /// <summary>What the running telling is doing right now, without re-announcing its name: the status
   /// card owns the title, and session 2 read the same title stacked in three places as a loss of
@@ -905,6 +956,28 @@ sealed class RuntimeExperienceEngine {
       }
     } catch { }
     return null;
+  }
+
+  public RuntimeRunCoordinator RunCoordinator() => runs;
+
+  public void ClearRunEphemera(string stateKey) {
+    if(!string.IsNullOrWhiteSpace(stateKey))rechecks.Remove(stateKey);
+  }
+
+  public IReadOnlyList<RuntimeRunStatusEntry> CurrentRuns() {
+    var values=new List<RuntimeRunStatusEntry>();
+    if(!TryLoad(out var active,out _))return values;
+    foreach(var wear in Bindings(active)) {
+      var zdo=wear?.GetComponent<ZNetView>()?.GetZDO();
+      if(zdo==null)continue;
+      var reference=Read(zdo);
+      if(reference==null||reference.ContentHash!=active.ContentHash)continue;
+      var identity=Identity(zdo,active);var record=runs.Registry.Find(identity.RunId);var progress=workflows.Get(identity);
+      if(record==null)continue;
+      values.Add(new RuntimeRunStatusEntry{RunId=record.RunId,ScopeId=record.ScopeId,ExperienceId=active.Document.Id,BindingZdo=identity.BindingZdo,ParticipantIds=record.Scope.ParticipantIds.ToArray(),ContentHash=identity.ContentHash,StageId=progress?.StageId??active.Document.EntryStage,Outcome=progress?.Outcome,RewardPolicy=record.RewardPolicy});
+      if(values.Count>=64)break;
+    }
+    return values;
   }
 
   static string Describe(TriggerExpression trigger) {

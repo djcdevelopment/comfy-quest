@@ -15,6 +15,8 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   RuntimeCharmBinding charms;
   RuntimeDevChannelCoordinator devChannel;
   RuntimeCreatorRequestController creatorRequests;
+  RuntimeRunControlController runControl;
+  RuntimeRunStatusStore runStatus;
   RuntimeArcaneSight arcaneSight;
   RuntimeExperienceEngine engine;
   ConfigEntry<KeyboardShortcut> checkHotkey;
@@ -26,7 +28,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   ConfigEntry<float> alertAnchorX;
   ConfigEntry<float> alertAnchorY;
   ConfigEntry<bool> showCreatorBar;
-  string runtimeRoot; bool inboxChecked; int checkedCandidates,checkedValid; bool showMaintenance,showCardDetails,showDetails; double nextDevPoll,nextContentProbe; bool welcomed,hasQuestContent; string statusDetail; bool statusIdle; IReadOnlyList<PackCandidate> quietInspected;
+  string runtimeRoot; bool inboxChecked; int checkedCandidates,checkedValid; bool showMaintenance,showCardDetails,showDetails; double nextDevPoll,nextContentProbe,nextRunStatus; bool welcomed,hasQuestContent; string statusDetail; bool statusIdle; IReadOnlyList<PackCandidate> quietInspected;
   readonly List<CreatorEvidenceLine> outcomes=new(); UnityEngine.Vector2 outcomeScroll,evidenceScroll,detailsScroll;
   bool barExpanded,alertDragging; UnityEngine.Vector2 alertDragOffset; string status="Runtime ready"; PackCandidate[] available=Array.Empty<PackCandidate>(); ActiveSet[] activationHistory=Array.Empty<ActiveSet>(); int selectedVersion,selectedActivation; UnityEngine.Rect details=new(24,140,560,610);
   UnityEngine.Texture2D windowBackground,rowBackground,helpBackground,greenBackground,greenGlowBackground,blueBackground,amberBackground,primaryBackground,castRowBackground,dimBackground,deadlineBackground,deadlineUrgentBackground,circleDoneBackground,circleCurrentBackground,circleWaitingBackground,railDoneBackground,railWaitingBackground; UnityEngine.GUIStyle windowStyle,barPanelStyle,sectionStyle,rowStyle,helpStyle,readyStyle,primaryStyle,blueButtonStyle,amberButtonStyle,dimButtonStyle,stepPendingStyle,rungDoneStyle,rungCurrentStyle,rungWaitingStyle,rungNameDoneStyle,rungNameCurrentStyle,rungNameWaitingStyle,railDoneStyle,railWaitingStyle,stampStyle,castRowStyle,deadlineStyle,deadlineUrgentStyle,storyStyle,castStyle,warnStyle,plumbStyle,questTitleStyle,playingStyle,chipStyle,stateReadyStyle,stateChoiceStyle;
@@ -39,6 +41,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     charms=new RuntimeCharmBinding(runtimeRoot,receipts);
     privateWorldConfirmed=Config.Bind("Safety","PrivateWorldConfirmed",false,"Required before Charm inscription or mutation. Enable only for a private solo/listen-host world you control.");
     engine=new RuntimeExperienceEngine(runtimeRoot,receipts,()=>privateWorldConfirmed.Value);
+    runStatus=new RuntimeRunStatusStore(runtimeRoot);
     devChannel=new RuntimeDevChannelCoordinator(runtimeRoot,(active,correlation)=>{
       var result=charms.RebindDevActive(active,correlation);
       if(result.Any(value=>value.Status=="rebound"||value.Status=="already_current")){
@@ -49,6 +52,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     });
     arcaneSight=new RuntimeArcaneSight(runtimeRoot);
     creatorRequests=new RuntimeCreatorRequestController(runtimeRoot,devChannel,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,message=>Logger.LogInfo(message),SetCreatorBuildMode,CreatorBuildModeEnabled);
+    runControl=new RuntimeRunControlController(runtimeRoot,engine,receipts,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,message=>Logger.LogInfo(message));
     studioUrl=Config.Bind("Studio","Url","http://127.0.0.1:8085/quest-studio","Loopback URL opened by the Runtime creator bar. Only an http:// localhost address is accepted.");
     var legacyAnchor=Config.Bind("Presentation","DeadlineAnchor",.16f,"Legacy vertical alert position; migrated into AlertAnchorY.");
     alertAnchorX=Config.Bind("Presentation","AlertAnchorX",.5f,"Horizontal center of the single alert anchor as a screen fraction (0.05-0.95).");
@@ -70,7 +74,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     foreach(var patch in RuntimePatching.Outcomes) Logger.LogInfo($"Runtime patch {patch.SignatureId}: {(patch.Applied?"ok":patch.Detail)}");
     Logger.LogInfo($"Runtime ready. CreatorBar={barHotkey.Value}, charm={castHotkey.Value}, check={checkHotkey.Value}, load={loadHotkey.Value}, inbox={Path.Combine(runtimeRoot,"inbox")}");
   }
-  void Update(){engine?.Tick();PollDevChannel();creatorRequests?.Poll(UnityEngine.Time.realtimeSinceStartup,engine?.CurrentStageId());arcaneSight?.Tick();WelcomeOnce();if(barExpanded)RuntimeInputPatches.Maintain();if(TypingInGame())return;if(barHotkey.Value.IsDown())SetBarExpanded(!barExpanded);if(barExpanded&&UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Escape))SetBarExpanded(false);if(barExpanded&&castHotkey.Value.IsDown())HandleCharmGesture();if(checkHotkey.Value.IsDown()){status=CheckForNew();Report(status,statusIdle);}if(loadHotkey.Value.IsDown()){status=LoadLatest();Report(status,statusIdle);}}
+  void Update(){engine?.Tick();PollDevChannel();creatorRequests?.Poll(UnityEngine.Time.realtimeSinceStartup,engine?.CurrentStageId());runControl?.Poll(UnityEngine.Time.realtimeSinceStartup);PublishRunStatus();arcaneSight?.Tick();WelcomeOnce();if(barExpanded)RuntimeInputPatches.Maintain();if(TypingInGame())return;if(barHotkey.Value.IsDown())SetBarExpanded(!barExpanded);if(barExpanded&&UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Escape))SetBarExpanded(false);if(barExpanded&&castHotkey.Value.IsDown())HandleCharmGesture();if(checkHotkey.Value.IsDown()){status=CheckForNew();Report(status,statusIdle);}if(loadHotkey.Value.IsDown()){status=LoadLatest();Report(status,statusIdle);}}
   void OnGUI() {
     // Visibility only. Update() keeps ticking the engine, polling the dev channel
     // and reading hotkeys, so turning this off costs nothing but the pixels.
@@ -299,6 +303,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   void WelcomeOnce(){if(welcomed||MessageHud.instance==null||Player.m_localPlayer==null)return;welcomed=true;if(HasQuestContent())Report("Comfy Quest ready. Press "+barHotkey.Value+" to expand the creator bar.");}
   bool HasQuestContent(){var now=UnityEngine.Time.realtimeSinceStartup;if(now<nextContentProbe)return hasQuestContent;nextContentProbe=now+1d;try{if(File.Exists(Path.Combine(runtimeRoot,"active","active-set.json")))return hasQuestContent=true;var inbox=Path.Combine(runtimeRoot,"inbox");return hasQuestContent=Directory.Exists(inbox)&&Directory.GetFiles(inbox,"*.questpack").Length>0;}catch{return hasQuestContent=false;}}
   static string CurrentWorldUid(){try{return ZNet.instance==null?string.Empty:ZNet.instance.GetWorldUID().ToString(System.Globalization.CultureInfo.InvariantCulture);}catch{return string.Empty;}}
+  void PublishRunStatus(){if(runStatus==null||UnityEngine.Time.realtimeSinceStartup<nextRunStatus)return;nextRunStatus=UnityEngine.Time.realtimeSinceStartup+1d;try{runStatus.Write(new RuntimeRunStatusDocument{ObservedUtc=DateTimeOffset.UtcNow,Machine=Environment.MachineName,WorldUid=CurrentWorldUid(),Runs=engine?.CurrentRuns()??Array.Empty<RuntimeRunStatusEntry>()});}catch(Exception e){Logger.LogWarning("Run status unavailable: "+e.Message);}}
   static bool CreatorBuildModeEnabled(){try{var player=Player.m_localPlayer;return player!=null&&player.NoCostCheat()&&player.InGodMode();}catch{return false;}}
   static void SetCreatorBuildMode(bool enabled){var player=Player.m_localPlayer??throw new InvalidOperationException("Local player is not available.");Exception failure=null;try{player.SetNoPlacementCost(enabled);}catch(Exception e){failure=e;}try{player.SetGodMode(enabled);}catch(Exception e){if(failure==null)failure=e;}if(failure==null)return;if(enabled){try{player.SetNoPlacementCost(false);}catch{}try{player.SetGodMode(false);}catch{}}throw new InvalidOperationException("Creator build mode could not be changed completely.",failure);}
   void DrawDevChannel(){UnityEngine.GUILayout.Label("DEV CHANNEL",sectionStyle,UnityEngine.GUILayout.Height(22));if(devChannel.Armed){if(UnityEngine.GUILayout.Button("DEV CHANNEL ARMED · DISARM",primaryStyle,UnityEngine.GUILayout.Height(34)))devChannel.Disarm(DateTimeOffset.UtcNow);UnityEngine.GUILayout.Label("Studio revisions are validated and pulled into this private session.",helpStyle,UnityEngine.GUILayout.Height(30));return;}var allowed=privateWorldConfirmed.Value;var prior=UnityEngine.GUI.enabled;UnityEngine.GUI.enabled=allowed;if(UnityEngine.GUILayout.Button(allowed?"ARM DEV CHANNEL":"PRIVATE WORLD CONFIRMATION REQUIRED",allowed?amberButtonStyle:dimButtonStyle,UnityEngine.GUILayout.Height(34))&&allowed)devChannel.Arm(DateTimeOffset.UtcNow);UnityEngine.GUI.enabled=prior;UnityEngine.GUILayout.Label("Arming is session-only. Studio can publish bytes; only the game may activate them.",helpStyle,UnityEngine.GUILayout.Height(30));}
