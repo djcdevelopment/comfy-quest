@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+<rect width="1200" height="800" fill="#08111f"/>
+<path d="M60 710H1140M60 60V710" stroke="#26364f" stroke-width="1"/>
+<text x="60" y="34" fill="#e8dfcf" font-family="sans-serif" font-size="22">Godbuild: first-portal-progression-shelter</text>
+<text x="1140" y="34" fill="#8fa0bb" font-family="monospace" font-size="13" text-anchor="end">12 pieces · e1e01ff67501</text>
+<g><circle cx="390.94" cy="463.83" r="2.6" fill="#048cb0"><title>fire_pit</title></circle><rect x="776.91" y="179.73" width="6" height="6" fill="#c50440"><title>sign</title></rect><circle cx="213.21" cy="519.61" r="2.6" fill="#9462a8"><title>wood_beam</title></circle><circle cx="519.61" cy="646.54" r="2.6" fill="#9462a8"><title>wood_beam</title></circle><circle cx="817.66" cy="197.57" r="2.6" fill="#9462a8"><title>wood_pole</title></circle><circle cx="60.00" cy="456.15" r="2.6" fill="#9462a8"><title>wood_pole2</title></circle><circle cx="66.35" cy="462.40" r="2.6" fill="#9462a8"><title>wood_pole2</title></circle><circle cx="672.82" cy="710.00" r="2.6" fill="#9462a8"><title>wood_pole2</title></circle><circle cx="276.67" cy="366.40" r="2.6" fill="#9462a8"><title>wood_roof</title></circle><circle cx="403.58" cy="60.00" r="2.6" fill="#9462a8"><title>wood_roof</title></circle><circle cx="583.07" cy="493.33" r="2.6" fill="#9462a8"><title>wood_roof</title></circle><circle cx="710.00" cy="186.91" r="2.6" fill="#9462a8"><title>wood_roof</title></circle></g>
+<text x="60" y="755" fill="#8fa0bb" font-family="sans-serif" font-size="13">Top-down X/Z projection · hover a mark for prefab identity</text>
+</svg>

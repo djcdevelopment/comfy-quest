@@ -22,5 +22,34 @@
       { "operation": "runtime_build_off", "status": "completed" },
       { "operation": "runtime_disarm", "status": "completed" }
     ]
+  },
+  "observed_live_godbuild": {
+    "session_id": "creator-first-godbuild-buildmode-20260824",
+    "machine": "OMEN",
+    "world_uid": "-7600395338659582326",
+    "world_name": "ComfyQuestDemo",
+    "build_on": {
+      "request_id": "runtime-build_on-20260824T130805Z-485fd57e",
+      "operation": "build_on",
+      "state": "completed",
+      "creator_build_enabled": true
+    },
+    "capture": {
+      "name": "first-portal-progression-shelter",
+      "piece_count": 12,
+      "source_pieces_sha256": "e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd",
+      "inspect": "internally_consistent"
+    },
+    "build_off": {
+      "request_id": "runtime-build_off-20260824T133209Z-187c0af5",
+      "operation": "build_off",
+      "state": "completed",
+      "creator_build_enabled": false
+    },
+    "close": {
+      "state": "closed",
+      "prior_install_bytes_restored": true,
+      "world_restore_performed": false
+    }
   }
 }

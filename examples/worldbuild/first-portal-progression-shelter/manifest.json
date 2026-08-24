@@ -1,0 +1,93 @@
+{
+  "schema": "comfy-quest-godbuild/v1",
+  "name": "first-portal-progression-shelter",
+  "source_schema": "comfy-questlab-capture/v1",
+  "source_pieces_sha256": "e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd",
+  "piece_count": 12,
+  "prefab_counts": {
+    "fire_pit": 1,
+    "sign": 1,
+    "wood_beam": 2,
+    "wood_pole": 1,
+    "wood_pole2": 3,
+    "wood_roof": 4
+  },
+  "bounds": {
+    "x": {
+      "min": 0.0,
+      "max": 4.5689,
+      "span": 4.5689
+    },
+    "y": {
+      "min": 0.0,
+      "max": 3.5568,
+      "span": 3.5568
+    },
+    "z": {
+      "min": 0.0,
+      "max": 3.9197,
+      "span": 3.9197
+    }
+  },
+  "metadata": {
+    "signs": 1,
+    "item_stands": 0,
+    "runes": 0,
+    "text_glows": 0
+  },
+  "artifacts": {
+    "first-portal-progression-shelter.capture.json": {
+      "sha256": "d9f8c8f49f15917aa3d96369e5d4c04829fa32d6c6c6327a4d8a714b4bf46798",
+      "bytes": 5763
+    },
+    "first-portal-progression-shelter.blueprint": {
+      "sha256": "1c2e71857cfbf6ea08eb23b6e58256c484467a1dc22fa7e92f064ee19fcdc881",
+      "bytes": 1050
+    },
+    "plan.json": {
+      "sha256": "bef4383f04fb03b77dffa509afe2cad2908b8d2db1668265c8287e59da224031",
+      "bytes": 5648
+    },
+    "preview.svg": {
+      "sha256": "2a95523784ac1115aad54e5c3fff946495d7aeb6bcb86424c23d41f3768fb513",
+      "bytes": 1675
+    }
+  },
+  "unsupported": [
+    {
+      "surface": "terrain_heights_and_vegetation",
+      "status": "excluded_upstream",
+      "silent": false
+    },
+    {
+      "surface": "portal_links",
+      "status": "excluded_upstream",
+      "silent": false
+    },
+    {
+      "surface": "container_contents",
+      "status": "excluded_upstream",
+      "silent": false
+    },
+    {
+      "surface": "door_state",
+      "status": "excluded_upstream",
+      "silent": false
+    },
+    {
+      "surface": "arbitrary_zdo_fields",
+      "status": "excluded_upstream",
+      "silent": false
+    },
+    {
+      "surface": "non_unit_scale",
+      "status": "rejected_upstream",
+      "silent": false
+    }
+  ],
+  "replay": {
+    "authority": "first-portal-progression-shelter.capture.json + first-portal-progression-shelter.blueprint",
+    "check_before_build": true,
+    "post_build_proof": "blueprint_diff must report MATCH"
+  }
+}

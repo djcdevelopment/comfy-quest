@@ -22,6 +22,7 @@ checkout.
 - OMEN Studio-to-Runtime acceptance: docs/runbooks/I2-QUESTPACK-OMEN.md
 - Demo World minimal tutorial: examples/demo-world/first-portal
 - Living Creator OS and seat mission control: docs/quest-mission-control.html
+- Creator portfolio functional/non-functional baseline: docs/creator-portfolio-requirements.md
 - R&D opportunity matrix: docs/quest-rd-opportunity-matrix.md
 - Repository boundary: BOUNDARY.md
 - Extraction record: PROVENANCE.md
@@ -72,11 +73,13 @@ vocabulary. The 91
 low-level assembly seams never become authoring choices.
 
 Open `docs/quest-mission-control.html` directly on a second display for the current
-Creator OS lane, fleet roles, machine-derived choreography, proof queue, and private
-session notes. Canonical status is tracked in Git; checkmarks and notes stay in that
-browser unless explicitly exported. Before a commit, update its JSON source when the
-change alters program state, machine roles, the creator sequence, expected receipts, or
-the next seat decision, then run the renderer drift check above.
+Creator OS lane, dogfood portfolio roadmap, fleet roles, machine-derived choreography,
+proof queue, and private session notes. The functional and non-functional adoption gates
+live in `docs/creator-portfolio-requirements.md`. Canonical status is tracked in Git;
+checkmarks and notes stay in that browser unless explicitly exported. Before a commit,
+update its JSON source when the change alters program state, machine roles, the creator
+sequence, expected receipts, or the next seat decision, then run the renderer drift
+check above.
 
 Studio lowers production beats into bounded acyclic Runtime graphs and certifies them
 against the shared contract. **Play this revision** writes an isolated dev artifact;
@@ -130,8 +133,10 @@ console commands nor synthetic keys; `BuildOff` reverses both before the world i
 Capture automatically produces a reviewable Godbuild under `examples/worldbuild/<name>`
 and verifies generator drift. Replay stages the exact reviewed capture/blueprint pair,
 runs check before build, and fails unless the translation-independent diff receipt says
-`MATCH`. The executable, precondition-ordered choreography and its current proof level live in
-`docs/creator-os.md`.
+`MATCH`. Captures are modular source and diff authority for the fields their manifest
+supports; the saved `.db`/`.fwl` world remains authoritative for terrain, vegetation,
+portal topology, and other excluded world-native state. The executable,
+precondition-ordered choreography and its current proof level live in `docs/creator-os.md`.
 
 The **R&D Signal Circuit** template is the current batch probe: normal chat, a durable
 wait, shout, two drops inside 30 seconds, pickup, equip, consume, heal, and a small

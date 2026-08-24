@@ -35,6 +35,18 @@ machine loop. The seat is for spatial judgment, authored choices, and play feel.
   same viewport; the capture cycle restored the game's minimized state without changing
   foreground focus or sending input. Close returned a correlated Disarm receipt, private
   confirmation is false, and the launch log has no exception, fatal, or error entry.
+- Creator Session `creator-first-godbuild-buildmode-20260824` completed the first live
+  world-authoring lap on the exact `ComfyQuestDemo` world. Correlated BuildOn request
+  `runtime-build_on-20260824T130805Z-485fd57e` reported
+  `creator_build_enabled: true`; Capture and Inspect recorded 12 creator-owned pieces
+  within 12 metres as `first-portal-progression-shelter`, source-pieces SHA256
+  `e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd`, with the
+  capture and PlanBuild projection internally consistent. BuildOff request
+  `runtime-build_off-20260824T133209Z-187c0af5` reported
+  `creator_build_enabled: false`. The closed session manifest records the exact prior
+  plugin/config restoration and a released session; the authored world was deliberately
+  retained. Its pre-session `.db`/`.fwl` pair remains in the session backup, but Creator
+  Session does not claim that `Close -Restore` restores world state.
 
 An earlier live launch exposed a success-sentinel defect before Arm dispatch. The
 validator now returns null on success, and both the executable controller round trip and
@@ -51,17 +63,25 @@ the corrected live Arm/Disarm receipts cover that exact branch.
 
 ## Studio creator loop
 
-The product reading order is **Author -> Rehearse -> Play -> Observe -> Capture Godbuild -> Replay elsewhere**. Runtime opens Studio with the active pack, version, requested stage, and current beat in the loopback query so Observe lands on the same telling rather than asking the creator to find it again.
+The single-experience reading order remains **Author -> Rehearse -> Play -> Observe -> Capture Godbuild -> Replay elsewhere**. Runtime opens Studio with the active pack, version, requested stage, and current beat in the loopback query so Observe lands on the same telling rather than asking the creator to find it again.
 
-The first real Godbuild target is intentionally small: build one room or one lane with
-human spacing, capture it once, review the generated preview and typed plan, then replay
-it elsewhere. The point of that lap is the reusable loop, not the size of the build.
+The broader dogfood order is **Imagine -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release**. The adoption gate is Derek creating a guild-scale portfolio of questlines, standalone quests, and rerunnable events through that loop. The requirements and exit gates are in `docs/creator-portfolio-requirements.md`.
+
+The first real Godbuild target is complete. Its 12 basic pieces demonstrate the useful
+part of capture: human spacing can become reviewable source, a typed plan, and a stable
+module. The live observation supplied the more important product fact: ordinary wood,
+roof, fire, and sign language locates a player in Valheim progression, while the terrain
+and uphill clearing supply the next stage. The capture manifest explicitly excludes
+terrain, vegetation, portal links, container contents, door state, and arbitrary ZDO
+fields. Therefore the saved world is the playable release authority; Godbuild remains an
+optional module/source/diff tool rather than a replacement for the world.
 
 The safe-top follow-up completed on the next normal Valheim launch without a dedicated
 seat session. Automation owned deployment, process/hash ordering, direct window-buffer
 capture, host-band clearance, Disarm, and Close. No F9 press, screenshot relay, console
 command, forced focus, or manual file copy was required. The next creator-scale target is
-the first small human-spaced Godbuild.
+the dogfood foundation: portfolio hierarchy, named world anchors, scoped reset/rerun,
+and a versioned saved-world bundle, followed by one real multi-quest guild slice.
 
 ## Capacity policy
 
@@ -71,3 +91,5 @@ the first small human-spaced Godbuild.
   adapter itself changes.
 - A screenshot or checkbox is orientation, not machine proof. Request receipts, active-set
   identity, capture hashes, and `MATCH` are the machine facts.
+- Auto-generation and the planned pattern notebook are optional accelerators. They earn
+  critical-path priority only when repeated guild authoring demonstrates the need.

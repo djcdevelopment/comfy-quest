@@ -5,8 +5,8 @@
     "title": "Quest Creator OS",
     "subtitle": "Automate the machine loop. Spend the seat on design, spacing, and play feel.",
     "observed_on": "2026-08-24",
-    "program_commit": "7860288",
-    "program_commit_label": "Build the Creator OS workflow"
+    "program_commit": "c1ec660",
+    "program_commit_label": "Automate private Godbuild mode"
   },
   "machines": [
     {
@@ -39,14 +39,14 @@
       "id": "env.repo",
       "label": "Repository baseline",
       "state": "confirmed",
-      "detail": "Creator OS implementation is recorded in 7860288 while the pre-existing Quest Lab Gallery work remains preserved in the same committed change.",
+      "detail": "Creator OS, safe-top Runtime composition, and bounded private Godbuild control are committed through c1ec660. This status snapshot adds the guild-dogfood requirements and first human-spaced capture.",
       "fact_kind": "git-observed"
     },
     {
       "id": "env.session",
       "label": "Creator Session",
       "state": "confirmed",
-      "detail": "Prepare, Status, Arm, Lab identity, Disarm, and Close completed in the corrected live OMEN session with matching install, machine, world, session, and request identities. Bounded BuildOn/BuildOff, exact backup/restore, and rejection branches are executable-fixture covered; the first Godbuild lap is the live build-control proof.",
+      "detail": "Session creator-first-godbuild-buildmode-20260824 completed on OMEN and ComfyQuestDemo: BuildOn and BuildOff returned correlated verified state, capture/inspect completed, and Close recorded the session closed with prior plugin/config bytes restored. The authored world was retained; its pre-session pair remains backed up.",
       "fact_kind": "live-and-fixture"
     },
     {
@@ -60,8 +60,8 @@
       "id": "env.godbuild",
       "label": "Godbuild round trip",
       "state": "confirmed",
-      "detail": "Private-world BuildOn/BuildOff control, capture import, normalized authority, typed plan, deterministic SVG, drift check, check-before-build, and MATCH-only replay are executable-test covered.",
-      "fact_kind": "executed-fixture"
+      "detail": "The first live human-spaced module contains 12 basic pieces with source hash e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd. Capture and plan agree. Its declared terrain and portal exclusions make the saved world the playable release authority; replay remains fixture-proven and awaits use only when a reusable module needs cloning.",
+      "fact_kind": "live-and-fixture"
     }
   ],
   "phases": [
@@ -95,26 +95,26 @@
     {
       "id": "phase-4",
       "number": 4,
-      "title": "Creator OS and Quest Lab spellbook",
+      "title": "Dogfood creator portfolio",
       "state": "active",
-      "summary": "The four-stage Studio loop, leased live control plane, and passively verified overhead Runtime surface pass; Godbuild capture/replay is the next creator-scale lane.",
-      "source": "docs/creator-os.md",
-      "source_contains": "The scarce resource is the creator's time in the seat"
+      "summary": "The live creator controls and first spatial capture pass. Portfolio hierarchy, world anchors and bundles, scoped rerun, and multi-experience guild authoring are now the adoption path; notebook and generation work are optional accelerators.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "The adoption gate is not another generated tutorial"
     },
     {
       "id": "phase-5",
       "number": 5,
       "title": "Community-ready artifacts",
       "state": "planned",
-      "summary": "Pack v3, provenance, import/export, and semantic diff remain planned after the Creator OS lane proves live.",
-      "source": "docs/five-intent-program-plan.md",
-      "source_contains": "comfy-quest-pack/v3"
+      "summary": "Guild provenance, dependencies, import/export, semantic and world diff, and clean-profile installation follow the local dogfood campaign.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "### 5 — Community release"
     }
   ],
   "recovery": {
     "id": "creator-os-active",
-    "title": "Creator OS operating lane",
-    "summary": "One leased session owns deployment, identity, requests, capture transport, proof, and rollback. Derek enters the loop only where human spatial judgment or play feel is the product.",
+    "title": "Guild dogfood operating lane",
+    "summary": "Build the portfolio, reset, anchor, and world-release leverage first. One leased session then owns deployment, identity, requests, capture transport, proof, and rollback; Derek enters only where authored judgment is the product.",
     "cold_load": {
       "id": "recovery.cold-load",
       "title": "Prepare one pinned Creator Session",
@@ -131,14 +131,14 @@
     },
     "revision_flow": {
       "id": "creator-os-product-loop",
-      "title": "Move one authored idea through the whole product",
-      "summary": "Studio keeps the creator in one telling; Godbuild turns human spacing into reviewable, replayable source instead of a manual reconstruction job.",
+      "title": "Move one guild idea through the whole product",
+      "summary": "World and Studio authoring share one guild, quest, revision, world, and run context. Observe, reset, and rerun close the loop before release instead of consuming a new manual setup lap.",
       "source": "docs/creator-os.md",
-      "source_sequence": "Author -> Rehearse -> Play -> Observe -> Capture Godbuild -> Replay elsewhere",
-      "source_contains": "Author -> Rehearse -> Play -> Observe -> Capture Godbuild -> Replay elsewhere",
-      "edit_source": "docs/creator-os.md",
-      "edit_source_contains": "The first real Godbuild target is intentionally small",
-      "suggested_edit": "Build one small room or lane with human spacing, capture it once, review the generated source, then replay it elsewhere and require MATCH."
+      "source_sequence": "Imagine -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release",
+      "source_contains": "The broader dogfood order is",
+      "edit_source": "docs/creator-portfolio-requirements.md",
+      "edit_source_contains": "### 4A — Dogfood foundation",
+      "suggested_edit": "Build portfolio hierarchy, named live anchors, scoped reset/rerun, and saved-world bundling before asking for another seat lap; then use the uphill clearing as First Portal stage two."
     },
     "expectations": "docs/creator-os-expected.json"
   },
@@ -160,27 +160,67 @@
     },
     {
       "id": "queue.first-godbuild",
-      "state": "ready",
-      "title": "Capture the first human-spaced Godbuild",
-      "detail": "Use one small room or lane to prove the receipt-backed private build toggle, capture, preview, typed plan, check, replay, and MATCH before scaling the content.",
+      "state": "complete",
+      "title": "First human-spaced module captured",
+      "detail": "The early-progression shelter is checked in as capture, blueprint, typed plan, SVG preview, and manifest. Live BuildOn/Capture/Inspect/BuildOff passed; replay remains available when a later authored need calls for cloning the module.",
       "source": "docs/creator-os.md",
-      "source_contains": "The first real Godbuild target is intentionally small"
+      "source_contains": "The first real Godbuild target is complete"
+    },
+    {
+      "id": "queue.requirements",
+      "state": "complete",
+      "title": "Adopt the guild-dogfood requirements",
+      "detail": "Functional and non-functional requirements now define the portfolio, questline, event, world bundle, run/reset, release, evidence, safety, and seat-efficiency boundaries.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "## Functional requirements"
+    },
+    {
+      "id": "queue.portfolio",
+      "state": "ready",
+      "title": "Build the portfolio and anchor foundation",
+      "detail": "Replace the flat one-project view with guild/questline/quest/event organization, then capture named world anchors into the same authored context.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "### Portfolio and progression"
+    },
+    {
+      "id": "queue.reset",
+      "state": "ready",
+      "title": "Make clean reruns a product operation",
+      "detail": "Add previewed, receipt-backed reset across workflow state, timers, action claims, spawned ownership, cleanup, notices, and reward policy so terminal content can rerun under a new run identity.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "FR-RESET-001"
+    },
+    {
+      "id": "queue.world-bundle",
+      "state": "ready",
+      "title": "Package the authored saved world",
+      "detail": "Create a closed-game, versioned and hash-pinned world bundle with identity, compatibility, anchors, linked guild release, atomic install, and rollback. Captures remain optional modules.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "FR-WORLD-003"
+    },
+    {
+      "id": "queue.guild-campaign",
+      "state": "gated",
+      "title": "Author the first top-to-bottom guild",
+      "detail": "After the 4A leverage exists, use the real campaign to drive prerequisites, multi-experience Runtime, capability admission, and hundredth-use composition.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "### 4B — Guild campaign"
     },
     {
       "id": "queue.phase3-lap",
       "state": "human",
       "title": "Batch the Phase 3 feel verdicts",
-      "detail": "Take the desperate-defense judgments together during a later creative sitting; the machine checks stay with the harness.",
+      "detail": "Take the desperate-defense judgments together during a later creative sitting; the machine checks stay with the harness and this does not gate the dogfood foundation.",
       "source": "docs/creator-os.md",
       "source_contains": "Phase 3's remaining combat-feel verdicts are parked"
     },
     {
       "id": "queue.community",
       "state": "gated",
-      "title": "Scale into community artifacts",
-      "detail": "After one live MATCH loop, use the capture and blueprint as replay authority while pack v3 and provenance work advance.",
-      "source": "docs/creator-os.md",
-      "source_contains": "capture/blueprint pair remains replay authority"
+      "title": "Release community-ready guild artifacts",
+      "detail": "Provenance, dependencies, permissions, import/export, semantic/world diff, and clean-profile installation follow the local guild campaign.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "### 5 — Community release"
     }
   ],
   "decisions": [
@@ -199,6 +239,22 @@
       "recommendation": "Yes. F9 expands or minimizes one always-present overhead bar; a single clamped alert anchor carries deadline or actionable warning state.",
       "source": "docs/creator-os.md",
       "source_contains": "Author -> Rehearse -> Play -> Observe"
+    },
+    {
+      "id": "decision.world",
+      "title": "Playable world authority",
+      "question": "Does Godbuild generation replace the saved guild world?",
+      "recommendation": "No. The versioned saved world owns terrain, vegetation, portal topology, and authored spatial context. Godbuild capture is optional reusable module/source/diff authority only for its declared fields.",
+      "source": "docs/creator-os.md",
+      "source_contains": "the saved world is the playable release authority"
+    },
+    {
+      "id": "decision.dogfood",
+      "title": "Adoption path",
+      "question": "Do notebook patterns or auto-generation come before guild authoring?",
+      "recommendation": "No. Build the portfolio, anchors, reset/rerun, and world-release foundation; let real guild authoring earn palette, pattern, and generation work from observed need.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "They are not substitutes for the authored source"
     },
     {
       "id": "decision.fleet",
@@ -269,6 +325,7 @@
     "The Creator Session lease owns the shared Valheim installation. Do not run another deployment or Lab mutation beside it.",
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
-    "The live control plane and y=92 compact-bar placement are proven. Keep future machine evidence receipt- and hash-backed; reserve the seat for authored spacing and play feel."
+    "Close -Restore restores prior install bytes, not the authored world. Treat the backed-up world pair as recovery material until the world-bundle lifecycle is implemented.",
+    "The live control plane, y=92 compact bar, private BuildOn/BuildOff, and first capture are proven. Reserve the next seat session for guild authorship after the machine-owned foundation is ready."
   ]
 }

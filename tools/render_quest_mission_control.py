@@ -325,21 +325,22 @@ def render(manifest: dict[str, Any]) -> str:
     creator_steps = list_items(markdown_section(source_path(creator["source"]), creator["heading"]), ordered=True)
     revision = manifest["recovery"]["revision_flow"]
     revision_steps = [item.strip() for item in revision["source_sequence"].split(" -> ") if item.strip()]
+    revision_source = read_text(source_path(revision["source"]))
     phase3 = manifest["phase3_lap"]
     phase3_source = source_path(phase3["source"])
     phase3_steps = list_items(markdown_section(phase3_source, phase3["sequence_heading"]), ordered=True)
     phase3_verdicts = list_items(markdown_section(phase3_source, phase3["verdicts_heading"]), ordered=False)
     if len(creator_steps) != 6:
         raise MissionControlError(f"Creator Session loop must remain six derived steps, found {len(creator_steps)}")
-    if len(revision_steps) != 6:
-        raise MissionControlError("Studio normal lap must remain a six-stage source sequence")
+    if len(revision_steps) < 2 or revision["source_sequence"] not in revision_source:
+        raise MissionControlError("Portfolio dogfood loop must remain a source-declared sequence")
     if len(phase3_steps) != 5 or len(phase3_verdicts) != 3:
         raise MissionControlError("Phase 3 runbook must expose five sequence steps and exactly three seat verdicts")
 
     expectations_relative = manifest["recovery"]["expectations"]
     expectations_path = source_path(expectations_relative)
     receipts = evidence_receipts(expectations_path)
-    later_revision = later_revision_expectation(expectations_path)
+    later_revision_expectation(expectations_path)
     source_hash = hashlib.sha256(SOURCE.read_bytes()).hexdigest()[:12]
 
     machine_cards = "".join(
@@ -383,20 +384,15 @@ def render(manifest: dict[str, Any]) -> str:
     revision_items = "".join(
         checklist_item(
             f"recovery.revision.{index}",
-            f'<strong>{html.escape(step)}</strong><small>Stage {index} of the Studio-to-Godbuild loop.</small>',
+            f'<strong>{html.escape(step)}</strong><small>Stage {index} of the portfolio dogfood loop.</small>',
             source=revision["source"] if index == 1 else None,
             source_label="Derived sequence",
         )
         for index, step in enumerate(revision_steps, 1)
     )
-    changed_receipt = later_revision["changed_content_receipt"]
-    legacy_revision_proof = (
-        '<div class="revision-proof"><span><strong>Identity</strong> Pack and experience IDs preserved</span>'
-        f'<span><strong>Changed content</strong> <code>{html.escape(changed_receipt["operation"])}</code> · {html.escape(changed_receipt["status"])}</span></div>'
-    )
     revision_proof = (
-        '<div class="revision-proof"><span><strong>Authority</strong> Capture source hash preserved</span>'
-        f'<span><strong>Replay proof</strong> <code>{html.escape(changed_receipt["operation"])}</code> · {html.escape(changed_receipt["status"])}</span></div>'
+        '<div class="revision-proof"><span><strong>4A machine gate</strong> Scoped reset receipt plus a distinct rerun identity</span>'
+        '<span><strong>4A seat gate</strong> No repository edit, console, file relay, log reading, or machine-fact check by Derek</span></div>'
     )
 
     proof_rows = "".join(
@@ -546,15 +542,15 @@ def render(manifest: dict[str, Any]) -> str:
 
   <section id="machines" class="section" aria-labelledby="machines-title"><div class="section-head"><div><span class="eyebrow">Lab topology</span><h2 id="machines-title">Machines and readiness</h2></div><p>Reported availability is separated from repository-owned role claims.</p></div><div class="machine-grid">{machine_cards}</div><article class="panel environment"><h3>Observed on {html.escape(page["observed_on"])}</h3><ul>{environment_cards}</ul></article></section>
 
-  <section id="program" class="section" aria-labelledby="program-title"><div class="section-head"><div><span class="eyebrow">Five-intent program</span><h2 id="program-title">Creator OS active; seat verdicts batched.</h2></div><p>Phase state is a cited program snapshot, not a live inference from checkboxes.</p></div><ol class="phase-list">{phases}</ol></section>
+  <section id="program" class="section" aria-labelledby="program-title"><div class="section-head"><div><span class="eyebrow">Five-intent program</span><h2 id="program-title">Guild dogfooding is the adoption path.</h2></div><p>Phase state is a cited program snapshot, not a live inference from checkboxes.</p></div><ol class="phase-list">{phases}</ol></section>
 
-  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">After implementation</span><h2 id="queue-title">Proof and scale queue</h2></div><p>The passive safe-top capture is complete; one small Godbuild now establishes replay evidence before content scales.</p></div><div class="queue-grid">{queue_cards}</div>
+  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">Adoption path</span><h2 id="queue-title">Build leverage, then author at scale</h2></div><p>The first spatial module is captured. Portfolio, anchors, reset/rerun, and saved-world release now come before another seat lap.</p></div><div class="queue-grid">{queue_cards}</div>
     <details class="future"><summary>Preview the derived Phase 3 exit lap</summary><div><p>{html.escape(phase3["summary"])}</p><ol class="derived-sequence">{phase3_sequence}</ol><h3>Exactly three human verdicts</h3><ul class="judgment-list">{phase3_judgments}</ul>{source_link(phase3["source"], "Derived runbook")}</div></details>
   </section>
 
   <section id="decisions" class="section" aria-labelledby="decisions-title"><div class="section-head"><div><span class="eyebrow">Resolved direction</span><h2 id="decisions-title">Decisions in force</h2></div><p>These constraints keep machine work scalable and protect the only capacity that does not scale with hardware.</p></div><div class="decision-grid">{decision_cards}</div></section>
 
-  <section id="commands" class="section" aria-labelledby="commands-title"><div class="section-head"><div><span class="eyebrow">Safe launch points</span><h2 id="commands-title">Commands</h2></div><p>Copy only. This page cannot arm Runtime, mutate Valheim, or execute repository tools.</p></div><div class="command-list">{command_cards}</div><p><a href="http://127.0.0.1:8085/quest-studio">Open Quest Studio on this machine</a> · <a href="../README.md">Repository README</a> · <a href="handoff-2026-08-20.md">Last handoff</a></p></section>
+  <section id="commands" class="section" aria-labelledby="commands-title"><div class="section-head"><div><span class="eyebrow">Safe launch points</span><h2 id="commands-title">Commands</h2></div><p>Copy only. This page cannot arm Runtime, mutate Valheim, or execute repository tools.</p></div><div class="command-list">{command_cards}</div><p><a href="http://127.0.0.1:8085/quest-studio">Open Quest Studio on this machine</a> · <a href="creator-portfolio-requirements.md">Portfolio requirements</a> · <a href="../README.md">Repository README</a> · <a href="handoff-2026-08-20.md">Last handoff</a></p></section>
 
   <section class="section" aria-labelledby="cautions-title"><div class="section-head"><div><span class="eyebrow">Do not relearn these</span><h2 id="cautions-title">Guardrails</h2></div></div><ul class="cautions">{caution_items}</ul></section>
 </main>
@@ -581,9 +577,9 @@ def render(manifest: dict[str, Any]) -> str:
         "Checkpoint B · source-derived creator loop": "Checkpoint B · source-derived Creator Session",
         "Checkpoint B \ufffd source-derived creator loop": "Checkpoint B · source-derived Creator Session",
         "begin the imported-fork path where its source says it begins. If recovery leaves the character elsewhere, record that state; do not invent a reset or silently skip the ascent beat.": "Prepare establishes every machine, world, session, install-hash, and backup precondition used by later steps. Do not substitute a human file relay or console command.",
-        "Checkpoint C · same fork, changed content": "Checkpoint C · Studio to Godbuild",
-        "Checkpoint C \ufffd same fork, changed content": "Checkpoint C · Studio to Godbuild",
-        "Bounded suggested edit": "First real Godbuild target",
+        "Checkpoint C · same fork, changed content": "Checkpoint C · portfolio dogfood",
+        "Checkpoint C \ufffd same fork, changed content": "Checkpoint C · portfolio dogfood",
+        "Bounded suggested edit": "Dogfood foundation gate",
         "Project source": "Operating source",
         "Acceptance evidence": "Machine evidence",
         "The product’s expected proof chain": "The Creator OS expected proof chain",

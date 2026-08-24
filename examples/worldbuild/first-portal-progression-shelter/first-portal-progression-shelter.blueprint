@@ -1,0 +1,16 @@
+#Name:first-portal-progression-shelter
+#Creator:ComfyQuestLab capture
+#Description:Deterministic projection of e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd; metadata is in the .capture.json sidecar.
+#Pieces
+fire_pit;Misc;1.9957;0;1.4845;0;-0.980785;0;0.19509;
+sign;Furniture;4.3413;1.3974;3.1796;0;-0.55557;0;0.83147;
+wood_beam;BuildingWorkbench;0.9239;2.5568;1.1481;0;-0.980785;0;0.19509;
+wood_beam;BuildingWorkbench;2.7716;2.5568;0.3827;0;-0.980785;0;0.19509;
+wood_pole;BuildingWorkbench;4.5689;0.9231;3.0901;0;-0.980785;0;0.19509;
+wood_pole2;BuildingWorkbench;0;1.5568;1.5308;0;-0.980785;0;0.19509;
+wood_pole2;BuildingWorkbench;0.0383;0.4607;1.4931;0;-0.980785;0;0.19509;
+wood_pole2;BuildingWorkbench;3.6955;1.5568;0;0;-0.980785;0;0.19509;
+wood_roof;BuildingWorkbench;1.3066;2.5568;2.072;0;-0.980785;0;0.19509;
+wood_roof;BuildingWorkbench;2.0719;3.5568;3.9197;0;-0.980785;0;0.19509;
+wood_roof;BuildingWorkbench;3.1543;2.5568;1.3066;0;-0.980785;0;0.19509;
+wood_roof;BuildingWorkbench;3.9197;3.5568;3.1544;0;-0.980785;0;0.19509;

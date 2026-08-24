@@ -93,6 +93,31 @@ The **validation-lap Event** (intent 01's success test) is a cross-phase thread:
 real multi-stage Event built at the end of Slice 1, extended every phase on the OMEN
 lap, with every "can't answer why" moment recorded as backlog.
 
+### Adoption-path pivot — 2026-08-24
+
+The first live Godbuild lap changed the ordering after Phase 3 without invalidating the
+five intents. A 12-piece early-progression shelter proved that capture can preserve a
+human-spaced module, and its own manifest proved that terrain, vegetation, portals, and
+other world-native state do not fit that authority. The adoption bottleneck is also now
+explicit: before community uptake, Derek needs to create and repeatedly run a substantial
+body of guild quests and events. His time in the seat cannot be spent operating the fleet.
+
+Accordingly, the **Quest Lab spellbook is no longer the next critical-path deliverable**.
+The post-Phase-3 order is now:
+
+| Lane | Intent | Exit |
+| --- | --- | --- |
+| 4A | Dogfood foundation: portfolio hierarchy, named live anchors, scoped reset/rerun, saved-world bundles | One multi-quest guild slice and one repeatable event run, reset, and rerun without repository edits, console/file relays, or machine-fact checks by Derek. |
+| 4B | Guild campaign: prerequisites/unlocks, multi-experience Runtime, portfolio readiness, atomic guild/world release | One top-to-bottom guild campaign runs from its released world bundle with rehearsal and required live evidence. |
+| 4C | Refinement through use: capability admission from blocked authored ideas, contextual friction ledger, hundredth-use composition | Multiple complete author-to-rerun cycles require no KVM turn; each tooling change links authored need to rerun proof. |
+| 5 | Community-ready guild artifacts | Export, import-fork, semantic/world diff, install, and lineage preservation work from a clean profile. |
+
+The Phase 4 notebook design below remains valid prior art, but patterns are now earned
+from structures the dogfood campaign actually repeats. Auto-generation is an optional
+accelerator using the same artifact and validator; it cannot replace the saved world,
+authored source, or acceptance evidence. `docs/creator-portfolio-requirements.md` is the
+canonical functional/non-functional baseline and owns the detailed gates.
+
 ---
 
 ## Slice 1 — Identity & evidence spine

@@ -1,0 +1,302 @@
+{
+  "schema": "comfy-quest-godbuild-plan/v1",
+  "name": "first-portal-progression-shelter",
+  "source_pieces_sha256": "e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd",
+  "selection": "mine",
+  "radius_metres": 12,
+  "bounds": {
+    "x": {
+      "min": 0.0,
+      "max": 4.5689,
+      "span": 4.5689
+    },
+    "y": {
+      "min": 0.0,
+      "max": 3.5568,
+      "span": 3.5568
+    },
+    "z": {
+      "min": 0.0,
+      "max": 3.9197,
+      "span": 3.9197
+    }
+  },
+  "pieces": [
+    {
+      "index": 0,
+      "prefab": "fire_pit",
+      "category": "Misc",
+      "position": [
+        1.9957,
+        0,
+        1.4845
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 1,
+      "prefab": "sign",
+      "category": "Furniture",
+      "position": [
+        4.3413,
+        1.3974,
+        3.1796
+      ],
+      "rotation": [
+        0,
+        -0.55557,
+        0,
+        0.83147
+      ],
+      "metadata": {
+        "sign_text": "Update this sign to let others know you were here ",
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 2,
+      "prefab": "wood_beam",
+      "category": "BuildingWorkbench",
+      "position": [
+        0.9239,
+        2.5568,
+        1.1481
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 3,
+      "prefab": "wood_beam",
+      "category": "BuildingWorkbench",
+      "position": [
+        2.7716,
+        2.5568,
+        0.3827
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 4,
+      "prefab": "wood_pole",
+      "category": "BuildingWorkbench",
+      "position": [
+        4.5689,
+        0.9231,
+        3.0901
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 5,
+      "prefab": "wood_pole2",
+      "category": "BuildingWorkbench",
+      "position": [
+        0,
+        1.5568,
+        1.5308
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 6,
+      "prefab": "wood_pole2",
+      "category": "BuildingWorkbench",
+      "position": [
+        0.0383,
+        0.4607,
+        1.4931
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 7,
+      "prefab": "wood_pole2",
+      "category": "BuildingWorkbench",
+      "position": [
+        3.6955,
+        1.5568,
+        0
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 8,
+      "prefab": "wood_roof",
+      "category": "BuildingWorkbench",
+      "position": [
+        1.3066,
+        2.5568,
+        2.072
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 9,
+      "prefab": "wood_roof",
+      "category": "BuildingWorkbench",
+      "position": [
+        2.0719,
+        3.5568,
+        3.9197
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 10,
+      "prefab": "wood_roof",
+      "category": "BuildingWorkbench",
+      "position": [
+        3.1543,
+        2.5568,
+        1.3066
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    },
+    {
+      "index": 11,
+      "prefab": "wood_roof",
+      "category": "BuildingWorkbench",
+      "position": [
+        3.9197,
+        3.5568,
+        3.1544
+      ],
+      "rotation": [
+        0,
+        -0.980785,
+        0,
+        0.19509
+      ],
+      "metadata": {
+        "sign_text": null,
+        "item": null,
+        "rune_school": null,
+        "rune_style": null,
+        "text_glow_school": null
+      }
+    }
+  ]
+}

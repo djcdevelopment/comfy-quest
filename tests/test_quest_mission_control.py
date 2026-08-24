@@ -77,9 +77,12 @@ class QuestMissionControlTests(unittest.TestCase):
     def test_generated_page_is_current(self):
         self.assertEqual(self.rendered, self.committed)
         self.assertIn('meta name="quest-mission-control-schema"', self.committed)
-        self.assertIn("Program reconciled through 7860288", self.committed)
+        self.assertIn("Program reconciled through c1ec660", self.committed)
         self.assertIn("Automate the machine loop. Spend the seat on design.", self.committed)
         self.assertIn("Safe-top overhead bar verified live", self.committed)
+        self.assertIn("First human-spaced module captured", self.committed)
+        self.assertIn("Guild dogfooding is the adoption path.", self.committed)
+        self.assertIn("Portfolio requirements", self.committed)
         self.assertIn("complete", self.renderer.ALLOWED_QUEUE_STATES)
 
     def test_manifest_rejects_duplicate_ids_and_stale_source_pins(self):
@@ -107,10 +110,21 @@ class QuestMissionControlTests(unittest.TestCase):
         revision = self.manifest["recovery"]["revision_flow"]
         revision_steps = revision["source_sequence"].split(" -> ")
         self.assertEqual(
-            ["Author", "Rehearse", "Play", "Observe", "Capture Godbuild", "Replay elsewhere"],
+            [
+                "Imagine",
+                "Author in the world and Studio",
+                "Rehearse",
+                "Play",
+                "Observe",
+                "Revise",
+                "Reset",
+                "Run again",
+                "Release",
+            ],
             revision_steps,
         )
-        self.assertIn("recovery.revision.6", self.committed)
+        self.assertIn(revision["source_sequence"], (REPO / revision["source"]).read_text(encoding="utf-8"))
+        self.assertIn("recovery.revision.9", self.committed)
 
         phase3 = self.manifest["phase3_lap"]
         source = self.renderer.source_path(phase3["source"])
@@ -145,6 +159,16 @@ class QuestMissionControlTests(unittest.TestCase):
         self.assertEqual(
             {"operation": "blueprint_diff", "status": "completed"}, later["changed_content_receipt"]
         )
+        live = json.loads(path.read_text(encoding="utf-8"))["observed_live_godbuild"]
+        self.assertTrue(live["build_on"]["creator_build_enabled"])
+        self.assertFalse(live["build_off"]["creator_build_enabled"])
+        self.assertEqual(12, live["capture"]["piece_count"])
+        self.assertEqual(
+            "e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd",
+            live["capture"]["source_pieces_sha256"],
+        )
+        self.assertTrue(live["close"]["prior_install_bytes_restored"])
+        self.assertFalse(live["close"]["world_restore_performed"])
 
     def test_page_is_standalone_and_accessible_by_structure(self):
         parser = SurfaceParser()
@@ -158,8 +182,8 @@ class QuestMissionControlTests(unittest.TestCase):
         self.assertEqual(0, parser.buttons_without_type)
         self.assertTrue(parser.checkbox_ids.issubset(parser.labels_for))
         self.assertEqual(len(parser.check_ids), len(set(parser.check_ids)))
-        self.assertEqual(16, len(parser.check_ids))
-        self.assertEqual(13, len([item for item in parser.check_ids if item.startswith("recovery.")]))
+        self.assertEqual(19, len(parser.check_ids))
+        self.assertEqual(16, len([item for item in parser.check_ids if item.startswith("recovery.")]))
         for href in parser.hrefs:
             if href.startswith("#"):
                 self.assertIn(href[1:], parser.ids)
