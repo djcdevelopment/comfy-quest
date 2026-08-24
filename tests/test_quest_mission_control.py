@@ -77,7 +77,7 @@ class QuestMissionControlTests(unittest.TestCase):
     def test_generated_page_is_current(self):
         self.assertEqual(self.rendered, self.committed)
         self.assertIn('meta name="quest-mission-control-schema"', self.committed)
-        self.assertIn("Program reconciled through c7ee57a", self.committed)
+        self.assertIn("Program reconciled through 7860288", self.committed)
         self.assertIn("Automate the machine loop. Spend the seat on design.", self.committed)
 
     def test_manifest_rejects_duplicate_ids_and_stale_source_pins(self):

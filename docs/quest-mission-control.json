@@ -5,8 +5,8 @@
     "title": "Quest Creator OS",
     "subtitle": "Automate the machine loop. Spend the seat on design, spacing, and play feel.",
     "observed_on": "2026-08-24",
-    "program_commit": "c7ee57a",
-    "program_commit_label": "Add living Quest mission control"
+    "program_commit": "7860288",
+    "program_commit_label": "Build the Creator OS workflow"
   },
   "machines": [
     {
@@ -39,7 +39,7 @@
       "id": "env.repo",
       "label": "Repository baseline",
       "state": "confirmed",
-      "detail": "Creator OS work is based on c7ee57a while the already-started Quest Lab Gallery r30 changes remain preserved in the same worktree.",
+      "detail": "Creator OS implementation is recorded in 7860288 while the pre-existing Quest Lab Gallery work remains preserved in the same committed change.",
       "fact_kind": "git-observed"
     },
     {
