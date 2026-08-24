@@ -1,0 +1,238 @@
+{
+  "schema": "comfy-quest-mission-control/v1",
+  "page": {
+    "id": "comfy-quest-program",
+    "title": "Quest Mission Control",
+    "subtitle": "One honest view of what is proven, what needs a human, and what comes next.",
+    "observed_on": "2026-08-23",
+    "program_commit": "f79a13e",
+    "program_commit_label": "Hand off the canonical Demo World acceptance"
+  },
+  "machines": [
+    {
+      "id": "omen",
+      "label": "OMEN",
+      "state": "ready",
+      "role": "Primary Valheim and Quest Studio seat",
+      "detail": "Back online with dual Intel Arc B70s and two displays; use the second display for this page and Studio evidence.",
+      "fact_kind": "operator-reported"
+    },
+    {
+      "id": "am4",
+      "label": "AM4",
+      "state": "online",
+      "role": "Online and available",
+      "detail": "Available to the wider lab, but this repository does not assign Companion, Gateway, telemetry, or architecture-indexing work to itself.",
+      "fact_kind": "operator-reported"
+    },
+    {
+      "id": "i5",
+      "label": "i5",
+      "state": "on-demand",
+      "role": "Native multiplayer peer",
+      "detail": "Offline nearby. Leave it off for ordinary creator-content work; start it only when the multiplayer event adapter itself changes.",
+      "fact_kind": "repo-and-operator"
+    }
+  ],
+  "environment": [
+    {
+      "id": "env.repo",
+      "label": "Repository",
+      "state": "confirmed",
+      "detail": "The product baseline was freshly fetched with no remote changes beyond f79a13e before this page was created.",
+      "fact_kind": "observed"
+    },
+    {
+      "id": "env.toolchain",
+      "label": "Creator toolchain",
+      "state": "confirmed",
+      "detail": "Repository discovery resolves .NET 9.0.315; Python 3.12 and gitleaks are available.",
+      "fact_kind": "observed"
+    },
+    {
+      "id": "env.valheim",
+      "label": "Valheim surface",
+      "state": "confirmed",
+      "detail": "The default Valheim/BepInEx Runtime root exists and Valheim was closed at reconciliation time.",
+      "fact_kind": "observed"
+    },
+    {
+      "id": "env.safety",
+      "label": "Safety window",
+      "state": "attention",
+      "detail": "Treat PrivateWorldConfirmed as closed until the owning harness proves otherwise. Take install-wide ownership before any automated live lap.",
+      "fact_kind": "repo-confirmed"
+    }
+  ],
+  "phases": [
+    {
+      "id": "phase-1",
+      "number": 1,
+      "title": "Identity and evidence spine",
+      "state": "complete",
+      "summary": "Activation, correlation, explainability, Runtime status, and the first OMEN acceptance spine landed.",
+      "source": "docs/five-intent-program-plan.md",
+      "source_contains": "phase-1 exit (2026-08-19)"
+    },
+    {
+      "id": "phase-2",
+      "number": 2,
+      "title": "Closed creator loop",
+      "state": "complete",
+      "summary": "The armed dev channel and Studio-to-live iteration loop were proven end to end in session 2.",
+      "source": "docs/five-intent-validation-lap-backlog.md",
+      "source_contains": "the creator loop ran end-to-end in the proven order"
+    },
+    {
+      "id": "phase-3",
+      "number": 3,
+      "title": "Adaptive event semantics",
+      "state": "active",
+      "summary": "Implementation is landed; exit waits on one short live lap and three human verdicts.",
+      "source": "docs/five-intent-program-plan.md",
+      "source_contains": "Phase 3 now waits on one thing: lap session 3"
+    },
+    {
+      "id": "phase-4",
+      "number": 4,
+      "title": "Quest Lab spellbook",
+      "state": "planned",
+      "summary": "Notebook identity and round-trip behavior are planned; the recommended combined shape is P4-C.",
+      "source": "docs/phase-4-scope-packet.md",
+      "source_contains": "P4-C"
+    },
+    {
+      "id": "phase-5",
+      "number": 5,
+      "title": "Community-ready artifacts",
+      "state": "planned",
+      "summary": "Pack v3, provenance, import/export, and semantic diff remain planned after the notebook foundation.",
+      "source": "docs/five-intent-program-plan.md",
+      "source_contains": "comfy-quest-pack/v3"
+    }
+  ],
+  "recovery": {
+    "id": "recovery-acceptance",
+    "title": "Recovery acceptance",
+    "summary": "First re-establish the one live judgment left by the shutdown, then exercise the creator loop as a fresh imported fork.",
+    "cold_load": {
+      "id": "recovery.cold-load",
+      "title": "Cold-load the canonical Demo World",
+      "instruction": "Load Comfy Quest Demo once and judge the breadcrumb/sign path from hub arrival. Do not rebuild the Gallery and do not repeat the already-proven Charm lap.",
+      "verdict": "Was CAST HERE and its Arcane Sight breadcrumb path immediately obvious from hub arrival?",
+      "source": "docs/handoff-2026-08-20.md",
+      "source_contains": "acceptance step is one cold load and one human judgment"
+    },
+    "creator_flow": {
+      "title": "Exercise the imported-fork creator loop",
+      "summary": "Use the checked-in schema-v3 project. Import creates fresh identities, so the canonical artifact remains untouched and the first fork needs one fresh CAST.",
+      "source": "examples/demo-world/first-portal/README.md",
+      "heading": "Public creator loop"
+    },
+    "revision_flow": {
+      "id": "recovery-revision",
+      "title": "Prove one later revision of the same fork",
+      "summary": "This is the live-unverified edit/Rehearse/Play/rebind loop. Keep the imported fork IDs, make one content-only change, and let the armed Runtime pull it.",
+      "source": "README.md",
+      "source_sequence": "Author -> Rehearse -> arm once in F9 -> Play this revision -> play -> inspect proof",
+      "source_contains": "Author -> Rehearse -> arm once in F9 -> Play this revision -> play -> inspect proof",
+      "edit_source": "examples/demo-world/first-portal/studio-project.json",
+      "edit_source_contains": "The First Portal answers. Your quest is complete.",
+      "suggested_edit": "In the imported fork, change the completion message to ‘The First Portal answers again. Your quest is complete.’ Keep the targetless portal trigger unchanged."
+    },
+    "expectations": "examples/demo-world/first-portal/expected.json"
+  },
+  "phase3_lap": {
+    "title": "Phase 3 exit lap",
+    "summary": "This is queued behind recovery acceptance. Its sequence and human verdicts are rendered directly from the derived session-3 runbook.",
+    "source": "docs/runbooks/OMEN-LAP-PHASE3-EXIT-S3.md",
+    "sequence_heading": "Sequence",
+    "verdicts_heading": "The three verdicts"
+  },
+  "queue": [
+    {
+      "id": "queue.top-bar",
+      "state": "ready",
+      "title": "Build the horizontal top bar",
+      "detail": "Four-rung ladder, four-dot minimized state, persistent CHECK / READY / LANDED indicator, and one player-configurable alert anchor.",
+      "source": "docs/handoff-2026-08-20.md",
+      "source_contains": "a horizontal top bar carrying the four-rung ladder"
+    },
+    {
+      "id": "queue.warning-expiry",
+      "state": "ready",
+      "title": "Expire stale warnings",
+      "detail": "Remove actionable warnings from the evidence surface when the condition they describe has cleared.",
+      "source": "docs/handoff-2026-08-20.md",
+      "source_contains": "warnings expire when the condition they describe clears"
+    },
+    {
+      "id": "queue.phase3-lap",
+      "state": "human",
+      "title": "Take the Phase 3 exit verdicts",
+      "detail": "One honest desperate-defense run; machine checks stay with the harness and only three experiential judgments belong to the seat.",
+      "source": "docs/runbooks/OMEN-LAP-PHASE3-EXIT-S3.md",
+      "source_contains": "Three judgments remain"
+    },
+    {
+      "id": "queue.scanner",
+      "state": "gated",
+      "title": "Reconcile scanner slice 1",
+      "detail": "The locked local scanner worktree is older than main. Do not resume it until Phase 3 exits and its branch is reconciled with current source.",
+      "source": "docs/handoff-2026-08-20.md",
+      "source_contains": "Scanner slice 1 (gated behind session 3"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision.phase4-shape",
+      "title": "Phase 4 shape",
+      "question": "Adopt P4-A, P4-B, or the recommended P4-C?",
+      "recommendation": "P4-C: notebook plus the bounded composition surface.",
+      "source": "docs/phase-4-scope-packet.md",
+      "source_contains": "Which shape"
+    },
+    {
+      "id": "decision.drawer",
+      "title": "Top bar and drawer",
+      "question": "Should the top bar replace the drawer or coexist with it?",
+      "recommendation": "Keep this open until the recovered seat can judge the real composition.",
+      "source": "docs/phase-4-scope-packet.md",
+      "source_contains": "Does the top bar replace the drawer"
+    },
+    {
+      "id": "decision.lab-ownership",
+      "title": "Lab ownership",
+      "question": "Do the Lab ownership decisions ship in Phase 4 or remain decision records?",
+      "recommendation": "Hold implementation until the Phase 4 shape is taken.",
+      "source": "docs/phase-4-scope-packet.md",
+      "source_contains": "Do the Lab ownership decisions ride this phase"
+    }
+  ],
+  "commands": [
+    {
+      "id": "command.studio",
+      "label": "Start Quest Studio",
+      "command": "tools\\quest-studio\\Start-QuestStudio.ps1",
+      "detail": "Run from the repository root, then open the loopback Studio link."
+    },
+    {
+      "id": "command.status",
+      "label": "Check repository state",
+      "command": "git status --short --branch",
+      "detail": "Read-only confirmation before starting work."
+    },
+    {
+      "id": "command.demo-drift",
+      "label": "Check Demo World artifacts",
+      "command": "python tools/quest-studio/build_demo_world_first_portal.py --check",
+      "detail": "Verifies the checked-in project, compiled experience, package, and expectation bundle without rebuilding them."
+    }
+  ],
+  "cautions": [
+    "A worktree isolates Git, not the shared Valheim installation. Take one install-wide owner before an automated live lap.",
+    "Rehearsal proves evaluator behavior and declares its own limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
+    "Restoring only world files does not reset durable Runtime completion state. Do not improvise a replay reset that the product has not proven.",
+    "The i5 peer is unnecessary for content-only creator-loop changes; use captured multiplayer scenarios unless an event adapter changes."
+  ]
+}

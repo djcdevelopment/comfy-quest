@@ -21,6 +21,7 @@ checkout.
 - Split-proof release runbook: docs/runbooks/QUEST-RELEASE.md
 - OMEN Studio-to-Runtime acceptance: docs/runbooks/I2-QUESTPACK-OMEN.md
 - Demo World minimal tutorial: examples/demo-world/first-portal
+- Living program and seat mission control: docs/quest-mission-control.html
 - R&D opportunity matrix: docs/quest-rd-opportunity-matrix.md
 - Repository boundary: BOUNDARY.md
 - Extraction record: PROVENANCE.md
@@ -35,6 +36,7 @@ installation. Do not set ComfyCopyToPlugins during verification.
     python -m unittest discover -s tests
     python tools/component-packets/render_quest_lab.py --check
     python tools/quest-studio/build_demo_world_first_portal.py --check
+    python tools/render_quest_mission_control.py --check
     $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.6.0-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
     $env:NUGET_PACKAGES = Join-Path $env:TEMP ("comfy-quest-verify-" + $contractsHash)
     dotnet build src/Quest.Studio/Quest.Studio.csproj -c Release
@@ -58,6 +60,11 @@ creator-safe Grimoire meanings, all backed by fail-closed Runtime adapters and a
 for production authoring. The two engine events stay separate from that creator
 vocabulary. The 91
 low-level assembly seams never become authoring choices.
+
+Open `docs/quest-mission-control.html` directly on a second display for the current
+program position, machine readiness, source-derived recovery checklist, and private
+session notes. Canonical status is tracked in Git; checkmarks and notes stay in that
+browser unless explicitly exported.
 
 Studio lowers production beats into bounded acyclic Runtime graphs and certifies them
 against the shared contract. **Play this revision** writes an isolated dev artifact;

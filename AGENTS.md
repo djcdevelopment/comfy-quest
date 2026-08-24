@@ -41,3 +41,9 @@ cause, consult the surface that already reports it. This product declares a grea
 about itself — rehearsal limitations, receipt evidence and rejected-branch traces,
 `ContractDiagnostic` codes, the Lab's usability classifier, harness verdicts — and prose
 that re-derives any of it is both wasted and unreliable.
+
+Before committing, check whether the change alters a user-visible creator or Runtime
+flow, program phase/status, open decision, machine role, or acceptance evidence. If it
+does, update `docs/quest-mission-control.json` and regenerate the living HTML; unrelated
+commits do not require a cosmetic edit. `python tools/render_quest_mission_control.py
+--check` is part of the normal drift gate.
