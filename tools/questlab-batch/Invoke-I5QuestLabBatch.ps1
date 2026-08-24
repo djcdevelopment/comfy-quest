@@ -17,7 +17,9 @@ param(
     [ValidateSet(
         'prepare', 'run', 'reset', 'report', 'export',
         'gallery_build', 'gallery_compare', 'gallery_identify', 'gallery_evidence',
-        'gallery_clear', 'gallery_rebuild'
+        'gallery_clear', 'gallery_rebuild',
+        'blueprint_capture', 'blueprint_inspect', 'blueprint_diff', 'blueprint_check',
+        'blueprint_build', 'blueprint_count', 'blueprint_clear'
     )]
     [string]$Operation,
 
@@ -49,11 +51,36 @@ param(
     [ValidatePattern('^[A-Za-z0-9._-]+$')]
     [string]$Selector = 'all',
 
+    [ValidatePattern('^[a-z0-9_-]{1,64}$')]
+    [string]$BlueprintName,
+
+    [ValidateRange(1, 40)]
+    [double]$RadiusMetres = 20,
+
+    [ValidateSet('mine', 'lab')]
+    [string]$Selection = 'mine',
+
+    [switch]$Replace,
+
+    [ValidateSet('ground', 'sky')]
+    [string]$BuildMode = 'ground',
+
+    [ValidatePattern('^[A-Za-z0-9._-]{1,80}$')]
+    [string]$ExpectedMachine,
+
+    [ValidatePattern('^-?[0-9]{1,20}$')]
+    [string]$ExpectedWorldUid,
+
+    [ValidatePattern('^[A-Za-z0-9._-]{1,80}$')]
+    [string]$CreatorSessionId,
+
     [ValidateRange(1, 30)]
     [int]$ExpiresMinutes = 10,
 
     [ValidateRange(0, 60)]
     [int]$WaitSeconds = 45,
+
+    [string]$OmenValheimRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim',
 
     [string]$OutputDirectory,
 
@@ -68,7 +95,6 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $deployScript = Join-Path $repoRoot 'tools\i5-deploy\Deploy-ToI5.ps1'
 & (Join-Path $repoRoot 'tools\Assert-RepoIdentity.ps1') | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Repository identity check failed.' }
-$omenValheimRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim'
 $i5ValheimRoot = 'C:/Program Files (x86)/Steam/steamapps/common/Valheim'
 if (-not $OutputDirectory) {
     $OutputDirectory = Join-Path $repoRoot ("captures\questlab\{0}" -f $Lane)
@@ -85,6 +111,16 @@ $request = [ordered]@{
     operation   = $Operation
     created_utc = $now.ToString('o')
     expires_utc = $now.AddMinutes($ExpiresMinutes).ToString('o')
+}
+$identityValues = @($ExpectedMachine, $ExpectedWorldUid, $CreatorSessionId) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+if ($identityValues.Count -ne 0 -and $identityValues.Count -ne 3) {
+    throw 'ExpectedMachine, ExpectedWorldUid, and CreatorSessionId must be supplied together.'
+}
+if ($identityValues.Count -eq 3) {
+    $request.expected_machine = $ExpectedMachine
+    $request.expected_world_uid = $ExpectedWorldUid
+    $request.creator_session_id = $CreatorSessionId
 }
 $effectiveProfile = if (
     $Operation -eq 'gallery_compare' -and
@@ -113,6 +149,34 @@ switch ($Operation) {
         $request.selector = $Selector
         break
     }
+    'blueprint_capture' {
+        if (-not $BlueprintName) { throw 'blueprint_capture requires -BlueprintName.' }
+        $request.blueprint_name = $BlueprintName
+        $request.radius_metres = $RadiusMetres.ToString('0.###', [Globalization.CultureInfo]::InvariantCulture)
+        $request.selection = $Selection
+        $request.replace = [bool]$Replace
+        break
+    }
+    'blueprint_diff' {
+        if (-not $BlueprintName) { throw 'blueprint_diff requires -BlueprintName.' }
+        $request.blueprint_name = $BlueprintName
+        if ($PSBoundParameters.ContainsKey('RadiusMetres')) {
+            $request.radius_metres = $RadiusMetres.ToString('0.###', [Globalization.CultureInfo]::InvariantCulture)
+        }
+        if ($PSBoundParameters.ContainsKey('Selection')) { $request.selection = $Selection }
+        break
+    }
+    'blueprint_build' {
+        if (-not $BlueprintName) { throw 'blueprint_build requires -BlueprintName.' }
+        $request.blueprint_name = $BlueprintName
+        $request.build_mode = $BuildMode
+        break
+    }
+    { $_ -in @('blueprint_inspect', 'blueprint_check', 'blueprint_count', 'blueprint_clear') } {
+        if (-not $BlueprintName) { throw "$Operation requires -BlueprintName." }
+        $request.blueprint_name = $BlueprintName
+        break
+    }
 }
 
 $requestJson = $request | ConvertTo-Json -Depth 4
@@ -129,6 +193,14 @@ if ($DryRun) {
     Write-Host "request envelope: $localRequestReceipt"
     Write-Output $requestJson
     exit 0
+}
+
+if ($Lane -eq 'omen') {
+    $OmenValheimRoot = [IO.Path]::GetFullPath($OmenValheimRoot).TrimEnd('\', '/')
+    if ([IO.Path]::GetPathRoot($OmenValheimRoot) -eq $OmenValheimRoot -or
+        -not (Test-Path -LiteralPath $OmenValheimRoot -PathType Container)) {
+        throw "Unsafe or missing OMEN Valheim root: $OmenValheimRoot"
+    }
 }
 
 if ($Lane -eq 'i5') {
@@ -236,8 +308,25 @@ if ($waitExit -ne 0) {
 }
 
 $receipt = $receiptJson | ConvertFrom-Json
+if ($receipt.schema -ne 'comfy-questlab-batch-request-receipt/v1') {
+    throw "unexpected request receipt schema: $($receipt.schema)"
+}
 if ($receipt.request_id -ne $requestId) {
     throw "receipt id mismatch: expected $requestId, got $($receipt.request_id)"
+}
+if ($receipt.operation -ne $Operation) {
+    throw "receipt operation mismatch: expected $Operation, got $($receipt.operation)"
+}
+if ($identityValues.Count -eq 3) {
+    if ($receipt.creator_session_id -ne $CreatorSessionId) {
+        throw 'Quest Lab receipt session mismatch.'
+    }
+    if ($receipt.machine -ne $ExpectedMachine) {
+        throw 'Quest Lab receipt machine mismatch.'
+    }
+    if ($receipt.world_uid -ne $ExpectedWorldUid) {
+        throw 'Quest Lab receipt world mismatch.'
+    }
 }
 $localReceipt = Join-Path $OutputDirectory "$requestId-receipt.json"
 [System.IO.File]::WriteAllText(
@@ -356,6 +445,68 @@ if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
         (New-Object System.Text.UTF8Encoding($false)))
     Write-Host "truth evidence: $localEvidence"
     Write-Host "truth verdict: $($evidenceObject.verdict)"
+}
+
+# Build-by-example artifacts are copied only from the Lab's fixed blueprint directory.
+# A receipt cannot redirect this sender to another path, and the request itself never
+# carries a path at all.
+foreach ($artifactSpec in @(
+        @{ Field = 'artifact_path'; Suffix = 'capture.json'; JsonSchema = 'comfy-questlab-capture/v1' },
+        @{ Field = 'blueprint_path'; Suffix = 'blueprint'; JsonSchema = $null }
+    )) {
+    $artifactPathRaw = [string]$receipt.($artifactSpec.Field)
+    if ([string]::IsNullOrWhiteSpace($artifactPathRaw)) { continue }
+    $artifactPathNormalized = $artifactPathRaw.Replace('\', '/')
+    $expectedArtifactRoot = if ($Lane -eq 'i5') {
+        "$i5ValheimRoot/BepInEx/config/comfy-quest-lab/blueprints/"
+    } else {
+        ($omenValheimRoot.Replace('\', '/') + '/BepInEx/config/comfy-quest-lab/blueprints/')
+    }
+    if (-not $artifactPathNormalized.StartsWith(
+            $expectedArtifactRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "$($artifactSpec.Field) escaped the fixed blueprint directory: $artifactPathRaw"
+    }
+    $artifactLeaf = $artifactPathNormalized.Substring($expectedArtifactRoot.Length)
+    $expectedPattern = if ($artifactSpec.Suffix -eq 'capture.json') {
+        '^[a-z0-9_-]{1,64}\.capture\.json$'
+    } else {
+        '^[a-z0-9_-]{1,64}\.blueprint$'
+    }
+    if ($artifactLeaf -notmatch $expectedPattern) {
+        throw "$($artifactSpec.Field) did not name one fixed-directory artifact: $artifactPathRaw"
+    }
+    if ($Lane -eq 'i5') {
+        $escapedArtifactPath = $artifactPathRaw.Replace("'", "''")
+        $artifactReadScript = @"
+`$path = '$escapedArtifactPath'
+if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding(`$false)
+[Console]::Write([System.IO.File]::ReadAllText(`$path))
+"@
+        $artifactEncoded = [Convert]::ToBase64String(
+            [Text.Encoding]::Unicode.GetBytes($artifactReadScript))
+        $artifactLines = & ssh -o BatchMode=yes -o ConnectTimeout=8 i5 `
+            "powershell.exe -NoProfile -EncodedCommand $artifactEncoded" 2>$null
+        if ($LASTEXITCODE -ne 0) { throw "$($artifactSpec.Field) was reported but could not be read" }
+        $artifactText = @($artifactLines) -join [Environment]::NewLine
+    } else {
+        if (-not (Test-Path -LiteralPath $artifactPathRaw)) {
+            throw "$($artifactSpec.Field) was reported but could not be read"
+        }
+        $artifactText = [System.IO.File]::ReadAllText($artifactPathRaw)
+    }
+    if ($artifactSpec.JsonSchema) {
+        $artifactObject = $artifactText | ConvertFrom-Json
+        if ($artifactObject.Schema -ne $artifactSpec.JsonSchema) {
+            throw "unexpected capture artifact schema: $($artifactObject.Schema)"
+        }
+    }
+    $localArtifact = Join-Path $OutputDirectory "$requestId-$($artifactSpec.Suffix)"
+    [System.IO.File]::WriteAllText(
+        $localArtifact,
+        $artifactText + [Environment]::NewLine,
+        (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "$($artifactSpec.Field): $localArtifact"
 }
 
 $logScript = @'

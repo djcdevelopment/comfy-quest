@@ -20,7 +20,7 @@ REPO = Path(__file__).resolve().parents[1]
 SOURCE = REPO / "docs" / "quest-mission-control.json"
 OUTPUT = REPO / "docs" / "quest-mission-control.html"
 SCHEMA = "comfy-quest-mission-control/v1"
-SESSION_SCHEMA = "comfy-quest-mission-control-session/v1"
+SESSION_SCHEMA = "comfy-quest-mission-control-session/v2"
 ALLOWED_PHASE_STATES = {"complete", "active", "planned"}
 ALLOWED_QUEUE_STATES = {"ready", "human", "gated"}
 
@@ -261,10 +261,10 @@ def evidence_receipts(expectations_path: Path) -> list[dict[str, Any]]:
         first = value["imported_fork"]["first_revision_receipts"]
         completion = value["behavior"]["receipt_assertions"]
     except (KeyError, TypeError, json.JSONDecodeError) as exc:
-        raise MissionControlError("Demo World expectation contract no longer exposes the pinned proof chain") from exc
+        raise MissionControlError("Creator OS expectation contract no longer exposes the pinned proof chain") from exc
     receipts = [*first, *completion]
     if not all(isinstance(item, dict) and item.get("operation") and item.get("status") for item in receipts):
-        raise MissionControlError("Demo World proof chain contains an invalid receipt assertion")
+        raise MissionControlError("Creator OS proof chain contains an invalid receipt assertion")
     return receipts
 
 
@@ -274,11 +274,11 @@ def later_revision_expectation(expectations_path: Path) -> dict[str, Any]:
         later = value["imported_fork"]["later_same_fork_revision"]
         receipt = later["changed_content_receipt"]
     except (KeyError, TypeError, json.JSONDecodeError) as exc:
-        raise MissionControlError("Demo World contract no longer exposes later-revision rebind proof") from exc
-    if later.get("pack_and_experience_ids_are_preserved") is not True:
-        raise MissionControlError("Demo World later-revision identity preservation is no longer pinned")
+        raise MissionControlError("Creator OS contract no longer exposes replay proof") from exc
+    if later.get("capture_source_hash_is_preserved") is not True:
+        raise MissionControlError("Creator OS capture authority is no longer hash-pinned")
     if not isinstance(receipt, dict) or not receipt.get("operation") or not receipt.get("status"):
-        raise MissionControlError("Demo World later-revision rebind receipt is invalid")
+        raise MissionControlError("Creator OS replay-diff receipt is invalid")
     return later
 
 
@@ -330,7 +330,7 @@ def render(manifest: dict[str, Any]) -> str:
     phase3_steps = list_items(markdown_section(phase3_source, phase3["sequence_heading"]), ordered=True)
     phase3_verdicts = list_items(markdown_section(phase3_source, phase3["verdicts_heading"]), ordered=False)
     if len(creator_steps) != 6:
-        raise MissionControlError(f"Demo World public creator loop must remain six derived steps, found {len(creator_steps)}")
+        raise MissionControlError(f"Creator Session loop must remain six derived steps, found {len(creator_steps)}")
     if len(revision_steps) != 6:
         raise MissionControlError("Studio normal lap must remain a six-stage source sequence")
     if len(phase3_steps) != 5 or len(phase3_verdicts) != 3:
@@ -369,7 +369,7 @@ def render(manifest: dict[str, Any]) -> str:
         cold["id"],
         f'<strong>{html.escape(cold["title"])}</strong><small>{html.escape(cold["instruction"])}</small>',
         source=cold["source"],
-        source_label="Handoff evidence",
+        source_label="Operating notes",
     )
     creator_items = "".join(
         checklist_item(
@@ -383,16 +383,20 @@ def render(manifest: dict[str, Any]) -> str:
     revision_items = "".join(
         checklist_item(
             f"recovery.revision.{index}",
-            f'<strong>{html.escape(step)}</strong><small>Stage {index} of the Studio normal lap.</small>',
+            f'<strong>{html.escape(step)}</strong><small>Stage {index} of the Studio-to-Godbuild loop.</small>',
             source=revision["source"] if index == 1 else None,
             source_label="Derived sequence",
         )
         for index, step in enumerate(revision_steps, 1)
     )
     changed_receipt = later_revision["changed_content_receipt"]
-    revision_proof = (
+    legacy_revision_proof = (
         '<div class="revision-proof"><span><strong>Identity</strong> Pack and experience IDs preserved</span>'
         f'<span><strong>Changed content</strong> <code>{html.escape(changed_receipt["operation"])}</code> · {html.escape(changed_receipt["status"])}</span></div>'
+    )
+    revision_proof = (
+        '<div class="revision-proof"><span><strong>Authority</strong> Capture source hash preserved</span>'
+        f'<span><strong>Replay proof</strong> <code>{html.escape(changed_receipt["operation"])}</code> · {html.escape(changed_receipt["status"])}</span></div>'
     )
 
     proof_rows = "".join(
@@ -406,7 +410,7 @@ def render(manifest: dict[str, Any]) -> str:
     )
 
     decision_cards = "".join(
-        f'''<article class="decision-card"><span class="eyebrow">Open decision</span><h3>{html.escape(item["title"])}</h3><p>{html.escape(item["question"])}</p><small>{html.escape(item["recommendation"])}</small>{source_link(item["source"])}</article>'''
+        f'''<article class="decision-card"><span class="eyebrow">Decision in force</span><h3>{html.escape(item["title"])}</h3><p>{html.escape(item["question"])}</p><small>{html.escape(item["recommendation"])}</small>{source_link(item["source"])}</article>'''
         for item in manifest["decisions"]
     )
 
@@ -431,27 +435,27 @@ def render(manifest: dict[str, Any]) -> str:
   'use strict';
   const schema={json.dumps(SESSION_SCHEMA)};
   const pageId={json.dumps(page["id"])};
-  const storageKey=`quest-mission-control.${{pageId}}.v1`;
+  const storageKey=`quest-mission-control.${{pageId}}.v2`;
   const status=document.querySelector('#session-status');
   const checks=[...document.querySelectorAll('[data-check-id]')];
   const knownIds=new Set(checks.map(item=>item.dataset.checkId));
   const notes=document.querySelector('#session-notes');
-  const verdict=document.querySelector('#cold-verdict');
-  let state={{schema,page_id:pageId,saved_at:null,checks:{{}},notes:'',visibility_verdict:'unrecorded'}};
+  const verdict=document.querySelector('#lane-verdict');
+  let state={{schema,page_id:pageId,saved_at:null,checks:{{}},notes:'',seat_verdict:'unrecorded'}};
   let saveTimer=0;
 
   function announce(message,bad=false){{status.textContent=message;status.style.color=bad?'var(--red)':'var(--green)'}}
   function bounded(value,limit){{return typeof value==='string'?value.slice(0,limit):''}}
   function normalize(input){{
     if(!input||input.schema!==schema||input.page_id!==pageId)throw new Error('This session file belongs to another page or schema.');
-    const next={{schema,page_id:pageId,saved_at:bounded(input.saved_at,64)||null,checks:{{}},notes:bounded(input.notes,20000),visibility_verdict:['unrecorded','obvious','not-obvious','mixed'].includes(input.visibility_verdict)?input.visibility_verdict:'unrecorded'}};
+    const next={{schema,page_id:pageId,saved_at:bounded(input.saved_at,64)||null,checks:{{}},notes:bounded(input.notes,20000),seat_verdict:['unrecorded','no-relay','needed-relay','mixed'].includes(input.seat_verdict)?input.seat_verdict:'unrecorded'}};
     if(input.checks&&typeof input.checks==='object')for(const [key,value] of Object.entries(input.checks))if(knownIds.has(key)&&value===true)next.checks[key]=true;
     return next;
   }}
   function apply(){{
     checks.forEach(item=>item.checked=state.checks[item.dataset.checkId]===true);
     notes.value=state.notes;
-    verdict.value=state.visibility_verdict;
+    verdict.value=state.seat_verdict;
     updateProgress();
   }}
   function updateProgress(){{
@@ -476,7 +480,7 @@ def render(manifest: dict[str, Any]) -> str:
   }}
   checks.forEach(item=>item.addEventListener('change',()=>{{if(item.checked)state.checks[item.dataset.checkId]=true;else delete state.checks[item.dataset.checkId];updateProgress();persist()}}));
   notes.addEventListener('input',()=>{{state.notes=bounded(notes.value,20000);persist()}});
-  verdict.addEventListener('change',()=>{{state.visibility_verdict=verdict.value;persist('Verdict saved in this browser')}});
+  verdict.addEventListener('change',()=>{{state.seat_verdict=verdict.value;persist('Seat verdict saved in this browser')}});
 
   document.querySelector('#export-session').addEventListener('click',()=>{{
     state.saved_at=new Date().toISOString();
@@ -490,8 +494,8 @@ def render(manifest: dict[str, Any]) -> str:
     try{{state=normalize(JSON.parse(await file.text()));apply();persist('Session imported and saved locally')}}catch(error){{announce(error.message||'Session import failed.',true)}}
   }});
   document.querySelector('#reset-session').addEventListener('click',()=>{{
-    if(!confirm("Clear this browser's Quest Mission Control checkmarks, verdict, and notes?"))return;
-    state={{schema,page_id:pageId,saved_at:null,checks:{{}},notes:'',visibility_verdict:'unrecorded'}};try{{localStorage.removeItem(storageKey)}}catch(error){{}}apply();announce('Local session cleared');
+    if(!confirm("Clear this browser's Creator OS checkmarks, verdict, and notes?"))return;
+    state={{schema,page_id:pageId,saved_at:null,checks:{{}},notes:'',seat_verdict:'unrecorded'}};try{{localStorage.removeItem(storageKey)}}catch(error){{}}apply();announce('Local session cleared');
   }});
   document.querySelector('#focus-current').addEventListener('click',event=>{{document.body.classList.toggle('compact');event.currentTarget.textContent=document.body.classList.contains('compact')?'Show full program':'Focus current lane'}});
 
@@ -504,7 +508,7 @@ def render(manifest: dict[str, Any]) -> str:
 }})();
 '''
 
-    return f'''<!doctype html>
+    rendered = f'''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -520,13 +524,13 @@ def render(manifest: dict[str, Any]) -> str:
 <header class="masthead"><div class="shell">
   <div class="masthead-row"><div class="brand"><div class="sigil" aria-hidden="true">Q</div><div><h1>{html.escape(page["title"])}</h1><p class="subtitle">{html.escape(page["subtitle"])}</p></div></div>
   <div class="snapshot"><strong>Program reconciled through {html.escape(page["program_commit"])}</strong><small>{html.escape(page["observed_on"])} · {html.escape(page["program_commit_label"])}</small></div></div>
-  <nav class="topnav" aria-label="Mission control sections"><a href="#recovery">Resume here</a><a href="#machines">Machines</a><a href="#program">Program</a><a href="#queue">Queue</a><a href="#decisions">Decisions</a><a href="#commands">Commands</a></nav>
+  <nav class="topnav" aria-label="Mission control sections"><a href="#recovery">Creator loop</a><a href="#machines">Machines</a><a href="#program">Program</a><a href="#queue">Queue</a><a href="#decisions">Decisions</a><a href="#commands">Commands</a></nav>
 </div></header>
 <main id="main" class="shell">
   <div class="hero-grid">
     <section class="panel now" aria-labelledby="now-title"><span class="eyebrow">Now · recovery acceptance</span><h2 id="now-title">Cold-load first. Create second.</h2><p class="lede">{html.escape(manifest["recovery"]["summary"])}</p>
-      <div class="next-callout"><strong>One unanswered human judgment</strong><span>{html.escape(cold["verdict"])}</span></div>
-      <div class="progress-line"><div id="lane-progressbar" class="progress-track" role="progressbar" aria-label="Recovery lane progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="lane-progress" class="progress-fill"></div></div><span id="progress-copy" class="progress-copy">0 checked</span></div>
+      <div class="next-callout"><strong>Capacity invariant</strong><span>{html.escape(cold["verdict"])}</span></div>
+      <div class="progress-line"><div id="lane-progressbar" class="progress-track" role="progressbar" aria-label="Creator OS lane progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="lane-progress" class="progress-fill"></div></div><span id="progress-copy" class="progress-copy">0 checked</span></div>
     </section>
     <aside class="panel session-panel" aria-labelledby="session-title"><span class="eyebrow local-only">Private to this browser</span><h2 id="session-title">Session notebook</h2><p>Checkmarks, the cold-load verdict, and notes stay in localStorage. Export JSON when the observation should travel.</p><label for="session-notes" class="eyebrow">Notes</label><textarea id="session-notes" maxlength="20000" placeholder="Record exact reactions, blockers, and anything that produces ‘can’t answer why’." spellcheck="true"></textarea><div class="button-row"><button id="export-session" class="button" type="button">Export</button><button id="import-session" class="button" type="button">Import</button><button id="reset-session" class="button button-danger" type="button">Reset</button><button id="focus-current" class="button" type="button">Focus current lane</button><input id="session-file" type="file" accept="application/json,.json" hidden></div><span id="session-status" role="status" aria-live="polite"></span></aside>
   </div>
@@ -542,13 +546,13 @@ def render(manifest: dict[str, Any]) -> str:
 
   <section id="machines" class="section" aria-labelledby="machines-title"><div class="section-head"><div><span class="eyebrow">Lab topology</span><h2 id="machines-title">Machines and readiness</h2></div><p>Reported availability is separated from repository-owned role claims.</p></div><div class="machine-grid">{machine_cards}</div><article class="panel environment"><h3>Observed on {html.escape(page["observed_on"])}</h3><ul>{environment_cards}</ul></article></section>
 
-  <section id="program" class="section" aria-labelledby="program-title"><div class="section-head"><div><span class="eyebrow">Five-intent program</span><h2 id="program-title">Two complete. One at the exit. Two planned.</h2></div><p>Phase state is a cited program snapshot, not a live inference from checkboxes.</p></div><ol class="phase-list">{phases}</ol></section>
+  <section id="program" class="section" aria-labelledby="program-title"><div class="section-head"><div><span class="eyebrow">Five-intent program</span><h2 id="program-title">Creator OS active; seat verdicts batched.</h2></div><p>Phase state is a cited program snapshot, not a live inference from checkboxes.</p></div><ol class="phase-list">{phases}</ol></section>
 
-  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">After recovery</span><h2 id="queue-title">Work queue</h2></div><p>The top bar and warning expiry are build-ready. Phase 3 remains the program gate.</p></div><div class="queue-grid">{queue_cards}</div>
+  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">After implementation</span><h2 id="queue-title">Proof and scale queue</h2></div><p>One passive safe-top capture and one small Godbuild establish the remaining visual and replay evidence before content scales.</p></div><div class="queue-grid">{queue_cards}</div>
     <details class="future"><summary>Preview the derived Phase 3 exit lap</summary><div><p>{html.escape(phase3["summary"])}</p><ol class="derived-sequence">{phase3_sequence}</ol><h3>Exactly three human verdicts</h3><ul class="judgment-list">{phase3_judgments}</ul>{source_link(phase3["source"], "Derived runbook")}</div></details>
   </section>
 
-  <section id="decisions" class="section" aria-labelledby="decisions-title"><div class="section-head"><div><span class="eyebrow">Not yet decided</span><h2 id="decisions-title">Phase 4 calls</h2></div><p>The top bar itself is already authorized; these choices shape the phase around it.</p></div><div class="decision-grid">{decision_cards}</div></section>
+  <section id="decisions" class="section" aria-labelledby="decisions-title"><div class="section-head"><div><span class="eyebrow">Resolved direction</span><h2 id="decisions-title">Decisions in force</h2></div><p>These constraints keep machine work scalable and protect the only capacity that does not scale with hardware.</p></div><div class="decision-grid">{decision_cards}</div></section>
 
   <section id="commands" class="section" aria-labelledby="commands-title"><div class="section-head"><div><span class="eyebrow">Safe launch points</span><h2 id="commands-title">Commands</h2></div><p>Copy only. This page cannot arm Runtime, mutate Valheim, or execute repository tools.</p></div><div class="command-list">{command_cards}</div><p><a href="http://127.0.0.1:8085/quest-studio">Open Quest Studio on this machine</a> · <a href="../README.md">Repository README</a> · <a href="handoff-2026-08-20.md">Last handoff</a></p></section>
 
@@ -557,6 +561,44 @@ def render(manifest: dict[str, Any]) -> str:
 <footer class="footer"><div class="shell footer-row"><span>Generated from tracked status and cited repository sources · manifest {source_hash}</span><span>Local session schema: {SESSION_SCHEMA}</span></div></footer>
 <script>{js}</script>
 </body></html>'''
+    replacements = {
+        "Now · recovery acceptance": "Creator OS rebase",
+        "Now \ufffd recovery acceptance": "Creator OS rebase",
+        "Cold-load first. Create second.": "Automate the machine loop. Spend the seat on design.",
+        "Checkmarks, the cold-load verdict, and notes": "Checkmarks, the seat-capacity verdict, and notes",
+        "cold-verdict": "lane-verdict",
+        'value="obvious"': 'value="no-relay"',
+        'value="not-obvious"': 'value="needed-relay"',
+        "Yes · immediately obvious": "No manual relay needed",
+        "Yes \ufffd immediately obvious": "No manual relay needed",
+        "No · not immediately obvious": "Manual relay was needed",
+        "No \ufffd not immediately obvious": "Manual relay was needed",
+        "Mixed · explain in notes": "Mixed; explain in notes",
+        "Mixed \ufffd explain in notes": "Mixed; explain in notes",
+        "Checkpoint A · immutable world judgment": "Checkpoint A · session ownership",
+        "Checkpoint A \ufffd immutable world judgment": "Checkpoint A · session ownership",
+        "Keep the canonical build unchanged": "Own deployment, identity, and rollback",
+        "Checkpoint B · source-derived creator loop": "Checkpoint B · source-derived Creator Session",
+        "Checkpoint B \ufffd source-derived creator loop": "Checkpoint B · source-derived Creator Session",
+        "begin the imported-fork path where its source says it begins. If recovery leaves the character elsewhere, record that state; do not invent a reset or silently skip the ascent beat.": "Prepare establishes every machine, world, session, install-hash, and backup precondition used by later steps. Do not substitute a human file relay or console command.",
+        "Checkpoint C · same fork, changed content": "Checkpoint C · Studio to Godbuild",
+        "Checkpoint C \ufffd same fork, changed content": "Checkpoint C · Studio to Godbuild",
+        "Bounded suggested edit": "First real Godbuild target",
+        "Project source": "Operating source",
+        "Acceptance evidence": "Machine evidence",
+        "The product’s expected proof chain": "The Creator OS expected proof chain",
+        "The product\ufffds expected proof chain": "The Creator OS expected proof chain",
+        "These receipt assertions come directly from the checked-in Demo World contract. Run-specific identities are deliberately not pinned.": "These assertions come from the checked-in Creator OS contract. Run-specific identities and hashes are deliberately not pinned.",
+        "Use Runtime receipts and the Studio cockpit for machine facts; preserve Derek’s exact words for the human judgment.": "Use correlated receipts, installed hashes, capture authority, and MATCH for machine facts; preserve exact seat observations only for human judgment.",
+        "Use Runtime receipts and the Studio cockpit for machine facts; preserve Derek\ufffds exact words for the human judgment.": "Use correlated receipts, installed hashes, capture authority, and MATCH for machine facts; preserve exact seat observations only for human judgment.",
+        "Last handoff": "Creator OS operating notes",
+        'href="handoff-2026-08-20.md"': 'href="creator-os.md"',
+        "‘can’t answer why’": "'can't answer why'",
+        "\ufffdcan\ufffdt answer why\ufffd": "'can't answer why'",
+    }
+    for old, new in replacements.items():
+        rendered = rendered.replace(old, new)
+    return rendered.replace("\ufffd", "·")
 
 
 def main(argv: list[str] | None = None) -> int:

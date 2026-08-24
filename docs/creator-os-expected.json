@@ -1,0 +1,24 @@
+{
+  "schema": "comfy-quest-creator-os-expected/v1",
+  "imported_fork": {
+    "first_revision_receipts": [
+      { "operation": "creator_session_prepare", "status": "active" },
+      { "operation": "blueprint_capture", "status": "completed" },
+      { "operation": "blueprint_inspect", "status": "completed" },
+      { "operation": "blueprint_check", "status": "completed" }
+    ],
+    "later_same_fork_revision": {
+      "capture_source_hash_is_preserved": true,
+      "changed_content_receipt": { "operation": "blueprint_diff", "status": "completed" }
+    }
+  },
+  "behavior": {
+    "receipt_assertions": [
+      { "operation": "blueprint_build", "status": "completed" },
+      { "operation": "blueprint_diff", "status": "completed" },
+      { "operation": "runtime_arm", "status": "completed" },
+      { "operation": "gallery_identify", "status": "completed" },
+      { "operation": "runtime_disarm", "status": "completed" }
+    ]
+  }
+}

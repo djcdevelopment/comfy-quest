@@ -85,6 +85,19 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, orphan)
 
+    def test_actionable_warnings_expire_by_stable_condition_key(self) -> None:
+        engine = ENGINE.read_text(encoding="utf-8")
+        notice = (
+            ROOT / "network" / "mod" / "ComfyQuestContracts" / "CreatorLoopNotice.cs"
+        ).read_text(encoding="utf-8")
+        self.assertIn("public string Key { get; set; }", notice)
+        self.assertIn("readonly Dictionary<string, CreatorEvidenceLine> activeAlerts", engine)
+        self.assertIn("public CreatorEvidenceLine CurrentAlert()", engine)
+        self.assertIn("public void ResolveAlert(string key)", engine)
+        self.assertIn('ResolveAlert("binding_version")', engine)
+        self.assertIn('CreatorEvidenceKind.Warning, "charm_unbound"', engine)
+        self.assertIn("recentEvidence.RemoveAll(value => string.Equals(value.Key, key", engine)
+
     def test_runtime_readers_bind_the_contract_active_set_without_shadow_copies(self) -> None:
         # active-set.json has one schema owner: ComfyQuestContracts.ActiveSet. A private
         # nested copy would silently fork the schema the moment a field is added to one
@@ -117,7 +130,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertNotIn("SetOwner(", sight)
         self.assertNotIn("DestroyZDO(", sight)
 
-    def test_f9_drawer_owns_the_arcane_sight_lifecycle(self) -> None:
+    def test_f9_bar_owns_the_arcane_sight_lifecycle(self) -> None:
         plugin = PLUGIN.read_text(encoding="utf-8")
         for marker in (
             "arcaneSight=new RuntimeArcaneSight(runtimeRoot)",
@@ -131,7 +144,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, plugin)
 
-    def test_f9_drawer_surfaces_recent_runtime_evidence(self) -> None:
+    def test_f9_bar_surfaces_recent_runtime_evidence(self) -> None:
         plugin = PLUGIN.read_text(encoding="utf-8")
         for marker in (
             "DrawRecentEvidence();",
@@ -191,11 +204,14 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("authored event predicates may evaluate", readme)
         self.assertIn("without ever filtering\nwhich bindings participate", readme)
 
-    def test_a_running_deadline_is_visible_without_opening_the_creator_drawer(self) -> None:
+    def test_a_running_deadline_is_visible_without_expanding_the_creator_bar(self) -> None:
         plugin = PLUGIN.read_text(encoding="utf-8")
         engine = ENGINE.read_text(encoding="utf-8")
-        # The banner draws before the drawer's early return, so a deadline is player-visible.
-        self.assertIn("void OnGUI(){EnsureStyles();DrawDeadline();if(!drawerVisible)return;", plugin)
+        # The alert draws before the expanded-only return, and the compact bar itself never hides.
+        on_gui = plugin[plugin.index("void OnGUI() {"):plugin.index("UnityEngine.Rect CreatorBarRect()")]
+        self.assertIn("if(!HasQuestContent()) return;", on_gui)
+        self.assertLess(on_gui.index("DrawCreatorBar();"), on_gui.index("DrawAlertAnchor();"))
+        self.assertLess(on_gui.index("DrawAlertAnchor();"), on_gui.index("if(!barExpanded) return;"))
         # Urgency is a fact beside the line, never parsed back out of the rendered copy —
         # a wording change must not be able to kill the red state.
         self.assertIn("engine.DeadlineUrgent()?deadlineUrgentStyle:deadlineStyle", plugin)
@@ -230,16 +246,21 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         countdown = (
             ROOT / "network" / "mod" / "ComfyQuestContracts" / "TriggerCountdown.cs"
         ).read_text(encoding="utf-8")
-        banner = plugin[plugin.index("void DrawDeadline()"):plugin.index("void DrawStatusCard()")]
+        banner = plugin[plugin.index("void DrawAlertAnchor()"):plugin.index("void DrawStatusCard()")]
         # No fixed rect survives: the pill measures its own copy and scales with the screen.
         self.assertNotIn("64f", banner)
         self.assertIn("style.CalcSize(new UnityEngine.GUIContent(line))", banner)
         self.assertIn("UnityEngine.GUI.matrix=UnityEngine.Matrix4x4.TRS", banner)
         self.assertIn("UnityEngine.GUI.matrix=matrix;", banner)
-        self.assertIn("UnityEngine.Mathf.Clamp(deadlineAnchor.Value,.05f,.85f)", banner)
+        self.assertIn("UnityEngine.Mathf.Clamp(alertAnchorX.Value,.05f,.95f)", banner)
+        self.assertIn("UnityEngine.Mathf.Clamp(alertAnchorY.Value,.05f,.85f)", banner)
+        self.assertIn("HandleAlertDrag(rect,size,screenWidth,screenHeight)", banner)
+        self.assertIn("Config.Save();", banner)
         # The anchor is the player's, which is how this interim stays subordinate to ADR 0005
         # rather than inventing one more fixed position for the alert anchor to unwind.
-        self.assertIn('deadlineAnchor=Config.Bind("Presentation","DeadlineAnchor"', plugin)
+        self.assertIn('legacyAnchor=Config.Bind("Presentation","DeadlineAnchor"', plugin)
+        self.assertIn('alertAnchorX=Config.Bind("Presentation","AlertAnchorX"', plugin)
+        self.assertIn('alertAnchorY=Config.Bind("Presentation","AlertAnchorY"', plugin)
         # A bordered pill, nine-sliced, in the drawer's own palette.
         self.assertIn("static UnityEngine.Texture2D Framed(", plugin)
         self.assertIn("static UnityEngine.GUIStyle PillStyle(", plugin)
@@ -308,7 +329,8 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         # Discoverability: one session-scoped hint, and the drawer buttons teach their keys.
         # Button copy is sentence case per the canvas (03); ALL CAPS belongs to the dim
         # overline captions alone.
-        self.assertIn('"Comfy Quest ready. Press "+drawerHotkey.Value', plugin)
+        self.assertIn('"Comfy Quest ready. Press "+barHotkey.Value', plugin)
+        self.assertIn('Config.Bind("Runtime","CreatorBarHotkey"', plugin)
         self.assertIn('"Check for updates · "+checkHotkey.Value', plugin)
         self.assertIn('"Load validated update · "+loadHotkey.Value', plugin)
         self.assertNotIn('"CHECK FOR UPDATES', plugin)
@@ -324,6 +346,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("CharmGestureHotkey = BackQuote", cfg)
+        self.assertIn("CreatorBarHotkey = F9", cfg)
 
     def test_evidence_rows_carry_their_kind_as_a_fact_in_the_design_tokens(self) -> None:
         plugin = PLUGIN.read_text(encoding="utf-8")
@@ -345,7 +368,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
             engine,
         )
         self.assertIn('ActionLine(action, "failed: " + e.Message), CreatorEvidenceKind.Warning);', engine)
-        self.assertIn('bindings now OTHER VERSION — re-CAST or roll back",\n          CreatorEvidenceKind.Warning);', engine)
+        self.assertIn('bindings now OTHER VERSION — re-CAST or roll back",\n          CreatorEvidenceKind.Warning, "binding_version");', engine)
         self.assertIn("public IReadOnlyList<CreatorEvidenceLine> RecentEvidenceLines()", engine)
         # The drawer renders kinds; it never classifies by inspecting the text.
         self.assertIn("engine?.RecentEvidenceLines()", plugin)
@@ -420,22 +443,39 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn("QuestCardState.UpdateReady=>stateReadyStyle", plugin)
         self.assertIn('"Now playing — up to date"', notice)
 
-    def test_drawer_composition_leads_with_the_status_card_and_recedes_machinery(self) -> None:
+    def test_overhead_bar_is_persistent_and_recedes_machinery(self) -> None:
         # Session 1's verdict — "kernel UI on f9 press looks the same" — held the lap
         # open for the design canvas's composition, not just its tokens: status card
         # first, content-update ladder and creator actions next, evidence feed last,
         # with captures, arcane sight, and rollback machinery behind one disclosure.
         plugin = PLUGIN.read_text(encoding="utf-8")
-        self.assertLess(plugin.index("DrawStatusCard();"), plugin.index("DrawUpdateWorkflow();"))
-        self.assertLess(plugin.index("DrawUpdateWorkflow();"), plugin.index("DrawRecentEvidence();"))
-        self.assertIn("if(showMaintenance){DrawOutcomes();", plugin)
+        self.assertIn("RuntimeCreatorBarLayout.Place(UnityEngine.Screen.width,UnityEngine.Screen.height,barExpanded)", plugin)
+        layout = (RUNTIME / "RuntimeCreatorBarLayout.cs").read_text(encoding="utf-8")
+        self.assertIn("public const float SafeTop = 92f;", layout)
+        self.assertIn("screenHeight - height - EdgeInset", layout)
+        self.assertIn("DrawCompactDots(workflow);", plugin)
+        self.assertIn("if(barExpanded) DrawExpandedBar(workflow);", plugin)
+        expanded = plugin[plugin.index("void DrawExpandedBar"):plugin.index("void ExpandedRung")]
+        for rung in ('"LOOK"', '"VALIDATE"', '"LOAD"', '"CONFIRM"'):
+            self.assertIn(rung, expanded)
+        self.assertEqual(3, expanded.count("ExpandedRail("))
+        details = plugin[plugin.index("void DrawDetailsPopover"):plugin.index("void DrawAlertAnchor")]
+        self.assertLess(details.index("DrawStatusCard();"), details.index("DrawRecentEvidence();"))
+        self.assertIn("if(showMaintenance) {", details)
+        self.assertIn("DrawArcaneSight();", details)
+        self.assertNotIn("DrawDrawer", plugin)
+        self.assertNotIn("drawerVisible", plugin)
+        self.assertIn('query.Add("stage="+(active==null?"author":"observe"));', plugin)
+        self.assertIn('query.Add("pack_id="+Uri.EscapeDataString(active.PackId??""));', plugin)
+        self.assertIn('query.Add("version="+Uri.EscapeDataString(active.Version??""));', plugin)
+        self.assertIn('query.Add("runtime_stage="+Uri.EscapeDataString(engine?.CurrentStageId()??""));', plugin)
         # The header rail renders the hotkey as its own keycap chip beside the overline.
-        self.assertIn("drawerHotkey.Value.ToString(),chipStyle", plugin)
+        self.assertIn('(barExpanded?"MINIMIZE ":"EXPAND ")+barHotkey.Value', plugin)
         # The ladder is circles joined by rails (canvas 03), not filled bars: done fills
         # Ready green, current fills solid amber, waiting stays a hollow ring, and a rail
         # takes the color of the rung it leaves. Every new texture is released.
-        self.assertIn("void Rung(string name,bool done,bool current,string detail)", plugin)
-        self.assertIn("void Rail(bool done)", plugin)
+        self.assertIn("void ExpandedRung(string name,int index,WorkflowSnapshot workflow,string detail)", plugin)
+        self.assertIn("void ExpandedRail(int index,WorkflowSnapshot workflow)", plugin)
         for texture_name in ("rung-done", "rung-current", "rung-waiting"):
             with self.subTest(ring=texture_name):
                 self.assertIn(f'Ring("runtime-{texture_name}"', plugin)

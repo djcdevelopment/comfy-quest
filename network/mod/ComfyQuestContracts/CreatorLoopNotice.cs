@@ -16,6 +16,11 @@ public sealed class CreatorEvidenceLine {
   public CreatorEvidenceKind Kind { get; set; }
   public string Text { get; set; }
 
+  /// <summary>Stable condition identity for an actionable warning. Null means historical
+  /// evidence. A keyed warning may occupy the alert anchor and is removed when its source
+  /// reports that the condition has cleared; renderers never infer this from warning copy.</summary>
+  public string Key { get; set; }
+
   /// <summary>Local HH:mm:ss when the row was composed — the feed's time gutter from the
   /// design canvas (05). Display-only beside the text; receipts keep their own AtUtc.</summary>
   public string Stamp { get; set; }
@@ -49,7 +54,7 @@ public sealed class QuestCardStatus {
 /// creator copy inline, so every sentence is provable without the game. The Headline is
 /// creator altitude — the quest's title first, version second, and never a pack id, a
 /// content hash, an absolute path, or a snake_case diagnostic. Raw identity lives in
-/// Detail, which only the drawer's maintainer surface shows.</summary>
+/// Detail, which only the creator bar's details surface shows.</summary>
 public sealed class CreatorLoopNotice {
   public string Headline { get; set; }
   public string Detail { get; set; }
@@ -70,7 +75,7 @@ public sealed class CreatorLoopNotice {
   /// one action. A player-facing count must count the noun the player can see.</summary>
   public static CreatorLoopNotice Check(
       IReadOnlyList<PackCandidate> candidates, ActiveSet active,
-      string loadKey = "F11", string drawerKey = "F9") {
+      string loadKey = "F11", string surfaceKey = "F9") {
     candidates ??= Array.Empty<PackCandidate>();
     var valid = candidates.Where(value => value.IsValid)
         .OrderByDescending(value => SemanticVersion.Parse(value.Manifest.Version))
@@ -78,12 +83,12 @@ public sealed class CreatorLoopNotice {
         .ToArray();
     var rejected = candidates.Count - valid.Length;
     var rejectedSuffix = rejected == 0 ? ""
-        : " " + RejectedSentence(rejected, candidates.Count, drawerKey);
+        : " " + RejectedSentence(rejected, candidates.Count, surfaceKey);
     if (candidates.Count == 0)
       return new() { Headline = "No new quests in your inbox.", Idle = true };
     if (valid.Length == 0)
       return new() {
-        Headline = RejectedSentence(rejected, candidates.Count, drawerKey),
+        Headline = RejectedSentence(rejected, candidates.Count, surfaceKey),
         Detail = CheckDetail(candidates.Count, 0, null),
       };
     var latest = valid[0];
@@ -104,14 +109,14 @@ public sealed class CreatorLoopNotice {
       };
     return new() {
       Headline = quests.ToString(CultureInfo.InvariantCulture)
-          + " quests are ready. Open " + drawerKey + " to choose." + rejectedSuffix,
+          + " quests are ready. Expand " + surfaceKey + " to choose." + rejectedSuffix,
       Detail = detail,
     };
   }
 
-  public static CreatorLoopNotice CheckFailed(string error, string drawerKey = "F9") =>
+  public static CreatorLoopNotice CheckFailed(string error, string surfaceKey = "F9") =>
       new() {
-        Headline = "Couldn't read your quest inbox. Open " + drawerKey + " for the reason.",
+        Headline = "Couldn't read your quest inbox. Expand " + surfaceKey + " for the reason.",
         Detail = error,
       };
 
@@ -139,16 +144,16 @@ public sealed class CreatorLoopNotice {
         Idle = true,
       };
 
-  public static CreatorLoopNotice LoadFailed(string error, string drawerKey = "F9") =>
+  public static CreatorLoopNotice LoadFailed(string error, string surfaceKey = "F9") =>
       new() {
-        Headline = "That quest couldn't be loaded. Open " + drawerKey + " for the reason.",
+        Headline = "That quest couldn't be loaded. Expand " + surfaceKey + " for the reason.",
         Detail = error,
       };
 
   /// <summary>The authored title of whatever is actually running: the title of the candidate
   /// whose content hash matches the active set. Null when the running revision's pack is no
   /// longer inspectable — there is honestly no title then, and surfaces fall back to pack id.
-  /// One shared fact so the drawer and Studio can never disagree about the quest's name.</summary>
+  /// One shared fact so the creator bar and Studio can never disagree about the quest's name.</summary>
   public static string ActiveTitle(IReadOnlyList<PackCandidate> candidates, ActiveSet active) {
     if (active == null || string.IsNullOrWhiteSpace(active.ContentHash)) return null;
     var match = candidates?.FirstOrDefault(value =>
@@ -215,13 +220,13 @@ public sealed class CreatorLoopNotice {
       candidate?.Titles?.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
       ?? candidate?.Manifest?.PackId ?? "This quest";
 
-  static string RejectedSentence(int rejected, int total, string drawerKey) =>
+  static string RejectedSentence(int rejected, int total, string surfaceKey) =>
       (rejected == total
           ? total == 1 ? "That quest can't be loaded."
               : total.ToString(CultureInfo.InvariantCulture) + " quests can't be loaded."
           : rejected.ToString(CultureInfo.InvariantCulture) + " of "
               + total.ToString(CultureInfo.InvariantCulture) + " quests can't be loaded.")
-      + " Open " + drawerKey + " for the reason.";
+      + " Expand " + surfaceKey + " for the reason.";
 
   static string OrphanSentence(int orphanedCharms) =>
       orphanedCharms <= 0 ? ""

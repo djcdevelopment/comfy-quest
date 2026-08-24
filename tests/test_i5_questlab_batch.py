@@ -6,6 +6,8 @@ import json
 import re
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -27,6 +29,13 @@ EXPECTED_OPERATIONS = {
     "gallery_evidence",
     "gallery_clear",
     "gallery_rebuild",
+    "blueprint_capture",
+    "blueprint_inspect",
+    "blueprint_diff",
+    "blueprint_check",
+    "blueprint_build",
+    "blueprint_count",
+    "blueprint_clear",
 }
 
 
@@ -218,6 +227,155 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
 
         self.assertIn("comfy-questlab-gallery-truth/v1", self.source)
         self.assertIn("receipts/truth/", self.source)
+
+    def test_blueprint_capture_envelope_is_bounded_and_identity_pinned(self) -> None:
+        with tempfile.TemporaryDirectory() as output_directory:
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(SCRIPT),
+                    "blueprint_capture",
+                    "-BlueprintName",
+                    "human-hall",
+                    "-RadiusMetres",
+                    "24",
+                    "-Selection",
+                    "mine",
+                    "-ExpectedMachine",
+                    "OMEN",
+                    "-ExpectedWorldUid",
+                    "-7600395338659582326",
+                    "-CreatorSessionId",
+                    "creator-20260824-abcd1234",
+                    "-OutputDirectory",
+                    output_directory,
+                    "-DryRun",
+                    "-Lane",
+                    "omen",
+                ],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            envelope = json.loads(
+                next(Path(output_directory).glob("*-request.json")).read_text()
+            )
+            self.assertEqual(envelope["operation"], "blueprint_capture")
+            self.assertEqual(envelope["blueprint_name"], "human-hall")
+            self.assertEqual(envelope["radius_metres"], "24")
+            self.assertEqual(envelope["selection"], "mine")
+            self.assertEqual(envelope["expected_machine"], "OMEN")
+            self.assertEqual(envelope["expected_world_uid"], "-7600395338659582326")
+            self.assertEqual(
+                envelope["creator_session_id"], "creator-20260824-abcd1234"
+            )
+            for forbidden in ("path", "prefab", "command", "key"):
+                self.assertNotIn(forbidden, envelope)
+
+        self.assertIn("comfy-quest-lab/blueprints/", self.source)
+        self.assertIn("artifact_path", self.source)
+        self.assertIn("[string]$OmenValheimRoot", self.source)
+
+    def test_local_sender_round_trip_validates_correlated_identity_receipt(self) -> None:
+        def run_case(receipt_machine: str) -> subprocess.CompletedProcess[str]:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "Valheim"
+                request_path = (
+                    root
+                    / "BepInEx"
+                    / "config"
+                    / "comfy-quest-lab"
+                    / "requests"
+                    / "questlab-batch-request.json"
+                )
+                receipt_root = (
+                    root
+                    / "BepInEx"
+                    / "config"
+                    / "comfy-quest-lab"
+                    / "receipts"
+                    / "requests"
+                )
+                root.mkdir(parents=True)
+                output = Path(temporary) / "evidence"
+                consumer_error: list[BaseException] = []
+
+                def consume() -> None:
+                    try:
+                        deadline = time.monotonic() + 8
+                        while not request_path.exists() and time.monotonic() < deadline:
+                            time.sleep(0.02)
+                        request = json.loads(request_path.read_text(encoding="utf-8"))
+                        receipt_root.mkdir(parents=True)
+                        receipt = {
+                            "schema": "comfy-questlab-batch-request-receipt/v1",
+                            "request_id": request["request_id"],
+                            "operation": request["operation"],
+                            "state": "completed",
+                            "machine": receipt_machine,
+                            "creator_session_id": request["creator_session_id"],
+                            "world_uid": request["expected_world_uid"],
+                            "detail": "fixture identify completed",
+                            "evidence_path": "",
+                            "artifact_path": "",
+                            "blueprint_path": "",
+                            "suite_receipt_path": "",
+                        }
+                        (receipt_root / f"{request['request_id']}.json").write_text(
+                            json.dumps(receipt), encoding="utf-8"
+                        )
+                    except BaseException as error:  # surfaced on the test thread below
+                        consumer_error.append(error)
+
+                thread = threading.Thread(target=consume)
+                thread.start()
+                result = subprocess.run(
+                    [
+                        "powershell.exe",
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(SCRIPT),
+                        "gallery_identify",
+                        "-Lane",
+                        "omen",
+                        "-OmenValheimRoot",
+                        str(root),
+                        "-ExpectedMachine",
+                        "OMEN",
+                        "-ExpectedWorldUid",
+                        "-7600395338659582326",
+                        "-CreatorSessionId",
+                        "creator-sender-roundtrip",
+                        "-OutputDirectory",
+                        str(output),
+                        "-WaitSeconds",
+                        "10",
+                    ],
+                    cwd=REPO,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                thread.join(timeout=10)
+                if consumer_error:
+                    raise consumer_error[0]
+                return result
+
+        accepted = run_case("OMEN")
+        self.assertEqual(0, accepted.returncode, accepted.stdout + accepted.stderr)
+        self.assertIn("request state: completed", accepted.stdout)
+
+        rejected = run_case("WRONG-MACHINE")
+        self.assertNotEqual(0, rejected.returncode)
+        self.assertIn("Quest Lab receipt machine mismatch", rejected.stdout + rejected.stderr)
 
     def test_no_generic_execution_or_keystroke_primitive_exists(self) -> None:
         for forbidden in (

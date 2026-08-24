@@ -21,6 +21,7 @@ public sealed class LabBatchController {
   const int MaxRequestBytes = 4096;
 
   readonly LabGalleryBuilder _gallery;
+  readonly LabBlueprintBuilder _blueprints;
   readonly LabHistoryScenarioRunner _history;
   LabBatchSession _session;
   bool _preparing;
@@ -32,8 +33,9 @@ public sealed class LabBatchController {
   float _nextRequestPoll;
   int _runSequence;
 
-  public LabBatchController(LabGalleryBuilder gallery) {
+  public LabBatchController(LabGalleryBuilder gallery, LabBlueprintBuilder blueprints = null) {
     _gallery = gallery ?? throw new ArgumentNullException(nameof(gallery));
+    _blueprints = blueprints;
     _history = new LabHistoryScenarioRunner();
   }
 
@@ -495,6 +497,15 @@ public sealed class LabBatchController {
 
   void Dispatch(MonoBehaviour host, LabBatchRequest request) {
     string operation = request.operation.ToLowerInvariant();
+    string identityError = CreatorIdentityError(request);
+    if (identityError != null) {
+      WriteRequestReceipt(request, "rejected", identityError);
+      return;
+    }
+    if (operation.StartsWith("blueprint_", StringComparison.Ordinal)) {
+      DispatchBlueprint(host, request, operation);
+      return;
+    }
     if (operation == "prepare") {
       if (_preparing || _gallery.IsRunning) {
         WriteRequestReceipt(request, "rejected", "gallery_or_prepare_busy");
@@ -596,6 +607,98 @@ public sealed class LabBatchController {
     }
   }
 
+  void DispatchBlueprint(MonoBehaviour host, LabBatchRequest request, string operation) {
+    if (_blueprints == null) {
+      WriteRequestReceipt(request, "rejected", "blueprint_surface_unavailable");
+      return;
+    }
+    if (_gallery.IsRunning || _preparing || _blueprints.IsRunning) {
+      WriteRequestReceipt(request, "rejected", "world_mutation_busy");
+      return;
+    }
+    string capturePath = LabBlueprintBuilder.CaptureArtifactPath(request.blueprint_name);
+    string blueprintPath = LabBlueprintBuilder.BlueprintArtifactPath(request.blueprint_name);
+    if (operation == "blueprint_capture") {
+      string detail = _blueprints.Capture(
+          request.blueprint_name, request.radius_metres, request.selection, request.replace);
+      bool captured = File.Exists(capturePath) && File.Exists(blueprintPath)
+          && detail.StartsWith("captured ", StringComparison.Ordinal);
+      WriteRequestReceipt(request, captured ? "completed" : "failed", detail,
+          artifactPath: captured ? capturePath : null,
+          blueprintPath: captured ? blueprintPath : null);
+      return;
+    }
+    if (operation == "blueprint_inspect") {
+      string detail = _blueprints.Inspect(request.blueprint_name);
+      WriteRequestReceipt(request,
+          detail.StartsWith("capture ", StringComparison.Ordinal) ? "completed" : "failed",
+          detail, artifactPath: File.Exists(capturePath) ? capturePath : null,
+          blueprintPath: File.Exists(blueprintPath) ? blueprintPath : null);
+      return;
+    }
+    if (operation == "blueprint_diff") {
+      string detail = _blueprints.Diff(
+          request.blueprint_name, request.radius_metres, request.selection);
+      WriteRequestReceipt(request,
+          detail.StartsWith("capture diff ", StringComparison.Ordinal) ? "completed" : "failed",
+          detail, artifactPath: File.Exists(capturePath) ? capturePath : null);
+      return;
+    }
+    if (operation == "blueprint_check") {
+      string detail = _blueprints.Check(request.blueprint_name);
+      WriteRequestReceipt(request,
+          detail.StartsWith("blueprint check ", StringComparison.Ordinal)
+              ? "completed" : "failed",
+          detail, artifactPath: File.Exists(capturePath) ? capturePath : null,
+          blueprintPath: File.Exists(blueprintPath) ? blueprintPath : null);
+      return;
+    }
+    if (operation == "blueprint_count") {
+      WriteRequestReceipt(request, "completed", _blueprints.Count(request.blueprint_name));
+      return;
+    }
+    if (operation == "blueprint_clear") {
+      string detail = _blueprints.Clear(request.blueprint_name);
+      WriteRequestReceipt(request,
+          _blueprints.StandingPieceCount(request.blueprint_name) == 0 ? "completed" : "failed",
+          detail);
+      return;
+    }
+    if (operation == "blueprint_build") {
+      string check = _blueprints.Check(request.blueprint_name);
+      if (!check.Contains("Ready. questlab_blueprint build ")) {
+        WriteRequestReceipt(request, "rejected", check,
+            artifactPath: File.Exists(capturePath) ? capturePath : null,
+            blueprintPath: File.Exists(blueprintPath) ? blueprintPath : null);
+        return;
+      }
+      int before = _blueprints.StandingPieceCount(request.blueprint_name);
+      host.StartCoroutine(RequestRoutine(
+          request,
+          _blueprints.Build(host, request.blueprint_name,
+              string.Equals(request.build_mode, "sky", StringComparison.Ordinal)),
+          () => _blueprints.Count(request.blueprint_name),
+          () => _blueprints.StandingPieceCount(request.blueprint_name) > before));
+      return;
+    }
+    WriteRequestReceipt(request, "rejected", "operation_not_allowlisted");
+  }
+
+  static string CreatorIdentityError(LabBatchRequest request) {
+    if (string.IsNullOrWhiteSpace(request.creator_session_id)) return null;
+    if (!string.Equals(request.expected_machine, Environment.MachineName,
+        StringComparison.OrdinalIgnoreCase)) return "creator_machine_mismatch";
+    if (ZNet.instance == null || Player.m_localPlayer == null) return "creator_world_not_loaded";
+    string actual;
+    try {
+      actual = ZNet.instance.GetWorldUID().ToString(CultureInfo.InvariantCulture);
+    } catch {
+      return "creator_world_unreadable";
+    }
+    return string.Equals(actual, request.expected_world_uid, StringComparison.Ordinal)
+        ? null : "creator_world_mismatch";
+  }
+
   IEnumerator RequestRoutine(
       LabBatchRequest request,
       IEnumerator work,
@@ -675,10 +778,36 @@ public sealed class LabBatchController {
   }
 
   static bool ValidRequestArguments(LabBatchRequest request, out string error) {
+    if (!LabBatchRequestPolicy.ValidateCreatorIdentity(
+            request.expected_machine, request.expected_world_uid,
+            request.creator_session_id, out error)) {
+      return false;
+    }
     if (string.Equals(request.operation, "history_step", StringComparison.OrdinalIgnoreCase)) {
       return LabBatchRequestPolicy.ValidateHistory(request.corpus, request.step,
           request.expected_previous_step, request.suite, request.profile,
           request.compare_profile, request.selector, out error);
+    }
+    if ((request.operation ?? string.Empty).StartsWith(
+            "blueprint_", StringComparison.OrdinalIgnoreCase)) {
+      if (!string.IsNullOrWhiteSpace(request.suite)
+          || !string.IsNullOrWhiteSpace(request.profile)
+          || !string.IsNullOrWhiteSpace(request.compare_profile)
+          || !string.IsNullOrWhiteSpace(request.selector)) {
+        error = "request_argument_not_allowed";
+        return false;
+      }
+      return LabBatchRequestPolicy.ValidateBlueprint(
+          request.operation, request.blueprint_name, request.radius_metres,
+          request.selection, request.replace, request.build_mode, out error);
+    }
+    if (!string.IsNullOrWhiteSpace(request.blueprint_name)
+        || !string.IsNullOrWhiteSpace(request.radius_metres)
+        || !string.IsNullOrWhiteSpace(request.selection)
+        || request.replace
+        || !string.IsNullOrWhiteSpace(request.build_mode)) {
+      error = "request_argument_not_allowed";
+      return false;
     }
     return LabBatchRequestPolicy.Validate(
         request.operation,
@@ -710,7 +839,8 @@ public sealed class LabBatchController {
   }
 
   void WriteRequestReceipt(
-      LabBatchRequest request, string state, string detail, string evidencePath = null) {
+      LabBatchRequest request, string state, string detail, string evidencePath = null,
+      string artifactPath = null, string blueprintPath = null) {
     try {
       Directory.CreateDirectory(RequestReceiptsDir);
       string path = Path.Combine(RequestReceiptsDir, request.request_id + ".json");
@@ -723,10 +853,17 @@ public sealed class LabBatchController {
       sb.AppendLine("  \"machine\": \"" + LabBatchContract.Json(Environment.MachineName) + "\",");
       sb.AppendLine("  \"plugin_version\": \"" + ComfyQuestLab.PluginVersion + "\",");
       sb.AppendLine("  \"release_id\": \"" + ComfyQuestLab.ReleaseId + "\",");
+      sb.AppendLine("  \"creator_session_id\": \""
+          + LabBatchContract.Json(request.creator_session_id ?? string.Empty) + "\",");
+      sb.AppendLine("  \"world_uid\": \"" + LabBatchContract.Json(CurrentWorldUid()) + "\",");
       sb.AppendLine("  \"completed_utc\": \"" + NowUtc() + "\",");
       sb.AppendLine("  \"detail\": \"" + LabBatchContract.Json(detail) + "\",");
       sb.AppendLine("  \"evidence_path\": \""
           + LabBatchContract.Json(evidencePath ?? string.Empty) + "\",");
+      sb.AppendLine("  \"artifact_path\": \""
+          + LabBatchContract.Json(artifactPath ?? string.Empty) + "\",");
+      sb.AppendLine("  \"blueprint_path\": \""
+          + LabBatchContract.Json(blueprintPath ?? string.Empty) + "\",");
       string suiteReceiptPath = RequestExposesSuiteReceipt(request.operation)
           ? _lastExportPath
           : string.Empty;
@@ -745,6 +882,15 @@ public sealed class LabBatchController {
     return operation == "run" || operation == "report" || operation == "export"
         || operation == "reset";
   }
+
+  static string CurrentWorldUid() {
+    try {
+      return ZNet.instance == null ? string.Empty
+          : ZNet.instance.GetWorldUID().ToString(CultureInfo.InvariantCulture);
+    } catch {
+      return string.Empty;
+    }
+  }
 }
 
 [Serializable]
@@ -756,6 +902,14 @@ public sealed class LabBatchRequest {
   public string profile;
   public string compare_profile;
   public string selector;
+  public string blueprint_name;
+  public string radius_metres;
+  public string selection;
+  public bool replace;
+  public string build_mode;
+  public string expected_machine;
+  public string expected_world_uid;
+  public string creator_session_id;
   public string created_utc;
   public string expires_utc;
   public string corpus;

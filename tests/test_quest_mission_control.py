@@ -77,7 +77,8 @@ class QuestMissionControlTests(unittest.TestCase):
     def test_generated_page_is_current(self):
         self.assertEqual(self.rendered, self.committed)
         self.assertIn('meta name="quest-mission-control-schema"', self.committed)
-        self.assertIn("Program reconciled through f79a13e", self.committed)
+        self.assertIn("Program reconciled through c7ee57a", self.committed)
+        self.assertIn("Automate the machine loop. Spend the seat on design.", self.committed)
 
     def test_manifest_rejects_duplicate_ids_and_stale_source_pins(self):
         duplicate = copy.deepcopy(self.manifest)
@@ -97,13 +98,14 @@ class QuestMissionControlTests(unittest.TestCase):
             ordered=True,
         )
         self.assertEqual(6, len(creator_steps))
-        self.assertTrue(creator_steps[0].startswith("Open Quest Studio"))
-        self.assertIn("press backtick once to CHECK, then again to CAST", creator_steps[4])
+        self.assertTrue(creator_steps[0].startswith("With Valheim closed"))
+        self.assertIn("one bounded operation", creator_steps[3])
+        self.assertIn("fails unless the receipt says `MATCH`", creator_steps[5])
 
         revision = self.manifest["recovery"]["revision_flow"]
         revision_steps = revision["source_sequence"].split(" -> ")
         self.assertEqual(
-            ["Author", "Rehearse", "arm once in F9", "Play this revision", "play", "inspect proof"],
+            ["Author", "Rehearse", "Play", "Observe", "Capture Godbuild", "Replay elsewhere"],
             revision_steps,
         )
         self.assertIn("recovery.revision.6", self.committed)
@@ -124,17 +126,20 @@ class QuestMissionControlTests(unittest.TestCase):
         self.assertIn("press <code>`</code> once", self.committed)
         self.assertIn("Press <code>`</code> once more", self.committed)
 
-    def test_expected_receipts_come_from_demo_world_contract(self):
+    def test_expected_receipts_come_from_creator_os_contract(self):
         path = self.renderer.source_path(self.manifest["recovery"]["expectations"])
         receipts = self.renderer.evidence_receipts(path)
         operations = [(item["operation"], item["status"]) for item in receipts]
-        self.assertEqual(("dev_transfer", "accepted"), operations[0])
-        self.assertIn(("bind", "inscribed"), operations)
-        self.assertIn(("transition", "complete"), operations)
+        self.assertEqual(("creator_session_prepare", "active"), operations[0])
+        self.assertIn(("blueprint_capture", "completed"), operations)
+        self.assertIn(("blueprint_diff", "completed"), operations)
+        self.assertIn(("runtime_arm", "completed"), operations)
+        self.assertIn(("gallery_identify", "completed"), operations)
+        self.assertIn(("runtime_disarm", "completed"), operations)
         later = self.renderer.later_revision_expectation(path)
-        self.assertTrue(later["pack_and_experience_ids_are_preserved"])
+        self.assertTrue(later["capture_source_hash_is_preserved"])
         self.assertEqual(
-            {"operation": "dev_rebind", "status": "rebound"}, later["changed_content_receipt"]
+            {"operation": "blueprint_diff", "status": "completed"}, later["changed_content_receipt"]
         )
 
     def test_page_is_standalone_and_accessible_by_structure(self):
@@ -162,7 +167,7 @@ class QuestMissionControlTests(unittest.TestCase):
 
     def test_session_state_is_bounded_local_and_exportable(self):
         for expected in (
-            "comfy-quest-mission-control-session/v1",
+            "comfy-quest-mission-control-session/v2",
             "localStorage.setItem",
             "localStorage.getItem",
             "file.size>262144",
@@ -170,7 +175,9 @@ class QuestMissionControlTests(unittest.TestCase):
             "Session JSON exported",
             "Session imported and saved locally",
             "Local session cleared",
-            'confirm("Clear this browser\'s Quest Mission Control',
+            'confirm("Clear this browser\'s Creator OS',
+            "seat_verdict",
+            'id="lane-verdict"',
         ):
             self.assertIn(expected, self.committed)
         for forbidden in ("fetch(", "XMLHttpRequest", "WebSocket", "sendBeacon"):

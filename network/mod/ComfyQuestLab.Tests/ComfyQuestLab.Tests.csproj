@@ -56,6 +56,8 @@
     <Compile Include="..\ComfyQuestLab\Core\LabEvents.cs" Link="LabEvents.cs" />
     <Compile Include="..\ComfyQuestLab\Core\LabEventArchive.cs" Link="LabEventArchive.cs" />
     <Compile Include="..\ComfyQuestLab\Core\LabGalleryPlan.g.cs" Link="LabGalleryPlan.g.cs" />
+    <Compile Include="..\ComfyQuestRuntime\RuntimeCreatorRequestController.cs" Link="RuntimeCreatorRequestController.cs" />
+    <Compile Include="..\ComfyQuestRuntime\RuntimeCreatorBarLayout.cs" Link="RuntimeCreatorBarLayout.cs" />
   </ItemGroup>
 
 </Project>

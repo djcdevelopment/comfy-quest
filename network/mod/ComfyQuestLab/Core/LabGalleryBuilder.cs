@@ -197,7 +197,7 @@ public sealed class LabGalleryBuilder {
         + (profile.PruneNaturalTrees ? "recoverable tree pruning; " : string.Empty)
         + profile.RuneNameHeaders.ToString(CultureInfo.InvariantCulture)
         + " horizontal rune headers ("
-        + profile.RuneNameSigns.ToString(CultureInfo.InvariantCulture) + " letter signs, "
+        + profile.RuneNameSigns.ToString(CultureInfo.InvariantCulture) + " word signs, "
         + profile.RuneNameLights.ToString(CultureInfo.InvariantCulture) + " lights).");
     sb.Append(missing.Count == 0
         ? "Ready. questlab_gallery build " + profile.Id

@@ -69,6 +69,19 @@ public sealed class LabBlueprintBuilder {
     return Path.Combine(BlueprintsDir, canonicalName + CaptureSuffix);
   }
 
+  /// <summary>Fixed-directory artifact locations exposed to the bounded request receipt.
+  /// The caller supplies only a canonical artifact name; no request may supply a path.</summary>
+  public static string BlueprintArtifactPath(string name) {
+    string canonical = LabCaptureContract.CanonicalName(name);
+    return canonical.Length == 0 ? string.Empty
+        : Path.Combine(BlueprintsDir, canonical + ".blueprint");
+  }
+
+  public static string CaptureArtifactPath(string name) {
+    string canonical = LabCaptureContract.CanonicalName(name);
+    return canonical.Length == 0 ? string.Empty : CapturePath(canonical);
+  }
+
   // ---- list ------------------------------------------------------------------------
 
   public string List() {
@@ -616,6 +629,24 @@ public sealed class LabBlueprintBuilder {
     }
     sb.Append("Loaded zones only — stand near the build for a true count.");
     return sb.ToString().TrimEnd();
+  }
+
+  /// <summary>Machine predicate for bounded build/clear receipts. Loaded zones only,
+  /// matching Count and Clear; the Creator Session keeps the player at the marked site.</summary>
+  public int StandingPieceCount(string name) {
+    if (ZDOMan.instance == null) return 0;
+    string wanted = LabCaptureContract.CanonicalName(name);
+    if (wanted.Length == 0) return 0;
+    int count = 0;
+    try {
+      foreach (ZDO zdo in _objectsByIdRef(ZDOMan.instance).Values) {
+        if (string.Equals(LabMarks.BlueprintName(zdo), wanted,
+            StringComparison.OrdinalIgnoreCase)) count++;
+      }
+    } catch {
+      return 0;
+    }
+    return count;
   }
 
   // ---- clear -----------------------------------------------------------------------

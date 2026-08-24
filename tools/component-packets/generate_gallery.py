@@ -233,9 +233,13 @@ def sign_text(category: str, note: str) -> str:
     )
 
 
-def rune_letter_text(category: str, letter: str) -> str:
+def rune_name_text(category: str) -> str:
     heading = hex_of(SCHOOL_COLOURS[category])
-    return f"<size=44><b><color={heading}>{letter}</color></b></size>"
+    # One complete school name on the smallest durable vanilla backing. The former
+    # one-sign-per-letter treatment turned a wayfinding label into a monumental word
+    # that competed with the rune behind it. Size 14 keeps the longest name on one
+    # ordinary sign without relying on transform scaling, which does not persist.
+    return f"<size=14><b><color={heading}>{category.upper()}</color></b></size>"
 
 
 def monument_beams(segments, angle_deg: float, spec: dict):
@@ -286,6 +290,9 @@ def build_monuments(spec: dict, segments: dict):
         station_text = ""
         station_light = ""
         if spec.get("compact_course") and category == "Social":
+            # The tutorial sign already faced the arriving player at yaw 180. The first
+            # canonical cold load showed that its separate support post hung from the
+            # wrong side; rotate only that post below and preserve this sign yaw.
             station_x, station_z, station_yaw = 3.5, 6.0, 180.0
             station_y = 1.7
             station_text = (
@@ -630,37 +637,27 @@ def rune_name_signs(spec: dict, monuments: list[dict]):
         return []
     signs = []
     inner_end = spec["ring_radius"] - spec["pad_depth"] / 2.0
-    # Derek's r10 pass liked the one-letter horizontal treatment but showed it floating
-    # above the far rune like a distant sky label. Stage the word as an entrance banner:
-    # just past the hub into the spoke throat, and 0.75 m above the wall courses.
+    # Stage one small, solid-backed word sign as an overhead lane marker, just past the
+    # hub into the spoke throat and 0.75 m above the wall courses. The sign faces the
+    # approaching player across the lane, like the minimal plaque on a future gantry.
     along = spec["plaza_radius"] + (inner_end - spec["plaza_radius"]) * 0.55
     y = spec["wall_courses"] * 2.0 + 0.75
     for monument in monuments:
         angle = math.radians(monument["angle"])
         sx, sz = math.sin(angle), math.cos(angle)
-        px, pz = math.cos(angle), -math.sin(angle)
-        name = monument["category"].upper()
-        # A vanilla sign is only one metre wide. Putting the whole school name on it
-        # makes Valheim wrap one character per line at this display size, which the r5
-        # live screenshot caught immediately. One letter per sign produces a durable,
-        # genuinely horizontal word without relying on unsaved transform scaling.
-        spacing = min(1.3, (spec["rune_width"] - 1.0) / max(1, len(name) - 1))
-        lit_index = len(name) // 2
-        for index, letter in enumerate(name):
-            offset = (index - (len(name) - 1) / 2.0) * spacing
-            signs.append(
-                fixture(
-                    COMMON_PALETTE["sign"],
-                    sx * along + px * offset,
-                    y,
-                    sz * along + pz * offset,
-                    monument["angle"] + 180.0,
-                    orient="rune-name-lit" if index == lit_index else "rune-name",
-                    text=rune_letter_text(monument["category"], letter),
-                    light_school=monument["category"].lower() if index == lit_index else "",
-                    text_glow_school=monument["category"].lower(),
-                )
+        signs.append(
+            fixture(
+                COMMON_PALETTE["sign"],
+                sx * along,
+                y,
+                sz * along,
+                monument["angle"] + 180.0,
+                orient="rune-name-lit",
+                text=rune_name_text(monument["category"]),
+                light_school=monument["category"].lower(),
+                text_glow_school=monument["category"].lower(),
             )
+        )
     return signs
 
 
@@ -709,7 +706,7 @@ def build_profile(spec: dict, segments: dict):
                     3.5,
                     0.0,
                     6.0,
-                    0.0,
+                    180.0,
                     orient="sign-post",
                     text="",
                 ),
@@ -882,7 +879,7 @@ def validate_profiles(profiles: list[dict], dump_path: Path) -> int:
             if attached != {"CookedMeat", "QueensJam", "Bread"}:
                 raise SystemExit("selected gallery welcome table is missing mounted food")
         expected_headers = 0 if profile["id"] == "classic" else len(ORDER)
-        expected_signs = 0 if profile["id"] == "classic" else sum(map(len, ORDER))
+        expected_signs = 0 if profile["id"] == "classic" else len(ORDER)
         if profile["counts"]["runeNameHeaders"] != expected_headers:
             raise SystemExit(
                 f"profile {profile['id']} has {profile['counts']['runeNameHeaders']} "
@@ -930,7 +927,7 @@ def render_csharp(profiles: list[dict]) -> str:
         "",
         "/// <summary>Gallery v2 profiles, relative to a player-selected world origin.</summary>",
         "public static class LabGalleryPlan {",
-        "  public const int PlanVersion = 10;",
+        "  public const int PlanVersion = 12;",
         f"  public const string DefaultProfileId = {cs(DEFAULT_PROFILE)};",
         "",
         "  public struct Beam { public float X, Y, Z, Dx, Dy, Dz; }",

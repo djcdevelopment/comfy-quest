@@ -21,7 +21,7 @@ checkout.
 - Split-proof release runbook: docs/runbooks/QUEST-RELEASE.md
 - OMEN Studio-to-Runtime acceptance: docs/runbooks/I2-QUESTPACK-OMEN.md
 - Demo World minimal tutorial: examples/demo-world/first-portal
-- Living program and seat mission control: docs/quest-mission-control.html
+- Living Creator OS and seat mission control: docs/quest-mission-control.html
 - R&D opportunity matrix: docs/quest-rd-opportunity-matrix.md
 - Repository boundary: BOUNDARY.md
 - Extraction record: PROVENANCE.md
@@ -32,19 +32,29 @@ The mod build requires the licensed Valheim/BepInEx assemblies from a local game
 installation. Do not set ComfyCopyToPlugins during verification.
 
     dotnet build network/mod/ComfyQuestLab/ComfyQuestLab.csproj -c Release
+    dotnet build network/mod/ComfyQuestRuntime/ComfyQuestRuntime.csproj -c Release
     dotnet test network/mod/ComfyQuestLab.Tests/ComfyQuestLab.Tests.csproj -c Release
     python -m unittest discover -s tests
+    python tools/component-packets/generate_gallery.py --check
     python tools/component-packets/render_quest_lab.py --check
+    python tools/component-packets/generate_seam_catalog.py --check
+    python tools/component-packets/check_lab_patches.py
     python tools/quest-studio/build_demo_world_first_portal.py --check
     python tools/render_quest_mission_control.py --check
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools/Assert-RepoIdentity.ps1
+    python tools/assert_no_reach_in.py
+    python tools/assert_no_reach_in.py --self-test
+    gitleaks git --no-banner --redact --log-opts='--all' .
     $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.6.0-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
-    $env:NUGET_PACKAGES = Join-Path $env:TEMP ("comfy-quest-verify-" + $contractsHash)
+    $sdkVersion = (dotnet --version)
+    $env:NUGET_PACKAGES = Join-Path $env:TEMP ("comfy-quest-verify-" + $contractsHash + "-" + $sdkVersion)
     dotnet build src/Quest.Studio/Quest.Studio.csproj -c Release
     dotnet test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release
 
 The interim Contracts package keeps a fixed local version while its bytes evolve.
-The package-hash-keyed cache above prevents NuGet from silently compiling Studio
-against older bytes from another `0.6.0-local` run.
+The package-and-SDK-keyed cache above prevents NuGet from silently compiling Studio
+against older bytes from another `0.6.0-local` run. Studio targets .NET 9 and therefore
+requires a .NET 9 SDK even when the licensed plugins are built with .NET 8.
 
 Run the sovereign, loopback-only Studio on its own port (the retired Baseline
 Workbench may still occupy 8080):
@@ -52,7 +62,7 @@ Workbench may still occupy 8080):
     tools/quest-studio/Start-QuestStudio.ps1
 
 Then open `http://127.0.0.1:8085/quest-studio`. Studio guides creators through
-**Author -> Rehearse -> Publish & Play** without locking the stages. Authoring defaults
+**Author -> Rehearse -> Play -> Observe** without locking the stages. Authoring defaults
 to an ordered list of low-friction quest beats: say, shout, drop, pick up, equip,
 consume, regain health, or wait. A beat can repeat up to 16 times, optionally inside a
 time window. **Browse player actions** adds a searchable, school-filtered view of all 34
@@ -62,9 +72,11 @@ vocabulary. The 91
 low-level assembly seams never become authoring choices.
 
 Open `docs/quest-mission-control.html` directly on a second display for the current
-program position, machine readiness, source-derived recovery checklist, and private
+Creator OS lane, fleet roles, machine-derived choreography, proof queue, and private
 session notes. Canonical status is tracked in Git; checkmarks and notes stay in that
-browser unless explicitly exported.
+browser unless explicitly exported. Before a commit, update its JSON source when the
+change alters program state, machine roles, the creator sequence, expected receipts, or
+the next seat decision, then run the renderer drift check above.
 
 Studio lowers production beats into bounded acyclic Runtime graphs and certifies them
 against the shared contract. **Play this revision** writes an isolated dev artifact;
@@ -84,23 +96,40 @@ conversion or data loss. Production activation still requires explicit F10 Check
 F11 Load; the creator loop never places dev revisions in that production inbox.
 
 The Studio workspace is the fast R&D loop: an on-demand local quest library, beat-first
-authoring, autosaved drafts, server-generated guided rehearsal, and a compact Publish &
-Play cockpit that renders Validation, Transfer, Activation, Rebind, and Runtime-observed
-proof from local receipts. Guided
+authoring, autosaved drafts, server-generated guided rehearsal, a compact Play cockpit,
+and an Observe stage that renders Validation, Transfer, Activation, Rebind, and
+Runtime-observed proof from local receipts. Guided
 rehearsal derives representative inputs from the saved quest, evaluator-checks the
 selected path, and reports untested branches or generation limits. Browser rehearsal
 previews logic and effects; it never claims to prove a Valheim adapter or mutation. The
 optional local usage toggle stores only fixed selections and broad quantity buckets for
 13 weeks on this machine—never titles, messages, targets, searches, identities, exact
 timestamps, or uploads. The normal lap is
-**Author -> Rehearse -> arm once in F9 -> Play this revision -> play -> inspect proof**.
+**Author -> Rehearse -> Play this revision -> play -> Observe**. Runtime's Studio link
+carries the active pack, version, requested stage, and current beat, so the creator
+returns to the same telling instead of searching for it.
 CAST is needed only for a quest without an existing Charm target. Reuse captured multiplayer scenarios for quest-content
 changes; run i5 only when the multiplayer event adapter itself changes.
 
-While the F9 Runtime drawer is open, Arcane Sight highlights and labels every valid
-Charm binding in the loaded scene. It is a client-local inspection layer only: the
-current ambient-event scope is the locally owned loaded binding set, not a fixed
-distance radius.
+F9 expands or minimizes the always-present Runtime overhead bar. Its compact state keeps
+the active title and independent Check, Ready, and Landed signals visible; the expanded
+state exposes the Look, Validate, Load, Confirm ladder, contextual action, Studio
+handoff, evidence, Charm controls, and machinery details. One clamped alert anchor owns
+deadline and actionable warning state. The bar uses a clamped 92-pixel safe top so the
+compact state clears the host diagnostic band at the live 1026x740 viewport. Arcane Sight remains a client-local inspection
+layer over the locally owned loaded binding set, not a fixed distance radius.
+
+For an install-wide creator lap, use
+`tools/creator-session/Invoke-CreatorSession.ps1`. Prepare runs once while Valheim is
+closed and owns build, exact backup, deployment, safety, identity pins, and rollback.
+After the creator enters the pinned world, Gallery, Runtime, and blueprint operations
+travel through bounded expiring request files and correlated receipts; no F5 relay or
+cross-machine hand copying is part of the loop. Capture automatically produces a
+reviewable Godbuild under `examples/worldbuild/<name>` and verifies generator drift.
+Replay stages the exact reviewed capture/blueprint pair, runs check before build, and
+fails unless the translation-independent diff receipt says `MATCH`. The executable,
+precondition-ordered choreography and its current proof level live in
+`docs/creator-os.md`.
 
 The **R&D Signal Circuit** template is the current batch probe: normal chat, a durable
 wait, shout, two drops inside 30 seconds, pickup, equip, consume, heal, and a small

@@ -1,5 +1,29 @@
 # Changelog
 
+**r31 Creator Session and Godbuild mailbox.** Quest Lab now accepts a closed set of
+identity-pinned, expiring blueprint capture/inspect/check/build/diff/count/clear requests.
+Artifacts live only in the Lab-owned blueprint directory; callers cannot supply paths,
+prefabs, keys, commands, or arbitrary ZDO fields. Capture normalization and signatures are
+deterministic, build refuses an unchecked blueprint, replayed pieces receive durable Lab
+marks, and translation-independent diff is the final `MATCH` proof. The fleet-facing Creator
+Session composes identify-before-rebuild and check-before-build without a console relay. This
+release is executable-test covered; the full r31 payload has not yet completed a live lap.
+
+**r30 arrival-facing tutorial sign.** The first r29 live frame proved the compact
+school-word treatment, then a walk around the tutorial target showed that its text was
+healthy but faced the far side. The support post stays rotated to yaw 180 while the
+separate sign returns to its proven yaw 180. This places the hanging board on the
+arrival side without turning its readable face away from the ascent portal.
+
+**r29 compact lane wayfinding.** The canonical world's first cold load showed that the
+arrival-side `CAST HERE` assembly presented its post-side to the player and that the
+six full-size signs spelling `COMBAT` dominated the intended tutorial target. The
+first correction rotated the tutorial pole and sign together; r30 preserves the sign's
+original facing instead. Every school header is reduced from one large sign per letter to one
+small complete word on a standard solid-backed sign. The plaque remains overhead and
+faces the lane approach; a two-pole highway-style gantry is deliberately left for a
+later composition pass.
+
 **r28 reusable-site preparation.** Rebuild and all-schools prepare now capture the
 existing Gallery's lower ascent portal before clear and raise the replacement at that
 same absolute world origin. The player no longer has to stand on the original build

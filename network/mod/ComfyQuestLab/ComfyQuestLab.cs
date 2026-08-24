@@ -37,7 +37,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.0-20260820-r28";
+  public const string ReleaseId = "questlab-v0.2.0-20260824-r31";
 
   public static ComfyQuestLab Instance { get; private set; }
 
@@ -62,8 +62,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     _ring = new LabEventRing(LabConfig.ConsoleRows.Value * 8);
     _panel = new LabPanel(_ring);
     _gallery = new LabGalleryBuilder();
-    _batch = new LabBatchController(_gallery);
     _blueprints = new LabBlueprintBuilder();
+    _batch = new LabBatchController(_gallery, _blueprints);
 
     // A dedicated server has no screen and no player to teach. Bail before patching so
     // a server operator who installs this by accident gets a no-op, not a surprise.

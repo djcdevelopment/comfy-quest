@@ -11,7 +11,7 @@ using UnityEngine;
 /// <summary>Client-local, read-only visibility for loaded Runtime Charm bindings.</summary>
 /// <remarks>
 /// Arcane Sight never writes a ZDO or changes event routing. It owns only renderer property
-/// blocks and child lights created here, and releases both when the Runtime drawer closes.
+/// blocks and child lights created here, and releases both when the Runtime bar minimizes.
 /// </remarks>
 sealed class RuntimeArcaneSight {
   const string Prefix = "comfyQuestRuntime.";

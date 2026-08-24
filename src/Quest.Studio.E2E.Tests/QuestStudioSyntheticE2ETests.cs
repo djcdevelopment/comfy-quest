@@ -142,7 +142,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForTextAsync(page.Locator("#rehearsal-result .trace-row.attempt.partial"), "partial 1/2", "amber partial attempt row");
             await WaitForTextAsync(page.Locator("#rehearsal-result .disclaimer"), "does not prove a Valheim adapter", "rehearsal evidence disclaimer");
 
-            await page.Locator("[data-stage='publish']").ClickAsync();
+            await page.Locator("[data-stage='play']").ClickAsync();
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish immutable version", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "first publish", 30_000);
             await RefreshRuntimeAsync(page);
@@ -188,6 +188,10 @@ public sealed class QuestStudioSyntheticE2ETests
             await RefreshRuntimeAsync(page);
             await WaitForExactTextAsync(page.Locator("#runtime-phase"), "complete", "complete Runtime phase");
             await WaitForTextAsync(page.Locator("#runtime-next"), "reports this quest complete", "completion instruction");
+            await page.Locator("[data-stage='observe']").ClickAsync();
+            Assert.True(await page.Locator("#stage-observe").IsVisibleAsync());
+            await WaitForExactTextAsync(page.Locator("#observe-runtime"), "Live proof complete", "Observe completion state");
+            await WaitForTextAsync(page.Locator("#runtime-receipts"), "Runtime observed", "Observe live proof trail");
 
             await page.Locator("#tools-menu summary").ClickAsync();
             await page.Locator("[data-tool='graph']").ClickAsync();
@@ -235,7 +239,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForCountAsync(page.Locator("#nodes .graph-node"), 9, "reloaded advanced graph nodes");
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Back to creator workflow", Exact = true }).ClickAsync();
 
-            await page.Locator("[data-stage='publish']").ClickAsync();
+            await page.Locator("[data-stage='play']").ClickAsync();
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Publish immutable version", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Version already published", "immutable version collision", 30_000);
             await WaitForTextAsync(page.Locator("#status-detail"), "Start a new iteration", "collision recovery instruction");
@@ -251,7 +255,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 2, "two immutable questpack versions");
 
             // Extraction remains deliberately outside the everyday journey. Exercise it only
-            // after the complete author/rehearse/publish path and inspect the browser bytes.
+            // after the complete Author/Rehearse/Play/Observe path and inspect the browser bytes.
             Assert.True(await page.Locator("#advanced-tools").IsHiddenAsync());
             Assert.True(await page.Locator("#tool-data").IsHiddenAsync());
             await page.Locator("#tools-menu summary").ClickAsync();
@@ -346,7 +350,7 @@ public sealed class QuestStudioSyntheticE2ETests
                 }
             });
             devChannel.Arm(DateTimeOffset.UtcNow);
-            await page.Locator("[data-stage='publish']").ClickAsync();
+            await page.Locator("[data-stage='play']").ClickAsync();
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Play this revision", Exact = true }).ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Playing The Woodbound Signal", "Woodbound r1 dev transfer", 30_000);
             await WaitForFileCountAsync(Path.Combine(run.RuntimeRoot, "inbox-dev"), "*.questpack", 1, "Woodbound r1 dev questpack");
@@ -369,7 +373,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.Locator(".beat-card[data-beat='2']").ClickAsync();
             await FillAndBlurAsync(page.Locator("#beat-message"), "The circuit closes. The revised charm remembers this telling.");
             await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", "Woodbound r2 autosave");
-            await page.Locator("[data-stage='publish']").ClickAsync();
+            await page.Locator("[data-stage='play']").ClickAsync();
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Play this revision", Exact = true }).ClickAsync();
             await WaitForFileCountAsync(Path.Combine(run.RuntimeRoot, "inbox-dev"), "*.questpack", 2, "Woodbound r2 dev questpack");
             var r2 = devChannel.Poll(DateTimeOffset.UtcNow, "start");
@@ -396,6 +400,25 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForExactTextAsync(page.Locator("#status-title"), "Published to Runtime inbox", "Woodbound publish", 30_000);
             await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 3, "Woodbound plus two Signal Circuit packs");
             ValidateWoodboundBrowserPack(run);
+
+            // Runtime opens Studio at the exact active telling. Prove the real host consumes
+            // that deep link and lands in Observe without asking the creator to find the
+            // project, revision, or current beat again.
+            var handoffPage = await context.NewPageAsync();
+            var handoffUrl = host.StudioUrl
+                + "?stage=observe&pack_id=" + Uri.EscapeDataString(rolled.PackId)
+                + "&version=" + Uri.EscapeDataString(rolled.Version)
+                + "&runtime_stage=start";
+            await handoffPage.GotoAsync(
+                handoffUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await WaitForInputValueAsync(
+                handoffPage.Locator("#title"), "The Woodbound Signal", "Runtime project handoff");
+            await WaitUntilAsync(
+                () => handoffPage.Locator("#stage-observe").IsVisibleAsync(),
+                "Runtime Observe handoff");
+            await WaitForExactTextAsync(
+                handoffPage.Locator("#observe-beat"), "start", "Runtime current-beat handoff");
+            await handoffPage.CloseAsync();
 
             // A representative phone-size smoke verifies the responsive primary path is
             // usable without re-running or mutating the journey.
@@ -468,7 +491,7 @@ public sealed class QuestStudioSyntheticE2ETests
     // journey also saves labeled screenshots of the Woodbound authoring path — the
     // screenshot-led tutorial is generated from the same synthetic browser that proves the
     // path, so the player is never asked to recreate captures. Unset, this is a no-op.
-    static readonly string TutorialShots =
+    static readonly string? TutorialShots =
         Environment.GetEnvironmentVariable("QUEST_STUDIO_TUTORIAL_SHOTS");
 
     static async Task ShotAsync(IPage page, string name)
@@ -482,7 +505,7 @@ public sealed class QuestStudioSyntheticE2ETests
     }
 
     static async Task AddPickerBeatAsync(IPage page, string eventName, string description,
-        string shotName = null)
+        string? shotName = null)
     {
         var before = await page.Locator(".beat-card").CountAsync();
         await page.Locator("#browse-events").ClickAsync();
@@ -516,7 +539,7 @@ public sealed class QuestStudioSyntheticE2ETests
 
     static async Task RefreshRuntimeAsync(IPage page)
     {
-        await page.Locator("[data-stage='publish']").ClickAsync();
+        await page.Locator("[data-stage='play']").ClickAsync();
         await page.EvaluateAsync("() => refreshRuntime()");
     }
 

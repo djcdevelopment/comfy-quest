@@ -76,24 +76,10 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertEqual(grand["ceilingFixtureHeights"], [16.0])
         self.assertEqual((grand["groundPortalX"], grand["groundPortalZ"]), (8.0, 0.0))
 
-    def test_v2_profiles_have_one_horizontal_header_per_rune(self) -> None:
-        # Profile ids are not school names; pin the generated eight-school lettering
-        # explicitly so adding a school or renaming one changes the physical count.
-        expected_signs = sum(
-            map(
-                len,
-                (
-                    "combat",
-                    "harvest",
-                    "inventory",
-                    "building",
-                    "crafting",
-                    "progression",
-                    "world",
-                    "social",
-                ),
-            )
-        )
+    def test_v2_profiles_have_one_compact_word_header_per_rune(self) -> None:
+        # One ordinary solid-backed sign carries each complete school name. This pins
+        # the compact wayfinding treatment and prevents a return to per-letter scenery.
+        expected_signs = 8
         for field in ("runeNameHeaders", "runeNameSigns", "runeNameLights"):
             self.assertEqual(self.profiles["classic"]["counts"][field], 0)
         for profile_id in ("marble-wide", "marble-grand"):
@@ -109,6 +95,7 @@ class GalleryProfileTests(unittest.TestCase):
             generator,
         )
         self.assertIn('y = spec["wall_courses"] * 2.0 + 0.75', generator)
+        self.assertIn('<size=14><b><color={heading}>{category.upper()}</color>', generator)
 
     def test_estimates_account_for_every_placed_object(self) -> None:
         # Build places one object for each generated floor/fixture/beam/course drop and
@@ -129,7 +116,7 @@ class GalleryProfileTests(unittest.TestCase):
 
     def test_generated_plan_retains_profile_and_compatibility_contracts(self) -> None:
         source = PLAN.read_text(encoding="utf-8")
-        self.assertIn("public const int PlanVersion = 10;", source)
+        self.assertIn("public const int PlanVersion = 12;", source)
         self.assertIn('public const string DefaultProfileId = "marble-grand";', source)
         self.assertIn(
             "public float PlatformClearance, RoofClearance, GroundPortalX, GroundPortalZ;",
@@ -146,9 +133,9 @@ class GalleryProfileTests(unittest.TestCase):
         self.assertIn("Orient, Text, LightSchool, TextGlowSchool;", source)
         self.assertIn("public bool InfiniteFuel;", source)
         self.assertEqual(source.count('Orient = "rune-name-lit"'), 16)
-        self.assertEqual(source.count('Orient = "rune-name",'), 104)
+        self.assertNotIn('Orient = "rune-name",', source)
         self.assertEqual(source.count('LightSchool = "combat"'), 2)
-        self.assertEqual(source.count('TextGlowSchool = "combat"'), 12)
+        self.assertEqual(source.count('TextGlowSchool = "combat"'), 2)
         self.assertIn("public static Profile Find(string id)", source)
         self.assertIn("public static Monument[] Monuments", source)
 
@@ -157,8 +144,8 @@ class GalleryProfileTests(unittest.TestCase):
         grand = plan[plan.index('Id = "marble-grand"') :]
         builder = BUILDER.read_text(encoding="utf-8")
         for marker in (
-            'Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\\nFirst Portal tutorial\\n<color=#8fdc8f>open F9 · use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f',
-            'Prefab = "wood_pole2", X = 3.5f, Y = 0f, Z = 6f',
+            'Text = "<size=30><b><color=#ffb2d9>CAST HERE</color></b></size>\\nFirst Portal tutorial\\n<color=#8fdc8f>open F9 · use the fixed center crosshair</color>", LightSchool = "social", X = 3.5f, Y = 1.7f, Z = 6f, Yaw = 180f',
+            'Prefab = "wood_pole2", X = 3.5f, Y = 0f, Z = 6f, Yaw = 180f',
             'Prefab = "itemstandh", X = 2.35f, Y = 0f, Z = 1.25f, Yaw = 0f, Orient = "tutorial-breadcrumb", Text = "", LightSchool = "social"',
             'Prefab = "itemstandh", X = 2.35f, Y = 0f, Z = 2.75f, Yaw = 0f, Orient = "tutorial-breadcrumb", Text = "", LightSchool = "social"',
             'Prefab = "itemstandh", X = 2.35f, Y = 0f, Z = 4.25f, Yaw = 0f, Orient = "tutorial-breadcrumb", Text = "", LightSchool = "social"',
@@ -188,7 +175,7 @@ class GalleryProfileTests(unittest.TestCase):
             builder,
         )
         self.assertEqual(self.profiles["marble-grand"]["counts"]["welcomeFixtures"], 6)
-        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1916)
+        self.assertEqual(self.profiles["marble-grand"]["counts"]["estimatedPlacedObjects"], 1864)
 
     def test_runtime_reports_clearance_and_horizontal_headers(self) -> None:
         source = BUILDER.read_text(encoding="utf-8")

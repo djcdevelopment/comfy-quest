@@ -234,6 +234,8 @@ public static class LabBatchRequestPolicy {
     "prepare", "run", "reset", "report", "export",
     "gallery_build", "gallery_compare", "gallery_identify", "gallery_evidence",
     "gallery_clear", "gallery_rebuild",
+    "blueprint_capture", "blueprint_inspect", "blueprint_diff", "blueprint_check",
+    "blueprint_build", "blueprint_count", "blueprint_clear",
   };
 
   public static bool Validate(
@@ -300,6 +302,96 @@ public static class LabBatchRequestPolicy {
     return false;
   }
 
+  /// <summary>The build-by-example request surface. It is deliberately separate from
+  /// the suite/gallery argument validator so adding a blueprint field can never make it
+  /// available to an unrelated operation. Names, radii, selections, and build modes are
+  /// all closed and bounded; there is still no path, prefab, console command, or key.</summary>
+  public static bool ValidateBlueprint(
+      string operation,
+      string name,
+      string radius,
+      string selection,
+      bool replace,
+      string buildMode,
+      out string error) {
+    error = string.Empty;
+    operation = (operation ?? string.Empty).Trim().ToLowerInvariant();
+    string canonical = LabCaptureContract.CanonicalName(name);
+    if (canonical.Length == 0 || !string.Equals(canonical, name, StringComparison.Ordinal)) {
+      error = "blueprint_name_invalid";
+      return false;
+    }
+    if (operation == "blueprint_capture") {
+      if (!BoundedRadius(radius) || (selection != "mine" && selection != "lab")) {
+        error = "blueprint_capture_arguments_invalid";
+        return false;
+      }
+      if (!string.IsNullOrWhiteSpace(buildMode)) {
+        error = "request_argument_not_allowed";
+        return false;
+      }
+      return true;
+    }
+    if (operation == "blueprint_diff") {
+      if ((!string.IsNullOrWhiteSpace(radius) && !BoundedRadius(radius))
+          || (!string.IsNullOrWhiteSpace(selection)
+              && selection != "mine" && selection != "lab")) {
+        error = "blueprint_diff_arguments_invalid";
+        return false;
+      }
+      return NoBlueprintMutationExtras(replace, buildMode, out error);
+    }
+    if (operation == "blueprint_build") {
+      if (!string.IsNullOrWhiteSpace(radius) || !string.IsNullOrWhiteSpace(selection)
+          || replace) {
+        error = "request_argument_not_allowed";
+        return false;
+      }
+      if (!string.IsNullOrWhiteSpace(buildMode)
+          && buildMode != "ground" && buildMode != "sky") {
+        error = "blueprint_build_mode_invalid";
+        return false;
+      }
+      return true;
+    }
+    if (operation == "blueprint_inspect" || operation == "blueprint_check"
+        || operation == "blueprint_count" || operation == "blueprint_clear") {
+      if (!string.IsNullOrWhiteSpace(radius) || !string.IsNullOrWhiteSpace(selection)) {
+        error = "request_argument_not_allowed";
+        return false;
+      }
+      return NoBlueprintMutationExtras(replace, buildMode, out error);
+    }
+    error = "operation_not_allowlisted";
+    return false;
+  }
+
+  /// <summary>Identity pins are additive to the v1 envelope. An entirely unpinned legacy
+  /// request remains valid; once any pin is supplied, all three are required so a caller
+  /// cannot mistake a partially constrained request for a Creator Session request.</summary>
+  public static bool ValidateCreatorIdentity(
+      string expectedMachine,
+      string expectedWorldUid,
+      string creatorSessionId,
+      out string error) {
+    bool any = !string.IsNullOrWhiteSpace(expectedMachine)
+        || !string.IsNullOrWhiteSpace(expectedWorldUid)
+        || !string.IsNullOrWhiteSpace(creatorSessionId);
+    if (!any) {
+      error = string.Empty;
+      return true;
+    }
+    if (!SafeToken(expectedMachine, 80) || !SafeToken(creatorSessionId, 80)
+        || !long.TryParse(expectedWorldUid, NumberStyles.Integer,
+            CultureInfo.InvariantCulture, out long worldUid)
+        || worldUid == 0L) {
+      error = "creator_identity_invalid";
+      return false;
+    }
+    error = string.Empty;
+    return true;
+  }
+
   public static bool ValidateHistory(string corpus, int step, int expectedPreviousStep,
       string suite, string profile, string compareProfile, string selector, out string error) {
     if (!SafeToken(corpus, 80) || step < 1 || step > 5 || expectedPreviousStep != step - 1) {
@@ -330,6 +422,22 @@ public static class LabBatchRequestPolicy {
     }
     error = string.Empty;
     return true;
+  }
+
+  static bool NoBlueprintMutationExtras(bool replace, string buildMode, out string error) {
+    if (replace || !string.IsNullOrWhiteSpace(buildMode)) {
+      error = "request_argument_not_allowed";
+      return false;
+    }
+    error = string.Empty;
+    return true;
+  }
+
+  static bool BoundedRadius(string value) {
+    return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture,
+        out float radius)
+        && radius >= LabCaptureContract.MinRadius
+        && radius <= LabCaptureContract.MaxRadius;
   }
 
   static bool SafeToken(string value, int maxLength) {

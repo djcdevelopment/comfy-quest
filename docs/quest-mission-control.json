@@ -2,66 +2,66 @@
   "schema": "comfy-quest-mission-control/v1",
   "page": {
     "id": "comfy-quest-program",
-    "title": "Quest Mission Control",
-    "subtitle": "One honest view of what is proven, what needs a human, and what comes next.",
-    "observed_on": "2026-08-23",
-    "program_commit": "f79a13e",
-    "program_commit_label": "Hand off the canonical Demo World acceptance"
+    "title": "Quest Creator OS",
+    "subtitle": "Automate the machine loop. Spend the seat on design, spacing, and play feel.",
+    "observed_on": "2026-08-24",
+    "program_commit": "c7ee57a",
+    "program_commit_label": "Add living Quest mission control"
   },
   "machines": [
     {
       "id": "omen",
       "label": "OMEN",
       "state": "ready",
-      "role": "Primary Valheim and Quest Studio seat",
-      "detail": "Back online with dual Intel Arc B70s and two displays; use the second display for this page and Studio evidence.",
+      "role": "Immersive creator seat",
+      "detail": "Dual Intel Arc B70s and two displays make this the place for Valheim feel, Studio authorship, spatial judgment, and visual review. It is not the fleet's manual KVM.",
       "fact_kind": "operator-reported"
     },
     {
       "id": "am4",
       "label": "AM4",
       "state": "online",
-      "role": "Online and available",
-      "detail": "Available to the wider lab, but this repository does not assign Companion, Gateway, telemetry, or architecture-indexing work to itself.",
-      "fact_kind": "operator-reported"
+      "role": "Always-on automation capacity",
+      "detail": "Online after the motherboard swap and available to the wider lab. Quest still integrates with platform services only through published packages and verified release files.",
+      "fact_kind": "operator-and-repo"
     },
     {
       "id": "i5",
       "label": "i5",
       "state": "on-demand",
       "role": "Native multiplayer peer",
-      "detail": "Offline nearby. Leave it off for ordinary creator-content work; start it only when the multiplayer event adapter itself changes.",
-      "fact_kind": "repo-and-operator"
+      "detail": "Offline nearby. Leave it off for creator-content and spatial work; start it only when the multiplayer event adapter itself changes.",
+      "fact_kind": "operator-and-repo"
     }
   ],
   "environment": [
     {
       "id": "env.repo",
-      "label": "Repository",
+      "label": "Repository baseline",
       "state": "confirmed",
-      "detail": "The product baseline was freshly fetched with no remote changes beyond f79a13e before this page was created.",
-      "fact_kind": "observed"
+      "detail": "Creator OS work is based on c7ee57a while the already-started Quest Lab Gallery r30 changes remain preserved in the same worktree.",
+      "fact_kind": "git-observed"
     },
     {
-      "id": "env.toolchain",
-      "label": "Creator toolchain",
+      "id": "env.session",
+      "label": "Creator Session",
       "state": "confirmed",
-      "detail": "Repository discovery resolves .NET 9.0.315; Python 3.12 and gitleaks are available.",
-      "fact_kind": "observed"
+      "detail": "Prepare, Status, Arm, Lab identity, Disarm, and Close completed in the corrected live OMEN session with matching install, machine, world, session, and request identities. Exact backup/restore and rejection branches remain executable-fixture covered.",
+      "fact_kind": "live-and-fixture"
     },
     {
-      "id": "env.valheim",
-      "label": "Valheim surface",
-      "state": "confirmed",
-      "detail": "The default Valheim/BepInEx Runtime root exists and Valheim was closed at reconciliation time.",
-      "fact_kind": "observed"
-    },
-    {
-      "id": "env.safety",
-      "label": "Safety window",
+      "id": "env.runtime",
+      "label": "Runtime creator surface",
       "state": "attention",
-      "detail": "Treat PrivateWorldConfirmed as closed until the owning harness proves otherwise. Take install-wide ownership before any automated live lap.",
-      "fact_kind": "repo-confirmed"
+      "detail": "The corrected live control plane passed Arm, armed/watching Status, Lab identity, Disarm, and clean log inspection. Passive window capture found the compact y=48 bar behind the host HUD ending at y=84; the clamped y=92 geometry is build- and executable-test proven and awaits the next normal launch.",
+      "fact_kind": "live-control-build-visual"
+    },
+    {
+      "id": "env.godbuild",
+      "label": "Godbuild round trip",
+      "state": "confirmed",
+      "detail": "Capture import, normalized authority, typed plan, deterministic SVG, drift check, check-before-build, and MATCH-only replay are executable-test covered.",
+      "fact_kind": "executed-fixture"
     }
   ],
   "phases": [
@@ -88,151 +88,169 @@
       "number": 3,
       "title": "Adaptive event semantics",
       "state": "active",
-      "summary": "Implementation is landed; exit waits on one short live lap and three human verdicts.",
-      "source": "docs/five-intent-program-plan.md",
-      "source_contains": "Phase 3 now waits on one thing: lap session 3"
+      "summary": "Implementation is present; the remaining combat-feel verdicts are parked for one later creative sitting and do not gate Creator OS construction.",
+      "source": "docs/creator-os.md",
+      "source_contains": "Phase 3's remaining combat-feel verdicts are parked"
     },
     {
       "id": "phase-4",
       "number": 4,
-      "title": "Quest Lab spellbook",
-      "state": "planned",
-      "summary": "Notebook identity and round-trip behavior are planned; the recommended combined shape is P4-C.",
-      "source": "docs/phase-4-scope-packet.md",
-      "source_contains": "P4-C"
+      "title": "Creator OS and Quest Lab spellbook",
+      "state": "active",
+      "summary": "The four-stage Studio loop and leased live control plane pass; the overhead surface has one machine-found safe-top fix awaiting passive verification on the next normal launch, while Godbuild capture/replay is ready.",
+      "source": "docs/creator-os.md",
+      "source_contains": "The scarce resource is the creator's time in the seat"
     },
     {
       "id": "phase-5",
       "number": 5,
       "title": "Community-ready artifacts",
       "state": "planned",
-      "summary": "Pack v3, provenance, import/export, and semantic diff remain planned after the notebook foundation.",
+      "summary": "Pack v3, provenance, import/export, and semantic diff remain planned after the Creator OS lane proves live.",
       "source": "docs/five-intent-program-plan.md",
       "source_contains": "comfy-quest-pack/v3"
     }
   ],
   "recovery": {
-    "id": "recovery-acceptance",
-    "title": "Recovery acceptance",
-    "summary": "First re-establish the one live judgment left by the shutdown, then exercise the creator loop as a fresh imported fork.",
+    "id": "creator-os-active",
+    "title": "Creator OS operating lane",
+    "summary": "One leased session owns deployment, identity, requests, capture transport, proof, and rollback. Derek enters the loop only where human spatial judgment or play feel is the product.",
     "cold_load": {
       "id": "recovery.cold-load",
-      "title": "Cold-load the canonical Demo World",
-      "instruction": "Load Comfy Quest Demo once and judge the breadcrumb/sign path from hub arrival. Do not rebuild the Gallery and do not repeat the already-proven Charm lap.",
-      "verdict": "Was CAST HERE and its Arcane Sight breadcrumb path immediately obvious from hub arrival?",
-      "source": "docs/handoff-2026-08-20.md",
-      "source_contains": "acceptance step is one cold load and one human judgment"
+      "title": "Prepare one pinned Creator Session",
+      "instruction": "With Valheim closed, run Prepare once. Use its returned session id for every later operation; do not hand-copy files, relay console commands, or change worlds mid-session.",
+      "verdict": "Did this lane complete without turning Derek into the fleet's manual KVM?",
+      "source": "docs/creator-os.md",
+      "source_contains": "With Valheim closed, run"
     },
     "creator_flow": {
-      "title": "Exercise the imported-fork creator loop",
-      "summary": "Use the checked-in schema-v3 project. Import creates fresh identities, so the canonical artifact remains untouched and the first fork needs one fresh CAST.",
-      "source": "examples/demo-world/first-portal/README.md",
-      "heading": "Public creator loop"
+      "title": "Run the machine-owned creator session",
+      "summary": "The six steps below are rendered from the checked-in Creator Session choreography, whose preconditions are ordered from Prepare through MATCH and Close.",
+      "source": "docs/creator-os.md",
+      "heading": "Creator session loop"
     },
     "revision_flow": {
-      "id": "recovery-revision",
-      "title": "Prove one later revision of the same fork",
-      "summary": "This is the live-unverified edit/Rehearse/Play/rebind loop. Keep the imported fork IDs, make one content-only change, and let the armed Runtime pull it.",
-      "source": "README.md",
-      "source_sequence": "Author -> Rehearse -> arm once in F9 -> Play this revision -> play -> inspect proof",
-      "source_contains": "Author -> Rehearse -> arm once in F9 -> Play this revision -> play -> inspect proof",
-      "edit_source": "examples/demo-world/first-portal/studio-project.json",
-      "edit_source_contains": "The First Portal answers. Your quest is complete.",
-      "suggested_edit": "In the imported fork, change the completion message to ‘The First Portal answers again. Your quest is complete.’ Keep the targetless portal trigger unchanged."
+      "id": "creator-os-product-loop",
+      "title": "Move one authored idea through the whole product",
+      "summary": "Studio keeps the creator in one telling; Godbuild turns human spacing into reviewable, replayable source instead of a manual reconstruction job.",
+      "source": "docs/creator-os.md",
+      "source_sequence": "Author -> Rehearse -> Play -> Observe -> Capture Godbuild -> Replay elsewhere",
+      "source_contains": "Author -> Rehearse -> Play -> Observe -> Capture Godbuild -> Replay elsewhere",
+      "edit_source": "docs/creator-os.md",
+      "edit_source_contains": "The first real Godbuild target is intentionally small",
+      "suggested_edit": "Build one small room or lane with human spacing, capture it once, review the generated source, then replay it elsewhere and require MATCH."
     },
-    "expectations": "examples/demo-world/first-portal/expected.json"
+    "expectations": "docs/creator-os-expected.json"
   },
   "phase3_lap": {
-    "title": "Phase 3 exit lap",
-    "summary": "This is queued behind recovery acceptance. Its sequence and human verdicts are rendered directly from the derived session-3 runbook.",
+    "title": "Parked Phase 3 exit lap",
+    "summary": "This remains a valid, source-derived five-step lap with exactly three human verdicts. Batch it into a later creative sitting; do not interrupt Creator OS construction for it.",
     "source": "docs/runbooks/OMEN-LAP-PHASE3-EXIT-S3.md",
     "sequence_heading": "Sequence",
     "verdicts_heading": "The three verdicts"
   },
   "queue": [
     {
-      "id": "queue.top-bar",
+      "id": "queue.live-lap",
       "state": "ready",
-      "title": "Build the horizontal top bar",
-      "detail": "Four-rung ladder, four-dot minimized state, persistent CHECK / READY / LANDED indicator, and one player-configurable alert anchor.",
-      "source": "docs/handoff-2026-08-20.md",
-      "source_contains": "a horizontal top bar carrying the four-rung ladder"
+      "title": "Passively verify the safe-top bar",
+      "detail": "On the next normal Valheim launch, automation owns deployment, direct window-buffer capture, host-band clearance, and clean Close. Do not schedule a dedicated seat lap or ask Derek to press F9, relay a screenshot, or inspect logs.",
+      "source": "docs/creator-os.md",
+      "source_contains": "The next normal Valheim launch"
     },
     {
-      "id": "queue.warning-expiry",
+      "id": "queue.first-godbuild",
       "state": "ready",
-      "title": "Expire stale warnings",
-      "detail": "Remove actionable warnings from the evidence surface when the condition they describe has cleared.",
-      "source": "docs/handoff-2026-08-20.md",
-      "source_contains": "warnings expire when the condition they describe clears"
+      "title": "Capture the first human-spaced Godbuild",
+      "detail": "Use one small room or lane to prove capture, preview, typed plan, check, replay, and MATCH before scaling the content.",
+      "source": "docs/creator-os.md",
+      "source_contains": "The first real Godbuild target is intentionally small"
     },
     {
       "id": "queue.phase3-lap",
       "state": "human",
-      "title": "Take the Phase 3 exit verdicts",
-      "detail": "One honest desperate-defense run; machine checks stay with the harness and only three experiential judgments belong to the seat.",
-      "source": "docs/runbooks/OMEN-LAP-PHASE3-EXIT-S3.md",
-      "source_contains": "Three judgments remain"
+      "title": "Batch the Phase 3 feel verdicts",
+      "detail": "Take the desperate-defense judgments together during a later creative sitting; the machine checks stay with the harness.",
+      "source": "docs/creator-os.md",
+      "source_contains": "Phase 3's remaining combat-feel verdicts are parked"
     },
     {
-      "id": "queue.scanner",
+      "id": "queue.community",
       "state": "gated",
-      "title": "Reconcile scanner slice 1",
-      "detail": "The locked local scanner worktree is older than main. Do not resume it until Phase 3 exits and its branch is reconciled with current source.",
-      "source": "docs/handoff-2026-08-20.md",
-      "source_contains": "Scanner slice 1 (gated behind session 3"
+      "title": "Scale into community artifacts",
+      "detail": "After one live MATCH loop, use the capture and blueprint as replay authority while pack v3 and provenance work advance.",
+      "source": "docs/creator-os.md",
+      "source_contains": "capture/blueprint pair remains replay authority"
     }
   ],
   "decisions": [
     {
-      "id": "decision.phase4-shape",
-      "title": "Phase 4 shape",
-      "question": "Adopt P4-A, P4-B, or the recommended P4-C?",
-      "recommendation": "P4-C: notebook plus the bounded composition surface.",
-      "source": "docs/phase-4-scope-packet.md",
-      "source_contains": "Which shape"
+      "id": "decision.seat",
+      "title": "Seat capacity",
+      "question": "What work is allowed to consume Derek's time at the keyboard?",
+      "recommendation": "Only authored choices, spatial judgment, visual review, and play feel. Deployment, relays, capture transport, and proof belong to the machine loop.",
+      "source": "docs/creator-os.md",
+      "source_contains": "The seat is for spatial judgment"
     },
     {
-      "id": "decision.drawer",
-      "title": "Top bar and drawer",
-      "question": "Should the top bar replace the drawer or coexist with it?",
-      "recommendation": "Keep this open until the recovered seat can judge the real composition.",
-      "source": "docs/phase-4-scope-packet.md",
-      "source_contains": "Does the top bar replace the drawer"
+      "id": "decision.bar",
+      "title": "Runtime surface",
+      "question": "Does the overhead bar replace the old F9 drawer?",
+      "recommendation": "Yes. F9 expands or minimizes one always-present overhead bar; a single clamped alert anchor carries deadline or actionable warning state.",
+      "source": "docs/creator-os.md",
+      "source_contains": "Author -> Rehearse -> Play -> Observe"
     },
     {
-      "id": "decision.lab-ownership",
-      "title": "Lab ownership",
-      "question": "Do the Lab ownership decisions ship in Phase 4 or remain decision records?",
-      "recommendation": "Hold implementation until the Phase 4 shape is taken.",
-      "source": "docs/phase-4-scope-packet.md",
-      "source_contains": "Do the Lab ownership decisions ride this phase"
+      "id": "decision.fleet",
+      "title": "Fleet roles",
+      "question": "When should the nearby i5 peer be powered on?",
+      "recommendation": "Only when the multiplayer adapter changes. Content-only and spatial work stay on the Creator Session lane without a human relay between machines.",
+      "source": "docs/creator-os.md",
+      "source_contains": "i5 stays off for content-only and spatial work"
     }
   ],
   "commands": [
     {
-      "id": "command.studio",
-      "label": "Start Quest Studio",
-      "command": "tools\\quest-studio\\Start-QuestStudio.ps1",
-      "detail": "Run from the repository root, then open the loopback Studio link."
+      "id": "command.prepare",
+      "label": "Prepare Creator Session",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Prepare",
+      "detail": "With Valheim closed: lease, build, backup, deploy, hash-pin, and open the private-world safety window."
     },
     {
       "id": "command.status",
-      "label": "Check repository state",
-      "command": "git status --short --branch",
-      "detail": "Read-only confirmation before starting work."
+      "label": "Verify session pins",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Status -SessionId <id>",
+      "detail": "Read-only validation of the lease, machine, world, session, and installed payload hashes."
     },
     {
-      "id": "command.demo-drift",
-      "label": "Check Demo World artifacts",
-      "command": "python tools/quest-studio/build_demo_world_first_portal.py --check",
-      "detail": "Verifies the checked-in project, compiled experience, package, and expectation bundle without rebuilding them."
+      "id": "command.capture",
+      "label": "Capture a Godbuild",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Capture -SessionId <id> -BlueprintName <name>",
+      "detail": "Capture and inspect once, then automatically import and drift-check the review bundle."
+    },
+    {
+      "id": "command.import",
+      "label": "Re-run standalone import",
+      "command": "python tools/blueprints/import_capture.py <name>.capture.json",
+      "detail": "Optional standalone entrypoint for an external Lab capture; Creator Session Capture already runs it."
+    },
+    {
+      "id": "command.replay",
+      "label": "Replay after review",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Replay -SessionId <id> -BlueprintName <name>",
+      "detail": "Run check, build, and translation-independent diff; fail unless the result is MATCH."
+    },
+    {
+      "id": "command.studio",
+      "label": "Start Quest Studio",
+      "command": "tools\\quest-studio\\Start-QuestStudio.ps1",
+      "detail": "Open the four-stage Author, Rehearse, Play, Observe cockpit on the second display."
     }
   ],
   "cautions": [
-    "A worktree isolates Git, not the shared Valheim installation. Take one install-wide owner before an automated live lap.",
-    "Rehearsal proves evaluator behavior and declares its own limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
-    "Restoring only world files does not reset durable Runtime completion state. Do not improvise a replay reset that the product has not proven.",
-    "The i5 peer is unnecessary for content-only creator-loop changes; use captured multiplayer scenarios unless an event adapter changes."
+    "The Creator Session lease owns the shared Valheim installation. Do not run another deployment or Lab mutation beside it.",
+    "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
+    "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
+    "The live control plane is proven. The y=92 compact-bar geometry remains build-proven until automation passively captures it on the next normal Valheim launch."
   ]
 }

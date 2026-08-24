@@ -66,14 +66,14 @@
         "floorTiles": 1517,
         "roofTiles": 0,
         "ceilingFixtures": 0,
-        "fixtures": 644,
+        "fixtures": 592,
         "runeBeams": 110,
         "runeNameHeaders": 8,
-        "runeNameSigns": 60,
+        "runeNameSigns": 8,
         "runeNameLights": 8,
         "courseDrops": 9,
         "welcomeFixtures": 0,
-        "estimatedPlacedObjects": 2291
+        "estimatedPlacedObjects": 2239
       }
     },
     {
@@ -106,14 +106,14 @@
         "floorTiles": 823,
         "roofTiles": 550,
         "ceilingFixtures": 9,
-        "fixtures": 377,
+        "fixtures": 325,
         "runeBeams": 134,
         "runeNameHeaders": 8,
-        "runeNameSigns": 60,
+        "runeNameSigns": 8,
         "runeNameLights": 8,
         "courseDrops": 6,
         "welcomeFixtures": 6,
-        "estimatedPlacedObjects": 1916
+        "estimatedPlacedObjects": 1864
       }
     }
   ]

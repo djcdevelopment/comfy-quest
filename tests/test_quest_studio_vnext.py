@@ -43,13 +43,14 @@ class QuestStudioVNextTests(unittest.TestCase):
             )
         self.assertEqual(0, result.returncode, result.stderr)
 
-    def test_page_guides_creators_through_three_soft_stages(self) -> None:
+    def test_page_guides_creators_through_four_soft_stages(self) -> None:
         html = raw_constant("Html")
         script = raw_constant("Js")
         for stage, label in (
             ("author", "Author"),
             ("rehearse", "Rehearse"),
-            ("publish", "Publish &amp; Play"),
+            ("play", "Play"),
+            ("observe", "Observe"),
         ):
             self.assertIn(f'data-stage="{stage}"', html)
             self.assertIn(f'data-stage-panel="{stage}"', html)
@@ -61,12 +62,16 @@ class QuestStudioVNextTests(unittest.TestCase):
             "Publish immutable version",
             "Runtime validates and pulls",
             "Live proof",
+            "Observe the live telling",
         ):
             self.assertIn(expected, html)
         self.assertIn("function showStage(name,moveFocus=true)", script)
         self.assertIn("workspace.scrollTop=0", script)
         self.assertIn("workspace.scrollLeft=0", script)
         self.assertIn("currentStage='author'", script)
+        self.assertIn("function readHandoff()", script)
+        self.assertIn("q.get('pack_id')", script)
+        self.assertIn("q.get('runtime_stage')", script)
         self.assertNotIn('data-tab="', html)
 
     def test_secondary_text_meets_normal_text_contrast_on_work_surfaces(self) -> None:
@@ -241,7 +246,7 @@ class QuestStudioVNextTests(unittest.TestCase):
     def test_play_revision_stays_locked_until_runtime_is_connected_and_armed(self) -> None:
         script = raw_constant("Js")
         journey = script[script.index("function renderJourney()") :]
-        journey = journey[: journey.index("\n")]
+        journey = journey[: journey.index("\nfunction showStage")]
         self.assertIn("devReady=runtimeState?.dev_connected&&runtimeState?.dev_armed", journey)
         self.assertIn("$('#play-project').disabled=!project||!devReady", journey)
 
@@ -481,7 +486,8 @@ class QuestStudioVNextTests(unittest.TestCase):
         for element_id in (
             "author-state",
             "rehearse-state",
-            "publish-state",
+            "play-state",
+            "observe-state",
             "draft-readiness",
             "preview-readiness",
             "runtime-readiness",

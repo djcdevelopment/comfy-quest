@@ -27,6 +27,9 @@ sealed class RuntimeExperienceEngine {
   readonly Dictionary<string, int> rechecks = new(StringComparer.Ordinal);
   readonly object evidenceGate = new();
   readonly List<CreatorEvidenceLine> recentEvidence = new();
+  readonly Dictionary<string, CreatorEvidenceLine> activeAlerts =
+      new(StringComparer.Ordinal);
+  readonly List<string> activeAlertOrder = new();
   string deadlineLine;
   bool deadlineUrgent;
   string deadlineError;
@@ -67,9 +70,30 @@ sealed class RuntimeExperienceEngine {
   }
 
   /// <summary>The same bounded evidence with each row's kind — a fact tagged where the
-  /// line was composed, so the drawer never classifies by parsing rendered copy.</summary>
+  /// line was composed, so the creator surface never classifies by parsing rendered copy.</summary>
   public IReadOnlyList<CreatorEvidenceLine> RecentEvidenceLines() {
     lock (evidenceGate) return recentEvidence.ToArray();
+  }
+
+  /// <summary>The newest still-actionable warning for the single configured alert anchor.
+  /// Historical warning rows have no key and therefore never become present-tense alerts.</summary>
+  public CreatorEvidenceLine CurrentAlert() {
+    lock (evidenceGate) {
+      for (var index = activeAlertOrder.Count - 1; index >= 0; index--)
+        if (activeAlerts.TryGetValue(activeAlertOrder[index], out var alert)) return alert;
+      return null;
+    }
+  }
+
+  /// <summary>Expire an actionable warning when the condition it describes clears. The
+  /// stable key is supplied at the emission site; warning copy is never parsed.</summary>
+  public void ResolveAlert(string key) {
+    if (string.IsNullOrWhiteSpace(key)) return;
+    lock (evidenceGate) {
+      activeAlerts.Remove(key);
+      activeAlertOrder.RemoveAll(value => string.Equals(value, key, StringComparison.Ordinal));
+      recentEvidence.RemoveAll(value => string.Equals(value.Key, key, StringComparison.Ordinal));
+    }
   }
 
   public void Tick() {
@@ -291,7 +315,7 @@ sealed class RuntimeExperienceEngine {
       if (!foundBinding) {
         WriteReceipt(EventReceipt("unbound", active, null, evt, null, null,
             new TriggerProgress { Current = 0, Required = 1 }, correlationId),
-            UnboundLine(active), CreatorEvidenceKind.Warning);
+            UnboundLine(active), CreatorEvidenceKind.Warning, "charm_unbound");
       }
     } catch (Exception e) {
       Write("action", "runtime_event_failed", active, null, e.Message, correlationId);
@@ -1039,7 +1063,14 @@ sealed class RuntimeExperienceEngine {
     cachedBindingContentHash = null;
     recentEventKeys.Clear();
     rechecks.Clear();
-    lock (evidenceGate) { countedKey = null; countedCurrent = 0; unboundReported = null; }
+    lock (evidenceGate) {
+      countedKey = null;
+      countedCurrent = 0;
+      unboundReported = null;
+      activeAlerts.Clear();
+      activeAlertOrder.Clear();
+      recentEvidence.RemoveAll(value => !string.IsNullOrWhiteSpace(value.Key));
+    }
   }
 
   void ReportOrphanedBindings(Active active) {
@@ -1054,6 +1085,7 @@ sealed class RuntimeExperienceEngine {
                 StringComparison.OrdinalIgnoreCase)) count++;
       }
       lock (evidenceGate) lastOrphanCount = count;
+      if (count == 0) { ResolveAlert("binding_version"); return; }
       WriteReceipt(new RuntimeReceipt {
         Operation = "activation",
         Status = "orphaned_bindings",
@@ -1064,7 +1096,7 @@ sealed class RuntimeExperienceEngine {
         CandidateCount = count,
         Diagnostics = Array.Empty<ContractDiagnostic>(),
       }, count + " bindings now OTHER VERSION — re-CAST or roll back",
-          CreatorEvidenceKind.Warning);
+          CreatorEvidenceKind.Warning, "binding_version");
     } catch {
       // Loaded-scene diagnostics must not make otherwise valid active content unusable.
     }
@@ -1087,17 +1119,23 @@ sealed class RuntimeExperienceEngine {
   }
 
   void WriteReceipt(RuntimeReceipt receipt, string evidenceLine = null,
-      CreatorEvidenceKind kind = CreatorEvidenceKind.Plumbing) {
+      CreatorEvidenceKind kind = CreatorEvidenceKind.Plumbing, string key = null) {
     receipt.EvidenceKind = CreatorEvidenceLine.KindName(kind);
     receipts.Write(receipt);
     if (string.IsNullOrWhiteSpace(evidenceLine)) return;
     if (evidenceLine.Length > 220) evidenceLine = evidenceLine.Substring(0, 219) + "…";
     var line = new CreatorEvidenceLine {
       Kind = kind,
+      Key = key,
       Stamp = receipt.AtUtc.ToLocalTime().ToString("HH:mm:ss"),
       Text = evidenceLine,
     };
     lock (evidenceGate) {
+      if (!string.IsNullOrWhiteSpace(key)) {
+        activeAlerts[key] = line;
+        activeAlertOrder.RemoveAll(value => string.Equals(value, key, StringComparison.Ordinal));
+        activeAlertOrder.Add(key);
+      }
       recentEvidence.Add(line);
       if (recentEvidence.Count > MaxRecentEvidence)
         recentEvidence.RemoveRange(0, recentEvidence.Count - MaxRecentEvidence);

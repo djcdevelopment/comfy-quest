@@ -14,38 +14,267 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   RuntimeReceiptStore receipts;
   RuntimeCharmBinding charms;
   RuntimeDevChannelCoordinator devChannel;
+  RuntimeCreatorRequestController creatorRequests;
   RuntimeArcaneSight arcaneSight;
   RuntimeExperienceEngine engine;
   ConfigEntry<KeyboardShortcut> checkHotkey;
   ConfigEntry<KeyboardShortcut> loadHotkey;
-  ConfigEntry<KeyboardShortcut> drawerHotkey;
+  ConfigEntry<KeyboardShortcut> barHotkey;
   ConfigEntry<KeyboardShortcut> castHotkey;
   ConfigEntry<bool> privateWorldConfirmed;
   ConfigEntry<string> studioUrl;
-  ConfigEntry<float> deadlineAnchor;
-  string runtimeRoot; bool inboxChecked; int checkedCandidates,checkedValid; bool showMaintenance,showCardDetails; double nextDevPoll; bool welcomed; string statusDetail; bool statusIdle; IReadOnlyList<PackCandidate> quietInspected;
-  readonly List<CreatorEvidenceLine> outcomes=new(); UnityEngine.Vector2 outcomeScroll,evidenceScroll;
-  bool drawerVisible; string status="Runtime ready"; PackCandidate[] available=Array.Empty<PackCandidate>(); ActiveSet[] activationHistory=Array.Empty<ActiveSet>(); int selectedVersion,selectedActivation; UnityEngine.Rect drawer=new(24,90,560,590);
-  UnityEngine.Texture2D windowBackground,rowBackground,helpBackground,greenBackground,greenGlowBackground,blueBackground,amberBackground,primaryBackground,castRowBackground,dimBackground,deadlineBackground,deadlineUrgentBackground,circleDoneBackground,circleCurrentBackground,circleWaitingBackground,railDoneBackground,railWaitingBackground; UnityEngine.GUIStyle windowStyle,sectionStyle,rowStyle,helpStyle,readyStyle,primaryStyle,blueButtonStyle,amberButtonStyle,dimButtonStyle,stepPendingStyle,rungDoneStyle,rungCurrentStyle,rungWaitingStyle,rungNameDoneStyle,rungNameCurrentStyle,rungNameWaitingStyle,railDoneStyle,railWaitingStyle,stampStyle,castRowStyle,deadlineStyle,deadlineUrgentStyle,storyStyle,castStyle,warnStyle,plumbStyle,questTitleStyle,playingStyle,chipStyle,stateReadyStyle,stateChoiceStyle;
-  void Awake(){runtimeRoot=Path.Combine(Paths.ConfigPath,"comfy-quest-runtime");Directory.CreateDirectory(Path.Combine(runtimeRoot,"inbox"));Directory.CreateDirectory(Path.Combine(runtimeRoot,"inbox-dev"));packs=new QuestPackStore(runtimeRoot);receipts=new RuntimeReceiptStore(runtimeRoot);charms=new RuntimeCharmBinding(runtimeRoot,receipts);devChannel=new RuntimeDevChannelCoordinator(runtimeRoot,charms.RebindDevActive);arcaneSight=new RuntimeArcaneSight(runtimeRoot);privateWorldConfirmed=Config.Bind("Safety","PrivateWorldConfirmed",false,"Required before Charm inscription or mutation. Enable only for a private solo/listen-host world you control.");studioUrl=Config.Bind("Studio","Url","http://127.0.0.1:8085/quest-studio","Loopback URL opened by the Runtime drawer. Only an http:// localhost address is accepted.");deadlineAnchor=Config.Bind("Presentation","DeadlineAnchor",.16f,"Where the running-deadline pill sits, as a fraction of screen height from the top (0.05-0.85). Move it clear of other overlays.");engine=new RuntimeExperienceEngine(runtimeRoot,receipts,()=>privateWorldConfirmed.Value);RuntimeEventRouter.Engine=engine;drawerHotkey=Config.Bind("Runtime","DrawerHotkey",new KeyboardShortcut(UnityEngine.KeyCode.F9),"Open the compact runtime drawer. F9 avoids Quest Lab F6 and legacy Control F7.");castHotkey=Config.Bind("Runtime","CharmGestureHotkey",new KeyboardShortcut(UnityEngine.KeyCode.BackQuote),"While F9 is open: first press CHECKS and captures the aimed target; second press CASTS onto that exact target.");checkHotkey=Config.Bind("Runtime","CheckHotkey",new KeyboardShortcut(UnityEngine.KeyCode.F10),"Check inbox without activating content.");loadHotkey=Config.Bind("Runtime","LoadLatestHotkey",new KeyboardShortcut(UnityEngine.KeyCode.F11),"Activate the highest compatible version.");devChannel.Heartbeat(DateTimeOffset.UtcNow);var harmony=new Harmony("djcdevelopment.valheim.comfyquestruntime");harmony.PatchAll(typeof(RuntimeInputPatches));RuntimeKillPatches.Apply(harmony);RuntimeCooperativePatches.Apply(harmony);RuntimeEasyEventPatches.Apply(harmony);RuntimeProgressionPatches.Apply(harmony);RuntimeWorldStatePatches.Apply(harmony);RuntimeCoreActionPatches.Apply(harmony);RuntimeHarvestPatches.Apply(harmony);foreach(var patch in RuntimePatching.Outcomes)Logger.LogInfo($"Runtime patch {patch.SignatureId}: {(patch.Applied?"ok":patch.Detail)}");Logger.LogInfo($"Runtime ready. Drawer={drawerHotkey.Value}, charm={castHotkey.Value}, check={checkHotkey.Value}, load={loadHotkey.Value}, inbox={Path.Combine(runtimeRoot,"inbox")}");}
-  void Update(){engine?.Tick();PollDevChannel();arcaneSight?.Tick();WelcomeOnce();if(drawerVisible)RuntimeInputPatches.Maintain();if(TypingInGame())return;if(drawerHotkey.Value.IsDown())SetDrawer(!drawerVisible);if(drawerVisible&&UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Escape))SetDrawer(false);if(drawerVisible&&castHotkey.Value.IsDown())HandleCharmGesture();if(checkHotkey.Value.IsDown()){status=CheckForNew();Report(status,statusIdle);}if(loadHotkey.Value.IsDown()){status=LoadLatest();Report(status,statusIdle);}}
-  void OnGUI(){EnsureStyles();DrawDeadline();if(!drawerVisible)return;arcaneSight?.Draw(helpStyle);drawer=UnityEngine.GUILayout.Window(94731,drawer,DrawDrawer,"Comfy Quest",windowStyle,UnityEngine.GUILayout.MinWidth(520f),UnityEngine.GUILayout.MinHeight(560f));drawer.x=UnityEngine.Mathf.Clamp(drawer.x,0,UnityEngine.Screen.width-drawer.width);drawer.y=UnityEngine.Mathf.Clamp(drawer.y,0,UnityEngine.Screen.height-drawer.height);}
-  // The drawer keeps the design canvas's one-screen composition (creator-loop.dc.html, 01):
-  // the status card leads, the content-update ladder with its one context action follows,
-  // the CAST strip and dev channel are the remaining creator actions, the evidence feed
-  // closes the creator surface, and the machinery — captures, arcane sight detail, versions
-  // & rollback — recedes behind one disclosure. Session 1 of the Phase 3 exit lap proved
-  // tokens alone don't cross the product threshold; the hierarchy is the design.
-  void DrawDrawer(int id){UnityEngine.GUILayout.BeginHorizontal();UnityEngine.GUILayout.Label("CREATOR DRAWER",sectionStyle);UnityEngine.GUILayout.Label(drawerHotkey.Value.ToString(),chipStyle,UnityEngine.GUILayout.Height(20));UnityEngine.GUILayout.FlexibleSpace();if(UnityEngine.GUILayout.Button("Open Studio",blueButtonStyle,UnityEngine.GUILayout.Width(100)))OpenStudio();if(UnityEngine.GUILayout.Button("Close",dimButtonStyle,UnityEngine.GUILayout.Width(62)))SetDrawer(false);UnityEngine.GUILayout.EndHorizontal();UnityEngine.GUILayout.Space(7);DrawStatusCard();UnityEngine.GUILayout.Space(7);DrawUpdateWorkflow();UnityEngine.GUILayout.Space(7);DrawReady(charms.CapturedPreview);UnityEngine.GUILayout.Space(7);DrawDevChannel();UnityEngine.GUILayout.Space(7);UnityEngine.GUILayout.Label("EXPERIENCE",sectionStyle,UnityEngine.GUILayout.Height(22));UnityEngine.GUILayout.Label(engine.DescribeProgress(),rowStyle,UnityEngine.GUILayout.Height(34));DrawRecentEvidence();UnityEngine.GUILayout.Space(7);if(UnityEngine.GUILayout.Button((showMaintenance?"− ":"+ ")+"MACHINERY · CAPTURES, ARCANE SIGHT, VERSIONS & ROLLBACK",dimButtonStyle,UnityEngine.GUILayout.Height(27))){showMaintenance=!showMaintenance;if(showMaintenance)RefreshActivationHistory();}if(showMaintenance){DrawOutcomes();UnityEngine.GUILayout.Space(7);DrawArcaneSight();UnityEngine.GUILayout.Space(7);DrawMaintenance();}UnityEngine.GUILayout.FlexibleSpace();UnityEngine.GUILayout.Label("F9 / Esc close  ·  ` CHECK / CAST  ·  drag title bar to move",helpStyle,UnityEngine.GUILayout.Height(28));UnityEngine.GUI.DragWindow(new UnityEngine.Rect(0,0,drawer.width-70,25));}
-  // The one always-on player surface: an authored deadline is only tension while it is visible.
-  // Session 2 ran a live ten-minute deadline that rendered every second of its length and was never
-  // perceived. Nothing was broken in the read: a flat 320x30 strip at a fixed y=64 sat four pixels
-  // under a host HUD band in the same dark-strip treatment, at 1440p it drew at two-thirds the size
-  // the layout assumed, and "594 seconds remaining" is a log line rather than a clock. It is now a
-  // bordered pill in the drawer's own palette, sized to its copy, scaled with the screen, and
-  // anchored where the player puts it — an interim that stays subordinate to the single configurable
-  // alert anchor (ADR 0005) rather than inventing another fixed position for it to unwind.
-  void DrawDeadline(){var line=engine?.Deadline();if(string.IsNullOrWhiteSpace(line))return;var style=engine.DeadlineUrgent()?deadlineUrgentStyle:deadlineStyle;var scale=UnityEngine.Mathf.Clamp(UnityEngine.Screen.height/900f,1f,2.5f);var matrix=UnityEngine.GUI.matrix;UnityEngine.GUI.matrix=UnityEngine.Matrix4x4.TRS(UnityEngine.Vector3.zero,UnityEngine.Quaternion.identity,new UnityEngine.Vector3(scale,scale,1f));var size=style.CalcSize(new UnityEngine.GUIContent(line));var rect=new UnityEngine.Rect((UnityEngine.Screen.width/scale-size.x)/2f,UnityEngine.Mathf.Clamp(deadlineAnchor.Value,.05f,.85f)*(UnityEngine.Screen.height/scale),size.x,size.y);UnityEngine.GUI.Label(rect,line,style);UnityEngine.GUI.matrix=matrix;}
+  ConfigEntry<float> alertAnchorX;
+  ConfigEntry<float> alertAnchorY;
+  string runtimeRoot; bool inboxChecked; int checkedCandidates,checkedValid; bool showMaintenance,showCardDetails,showDetails; double nextDevPoll,nextContentProbe; bool welcomed,hasQuestContent; string statusDetail; bool statusIdle; IReadOnlyList<PackCandidate> quietInspected;
+  readonly List<CreatorEvidenceLine> outcomes=new(); UnityEngine.Vector2 outcomeScroll,evidenceScroll,detailsScroll;
+  bool barExpanded,alertDragging; UnityEngine.Vector2 alertDragOffset; string status="Runtime ready"; PackCandidate[] available=Array.Empty<PackCandidate>(); ActiveSet[] activationHistory=Array.Empty<ActiveSet>(); int selectedVersion,selectedActivation; UnityEngine.Rect details=new(24,140,560,610);
+  UnityEngine.Texture2D windowBackground,rowBackground,helpBackground,greenBackground,greenGlowBackground,blueBackground,amberBackground,primaryBackground,castRowBackground,dimBackground,deadlineBackground,deadlineUrgentBackground,circleDoneBackground,circleCurrentBackground,circleWaitingBackground,railDoneBackground,railWaitingBackground; UnityEngine.GUIStyle windowStyle,barPanelStyle,sectionStyle,rowStyle,helpStyle,readyStyle,primaryStyle,blueButtonStyle,amberButtonStyle,dimButtonStyle,stepPendingStyle,rungDoneStyle,rungCurrentStyle,rungWaitingStyle,rungNameDoneStyle,rungNameCurrentStyle,rungNameWaitingStyle,railDoneStyle,railWaitingStyle,stampStyle,castRowStyle,deadlineStyle,deadlineUrgentStyle,storyStyle,castStyle,warnStyle,plumbStyle,questTitleStyle,playingStyle,chipStyle,stateReadyStyle,stateChoiceStyle;
+  void Awake() {
+    runtimeRoot=Path.Combine(Paths.ConfigPath,"comfy-quest-runtime");
+    Directory.CreateDirectory(Path.Combine(runtimeRoot,"inbox"));
+    Directory.CreateDirectory(Path.Combine(runtimeRoot,"inbox-dev"));
+    packs=new QuestPackStore(runtimeRoot);
+    receipts=new RuntimeReceiptStore(runtimeRoot);
+    charms=new RuntimeCharmBinding(runtimeRoot,receipts);
+    privateWorldConfirmed=Config.Bind("Safety","PrivateWorldConfirmed",false,"Required before Charm inscription or mutation. Enable only for a private solo/listen-host world you control.");
+    engine=new RuntimeExperienceEngine(runtimeRoot,receipts,()=>privateWorldConfirmed.Value);
+    devChannel=new RuntimeDevChannelCoordinator(runtimeRoot,(active,correlation)=>{
+      var result=charms.RebindDevActive(active,correlation);
+      if(result.Any(value=>value.Status=="rebound"||value.Status=="already_current")){
+        engine?.ResolveAlert("charm_unbound");
+        engine?.ResolveAlert("binding_version");
+      }
+      return result;
+    });
+    arcaneSight=new RuntimeArcaneSight(runtimeRoot);
+    creatorRequests=new RuntimeCreatorRequestController(runtimeRoot,devChannel,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,message=>Logger.LogInfo(message));
+    studioUrl=Config.Bind("Studio","Url","http://127.0.0.1:8085/quest-studio","Loopback URL opened by the Runtime creator bar. Only an http:// localhost address is accepted.");
+    var legacyAnchor=Config.Bind("Presentation","DeadlineAnchor",.16f,"Legacy vertical alert position; migrated into AlertAnchorY.");
+    alertAnchorX=Config.Bind("Presentation","AlertAnchorX",.5f,"Horizontal center of the single alert anchor as a screen fraction (0.05-0.95).");
+    alertAnchorY=Config.Bind("Presentation","AlertAnchorY",legacyAnchor.Value,"Top of the single alert anchor as a screen fraction (0.05-0.85).");
+    var legacyHotkey=Config.Bind("Runtime","DrawerHotkey",new KeyboardShortcut(UnityEngine.KeyCode.F9),"Legacy creator-surface key; migrated into CreatorBarHotkey.");
+    barHotkey=Config.Bind("Runtime","CreatorBarHotkey",legacyHotkey.Value,"Expand or minimize the overhead creator bar.");
+    castHotkey=Config.Bind("Runtime","CharmGestureHotkey",new KeyboardShortcut(UnityEngine.KeyCode.BackQuote),"While the creator bar is expanded: first press CHECKS and captures the aimed target; second press CASTS onto that exact target.");
+    checkHotkey=Config.Bind("Runtime","CheckHotkey",new KeyboardShortcut(UnityEngine.KeyCode.F10),"Check inbox without activating content.");
+    loadHotkey=Config.Bind("Runtime","LoadLatestHotkey",new KeyboardShortcut(UnityEngine.KeyCode.F11),"Activate the highest compatible version.");
+    RuntimeEventRouter.Engine=engine;
+    devChannel.Heartbeat(DateTimeOffset.UtcNow);
+    var harmony=new Harmony("djcdevelopment.valheim.comfyquestruntime");
+    harmony.PatchAll(typeof(RuntimeInputPatches));
+    RuntimeKillPatches.Apply(harmony); RuntimeCooperativePatches.Apply(harmony);
+    RuntimeEasyEventPatches.Apply(harmony); RuntimeProgressionPatches.Apply(harmony);
+    RuntimeWorldStatePatches.Apply(harmony); RuntimeCoreActionPatches.Apply(harmony);
+    RuntimeHarvestPatches.Apply(harmony);
+    foreach(var patch in RuntimePatching.Outcomes) Logger.LogInfo($"Runtime patch {patch.SignatureId}: {(patch.Applied?"ok":patch.Detail)}");
+    Logger.LogInfo($"Runtime ready. CreatorBar={barHotkey.Value}, charm={castHotkey.Value}, check={checkHotkey.Value}, load={loadHotkey.Value}, inbox={Path.Combine(runtimeRoot,"inbox")}");
+  }
+  void Update(){engine?.Tick();PollDevChannel();creatorRequests?.Poll(UnityEngine.Time.realtimeSinceStartup,engine?.CurrentStageId());arcaneSight?.Tick();WelcomeOnce();if(barExpanded)RuntimeInputPatches.Maintain();if(TypingInGame())return;if(barHotkey.Value.IsDown())SetBarExpanded(!barExpanded);if(barExpanded&&UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Escape))SetBarExpanded(false);if(barExpanded&&castHotkey.Value.IsDown())HandleCharmGesture();if(checkHotkey.Value.IsDown()){status=CheckForNew();Report(status,statusIdle);}if(loadHotkey.Value.IsDown()){status=LoadLatest();Report(status,statusIdle);}}
+  void OnGUI() {
+    if(!HasQuestContent()) return;
+    EnsureStyles();
+    DrawCreatorBar();
+    DrawAlertAnchor();
+    if(!barExpanded) return;
+    arcaneSight?.Draw(helpStyle);
+    if(showDetails) {
+      var bar=CreatorBarRect();
+      details.width=UnityEngine.Mathf.Max(120f,UnityEngine.Mathf.Min(560f,UnityEngine.Screen.width-16f));
+      details.x=UnityEngine.Mathf.Clamp(bar.x,8f,UnityEngine.Mathf.Max(8f,UnityEngine.Screen.width-details.width-8f));
+      details.y=UnityEngine.Mathf.Min(bar.yMax+8f,UnityEngine.Mathf.Max(8f,UnityEngine.Screen.height-188f));
+      details.height=UnityEngine.Mathf.Max(180f,UnityEngine.Mathf.Min(610f,UnityEngine.Screen.height-details.y-8f));
+      details=UnityEngine.GUILayout.Window(94731,details,DrawDetailsPopover,"Creator details",windowStyle);
+    }
+  }
+
+  // The creator surface is always overhead when quest content exists. F9 changes density,
+  // not visibility: 36 px for the hundredth run, 116 px when names and actions are needed.
+  // The safe top is below the observed host diagnostic band; the previous y=48 placed the
+  // complete compact bar behind that band at the 1026x740 live viewport.
+  UnityEngine.Rect CreatorBarRect() {
+    var bounds=RuntimeCreatorBarLayout.Place(UnityEngine.Screen.width,UnityEngine.Screen.height,barExpanded);
+    return new UnityEngine.Rect(bounds.X,bounds.Y,bounds.Width,bounds.Height);
+  }
+
+  sealed class WorkflowSnapshot {
+    public ActiveSet Active;
+    public PackCandidate Latest;
+    public bool Valid;
+    public bool Confirmed;
+    public int Current;
+  }
+
+  WorkflowSnapshot Workflow() {
+    var active=ReadActive();
+    var valid=inboxChecked&&checkedCandidates>0&&checkedCandidates==checkedValid;
+    var latest=available.Length>0?available[0]:null;
+    var confirmed=active!=null&&latest!=null&&active.PackId==latest.Manifest.PackId
+        &&active.Version==latest.Manifest.Version
+        &&string.Equals(active.ContentHash,latest.ContentHash,StringComparison.OrdinalIgnoreCase);
+    return new WorkflowSnapshot {
+      Active=active, Latest=latest, Valid=valid, Confirmed=confirmed,
+      Current=!inboxChecked?0:!valid?1:!confirmed?2:4,
+    };
+  }
+
+  void DrawCreatorBar() {
+    var rect=CreatorBarRect();
+    barPanelStyle??=BarStyle(windowBackground);
+    UnityEngine.GUI.Box(rect,UnityEngine.GUIContent.none,barPanelStyle);
+    UnityEngine.GUILayout.BeginArea(new UnityEngine.Rect(rect.x+7f,rect.y+2f,rect.width-14f,rect.height-4f));
+    var workflow=Workflow();
+    DrawCompactBar(workflow);
+    if(barExpanded) DrawExpandedBar(workflow);
+    UnityEngine.GUILayout.EndArea();
+  }
+
+  void DrawCompactBar(WorkflowSnapshot workflow) {
+    UnityEngine.GUILayout.BeginHorizontal(UnityEngine.GUILayout.Height(32f));
+    UnityEngine.GUILayout.Label("COMFY QUEST",sectionStyle,UnityEngine.GUILayout.Width(92f),UnityEngine.GUILayout.Height(30f));
+    DrawCompactDots(workflow);
+    var active=workflow.Active;
+    var title=active==null?"Nothing playing":CreatorLoopNotice.ActiveTitle(TitleSource(),active)??active.PackId;
+    UnityEngine.GUILayout.Label(active==null?title:title+"  "+active.Version,playingStyle,UnityEngine.GUILayout.MinWidth(170f),UnityEngine.GUILayout.Height(30f));
+    UnityEngine.GUILayout.FlexibleSpace();
+    UnityEngine.GUILayout.Label(CharmState(),CharmReady()?readyStyle:stepPendingStyle,UnityEngine.GUILayout.Width(92f),UnityEngine.GUILayout.Height(28f));
+    if(UnityEngine.GUILayout.Button((barExpanded?"MINIMIZE ":"EXPAND ")+barHotkey.Value,dimButtonStyle,UnityEngine.GUILayout.Width(132f),UnityEngine.GUILayout.Height(28f))) SetBarExpanded(!barExpanded);
+    UnityEngine.GUILayout.EndHorizontal();
+  }
+
+  void DrawCompactDots(WorkflowSnapshot workflow) {
+    UnityEngine.GUILayout.BeginHorizontal(UnityEngine.GUILayout.Width(116f));
+    for(var index=0;index<4;index++) {
+      var done=workflow.Current==4||index<workflow.Current;
+      var current=workflow.Current==index;
+      UnityEngine.GUILayout.Label(done?"✓":"",done?rungDoneStyle:current?rungCurrentStyle:rungWaitingStyle,UnityEngine.GUILayout.Width(22f),UnityEngine.GUILayout.Height(22f));
+      if(index<3) UnityEngine.GUILayout.Space(6f);
+    }
+    UnityEngine.GUILayout.EndHorizontal();
+  }
+
+  void DrawExpandedBar(WorkflowSnapshot workflow) {
+    UnityEngine.GUILayout.BeginHorizontal(UnityEngine.GUILayout.Height(70f));
+    ExpandedRung("LOOK",0,workflow,$"{checkedCandidates} found");
+    ExpandedRail(0,workflow);
+    ExpandedRung("VALIDATE",1,workflow,$"{checkedValid} valid");
+    ExpandedRail(1,workflow);
+    ExpandedRung("LOAD",2,workflow,workflow.Active?.Version??"none");
+    ExpandedRail(2,workflow);
+    ExpandedRung("CONFIRM",3,workflow,workflow.Confirmed?"active":"waiting");
+    UnityEngine.GUILayout.Space(8f);
+    DrawUpdateAction(workflow);
+    UnityEngine.GUILayout.FlexibleSpace();
+    if(UnityEngine.GUILayout.Button(devChannel.Armed?"DEV ARMED":"ARM DEV",devChannel.Armed?primaryStyle:amberButtonStyle,UnityEngine.GUILayout.Width(96f),UnityEngine.GUILayout.Height(34f))) {
+      if(devChannel.Armed) devChannel.Disarm(DateTimeOffset.UtcNow);
+      else if(privateWorldConfirmed.Value) devChannel.Arm(DateTimeOffset.UtcNow);
+      else { status="Private world confirmation required."; Report(status); }
+    }
+    if(UnityEngine.GUILayout.Button("OPEN STUDIO",blueButtonStyle,UnityEngine.GUILayout.Width(108f),UnityEngine.GUILayout.Height(34f))) OpenStudio();
+    if(UnityEngine.GUILayout.Button(showDetails?"HIDE DETAILS":"DETAILS",dimButtonStyle,UnityEngine.GUILayout.Width(102f),UnityEngine.GUILayout.Height(34f))) {
+      showDetails=!showDetails;
+      if(showDetails) RefreshActivationHistory();
+    }
+    UnityEngine.GUILayout.EndHorizontal();
+  }
+
+  void ExpandedRung(string name,int index,WorkflowSnapshot workflow,string detail) {
+    var done=workflow.Current==4||index<workflow.Current;
+    var current=workflow.Current==index;
+    UnityEngine.GUILayout.BeginVertical(UnityEngine.GUILayout.Width(78f));
+    UnityEngine.GUILayout.Label(done?"✓":"",done?rungDoneStyle:current?rungCurrentStyle:rungWaitingStyle,UnityEngine.GUILayout.Width(22f),UnityEngine.GUILayout.Height(22f));
+    UnityEngine.GUILayout.Label(name+"\n"+detail,done?rungNameDoneStyle:current?rungNameCurrentStyle:rungNameWaitingStyle,UnityEngine.GUILayout.Width(78f),UnityEngine.GUILayout.Height(36f));
+    UnityEngine.GUILayout.EndVertical();
+  }
+
+  void ExpandedRail(int index,WorkflowSnapshot workflow) {
+    var done=workflow.Current==4||index<workflow.Current;
+    UnityEngine.GUILayout.BeginVertical(UnityEngine.GUILayout.Width(22f));
+    UnityEngine.GUILayout.Space(10f);
+    UnityEngine.GUILayout.Label(UnityEngine.GUIContent.none,done?railDoneStyle:railWaitingStyle,UnityEngine.GUILayout.Height(2f),UnityEngine.GUILayout.Width(22f));
+    UnityEngine.GUILayout.EndVertical();
+  }
+
+  void DrawUpdateAction(WorkflowSnapshot workflow) {
+    var label=!inboxChecked?"CHECK "+checkHotkey.Value:!workflow.Valid?"CHECK DIAGNOSTICS":!workflow.Confirmed?"PLAY "+loadHotkey.Value:"UP TO DATE";
+    var style=!inboxChecked?blueButtonStyle:!workflow.Valid?amberButtonStyle:!workflow.Confirmed?primaryStyle:dimButtonStyle;
+    var prior=UnityEngine.GUI.enabled;
+    if(workflow.Confirmed) UnityEngine.GUI.enabled=false;
+    if(UnityEngine.GUILayout.Button(label,style,UnityEngine.GUILayout.Width(178f),UnityEngine.GUILayout.Height(34f))) {
+      status=!inboxChecked||!workflow.Valid?CheckForNew():LoadLatest();
+      Report(status,statusIdle);
+    }
+    UnityEngine.GUI.enabled=prior;
+  }
+
+  string CharmState() {
+    var aim=charms?.CapturedPreview;
+    if(aim!=null) return aim.Allowed?"READY":"NOT READY";
+    return string.IsNullOrWhiteSpace(charms?.Landed)?"CHECK":"LANDED";
+  }
+  bool CharmReady()=>charms?.CapturedPreview?.Allowed==true||!string.IsNullOrWhiteSpace(charms?.Landed);
+
+  void DrawDetailsPopover(int id) {
+    detailsScroll=UnityEngine.GUILayout.BeginScrollView(detailsScroll);
+    DrawStatusCard();
+    UnityEngine.GUILayout.Space(7);
+    UnityEngine.GUILayout.Label("EXPERIENCE",sectionStyle,UnityEngine.GUILayout.Height(22));
+    UnityEngine.GUILayout.Label(engine.DescribeProgress(),rowStyle,UnityEngine.GUILayout.Height(34));
+    DrawRecentEvidence();
+    UnityEngine.GUILayout.Space(7);
+    DrawReady(charms.CapturedPreview);
+    UnityEngine.GUILayout.Space(7);
+    if(UnityEngine.GUILayout.Button((showMaintenance?"- ":"+ ")+"MACHINERY · CAPTURES, ARCANE SIGHT, VERSIONS & ROLLBACK",dimButtonStyle,UnityEngine.GUILayout.Height(27))) {
+      showMaintenance=!showMaintenance;
+      if(showMaintenance) RefreshActivationHistory();
+    }
+    if(showMaintenance) {
+      DrawOutcomes();
+      UnityEngine.GUILayout.Space(7);
+      DrawArcaneSight();
+      UnityEngine.GUILayout.Space(7);
+      DrawMaintenance();
+    }
+    UnityEngine.GUILayout.EndScrollView();
+  }
+
+  // Deadlines and actionable warnings share one movable anchor. The engine supplies a
+  // stable warning key and explicitly clears it; this surface never parses prose for state.
+  void DrawAlertAnchor() {
+    var deadline=engine?.Deadline();
+    var warning=string.IsNullOrWhiteSpace(deadline)?engine?.CurrentAlert():null;
+    var line=string.IsNullOrWhiteSpace(deadline)?warning?.Text:deadline;
+    if(string.IsNullOrWhiteSpace(line)) return;
+    var style=!string.IsNullOrWhiteSpace(deadline)&&engine.DeadlineUrgent()?deadlineUrgentStyle:deadlineStyle;
+    var scale=UnityEngine.Mathf.Clamp(UnityEngine.Screen.height/900f,1f,2.5f);
+    var matrix=UnityEngine.GUI.matrix;
+    UnityEngine.GUI.matrix=UnityEngine.Matrix4x4.TRS(UnityEngine.Vector3.zero,UnityEngine.Quaternion.identity,new UnityEngine.Vector3(scale,scale,1f));
+    var size=style.CalcSize(new UnityEngine.GUIContent(line));
+    var screenWidth=UnityEngine.Screen.width/scale;
+    var screenHeight=UnityEngine.Screen.height/scale;
+    var x=UnityEngine.Mathf.Clamp(alertAnchorX.Value,.05f,.95f)*screenWidth-size.x/2f;
+    var y=UnityEngine.Mathf.Clamp(alertAnchorY.Value,.05f,.85f)*screenHeight;
+    var rect=new UnityEngine.Rect(UnityEngine.Mathf.Clamp(x,0f,screenWidth-size.x),UnityEngine.Mathf.Clamp(y,0f,screenHeight-size.y),size.x,size.y);
+    UnityEngine.GUI.Label(rect,line,style);
+    if(barExpanded) HandleAlertDrag(rect,size,screenWidth,screenHeight);
+    UnityEngine.GUI.matrix=matrix;
+  }
+
+  void HandleAlertDrag(UnityEngine.Rect rect,UnityEngine.Vector2 size,float screenWidth,float screenHeight) {
+    var evt=UnityEngine.Event.current;
+    if(evt.type==UnityEngine.EventType.MouseDown&&evt.button==0&&rect.Contains(evt.mousePosition)) {
+      alertDragging=true;
+      alertDragOffset=evt.mousePosition-rect.position;
+      evt.Use();
+    } else if(alertDragging&&evt.type==UnityEngine.EventType.MouseDrag) {
+      var origin=evt.mousePosition-alertDragOffset;
+      alertAnchorX.Value=UnityEngine.Mathf.Clamp((origin.x+size.x/2f)/screenWidth,.05f,.95f);
+      alertAnchorY.Value=UnityEngine.Mathf.Clamp(origin.y/screenHeight,.05f,.85f);
+      evt.Use();
+    } else if(alertDragging&&evt.type==UnityEngine.EventType.MouseUp) {
+      alertDragging=false;
+      Config.Save();
+      evt.Use();
+    }
+  }
   // The status card answers "which revision is running?" title-first: the quest's authored
   // name is the shared CreatorLoopNotice.ActiveTitle fact, the state line is the shared Card
   // fact — with the idle "up to date" answer first-class, because session 1 of the Phase 3
@@ -60,14 +289,30 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   // Mirrors the Lab InputGuard seams without referencing its assembly: every keystroke is a
   // hotkey unless something says otherwise, and chat, console, and text input say otherwise.
   static bool TypingInGame(){try{if(global::Console.IsVisible())return true;}catch{}try{if(TextInput.IsVisible())return true;}catch{}try{if(Chat.instance!=null&&Chat.instance.HasFocus())return true;}catch{}return false;}
-  // One session-scoped line so the drawer is discoverable in the world it serves; only when
+  // One session-scoped line so the expanded bar is discoverable in the world it serves; only when
   // quest content actually exists, so a mod-less install stays silent.
-  void WelcomeOnce(){if(welcomed||MessageHud.instance==null||Player.m_localPlayer==null)return;welcomed=true;if(HasQuestContent())Report("Comfy Quest ready. Press "+drawerHotkey.Value+" for the creator drawer.");}
-  bool HasQuestContent(){try{if(File.Exists(Path.Combine(runtimeRoot,"active","active-set.json")))return true;var inbox=Path.Combine(runtimeRoot,"inbox");return Directory.Exists(inbox)&&Directory.GetFiles(inbox,"*.questpack").Length>0;}catch{return false;}}
+  void WelcomeOnce(){if(welcomed||MessageHud.instance==null||Player.m_localPlayer==null)return;welcomed=true;if(HasQuestContent())Report("Comfy Quest ready. Press "+barHotkey.Value+" to expand the creator bar.");}
+  bool HasQuestContent(){var now=UnityEngine.Time.realtimeSinceStartup;if(now<nextContentProbe)return hasQuestContent;nextContentProbe=now+1d;try{if(File.Exists(Path.Combine(runtimeRoot,"active","active-set.json")))return hasQuestContent=true;var inbox=Path.Combine(runtimeRoot,"inbox");return hasQuestContent=Directory.Exists(inbox)&&Directory.GetFiles(inbox,"*.questpack").Length>0;}catch{return hasQuestContent=false;}}
+  static string CurrentWorldUid(){try{return ZNet.instance==null?string.Empty:ZNet.instance.GetWorldUID().ToString(System.Globalization.CultureInfo.InvariantCulture);}catch{return string.Empty;}}
   void DrawDevChannel(){UnityEngine.GUILayout.Label("DEV CHANNEL",sectionStyle,UnityEngine.GUILayout.Height(22));if(devChannel.Armed){if(UnityEngine.GUILayout.Button("DEV CHANNEL ARMED · DISARM",primaryStyle,UnityEngine.GUILayout.Height(34)))devChannel.Disarm(DateTimeOffset.UtcNow);UnityEngine.GUILayout.Label("Studio revisions are validated and pulled into this private session.",helpStyle,UnityEngine.GUILayout.Height(30));return;}var allowed=privateWorldConfirmed.Value;var prior=UnityEngine.GUI.enabled;UnityEngine.GUI.enabled=allowed;if(UnityEngine.GUILayout.Button(allowed?"ARM DEV CHANNEL":"PRIVATE WORLD CONFIRMATION REQUIRED",allowed?amberButtonStyle:dimButtonStyle,UnityEngine.GUILayout.Height(34))&&allowed)devChannel.Arm(DateTimeOffset.UtcNow);UnityEngine.GUI.enabled=prior;UnityEngine.GUILayout.Label("Arming is session-only. Studio can publish bytes; only the game may activate them.",helpStyle,UnityEngine.GUILayout.Height(30));}
   void PollDevChannel(){if(devChannel==null||UnityEngine.Time.realtimeSinceStartup<nextDevPoll)return;nextDevPoll=UnityEngine.Time.realtimeSinceStartup+.5;try{var result=devChannel.Poll(DateTimeOffset.UtcNow,engine?.CurrentStageId());if(result.Activated){status=result.Message;AddOutcome(CreatorEvidenceKind.Plumbing,"DEV · "+result.Message);}else if(result.Message!=null&&result.Message.StartsWith("Dev revision rejected",StringComparison.Ordinal)){status=result.Message;AddOutcome(CreatorEvidenceKind.Warning,"DEV REJECTED · "+result.Message);}}catch(Exception e){status="Dev channel unavailable: "+e.Message;Logger.LogWarning(status);}}
   void DrawArcaneSight(){if(UnityEngine.GUILayout.Button(arcaneSight.Active?"ARCANE SIGHT - ON":"ARCANE SIGHT - OFF",blueButtonStyle,UnityEngine.GUILayout.Height(27)))arcaneSight.Toggle();UnityEngine.GUILayout.Label(arcaneSight.Describe(),rowStyle,UnityEngine.GUILayout.Height(36));}
-  void OpenStudio(){if(!Uri.TryCreate(studioUrl.Value,UriKind.Absolute,out var uri)||uri.Scheme!="http"||!(uri.Host=="127.0.0.1"||uri.Host=="localhost"||uri.Host=="::1")){status="Studio URL rejected: loopback http required.";Report(status);return;}UnityEngine.Application.OpenURL(uri.AbsoluteUri);}
+  void OpenStudio(){
+    if(!Uri.TryCreate(studioUrl.Value,UriKind.Absolute,out var uri)||uri.Scheme!="http"||!(uri.Host=="127.0.0.1"||uri.Host=="localhost"||uri.Host=="::1")){
+      status="Studio URL rejected: loopback http required."; Report(status); return;
+    }
+    var active=ReadActive();
+    var query=new List<string>();
+    if(!string.IsNullOrWhiteSpace(uri.Query)) query.Add(uri.Query.TrimStart('?'));
+    query.Add("stage="+(active==null?"author":"observe"));
+    if(active!=null){
+      query.Add("pack_id="+Uri.EscapeDataString(active.PackId??""));
+      query.Add("version="+Uri.EscapeDataString(active.Version??""));
+      query.Add("runtime_stage="+Uri.EscapeDataString(engine?.CurrentStageId()??""));
+    }
+    var target=new UriBuilder(uri){Query=string.Join("&",query.Where(value=>!string.IsNullOrWhiteSpace(value)))};
+    UnityEngine.Application.OpenURL(target.Uri.AbsoluteUri);
+  }
   // Three states, not two: CHECK (nothing captured), READY / NOT READY (a capture is standing, and
   // it is lit in the world so the player can see what it is), and LANDED after a cast — session 2's
   // strip snapped back to READY the instant a charm landed and re-armed silently on the next press.
@@ -81,7 +326,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   void DrawEvidenceRow(CreatorEvidenceLine line){if(line==null)return;UnityEngine.GUILayout.BeginHorizontal(line.Kind==CreatorEvidenceKind.Cast?castRowStyle:UnityEngine.GUIStyle.none);UnityEngine.GUILayout.Label(line.Stamp??"",stampStyle,UnityEngine.GUILayout.Width(58));UnityEngine.GUILayout.Label(Mark(line.Kind),EvidenceStyle(line.Kind),UnityEngine.GUILayout.Width(24));UnityEngine.GUILayout.Label(line.Text,EvidenceStyle(line.Kind));UnityEngine.GUILayout.EndHorizontal();}
   static string Mark(CreatorEvidenceKind kind)=>kind switch{CreatorEvidenceKind.Story=>"◆",CreatorEvidenceKind.Cast=>"◆",CreatorEvidenceKind.Warning=>"▲",_=>"·"};
   UnityEngine.GUIStyle EvidenceStyle(CreatorEvidenceKind kind)=>kind switch{CreatorEvidenceKind.Story=>storyStyle,CreatorEvidenceKind.Cast=>castStyle,CreatorEvidenceKind.Warning=>warnStyle,_=>plumbStyle};
-  void HandleCharmGesture(){if(!charms.HasCapture){var aim=charms.Capture(privateWorldConfirmed.Value);AddOutcome(aim.Allowed?CreatorEvidenceKind.Plumbing:CreatorEvidenceKind.Warning,(aim.Allowed?"CHECK READY · ":"CHECK REJECTED · ")+aim.Summary);status=aim.Allowed?"Target captured. Press ` again to Cast Charm.":"Target rejected. Aim elsewhere and CHECK again.";Report(status);}else{status=charms.CastCaptured(privateWorldConfirmed.Value);AddOutcome(CreatorEvidenceKind.Cast,"CAST · "+status);Report(status);}}
+  void HandleCharmGesture(){if(!charms.HasCapture){var aim=charms.Capture(privateWorldConfirmed.Value);AddOutcome(aim.Allowed?CreatorEvidenceKind.Plumbing:CreatorEvidenceKind.Warning,(aim.Allowed?"CHECK READY · ":"CHECK REJECTED · ")+aim.Summary);status=aim.Allowed?"Target captured. Press ` again to Cast Charm.":"Target rejected. Aim elsewhere and CHECK again.";Report(status);}else{status=charms.CastCaptured(privateWorldConfirmed.Value);if(!string.IsNullOrWhiteSpace(charms.Landed)){engine?.ResolveAlert("charm_unbound");engine?.ResolveAlert("binding_version");}AddOutcome(CreatorEvidenceKind.Cast,"CAST · "+status);Report(status);}}
   void AddOutcome(CreatorEvidenceKind kind,string value){outcomes.Add(new CreatorEvidenceLine{Kind=kind,Stamp=DateTime.Now.ToString("HH:mm:ss"),Text=value});if(outcomes.Count>20)outcomes.RemoveAt(0);outcomeScroll.y=float.MaxValue;}
   void DrawUpdateWorkflow(){UnityEngine.GUILayout.Label("CONTENT UPDATE",sectionStyle,UnityEngine.GUILayout.Height(22));var active=ReadActive();var valid=inboxChecked&&checkedCandidates==checkedValid;var latest=available.Length>0?available[0]:null;var confirmed=active!=null&&latest!=null&&active.PackId==latest.Manifest.PackId&&active.Version==latest.Manifest.Version&&string.Equals(active.ContentHash,latest.ContentHash,StringComparison.OrdinalIgnoreCase);UnityEngine.GUILayout.BeginHorizontal();Rung("LOOK",inboxChecked,!inboxChecked,inboxChecked?$"{checkedCandidates} found":"inbox");Rail(inboxChecked);Rung("VALIDATE",valid,inboxChecked&&!valid,inboxChecked?$"{checkedValid} valid":"waiting");Rail(valid);Rung("LOAD",confirmed,valid&&!confirmed,active==null?"none":active.Version);Rail(confirmed);Rung("CONFIRM",confirmed,false,confirmed?"active":"waiting");UnityEngine.GUILayout.EndHorizontal();if(!inboxChecked){if(UnityEngine.GUILayout.Button("Check for updates · "+checkHotkey.Value,blueButtonStyle,UnityEngine.GUILayout.Height(36))){status=CheckForNew();Report(status,statusIdle);}}else if(!valid){if(UnityEngine.GUILayout.Button("Check again · diagnostics present",amberButtonStyle,UnityEngine.GUILayout.Height(36))){status=CheckForNew();Report(status,statusIdle);}}else if(!confirmed){if(UnityEngine.GUILayout.Button("Load validated update · "+loadHotkey.Value,primaryStyle,UnityEngine.GUILayout.Height(36))){status=LoadLatest();Report(status,statusIdle);}}else{var prior=UnityEngine.GUI.enabled;UnityEngine.GUI.enabled=false;UnityEngine.GUILayout.Button("Up to date · "+active.Version,dimButtonStyle,UnityEngine.GUILayout.Height(36));UnityEngine.GUI.enabled=prior;}UnityEngine.GUILayout.Label(status,plumbStyle,UnityEngine.GUILayout.Height(30));if(!string.IsNullOrWhiteSpace(statusDetail))UnityEngine.GUILayout.Label(statusDetail,helpStyle,UnityEngine.GUILayout.Height(24));}
   // Ladder grammar from the canvas (03): circles joined by rails, not filled bars. A done rung
@@ -110,7 +355,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   static UnityEngine.GUIStyle CircleStyle(UnityEngine.Texture2D background,UnityEngine.Color glyph){var style=new UnityEngine.GUIStyle(UnityEngine.GUI.skin.label){padding=new UnityEngine.RectOffset(0,0,0,0),margin=new UnityEngine.RectOffset(0,0,0,0),alignment=UnityEngine.TextAnchor.MiddleCenter,fontStyle=UnityEngine.FontStyle.Bold,fontSize=13};style.normal.background=background;style.normal.textColor=glyph;return style;}
   static UnityEngine.GUIStyle RungNameStyle(UnityEngine.Color color){var style=new UnityEngine.GUIStyle(UnityEngine.GUI.skin.label){padding=new UnityEngine.RectOffset(0,0,2,0),margin=new UnityEngine.RectOffset(0,0,0,0),alignment=UnityEngine.TextAnchor.MiddleCenter,fontStyle=UnityEngine.FontStyle.Bold,fontSize=11};style.normal.textColor=color;return style;}
   static UnityEngine.GUIStyle BarStyle(UnityEngine.Texture2D background){var style=new UnityEngine.GUIStyle{padding=new UnityEngine.RectOffset(0,0,0,0),margin=new UnityEngine.RectOffset(1,1,1,1)};style.normal.background=background;return style;}
-  void SetDrawer(bool visible){drawerVisible=visible;if(visible){RuntimeInputPatches.Acquire();arcaneSight?.Enable();}else{RuntimeInputPatches.Release();arcaneSight?.Disable();charms?.Release();}}
+  void SetBarExpanded(bool expanded){barExpanded=expanded;if(expanded){RuntimeInputPatches.Acquire();arcaneSight?.Enable();}else{showDetails=false;alertDragging=false;RuntimeInputPatches.Release();arcaneSight?.Disable();charms?.Release();}}
   // Creator plumbing speaks TopLeft, matching the Lab's convention; Center belongs to the
   // authored story and the countdown, and the plumbing never competes with it again.
   // An idle response re-asserts through the HUD's own repeat affordance: MessageHud.UpdateMessage
@@ -126,11 +371,11 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   // creator explicitly arms it in-game for this process session.
   // Both entrypoints speak through CreatorLoopNotice — the plugin renders, it never composes
   // creator copy inline. F10 states what checking proved; activation language belongs to F11.
-  public string CheckForNew(){try{var c=RefreshInbox();var notice=CreatorLoopNotice.Check(c,ReadActive(),loadHotkey.Value.ToString(),drawerHotkey.Value.ToString());statusDetail=notice.Detail;statusIdle=notice.Idle;return notice.Headline;}catch(Exception e){receipts.Write(new RuntimeReceipt{Operation="check",Status="rejected",Error=e.Message,EvidenceKind=CreatorEvidenceLine.KindName(CreatorEvidenceKind.Warning)});statusDetail=e.Message;statusIdle=false;return CreatorLoopNotice.CheckFailed(e.Message,drawerHotkey.Value.ToString()).Headline;}}
+  public string CheckForNew(){try{var c=RefreshInbox();var notice=CreatorLoopNotice.Check(c,ReadActive(),loadHotkey.Value.ToString(),barHotkey.Value.ToString());statusDetail=notice.Detail;statusIdle=notice.Idle;return notice.Headline;}catch(Exception e){receipts.Write(new RuntimeReceipt{Operation="check",Status="rejected",Error=e.Message,EvidenceKind=CreatorEvidenceLine.KindName(CreatorEvidenceKind.Warning)});statusDetail=e.Message;statusIdle=false;return CreatorLoopNotice.CheckFailed(e.Message,barHotkey.Value.ToString()).Headline;}}
   IReadOnlyList<PackCandidate> RefreshInbox(){var c=packs.CheckInbox();var valid=c.Count(x=>x.IsValid);inboxChecked=true;checkedCandidates=c.Count;checkedValid=valid;available=c.Where(x=>x.IsValid).OrderByDescending(x=>SemanticVersion.Parse(x.Manifest.Version)).ToArray();selectedVersion=0;receipts.Write(new RuntimeReceipt{Operation="check",Status=c.Count==valid?"accepted":"diagnostics",CandidateCount=c.Count,ValidCount=valid,Diagnostics=c.SelectMany(x=>x.Diagnostics).ToArray()});foreach(var candidate in available)receipts.Write(new RuntimeReceipt{Operation="check",Status="accepted",PackId=candidate.Manifest.PackId,Version=candidate.Manifest.Version,ContentHash=candidate.ContentHash,CandidateCount=c.Count,ValidCount=valid,Diagnostics=Array.Empty<ContractDiagnostic>()});return c;}
-  // F11 refreshes the same inbox state F10 populates, so the drawer's 1-2-3-4 ladder is a
+  // F11 refreshes the same inbox state F10 populates, so the bar's 1-2-3-4 ladder is a
   // fact about what the keys did rather than a narrative they bypass.
-  public string LoadLatest(){try{RefreshInbox();var before=ReadActive();var c=packs.LoadLatest();if(c==null){receipts.Write(new RuntimeReceipt{Operation="load",Status="rejected",Error="no_compatible_pack"});statusDetail="no_compatible_pack";var empty=CreatorLoopNotice.NothingToLoad(checkHotkey.Value.ToString());statusIdle=empty.Idle;return empty.Headline;}var active=ReadActive();if(before!=null&&active!=null&&string.Equals(before.ActivationId,active.ActivationId,StringComparison.Ordinal)){receipts.Write(new RuntimeReceipt{Operation="load",Status="already_active",PackId=c.Manifest.PackId,Version=c.Manifest.Version,ContentHash=c.ContentHash,ActivationId=active.ActivationId,Diagnostics=Array.Empty<ContractDiagnostic>()});var current=CreatorLoopNotice.AlreadyPlaying(c);statusDetail=current.Detail;statusIdle=current.Idle;return current.Headline;}receipts.Write(new RuntimeReceipt{Operation="load",Status="activated",PackId=c.Manifest.PackId,Version=c.Manifest.Version,ContentHash=c.ContentHash,ActivationId=active?.ActivationId,Diagnostics=Array.Empty<ContractDiagnostic>()});var notice=CreatorLoopNotice.Loaded(c,active,engine?.OrphanedBindingsAfterActivation()??0);statusDetail=notice.Detail;statusIdle=notice.Idle;return notice.Headline;}catch(Exception e){receipts.Write(new RuntimeReceipt{Operation="load",Status="rejected",Error=e.Message,EvidenceKind=CreatorEvidenceLine.KindName(CreatorEvidenceKind.Warning)});statusDetail=e.Message;statusIdle=false;return CreatorLoopNotice.LoadFailed(e.Message,drawerHotkey.Value.ToString()).Headline;}}
+  public string LoadLatest(){try{RefreshInbox();var before=ReadActive();var c=packs.LoadLatest();if(c==null){receipts.Write(new RuntimeReceipt{Operation="load",Status="rejected",Error="no_compatible_pack"});statusDetail="no_compatible_pack";var empty=CreatorLoopNotice.NothingToLoad(checkHotkey.Value.ToString());statusIdle=empty.Idle;return empty.Headline;}var active=ReadActive();if(before!=null&&active!=null&&string.Equals(before.ActivationId,active.ActivationId,StringComparison.Ordinal)){receipts.Write(new RuntimeReceipt{Operation="load",Status="already_active",PackId=c.Manifest.PackId,Version=c.Manifest.Version,ContentHash=c.ContentHash,ActivationId=active.ActivationId,Diagnostics=Array.Empty<ContractDiagnostic>()});var current=CreatorLoopNotice.AlreadyPlaying(c);statusDetail=current.Detail;statusIdle=current.Idle;return current.Headline;}receipts.Write(new RuntimeReceipt{Operation="load",Status="activated",PackId=c.Manifest.PackId,Version=c.Manifest.Version,ContentHash=c.ContentHash,ActivationId=active?.ActivationId,Diagnostics=Array.Empty<ContractDiagnostic>()});var notice=CreatorLoopNotice.Loaded(c,active,engine?.OrphanedBindingsAfterActivation()??0);statusDetail=notice.Detail;statusIdle=notice.Idle;return notice.Headline;}catch(Exception e){receipts.Write(new RuntimeReceipt{Operation="load",Status="rejected",Error=e.Message,EvidenceKind=CreatorEvidenceLine.KindName(CreatorEvidenceKind.Warning)});statusDetail=e.Message;statusIdle=false;return CreatorLoopNotice.LoadFailed(e.Message,barHotkey.Value.ToString()).Headline;}}
   public string LoadSelected(){if(available.Length==0)return "Check for new first.";var selected=available[Math.Max(0,Math.Min(selectedVersion,available.Length-1))];return Activate("load_selected",()=>packs.LoadVersion(selected.Manifest.PackId,selected.Manifest.Version));}
   public string Rollback()=>Activate("rollback",()=>packs.Rollback());
   public string Rollback(string activationId)=>Activate("rollback",()=>packs.Rollback(activationId));

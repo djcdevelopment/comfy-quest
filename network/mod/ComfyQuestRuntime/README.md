@@ -2,8 +2,10 @@
 
 Small gameplay-side consumer for certified `comfy-quest-experience/v1` documents. It owns explicit
 inbox checking and atomic activation; it does not watch files and never executes schema-1 quests.
-The current shell exposes an F9 compact drawer, explicit F10 Check and F11 Load latest, immutable JSON
-receipts, and a configurable loopback Open Studio button (default `127.0.0.1:8085`). The drawer previews a bounded aimed target and can inscribe
+The current shell exposes an always-present overhead creator bar, explicit F10 Check and F11 Load latest,
+immutable JSON receipts, and a configurable loopback Open Studio button (default
+`127.0.0.1:8085`). F9 changes the bar between a 36-pixel compact state and a named, actionable
+116-pixel state. Its details popover previews a bounded aimed target and can inscribe
 five namespaced references onto a locally owned creator-built object after explicit private-world
 confirmation. A one-stage `kill` or exact-bound-object `piece_damaged` to `message` executor uses a durable
 world/player/ZDO/content/stage/transition/action claim to suppress duplicates and restart replays. OMEN has
@@ -35,34 +37,41 @@ the matchable localization token; resources use clone-free prefab names. Only we
 classification cross the event boundary, and rejected/no-op damage or pick requests never advance a quest.
 
 Durable multi-stage progress is keyed by world, character, binding ZDO, and content hash. Transitions remain
-pending across reloads until their exactly-once actions are processed; the drawer reports current
+pending across reloads until their exactly-once actions are processed; the creator details report current
 stage/outcome. Two-stage sign editing and restart-safe engine-owned timers are automated and live-proven.
 
-The F9 drawer follows the Quest Lab F6 visual language while remaining a separate compact product
-surface: opaque dark hierarchy, section headers, readable status rows and hashes, title-bar dragging,
-Escape close, and distinct Active Content, Charm, and Experience sections. Multiple OMEN usability passes
-established the final two-press backquote CHECK/CAST workflow and bounded outcome log.
+The overhead bar follows the Quest Lab F6 visual language while remaining a separate product surface.
+Its clamped 92-pixel safe top clears the host diagnostic band proven at the live 1026x740 viewport.
+Its compact state keeps four workflow dots, active revision, CHECK/READY/LANDED, and the F9 affordance
+visible without taking the player out of the world. Expansion names Look/Validate/Load/Confirm, joins
+the rungs with state rails, and exposes the contextual Check/Play action, session-only dev arm, Studio
+handoff, and one details popover. Multiple OMEN usability passes established the final two-press
+backquote CHECK/CAST workflow and bounded outcome log.
 
-Opening F9 also enables client-local **Arcane Sight**. Every valid Runtime Charm binding in the
+Deadlines and present-tense warnings share one scaled, clamped alert anchor. The creator can drag it
+while the bar is expanded; Runtime stores X/Y fractions. Actionable warnings carry stable condition
+keys and disappear from both the anchor and evidence feed when their source reports that the condition
+has cleared. Copy is never parsed to infer state.
+
+Expanding F9 also enables client-local **Arcane Sight**. Every valid Runtime Charm binding in the
 currently loaded scene receives a temporary glow and an on-screen label with its experience,
-version, active/older-content state, local/remote ownership, and player distance. Closing F9
+version, active/older-content state, local/remote ownership, and player distance. Minimizing F9
 restores the prior renderer property blocks and removes the temporary lights; Arcane Sight never
 writes a ZDO or changes event routing. CHECK's fallback aim ray is bounded to 10 metres. Ambient
 quest events have no fixed metre radius: Runtime currently considers every matching, locally
-owned binding present in the loaded `WearNTear` instance set, and the drawer says so explicitly.
+owned binding present in the loaded `WearNTear` instance set, and the details popover says so explicitly.
 "No fixed radius" describes binding discovery only: authored event predicates may evaluate
 spatial relationships. A reviewed `SPATIAL` trigger clause compares stamped witness positions
 against an authored anchor and radius in the pure Contracts evaluator, without ever filtering
 which bindings participate.
 
-The second visual candidate prioritizes the normal operator path: a green READY/INSCRIBE affordance first,
-then a numbered Look/Validate/Load/Confirm update workflow driven by one context-sensitive button. Loading
-still requires its own explicit click. Version selection and rollback are collapsed into maintenance at the
-bottom, and every window interaction state retains the dark background.
+The expanded bar prioritizes the normal creator path: a four-rung Look/Validate/Load/Confirm workflow
+driven by one context-sensitive button. Loading still requires its own explicit click. Version selection,
+capture history, Arcane Sight controls, and rollback recede behind the maintenance disclosure.
 
-While F9 is open, configurable backquote (`` ` ``) is a two-press CHECK/CAST gesture. CHECK captures the exact aimed
+While F9 is expanded, configurable backquote (`` ` ``) is a two-press CHECK/CAST gesture. CHECK captures the exact aimed
 ZDO; CAST revalidates and inscribes that captured identity, independent of later cursor movement. Rejected
-targets stay in CHECK mode, and the drawer retains the latest 20 timestamped capture/outcome rows. Middle
+targets stay in CHECK mode, and the details popover retains the latest 20 timestamped capture/outcome rows. Middle
 mouse and Ctrl+Space are deliberately untouched because Valheim uses them for secondary attacks and roll.
 
 The executor implements a closed mutation registry: capped allowlisted item grants and bounded

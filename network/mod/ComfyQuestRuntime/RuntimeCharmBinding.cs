@@ -26,7 +26,7 @@ sealed class RuntimeCharmBinding {
   /// fresh capture looked identical.</summary>
   public string Landed=>landed;
   public string CastCaptured(bool privateConfirmed){var aim=captured;captured=null;ClearMark();return aim==null?"Cast failed: CHECK a target first.":InscribeAim(aim,privateConfirmed,"Cast Charm");}
-  /// <summary>Drop the capture and everything it lit up — the gesture belongs to the open drawer.</summary>
+  /// <summary>Drop the capture and everything it lit up — the gesture belongs to the expanded bar.</summary>
   public void Release(){captured=null;ClearMark();}
 
   /// <summary>Show the player what CHECK actually captured, before CAST commits to it. Session 2's

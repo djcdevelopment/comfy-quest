@@ -161,7 +161,7 @@ public class LabBatchContractTests {
 
   [Fact]
   public void RemotePolicyIsAClosedAllowlistWithNoConsoleOrKeystrokeLane() {
-    Assert.Equal(11, LabBatchRequestPolicy.Operations.Length);
+    Assert.Equal(18, LabBatchRequestPolicy.Operations.Length);
     Assert.True(LabBatchRequestPolicy.Validate(
         "prepare", "all-schools", null, null, null, out string _));
     Assert.True(LabBatchRequestPolicy.Validate(
@@ -195,6 +195,49 @@ public class LabBatchContractTests {
         "gallery_evidence", null, "unexpected-profile-field", null, "all",
         out string evidenceExtraError));
     Assert.Equal("request_argument_not_allowed", evidenceExtraError);
+  }
+
+  [Fact]
+  public void BlueprintMailboxIsBoundedWithoutPathsPrefabsCommandsOrKeys() {
+    Assert.True(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_capture", "human-hall", "20", "mine", false, null, out string _));
+    Assert.True(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_diff", "human-hall", null, null, false, null, out _));
+    Assert.True(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_build", "human-hall", null, null, false, "ground", out _));
+    Assert.True(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_clear", "human-hall", null, null, false, null, out _));
+
+    Assert.False(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_capture", "../escape", "20", "mine", false, null,
+        out string nameError));
+    Assert.Equal("blueprint_name_invalid", nameError);
+    Assert.False(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_capture", "human-hall", "41", "mine", false, null,
+        out string radiusError));
+    Assert.Equal("blueprint_capture_arguments_invalid", radiusError);
+    Assert.False(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_build", "human-hall", null, null, false, "arbitrary",
+        out string modeError));
+    Assert.Equal("blueprint_build_mode_invalid", modeError);
+    Assert.False(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_clear", "human-hall", null, null, true, null,
+        out string extraError));
+    Assert.Equal("request_argument_not_allowed", extraError);
+  }
+
+  [Fact]
+  public void CreatorIdentityPinsAreAllOrNothingAndLegacyRequestsRemainValid() {
+    Assert.True(LabBatchRequestPolicy.ValidateCreatorIdentity(
+        null, null, null, out string _));
+    Assert.True(LabBatchRequestPolicy.ValidateCreatorIdentity(
+        "OMEN", "-7600395338659582326", "creator-20260824-abcd1234", out _));
+    Assert.False(LabBatchRequestPolicy.ValidateCreatorIdentity(
+        "OMEN", null, "creator-20260824-abcd1234", out string partialError));
+    Assert.Equal("creator_identity_invalid", partialError);
+    Assert.False(LabBatchRequestPolicy.ValidateCreatorIdentity(
+        "OMEN", "not-a-world", "creator-20260824-abcd1234", out string worldError));
+    Assert.Equal("creator_identity_invalid", worldError);
   }
 
   [Fact]
