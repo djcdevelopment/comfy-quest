@@ -25,6 +25,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   ConfigEntry<string> studioUrl;
   ConfigEntry<float> alertAnchorX;
   ConfigEntry<float> alertAnchorY;
+  ConfigEntry<bool> showCreatorBar;
   string runtimeRoot; bool inboxChecked; int checkedCandidates,checkedValid; bool showMaintenance,showCardDetails,showDetails; double nextDevPoll,nextContentProbe; bool welcomed,hasQuestContent; string statusDetail; bool statusIdle; IReadOnlyList<PackCandidate> quietInspected;
   readonly List<CreatorEvidenceLine> outcomes=new(); UnityEngine.Vector2 outcomeScroll,evidenceScroll,detailsScroll;
   bool barExpanded,alertDragging; UnityEngine.Vector2 alertDragOffset; string status="Runtime ready"; PackCandidate[] available=Array.Empty<PackCandidate>(); ActiveSet[] activationHistory=Array.Empty<ActiveSet>(); int selectedVersion,selectedActivation; UnityEngine.Rect details=new(24,140,560,610);
@@ -52,6 +53,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     var legacyAnchor=Config.Bind("Presentation","DeadlineAnchor",.16f,"Legacy vertical alert position; migrated into AlertAnchorY.");
     alertAnchorX=Config.Bind("Presentation","AlertAnchorX",.5f,"Horizontal center of the single alert anchor as a screen fraction (0.05-0.95).");
     alertAnchorY=Config.Bind("Presentation","AlertAnchorY",legacyAnchor.Value,"Top of the single alert anchor as a screen fraction (0.05-0.85).");
+    showCreatorBar=Config.Bind("Presentation","ShowCreatorBar",true,"Draw the overhead creator surface. OFF hides every Runtime overlay and changes nothing else -- quests still load, events still fire, hotkeys still work. For unattended screenshot capture, where the bar otherwise burns into every frame. ComfyNetworkSense's showHudOnStart is the same idea.");
     var legacyHotkey=Config.Bind("Runtime","DrawerHotkey",new KeyboardShortcut(UnityEngine.KeyCode.F9),"Legacy creator-surface key; migrated into CreatorBarHotkey.");
     barHotkey=Config.Bind("Runtime","CreatorBarHotkey",legacyHotkey.Value,"Expand or minimize the overhead creator bar.");
     castHotkey=Config.Bind("Runtime","CharmGestureHotkey",new KeyboardShortcut(UnityEngine.KeyCode.BackQuote),"While the creator bar is expanded: first press CHECKS and captures the aimed target; second press CASTS onto that exact target.");
@@ -70,6 +72,9 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   }
   void Update(){engine?.Tick();PollDevChannel();creatorRequests?.Poll(UnityEngine.Time.realtimeSinceStartup,engine?.CurrentStageId());arcaneSight?.Tick();WelcomeOnce();if(barExpanded)RuntimeInputPatches.Maintain();if(TypingInGame())return;if(barHotkey.Value.IsDown())SetBarExpanded(!barExpanded);if(barExpanded&&UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Escape))SetBarExpanded(false);if(barExpanded&&castHotkey.Value.IsDown())HandleCharmGesture();if(checkHotkey.Value.IsDown()){status=CheckForNew();Report(status,statusIdle);}if(loadHotkey.Value.IsDown()){status=LoadLatest();Report(status,statusIdle);}}
   void OnGUI() {
+    // Visibility only. Update() keeps ticking the engine, polling the dev channel
+    // and reading hotkeys, so turning this off costs nothing but the pixels.
+    if(!showCreatorBar.Value) return;
     if(!HasQuestContent()) return;
     EnsureStyles();
     DrawCreatorBar();
