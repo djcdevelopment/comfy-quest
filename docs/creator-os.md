@@ -10,8 +10,12 @@ machine loop. The seat is for spatial judgment, authored choices, and play feel.
   Status, Close, exact plugin/config restoration, its closed action vocabulary,
   exclusive lease, install hash pins, backups, and rollback manifest. A second executable
   path drives Creator Session through the PowerShell sender, real Runtime request file,
-  shipping controller, correlated receipt, Arm, Disarm, and Restore. The Lab sender has a
-  corresponding correlated local round trip and fails on receipt identity drift.
+  shipping controller, correlated receipt, BuildOn, BuildOff, Arm, Disarm, and Restore.
+  Build control verifies both Valheim no-cost/all-pieces and god-mode state, rejects
+  enabling in an unconfirmed private world, keeps disabling available as a fail-safe, and
+  cannot carry a console command or synthetic key. The Lab
+  sender has a corresponding correlated local round trip and fails on receipt identity
+  drift.
 - Quest Lab capture normalization, projection, check-before-build, durable marking, and
   translation-independent diff are executable-test covered. The Godbuild importer is
   exercised through write, clean `--check`, and deliberate-drift rejection.
@@ -41,9 +45,9 @@ the corrected live Arm/Disarm receipts cover that exact branch.
 1. With Valheim closed, run `tools\creator-session\Invoke-CreatorSession.ps1 Prepare`. Prepare takes the install-wide lease, builds and hash-verifies the payload, backs up exact plugin/config/world files, enables the private-world safety gate, and records the machine/world/session pins used by every later request.
 2. Launch Valheim and enter the exact world named by the session manifest. This is the only keyboard step needed to establish the live-world precondition; do not open the console or relay F5 commands.
 3. Run `tools\creator-session\Invoke-CreatorSession.ps1 Status -SessionId <id>`. Continue only while the session is active, the machine and world pins agree, and every installed plugin hash still matches Prepare.
-4. Run one bounded operation: `GalleryRebuild`, `Capture -BlueprintName <name>`, or `Arm`. Each request expires, carries the same three identity pins, is consumed once in game, and returns a request-correlated receipt.
+4. For a Godbuild lap, run the bounded `BuildOn` operation and require its correlated receipt before the creator begins spatial work. While it is active, the creator uses ordinary hammer/build controls; run one bounded operation from `GalleryRebuild`, `Capture -BlueprintName <name>`, or `Arm` only when the lap calls for it. Every request expires, carries the same three identity pins, is consumed once in game, and has no console-command or synthetic-key field.
 5. Capture automatically imports the fixed receipt artifact and runs the generator-drift check. Review `examples/worldbuild/<name>/preview.svg`, `plan.json`, and `manifest.json`; the manifest names upstream exclusions and the capture/blueprint pair remains replay authority.
-6. Run `Replay -BlueprintName <name>` only after review. Replay hash-verifies and stages that exact reviewed pair, then performs check, build, and translation-independent diff and fails unless the receipt says `MATCH`; finish with `Close`, adding `-Restore` while Valheim is closed when the prior install bytes should be restored.
+6. Run `Replay -BlueprintName <name>` only after review. Replay hash-verifies and stages that exact reviewed pair, then performs check, build, and translation-independent diff and fails unless the receipt says `MATCH`. Run `BuildOff` and require its receipt before leaving the loaded world; then finish with `Close`. When prior install bytes should be restored, quit Valheim after `BuildOff` and use `Close -Restore`.
 
 ## Studio creator loop
 

@@ -7,7 +7,8 @@ using Newtonsoft.Json;
 
 /// <summary>Filesystem half of the Runtime Creator Session mailbox. One fixed request
 /// file, one fixed receipt directory, one expiring allowlist. World identity and safety
-/// are checked inside the game process before the only mutation (dev-channel arm).</summary>
+/// are checked inside the game process before either bounded mutation: dev-channel arm
+/// or private-world creator build mode.</summary>
 public sealed class RuntimeCreatorRequestController {
   const int MaxRequestBytes = 4096;
   const double PollSeconds = .5;
@@ -20,6 +21,8 @@ public sealed class RuntimeCreatorRequestController {
   readonly Func<bool> worldLoaded;
   readonly Func<string> worldUid;
   readonly Action<string> log;
+  readonly Action<bool> setCreatorBuildMode;
+  readonly Func<bool> creatorBuildMode;
   double nextPoll;
 
   public RuntimeCreatorRequestController(
@@ -28,13 +31,17 @@ public sealed class RuntimeCreatorRequestController {
       Func<bool> privateWorldConfirmed,
       Func<bool> isWorldLoaded,
       Func<string> currentWorldUid,
-      Action<string> logger = null) {
+      Action<string> logger = null,
+      Action<bool> setBuildMode = null,
+      Func<bool> isBuildModeEnabled = null) {
     string root = Path.GetFullPath(runtimeRoot ?? throw new ArgumentNullException(nameof(runtimeRoot)));
     devChannel = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
     privateConfirmed = privateWorldConfirmed ?? (() => false);
     worldLoaded = isWorldLoaded ?? (() => false);
     worldUid = currentWorldUid ?? (() => string.Empty);
     log = logger ?? (_ => { });
+    setCreatorBuildMode = setBuildMode;
+    creatorBuildMode = isBuildModeEnabled;
     requestPath = Path.Combine(root, "requests", "creator-request.json");
     receiptDirectory = Path.Combine(root, "receipts", "creator-requests");
     statusStore = new RuntimeDevChannelStatusStore(root);
@@ -107,6 +114,31 @@ public sealed class RuntimeCreatorRequestController {
           ? "dev_channel_armed" : "dev_channel_disarmed", currentStageId);
       return;
     }
+    if (operation == "build_on" || operation == "build_off") {
+      bool enable = operation == "build_on";
+      if (enable && !privateConfirmed()) {
+        Write(request, "rejected", "private_world_confirmation_required", currentStageId);
+        return;
+      }
+      if (setCreatorBuildMode == null || creatorBuildMode == null) {
+        Write(request, "rejected", "creator_build_control_unavailable", currentStageId);
+        return;
+      }
+      try {
+        setCreatorBuildMode(enable);
+        if (creatorBuildMode() != enable) {
+          try { setCreatorBuildMode(false); } catch { }
+          Write(request, "failed", "creator_build_state_mismatch", currentStageId);
+          return;
+        }
+        Write(request, "completed", enable
+            ? "creator_build_enabled" : "creator_build_disabled", currentStageId);
+      } catch (Exception exception) {
+        Write(request, "failed", "creator_build_failed:" + exception.GetType().Name,
+            currentStageId);
+      }
+      return;
+    }
     Write(request, "rejected", "operation_not_allowlisted", currentStageId);
   }
 
@@ -131,6 +163,7 @@ public sealed class RuntimeCreatorRequestController {
         ActiveContentHash = status?.ActiveContentHash,
         ActiveActivationId = status?.ActiveActivationId,
         CurrentStageId = status?.CurrentStageId ?? currentStageId,
+        CreatorBuildEnabled = creatorBuildMode == null ? null : creatorBuildMode(),
       };
       Directory.CreateDirectory(receiptDirectory);
       string path = Path.Combine(receiptDirectory, request.RequestId + ".json");

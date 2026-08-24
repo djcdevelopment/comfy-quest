@@ -5,8 +5,9 @@ using System.Globalization;
 using Newtonsoft.Json;
 
 /// <summary>One expiring, identity-pinned control request for the Runtime creator loop.
-/// The vocabulary intentionally stops at status/arm/disarm: it cannot load a pack,
-/// cast a Charm, inject a key, run a command, or name a path.</summary>
+/// The vocabulary intentionally stops at session state and the private-world creator
+/// build toggle: it cannot load a pack, cast a Charm, inject a key, run a command, or
+/// name a path.</summary>
 public sealed class RuntimeCreatorRequest {
   public const string CurrentSchema = "comfy-quest-runtime-request/v1";
 
@@ -21,7 +22,9 @@ public sealed class RuntimeCreatorRequest {
 }
 
 public static class RuntimeCreatorRequestPolicy {
-  public static readonly string[] Operations = { "status", "arm", "disarm" };
+  public static readonly string[] Operations = {
+    "status", "arm", "disarm", "build_on", "build_off"
+  };
 
   public static bool Validate(
       RuntimeCreatorRequest request, DateTimeOffset now, out string error) {
@@ -98,4 +101,6 @@ public sealed class RuntimeCreatorRequestReceipt {
   public string ActiveActivationId { get; set; }
   [JsonProperty("current_stage_id", NullValueHandling=NullValueHandling.Ignore)]
   public string CurrentStageId { get; set; }
+  [JsonProperty("creator_build_enabled", NullValueHandling=NullValueHandling.Ignore)]
+  public bool? CreatorBuildEnabled { get; set; }
 }

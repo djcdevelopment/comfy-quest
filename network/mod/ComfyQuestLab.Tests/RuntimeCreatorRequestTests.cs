@@ -26,6 +26,8 @@ public sealed class RuntimeCreatorRequestTests {
   [InlineData("status")]
   [InlineData("arm")]
   [InlineData("disarm")]
+  [InlineData("build_on")]
+  [InlineData("build_off")]
   public void RuntimeCreatorVocabularyStopsAtSessionControl(string operation) {
     Assert.True(RuntimeCreatorRequestPolicy.Validate(
         Request(operation), DateTimeOffset.Parse("2026-08-24T12:00:01Z"), out string error),
@@ -65,21 +67,31 @@ public sealed class RuntimeCreatorRequestTests {
   }
 
   [Fact]
-  public void ControllerConsumesRealMailboxFilesAcrossStatusArmAndDisarm() {
+  public void ControllerConsumesRealMailboxFilesAcrossStatusBuildArmAndDisarm() {
     string root = Path.Combine(Path.GetTempPath(), "comfy-runtime-request-" + Guid.NewGuid().ToString("N"));
     try {
       var coordinator = new RuntimeDevChannelCoordinator(root);
       var logs = new System.Collections.Generic.List<string>();
+      bool creatorBuild = false;
       var controller = new RuntimeCreatorRequestController(
           root, coordinator, () => true, () => true,
-          () => "-7600395338659582326", logs.Add);
+          () => "-7600395338659582326", logs.Add,
+          enabled => creatorBuild = enabled, () => creatorBuild);
 
       RuntimeCreatorRequestReceipt status = Dispatch(
           root, controller, RequestNow("status", "request-status"), 1d);
       Assert.Equal("completed", status.State);
       Assert.Equal("dev_channel_disarmed", status.Detail);
       Assert.False(status.DevArmed);
+      Assert.False(status.CreatorBuildEnabled);
       Assert.Equal("stage-one", status.CurrentStageId);
+
+      RuntimeCreatorRequestReceipt buildOn = Dispatch(
+          root, controller, RequestNow("build_on", "request-build-on"), 1.5d);
+      Assert.Equal("completed", buildOn.State);
+      Assert.Equal("creator_build_enabled", buildOn.Detail);
+      Assert.True(buildOn.CreatorBuildEnabled);
+      Assert.True(creatorBuild);
 
       RuntimeCreatorRequestReceipt armed = Dispatch(
           root, controller, RequestNow("arm", "request-arm"), 2d);
@@ -100,6 +112,13 @@ public sealed class RuntimeCreatorRequestTests {
       Assert.Equal("dev_channel_disarmed", disarmed.Detail);
       Assert.False(disarmed.DevArmed);
       Assert.False(coordinator.Armed);
+
+      RuntimeCreatorRequestReceipt buildOff = Dispatch(
+          root, controller, RequestNow("build_off", "request-build-off"), 5d);
+      Assert.Equal("completed", buildOff.State);
+      Assert.Equal("creator_build_disabled", buildOff.Detail);
+      Assert.False(buildOff.CreatorBuildEnabled);
+      Assert.False(creatorBuild);
       Assert.Contains(logs, line => line.Contains("request-arm completed - arm"));
     } finally {
       if (Directory.Exists(root)) Directory.Delete(root, true);
@@ -124,6 +143,14 @@ public sealed class RuntimeCreatorRequestTests {
         RequestNow("arm", "private-required"),
         privateConfirmed: false, worldLoaded: true, actualWorld: "-7600395338659582326",
         expected: "private_world_confirmation_required");
+    AssertDispatchRejected(
+        RequestNow("build_on", "build-private-required"),
+        privateConfirmed: false, worldLoaded: true, actualWorld: "-7600395338659582326",
+        expected: "private_world_confirmation_required");
+    AssertDispatchRejected(
+        RequestNow("build_on", "build-control-unavailable"),
+        privateConfirmed: true, worldLoaded: true, actualWorld: "-7600395338659582326",
+        expected: "creator_build_control_unavailable");
 
     RuntimeCreatorRequest expired = RequestNow("status", "expired-request");
     expired.CreatedUtc = DateTimeOffset.UtcNow.AddMinutes(-20).ToString("o");
@@ -131,6 +158,37 @@ public sealed class RuntimeCreatorRequestTests {
     AssertDispatchRejected(
         expired, privateConfirmed: true, worldLoaded: true,
         actualWorld: "-7600395338659582326", expected: "request_expired");
+  }
+
+  [Fact]
+  public void BuildOffIsAlwaysReachableAndAnEnableMismatchRollsBack() {
+    string root = Path.Combine(Path.GetTempPath(), "comfy-runtime-build-safety-" + Guid.NewGuid().ToString("N"));
+    try {
+      bool creatorBuild = true;
+      var controller = new RuntimeCreatorRequestController(
+          root, new RuntimeDevChannelCoordinator(root), () => false, () => true,
+          () => "-7600395338659582326", null,
+          enabled => creatorBuild = enabled, () => creatorBuild);
+      RuntimeCreatorRequestReceipt buildOff = Dispatch(
+          root, controller, RequestNow("build_off", "build-off-with-gate-closed"), 1d);
+      Assert.Equal("completed", buildOff.State);
+      Assert.Equal("creator_build_disabled", buildOff.Detail);
+      Assert.False(creatorBuild);
+
+      var transitions = new System.Collections.Generic.List<bool>();
+      var mismatchController = new RuntimeCreatorRequestController(
+          root, new RuntimeDevChannelCoordinator(root), () => true, () => true,
+          () => "-7600395338659582326", null,
+          enabled => transitions.Add(enabled), () => false);
+      RuntimeCreatorRequestReceipt mismatch = Dispatch(
+          root, mismatchController, RequestNow("build_on", "build-on-mismatch"), 2d);
+      Assert.Equal("failed", mismatch.State);
+      Assert.Equal("creator_build_state_mismatch", mismatch.Detail);
+      Assert.Equal(new[] { true, false }, transitions);
+      Assert.False(mismatch.CreatorBuildEnabled);
+    } finally {
+      if (Directory.Exists(root)) Directory.Delete(root, true);
+    }
   }
 
   [Fact]
@@ -165,10 +223,26 @@ public sealed class RuntimeCreatorRequestTests {
       string config = Path.Combine(
           root, "BepInEx", "config", "djcdevelopment.valheim.comfyquestruntime.cfg");
       var coordinator = new RuntimeDevChannelCoordinator(runtimeRoot);
+      bool creatorBuild = false;
       var controller = new RuntimeCreatorRequestController(
           runtimeRoot, coordinator,
           () => File.ReadAllText(config).Contains("PrivateWorldConfirmed = true"),
-          () => true, () => "-7600395338659582326");
+          () => true, () => "-7600395338659582326", null,
+          enabled => creatorBuild = enabled, () => creatorBuild);
+
+      ProcessResult buildOn = RunPowerShell(
+          repo, script, new[] { "BuildOn", "-WaitSeconds", "10" }.Concat(common).ToArray(),
+          controller);
+      Assert.Equal(0, buildOn.ExitCode);
+      Assert.Contains("Runtime request state: completed", buildOn.Output);
+      Assert.True(creatorBuild);
+
+      ProcessResult buildOff = RunPowerShell(
+          repo, script, new[] { "BuildOff", "-WaitSeconds", "10" }.Concat(common).ToArray(),
+          controller);
+      Assert.Equal(0, buildOff.ExitCode);
+      Assert.Contains("Runtime request state: completed", buildOff.Output);
+      Assert.False(creatorBuild);
 
       ProcessResult armed = RunPowerShell(
           repo, script, new[] { "Arm", "-WaitSeconds", "10" }.Concat(common).ToArray(),

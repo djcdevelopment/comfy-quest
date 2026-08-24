@@ -124,11 +124,13 @@ For an install-wide creator lap, use
 closed and owns build, exact backup, deployment, safety, identity pins, and rollback.
 After the creator enters the pinned world, Gallery, Runtime, and blueprint operations
 travel through bounded expiring request files and correlated receipts; no F5 relay or
-cross-machine hand copying is part of the loop. Capture automatically produces a
-reviewable Godbuild under `examples/worldbuild/<name>` and verifies generator drift.
-Replay stages the exact reviewed capture/blueprint pair, runs check before build, and
-fails unless the translation-independent diff receipt says `MATCH`. The executable,
-precondition-ordered choreography and its current proof level live in
+cross-machine hand copying is part of the loop. `BuildOn` directly enables the local
+private-world no-cost/all-pieces and god-mode states, verifies both, and exposes neither
+console commands nor synthetic keys; `BuildOff` reverses both before the world is left.
+Capture automatically produces a reviewable Godbuild under `examples/worldbuild/<name>`
+and verifies generator drift. Replay stages the exact reviewed capture/blueprint pair,
+runs check before build, and fails unless the translation-independent diff receipt says
+`MATCH`. The executable, precondition-ordered choreography and its current proof level live in
 `docs/creator-os.md`.
 
 The **R&D Signal Circuit** template is the current batch probe: normal chat, a durable

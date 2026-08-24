@@ -4,14 +4,15 @@ Send one bounded Runtime Creator Session request and collect its receipt.
 
 .DESCRIPTION
 Writes the fixed comfy-quest-runtime-request/v1 envelope to OMEN or the verified i5
-config lane. The only operations are status, arm, and disarm. Every request expires and
-pins machine, world UID, and Creator Session id; there is no command, key, pack, Charm,
-prefab, or path field.
+config lane. Operations are status, arm, disarm, build_on, and build_off. The build pair
+only controls Valheim's local no-cost/all-pieces and god-mode booleans inside an
+identity-pinned private world. Every request expires and pins machine, world UID, and
+Creator Session id; there is no command, key, pack, Charm, prefab, or path field.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('status', 'arm', 'disarm')]
+    [ValidateSet('status', 'arm', 'disarm', 'build_on', 'build_off')]
     [string]$Operation,
 
     [Parameter(Mandatory = $true)]

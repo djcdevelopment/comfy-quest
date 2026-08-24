@@ -16,7 +16,7 @@ claim a different session through this entrypoint.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('Prepare', 'Status', 'GalleryRebuild', 'Capture', 'Replay', 'Arm', 'Disarm', 'Close')]
+    [ValidateSet('Prepare', 'Status', 'GalleryRebuild', 'Capture', 'Replay', 'Arm', 'Disarm', 'BuildOn', 'BuildOff', 'Close')]
     [string]$Action,
 
     [ValidatePattern('^[A-Za-z0-9._-]{1,80}$')]
@@ -498,11 +498,16 @@ try {
             -not (([IO.File]::ReadAllText($diffReceipt.FullName) | ConvertFrom-Json).detail -match ': MATCH')) {
             throw 'Blueprint replay did not produce a translation-independent zero diff.'
         }
-    } elseif ($Action -eq 'Arm' -or $Action -eq 'Disarm') {
-        $runtimeOperation = $Action.ToLowerInvariant()
+    } elseif ($Action -in @('Arm', 'Disarm', 'BuildOn', 'BuildOff')) {
+        $runtimeOperation = switch ($Action) {
+            'BuildOn' { 'build_on' }
+            'BuildOff' { 'build_off' }
+            default { $Action.ToLowerInvariant() }
+        }
         Invoke-ChildScript $runtimeScript (@($runtimeOperation) + $identityArgs)
     } elseif ($Action -eq 'Close') {
         if (Test-ValheimRunning) {
+            Invoke-ChildScript $runtimeScript (@('build_off') + $identityArgs)
             Invoke-ChildScript $runtimeScript (@('disarm') + $identityArgs)
         }
         Set-PrivateWorldConfirmation ([string]$context.runtime_config.path) $false

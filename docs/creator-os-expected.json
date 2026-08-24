@@ -16,8 +16,10 @@
     "receipt_assertions": [
       { "operation": "blueprint_build", "status": "completed" },
       { "operation": "blueprint_diff", "status": "completed" },
+      { "operation": "runtime_build_on", "status": "completed" },
       { "operation": "runtime_arm", "status": "completed" },
       { "operation": "gallery_identify", "status": "completed" },
+      { "operation": "runtime_build_off", "status": "completed" },
       { "operation": "runtime_disarm", "status": "completed" }
     ]
   }

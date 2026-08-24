@@ -46,7 +46,7 @@
       "id": "env.session",
       "label": "Creator Session",
       "state": "confirmed",
-      "detail": "Prepare, Status, Arm, Lab identity, Disarm, and Close completed in the corrected live OMEN session with matching install, machine, world, session, and request identities. Exact backup/restore and rejection branches remain executable-fixture covered.",
+      "detail": "Prepare, Status, Arm, Lab identity, Disarm, and Close completed in the corrected live OMEN session with matching install, machine, world, session, and request identities. Bounded BuildOn/BuildOff, exact backup/restore, and rejection branches are executable-fixture covered; the first Godbuild lap is the live build-control proof.",
       "fact_kind": "live-and-fixture"
     },
     {
@@ -60,7 +60,7 @@
       "id": "env.godbuild",
       "label": "Godbuild round trip",
       "state": "confirmed",
-      "detail": "Capture import, normalized authority, typed plan, deterministic SVG, drift check, check-before-build, and MATCH-only replay are executable-test covered.",
+      "detail": "Private-world BuildOn/BuildOff control, capture import, normalized authority, typed plan, deterministic SVG, drift check, check-before-build, and MATCH-only replay are executable-test covered.",
       "fact_kind": "executed-fixture"
     }
   ],
@@ -125,7 +125,7 @@
     },
     "creator_flow": {
       "title": "Run the machine-owned creator session",
-      "summary": "The six steps below are rendered from the checked-in Creator Session choreography, whose preconditions are ordered from Prepare through MATCH and Close.",
+      "summary": "The six steps below are rendered from the checked-in Creator Session choreography, whose preconditions are ordered from Prepare through verified BuildOn, MATCH, BuildOff, and Close.",
       "source": "docs/creator-os.md",
       "heading": "Creator session loop"
     },
@@ -162,7 +162,7 @@
       "id": "queue.first-godbuild",
       "state": "ready",
       "title": "Capture the first human-spaced Godbuild",
-      "detail": "Use one small room or lane to prove capture, preview, typed plan, check, replay, and MATCH before scaling the content.",
+      "detail": "Use one small room or lane to prove the receipt-backed private build toggle, capture, preview, typed plan, check, replay, and MATCH before scaling the content.",
       "source": "docs/creator-os.md",
       "source_contains": "The first real Godbuild target is intentionally small"
     },
@@ -223,6 +223,12 @@
       "detail": "Read-only validation of the lease, machine, world, session, and installed payload hashes."
     },
     {
+      "id": "command.build-on",
+      "label": "Enable private build mode",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 BuildOn -SessionId <id>",
+      "detail": "After entering the pinned private world: directly enable and verify no-cost/all-pieces plus god mode without a console relay."
+    },
+    {
       "id": "command.capture",
       "label": "Capture a Godbuild",
       "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Capture -SessionId <id> -BlueprintName <name>",
@@ -239,6 +245,18 @@
       "label": "Replay after review",
       "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Replay -SessionId <id> -BlueprintName <name>",
       "detail": "Run check, build, and translation-independent diff; fail unless the result is MATCH."
+    },
+    {
+      "id": "command.build-off",
+      "label": "Disable private build mode",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 BuildOff -SessionId <id>",
+      "detail": "Before leaving the loaded world: disable and verify both no-cost/all-pieces and god mode."
+    },
+    {
+      "id": "command.close",
+      "label": "Close Creator Session",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Close -SessionId <id> -Restore",
+      "detail": "After BuildOff and quitting Valheim: clear private confirmation, restore exact prior bytes, and release the install-wide lease."
     },
     {
       "id": "command.studio",

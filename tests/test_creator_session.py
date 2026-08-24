@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SESSION = ROOT / "tools" / "creator-session" / "Invoke-CreatorSession.ps1"
 RUNTIME = ROOT / "tools" / "creator-session" / "Invoke-RuntimeCreatorRequest.ps1"
+PLUGIN = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "ComfyQuestRuntime.cs"
 
 
 class CreatorSessionTests(unittest.TestCase):
@@ -20,6 +21,7 @@ class CreatorSessionTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.session = SESSION.read_text(encoding="utf-8")
         cls.runtime = RUNTIME.read_text(encoding="utf-8")
+        cls.plugin = PLUGIN.read_text(encoding="utf-8")
 
     def test_creator_session_actions_are_closed(self) -> None:
         match = re.search(
@@ -38,6 +40,8 @@ class CreatorSessionTests(unittest.TestCase):
                 "Replay",
                 "Arm",
                 "Disarm",
+                "BuildOn",
+                "BuildOff",
                 "Close",
             },
         )
@@ -78,7 +82,7 @@ class CreatorSessionTests(unittest.TestCase):
         self.assertIn("Reviewed Godbuild hash mismatch", self.session)
         self.assertIn("[IO.File]::Replace", self.session)
 
-    def test_runtime_request_can_only_status_arm_or_disarm(self) -> None:
+    def test_runtime_request_is_closed_to_session_and_private_build_control(self) -> None:
         match = re.search(
             r"\[ValidateSet\((.*?)\)\]\s*\[string\]\$Operation",
             self.runtime,
@@ -86,8 +90,8 @@ class CreatorSessionTests(unittest.TestCase):
         )
         self.assertIsNotNone(match)
         self.assertEqual(
-            set(re.findall(r"'([a-z]+)'", match.group(1))),
-            {"status", "arm", "disarm"},
+            set(re.findall(r"'([a-z_]+)'", match.group(1))),
+            {"status", "arm", "disarm", "build_on", "build_off"},
         )
         self.assertIn("comfy-quest-runtime-request/v1", self.runtime)
         for forbidden in (
@@ -100,6 +104,16 @@ class CreatorSessionTests(unittest.TestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, self.runtime)
                 self.assertNotIn(forbidden, self.session)
+        close = self.session[self.session.index("} elseif ($Action -eq 'Close')") :]
+        self.assertLess(close.index("@('build_off')"), close.index("@('disarm')"))
+
+    def test_private_build_control_uses_direct_bounded_player_apis(self) -> None:
+        self.assertIn("SetCreatorBuildMode,CreatorBuildModeEnabled", self.plugin)
+        self.assertIn("player.SetNoPlacementCost(enabled)", self.plugin)
+        self.assertIn("player.SetGodMode(enabled)", self.plugin)
+        self.assertIn("player.NoCostCheat()&&player.InGodMode()", self.plugin)
+        self.assertNotIn("Console.instance", self.plugin)
+        self.assertNotIn("ZInput.Simulate", self.plugin)
 
     def test_dry_run_reports_the_pinned_plan_without_deploying(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
