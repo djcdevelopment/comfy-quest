@@ -22,7 +22,7 @@ OUTPUT = REPO / "docs" / "quest-mission-control.html"
 SCHEMA = "comfy-quest-mission-control/v1"
 SESSION_SCHEMA = "comfy-quest-mission-control-session/v2"
 ALLOWED_PHASE_STATES = {"complete", "active", "planned"}
-ALLOWED_QUEUE_STATES = {"ready", "human", "gated"}
+ALLOWED_QUEUE_STATES = {"complete", "ready", "human", "gated"}
 
 
 class MissionControlError(RuntimeError):
@@ -548,7 +548,7 @@ def render(manifest: dict[str, Any]) -> str:
 
   <section id="program" class="section" aria-labelledby="program-title"><div class="section-head"><div><span class="eyebrow">Five-intent program</span><h2 id="program-title">Creator OS active; seat verdicts batched.</h2></div><p>Phase state is a cited program snapshot, not a live inference from checkboxes.</p></div><ol class="phase-list">{phases}</ol></section>
 
-  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">After implementation</span><h2 id="queue-title">Proof and scale queue</h2></div><p>One passive safe-top capture and one small Godbuild establish the remaining visual and replay evidence before content scales.</p></div><div class="queue-grid">{queue_cards}</div>
+  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">After implementation</span><h2 id="queue-title">Proof and scale queue</h2></div><p>The passive safe-top capture is complete; one small Godbuild now establishes replay evidence before content scales.</p></div><div class="queue-grid">{queue_cards}</div>
     <details class="future"><summary>Preview the derived Phase 3 exit lap</summary><div><p>{html.escape(phase3["summary"])}</p><ol class="derived-sequence">{phase3_sequence}</ol><h3>Exactly three human verdicts</h3><ul class="judgment-list">{phase3_judgments}</ul>{source_link(phase3["source"], "Derived runbook")}</div></details>
   </section>
 

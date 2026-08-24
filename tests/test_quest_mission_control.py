@@ -79,6 +79,8 @@ class QuestMissionControlTests(unittest.TestCase):
         self.assertIn('meta name="quest-mission-control-schema"', self.committed)
         self.assertIn("Program reconciled through 7860288", self.committed)
         self.assertIn("Automate the machine loop. Spend the seat on design.", self.committed)
+        self.assertIn("Safe-top overhead bar verified live", self.committed)
+        self.assertIn("complete", self.renderer.ALLOWED_QUEUE_STATES)
 
     def test_manifest_rejects_duplicate_ids_and_stale_source_pins(self):
         duplicate = copy.deepcopy(self.manifest)

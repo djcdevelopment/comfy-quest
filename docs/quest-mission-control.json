@@ -52,9 +52,9 @@
     {
       "id": "env.runtime",
       "label": "Runtime creator surface",
-      "state": "attention",
-      "detail": "The corrected live control plane passed Arm, armed/watching Status, Lab identity, Disarm, and clean log inspection. Passive window capture found the compact y=48 bar behind the host HUD ending at y=84; the clamped y=92 geometry is build- and executable-test proven and awaits the next normal launch.",
-      "fact_kind": "live-control-build-visual"
+      "state": "confirmed",
+      "detail": "The corrected live control plane passed Arm, armed/watching Status, Lab identity, and Disarm. A later hash-pinned launch passively captured the complete y=92 compact bar below the host band at the same 1026x740 viewport, restored minimized state without focus or input, and closed cleanly.",
+      "fact_kind": "live-control-and-visual"
     },
     {
       "id": "env.godbuild",
@@ -97,7 +97,7 @@
       "number": 4,
       "title": "Creator OS and Quest Lab spellbook",
       "state": "active",
-      "summary": "The four-stage Studio loop and leased live control plane pass; the overhead surface has one machine-found safe-top fix awaiting passive verification on the next normal launch, while Godbuild capture/replay is ready.",
+      "summary": "The four-stage Studio loop, leased live control plane, and passively verified overhead Runtime surface pass; Godbuild capture/replay is the next creator-scale lane.",
       "source": "docs/creator-os.md",
       "source_contains": "The scarce resource is the creator's time in the seat"
     },
@@ -152,11 +152,11 @@
   "queue": [
     {
       "id": "queue.live-lap",
-      "state": "ready",
-      "title": "Passively verify the safe-top bar",
-      "detail": "On the next normal Valheim launch, automation owns deployment, direct window-buffer capture, host-band clearance, and clean Close. Do not schedule a dedicated seat lap or ask Derek to press F9, relay a screenshot, or inspect logs.",
+      "state": "complete",
+      "title": "Safe-top overhead bar verified live",
+      "detail": "Automation deployed the hash-pinned y=92 build, directly captured the full compact bar below the host band, preserved foreground and minimized state, and closed the session. Derek supplied only the ordinary out/in lifecycle cues.",
       "source": "docs/creator-os.md",
-      "source_contains": "The next normal Valheim launch"
+      "source_contains": "The safe-top follow-up completed"
     },
     {
       "id": "queue.first-godbuild",
@@ -251,6 +251,6 @@
     "The Creator Session lease owns the shared Valheim installation. Do not run another deployment or Lab mutation beside it.",
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
-    "The live control plane is proven. The y=92 compact-bar geometry remains build-proven until automation passively captures it on the next normal Valheim launch."
+    "The live control plane and y=92 compact-bar placement are proven. Keep future machine evidence receipt- and hash-backed; reserve the seat for authored spacing and play feel."
   ]
 }

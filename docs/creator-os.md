@@ -25,8 +25,12 @@ machine loop. The seat is for spatial judgment, authored choices, and play feel.
   creator to relay it: the 36-pixel compact bar at y=48 was wholly behind the observed
   host diagnostic band ending at y=84 in the 1026x740 live viewport. Production geometry
   now uses the pure, executable-tested `RuntimeCreatorBarLayout` with a y=92 safe top and
-  on-screen clamping. Those new bytes are build-proven, not live-proven; the running game
-  still has the prior DLL mapped, so the page must not call the visual exit complete.
+  on-screen clamping. Creator Session `creator-20260824T105854Z-b55c8b18` deployed those
+  exact hash-pinned bytes before the next process started. A no-activate direct buffer
+  capture then showed the complete compact bar immediately below the host band at the
+  same viewport; the capture cycle restored the game's minimized state without changing
+  foreground focus or sending input. Close returned a correlated Disarm receipt, private
+  confirmation is false, and the launch log has no exception, fatal, or error entry.
 
 An earlier live launch exposed a success-sentinel defect before Arm dispatch. The
 validator now returns null on success, and both the executable controller round trip and
@@ -49,11 +53,11 @@ The first real Godbuild target is intentionally small: build one room or one lan
 human spacing, capture it once, review the generated preview and typed plan, then replay
 it elsewhere. The point of that lap is the reusable loop, not the size of the build.
 
-The next normal Valheim launch—not a dedicated seat session—is the only remaining
-Runtime-surface check. After the game is naturally closed, Creator Session can deploy the
-y=92 payload; on the next ordinary world entry automation should take the direct
-window-buffer capture, verify that the compact bar clears the host band, and close the
-session. No F9 press, screenshot relay, console command, or manual file copy is required.
+The safe-top follow-up completed on the next normal Valheim launch without a dedicated
+seat session. Automation owned deployment, process/hash ordering, direct window-buffer
+capture, host-band clearance, Disarm, and Close. No F9 press, screenshot relay, console
+command, forced focus, or manual file copy was required. The next creator-scale target is
+the first small human-spaced Godbuild.
 
 ## Capacity policy
 
