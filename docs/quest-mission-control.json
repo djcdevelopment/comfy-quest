@@ -351,16 +351,28 @@
     },
     {
       "id": "queue.guild-runtime",
-      "state": "ready",
+      "state": "implemented",
       "lane": "4A",
       "requirements": [
         "FR-RUN-001",
         "FR-AUTH-005"
       ],
       "title": "Unlock guild-scale Runtime",
-      "detail": "Implement multi-experience guild artifacts, prerequisites/unlocks, Runtime experience selection, independent run status, and creator-event controls as one coherent Studio-to-Runtime capability.",
+      "detail": "Runtime experience selection is implemented: an additive `experience_id` on the active set, a bounded `select_experience` operation on the run-control allowlist, and one resolver behind both former refusal sites. Prerequisites/unlocks, independent run status, and creator-event controls build on top of it. Promote it only after an installed game run selects and plays more than one guild experience.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4A — Dogfood foundation"
+    },
+    {
+      "id": "queue.receipt-retention",
+      "state": "ready",
+      "lane": "4B",
+      "requirements": [
+        "NFR-OBS-001"
+      ],
+      "title": "Make the evidence loop trustworthy",
+      "detail": "Give RuntimeReceiptStore explicit retention with archive-or-export before deletion, and make run-control pruning archive rather than discard, scoped so one run's activity cannot evict another run's audit chain. It is ordered before the 4A evidence collection, not after: otherwise the evidence that closes 4A is written to a store that can silently drop members of a correlated proof set.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "NFR-OBS-001"
     },
     {
       "id": "queue.full-width-journey",

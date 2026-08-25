@@ -133,6 +133,8 @@ public sealed class QuestStudioService
         _runControl.PreviewAsync(projectId, request, cancellationToken);
     public Task<StudioRunControlResult> ApplyResetAsync(string projectId, StudioRunResetRequest? request, CancellationToken cancellationToken) =>
         _runControl.ApplyAsync(projectId, request, cancellationToken);
+    public Task<StudioRunControlResult> SelectExperienceAsync(string projectId, StudioSelectExperienceRequest? request, CancellationToken cancellationToken) =>
+        _runControl.SelectExperienceAsync(projectId, request, cancellationToken);
     public StudioRunControlResult RunControlReceipt(string projectId, string? requestId, string? runId) =>
         _runControl.Receipt(projectId, requestId, runId);
 

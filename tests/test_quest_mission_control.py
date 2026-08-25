@@ -377,9 +377,11 @@ class RoadmapSurfaceTests(unittest.TestCase):
         for requirement_id in parked:
             with self.subTest(requirement=requirement_id):
                 self.assertIn(requirement_id, handoff)
-        # And it names the next executable task, which is the question a cold start asks first.
-        self.assertIn("queue.guild-runtime", handoff)
-        self.assertIn("RuntimeCharmBinding.cs:45", handoff)
+        # And it names everything executable, which is the question a cold start asks first.
+        for item in self.manifest["queue"]:
+            if item["state"] == "ready":
+                with self.subTest(item=item["id"]):
+                    self.assertIn(item["id"], handoff)
 
     def test_the_caution_says_what_the_environment_entry_says(self):
         # Audit B8: the caution sent a reader hunting for wiring that exists.
@@ -867,11 +869,17 @@ class ProgramInvariantTests(unittest.TestCase):
         self.assertEqual("ready", workbench["state"])
         self.assertEqual("unassigned", workbench["lane"])
         self.assertIn("ruling", workbench["lane_note"])
-        # The next task is still unambiguous, because the other `ready` item has a real lane.
-        ready = [item for item in self.manifest["queue"] if item["state"] == "ready"]
-        self.assertEqual(2, len(ready))
-        laned = [item for item in ready if item["lane"] in self.lanes["lane_ids"]]
-        self.assertEqual(["queue.guild-runtime"], [item["id"] for item in laned])
+        # The property, not a head count: an executable item either sits in a real lane, or says
+        # explicitly that it does not and names the ruling that would place it.
+        for item in self.manifest["queue"]:
+            if item["state"] != "ready":
+                continue
+            with self.subTest(item=item["id"]):
+                self.assertTrue(
+                    item["lane"] in self.lanes["lane_ids"]
+                    or (item["lane"] == "unassigned" and item.get("lane_note")),
+                    f"{item['id']} is ready with neither a lane nor a recorded reason",
+                )
 
     def test_the_invariant_runs_inside_the_ordinary_manifest_gate(self):
         # It has to fire in CI, not only when someone calls it directly.

@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 namespace Comfy.Quest.Studio;
 
 public sealed record StudioRunResetRequest(string RunId, string? PreviewToken = null, bool ConfirmReset = false);
+public sealed record StudioSelectExperienceRequest(string? ExperienceId);
 public sealed record StudioRunStatusView(
     int SchemaVersion,
     bool Available,
@@ -76,6 +77,30 @@ internal sealed class QuestStudioRunControl
     public Task<StudioRunControlResult> ApplyAsync(string projectId, StudioRunResetRequest? request, CancellationToken cancellationToken) =>
         SendAsync(projectId, request, "apply_reset", cancellationToken);
 
+    /// <summary>Bind one experience of the activated pack. A guild ships several experiences in one
+    /// pack and Runtime will not guess between them, so this is how the creator says which one is
+    /// being played without republishing. It addresses the pack rather than a run, and so carries
+    /// no run scope — the reason the request policy allows exactly one operation without a run id.</summary>
+    public Task<StudioRunControlResult> SelectExperienceAsync(string projectId, StudioSelectExperienceRequest? request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.ExperienceId))
+            return Task.FromResult(new StudioRunControlResult(false, false, "experience_selection_required", null));
+        var status = Status(projectId);
+        if (!status.Available || !status.Connected)
+            return Task.FromResult(new StudioRunControlResult(false, false, status.Error ?? "runtime_disconnected", null));
+        var now = DateTimeOffset.UtcNow;
+        return DispatchAsync(RuntimeRoot()!, new RuntimeRunControlRequest
+        {
+            RequestId = RequestId("select_experience", now),
+            Operation = "select_experience",
+            CreatedUtc = now.ToString("O"),
+            ExpiresUtc = now.AddMinutes(2).ToString("O"),
+            ExpectedMachine = status.Machine!,
+            ExpectedWorldUid = status.WorldUid!,
+            ExperienceId = request.ExperienceId,
+        }, cancellationToken);
+    }
+
     public StudioRunControlResult Receipt(string projectId, string? requestId, string? runId)
     {
         if (_workspace.ReadProject(projectId) is null) return new(false, false, "project_missing", null);
@@ -102,13 +127,10 @@ internal sealed class QuestStudioRunControl
         var run = status.Runs.SingleOrDefault(value => value.RunId == request.RunId);
         if (run is null) return new(false, false, "run_scope_not_loaded", null);
         var root = RuntimeRoot()!;
-        var mailbox = Path.Combine(root, "requests", "run-control.json");
-        if (File.Exists(mailbox)) return new(false, false, "runtime_run_control_busy", null);
         var now = DateTimeOffset.UtcNow;
-        var requestId = "studio-" + operation.Replace('_', '-') + "-" + now.ToUniversalTime().ToString("yyyyMMdd'T'HHmmssfff'Z'") + "-" + Guid.NewGuid().ToString("N")[..8];
-        var body = new RuntimeRunControlRequest
+        return await DispatchAsync(root, new RuntimeRunControlRequest
         {
-            RequestId = requestId,
+            RequestId = RequestId(operation, now),
             Operation = operation,
             CreatedUtc = now.ToString("O"),
             ExpiresUtc = now.AddMinutes(2).ToString("O"),
@@ -117,7 +139,20 @@ internal sealed class QuestStudioRunControl
             RunId = request.RunId,
             PreviewToken = request.PreviewToken,
             ConfirmReset = request.ConfirmReset,
-        };
+        }, cancellationToken);
+    }
+
+    static string RequestId(string operation, DateTimeOffset now) =>
+        "studio-" + operation.Replace('_', '-') + "-"
+        + now.ToUniversalTime().ToString("yyyyMMdd'T'HHmmssfff'Z'") + "-"
+        + Guid.NewGuid().ToString("N")[..8];
+
+    /// <summary>One bounded request through the single-slot mailbox, then wait for its receipt.</summary>
+    async Task<StudioRunControlResult> DispatchAsync(string root, RuntimeRunControlRequest body, CancellationToken cancellationToken)
+    {
+        var requestId = body.RequestId!;
+        var mailbox = Path.Combine(root, "requests", "run-control.json");
+        if (File.Exists(mailbox)) return new(false, false, "runtime_run_control_busy", null);
         Directory.CreateDirectory(Path.GetDirectoryName(mailbox)!);
         var temporary = mailbox + ".tmp-" + Guid.NewGuid().ToString("N");
         try

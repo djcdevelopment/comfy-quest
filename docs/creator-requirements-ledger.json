@@ -386,10 +386,10 @@
     },
     {
       "id": "NFR-OBS-001",
-      "disposition": "deferred",
-      "phase": "4B",
+      "disposition": "active",
+      "lane": "4B",
       "lane_authority": "phase-authority",
-      "note": "Audit C3 records both halves violated: run-control receipts prune globally across runs from a flat directory, and RuntimeReceiptStore has no cap at all. The build strategy repairs this in its Lane 2, before Lane 4 collects the 4A evidence, because otherwise the evidence that closes 4A is written to a store that can silently drop members of a correlated proof set."
+      "note": "Audit C3 records both halves violated: run-control receipts prune globally across runs from a flat directory, and RuntimeReceiptStore has no cap at all. queue.receipt-retention claims it now because the build strategy orders this repair before Lane 4 collects the 4A evidence -- otherwise the evidence that closes 4A is written to a store that can silently drop members of a correlated proof set. The lane is still 4B's; only the scheduling moved."
     },
     {
       "id": "NFR-TEST-001",

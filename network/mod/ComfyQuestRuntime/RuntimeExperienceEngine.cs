@@ -1086,16 +1086,15 @@ sealed class RuntimeExperienceEngine {
         return false;
       }
       using var zip = ZipFile.OpenRead(package);
-      var entries = zip.Entries.Where(value =>
-          value.FullName.StartsWith("experiences/", StringComparison.Ordinal)
-          && value.FullName.EndsWith(".json", StringComparison.Ordinal)).ToArray();
-      if (entries.Length != 1) {
+      // A guild ships as one pack holding several experiences. Which of them this Runtime is
+      // running is the active set's selector, resolved in one place so this site and the charm
+      // binding cannot disagree about what "active" means.
+      if (!ActiveExperienceResolver.TryResolve(zip, set.ExperienceId, out var chosen, out var selection)) {
         InvalidateActive();
-        error = "active_experience_ambiguous";
+        error = selection;
         return false;
       }
-      using var reader = new StreamReader(entries[0].Open());
-      var compiled = ExperienceCompiler.CompileProductionJson(reader.ReadToEnd());
+      var compiled = ExperienceCompiler.CompileProductionJson(chosen.Json);
       if (!compiled.IsValid) {
         InvalidateActive();
         error = "active_experience_invalid";

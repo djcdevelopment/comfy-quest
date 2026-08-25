@@ -225,8 +225,90 @@ public sealed class ActiveSet {
   [JsonProperty("source")] public string Source {get;set;}
   [JsonProperty("activated_utc")] public DateTimeOffset ActivatedUtc {get;set;}
   [JsonProperty("activation_id", NullValueHandling=NullValueHandling.Ignore)] public string ActivationId {get;set;}
+  /// <summary>Which experience of a multi-experience pack is bound and run. Additive and nullable
+  /// on purpose, the same shape activation_id uses: an absent selector means the pack holds exactly
+  /// one, which is every pack written before this field existed. Activation deliberately does not
+  /// carry it forward — a new revision may not contain the selected experience, and a silently
+  /// wrong selection is worse than an explicit re-selection.</summary>
+  [JsonProperty("experience_id", NullValueHandling=NullValueHandling.Ignore)] public string ExperienceId {get;set;}
   [JsonProperty("source_channel", NullValueHandling=NullValueHandling.Ignore)] public string SourceChannel {get;set;}
   [JsonProperty("previous_activation_id", NullValueHandling=NullValueHandling.Ignore)] public string PreviousActivationId {get;set;}
+}
+
+/// <summary>Which experience document of an activated pack Runtime binds and runs.
+/// <para>QuestPackStore already validates, hashes, and compiles <em>N</em> documents. Before the
+/// selector existed both Runtime call sites simply refused the second one with
+/// <c>active_experience_ambiguous</c>, which is the single check that kept a guild from shipping
+/// and binding as one unit. Resolution lives here rather than at either call site so that the two
+/// cannot drift apart, and so it is testable without the game.</para></summary>
+public static class ActiveExperienceResolver {
+  /// <summary>Declared before the feature ships, per NFR-BOUND-001. Selection reads every entry to
+  /// match an id, so the read is bounded by an explicit number rather than by whatever the archive
+  /// happens to hold. A guild is authored content, not a catalog.</summary>
+  public const int MaxSelectableExperiences=64;
+  public const string Missing="active_experience_missing";
+  public const string Ambiguous="active_experience_ambiguous";
+  public const string NotInPack="active_experience_not_in_pack";
+  public const string TooMany="active_experience_count_exceeded";
+  public const string Unreadable="active_experience_unreadable";
+
+  /// <summary>Every experience id in the pack, in archive order. Empty when the pack cannot be
+  /// read: this answers "what could I have selected", never "what is selected".</summary>
+  public static IReadOnlyList<string> Ids(ZipArchive zip){return Scan(zip,out var documents,out _)?documents.Select(value=>value.Id).ToArray():Array.Empty<string>();}
+
+  /// <summary>Resolve the bound document. An absent or blank <paramref name="requestedId"/> means
+  /// "the pack holds exactly one" — every pack shipped before this field existed — and resolves
+  /// exactly as it did then, including the same diagnostic when it holds more.</summary>
+  public static bool TryResolve(ZipArchive zip,string requestedId,out ResolvedExperience resolved,out string error){
+    resolved=null;
+    if(!Scan(zip,out var documents,out error))return false;
+    var wanted=string.IsNullOrWhiteSpace(requestedId)?null:requestedId.Trim();
+    if(wanted==null){
+      if(documents.Count>1){error=Ambiguous;return false;}
+      resolved=documents[0];
+    } else {
+      resolved=documents.Find(value=>string.Equals(value.Id,wanted,StringComparison.Ordinal));
+      if(resolved==null){error=NotInPack;return false;}
+    }
+    resolved.Available=documents.Select(value=>value.Id).ToArray();
+    error=null;
+    return true;
+  }
+
+  static bool Scan(ZipArchive zip,out List<ResolvedExperience> documents,out string error){
+    documents=new List<ResolvedExperience>();
+    error=Unreadable;
+    if(zip==null)return false;
+    var entries=zip.Entries
+      .Where(value=>value.FullName.StartsWith("experiences/",StringComparison.Ordinal)
+        &&value.FullName.EndsWith(".json",StringComparison.Ordinal))
+      .OrderBy(value=>value.FullName,StringComparer.Ordinal).ToArray();
+    if(entries.Length==0){error=Missing;return false;}
+    if(entries.Length>MaxSelectableExperiences){error=TooMany;return false;}
+    var seen=new HashSet<string>(StringComparer.Ordinal);
+    foreach(var entry in entries){
+      string json,id;
+      try{
+        using var reader=new StreamReader(entry.Open());
+        json=reader.ReadToEnd();
+        id=JsonConvert.DeserializeObject<ExperienceDocument>(json)?.Id;
+      }catch{error=Unreadable;return false;}
+      if(string.IsNullOrWhiteSpace(id)){error=Unreadable;return false;}
+      // Two documents under one id can never be selected between, so this stays ambiguous
+      // rather than resolving to whichever one the archive listed first.
+      if(!seen.Add(id)){error=Ambiguous;return false;}
+      documents.Add(new ResolvedExperience{Id=id,Json=json,EntryName=entry.FullName});
+    }
+    error=null;
+    return true;
+  }
+
+  public sealed class ResolvedExperience {
+    public string Id {get;set;}
+    public string Json {get;set;}
+    public string EntryName {get;set;}
+    public IReadOnlyList<string> Available {get;set;}=Array.Empty<string>();
+  }
 }
 
 public sealed class QuestPackStore {
@@ -250,6 +332,30 @@ public sealed class QuestPackStore {
   public PackCandidate LoadVersion(string packId,string version,ISet<string> events=null){var valid=ListVersions(events).ToArray();EnsureNoCollisions(valid);var chosen=valid.SingleOrDefault(x=>string.Equals(x.Manifest.PackId,packId,StringComparison.Ordinal)&&string.Equals(x.Manifest.Version,version,StringComparison.Ordinal));return chosen==null?null:ActivateCandidate(chosen);}
   public PackCandidate LoadDevRevision(string source,ISet<string> events=null){if(source!=Path.GetFileName(source))throw new InvalidOperationException("dev_source_invalid");var candidate=InspectDev(Path.Combine(LaneRoot(QuestPackLane.Dev),source),events);if(!candidate.IsValid)throw new InvalidOperationException("dev_candidate_invalid");return ActivateCandidate(candidate);}
   public ActiveSet ReadActive()=>ReadActiveFile(Path.Combine(root,"active","active-set.json"),"active_set_unreadable");
+  /// <summary>Every experience id the activated pack offers, for a creator choosing between them.</summary>
+  public IReadOnlyList<string> ActiveExperienceIds(){var active=ReadActive();if(active==null)return Array.Empty<string>();var package=ActivePackagePath(active);if(!File.Exists(package))return Array.Empty<string>();try{using var zip=ZipFile.OpenRead(package);return ActiveExperienceResolver.Ids(zip);}catch{return Array.Empty<string>();}}
+  /// <summary>Bind one experience of the already-activated pack. Selection is not an activation: it
+  /// mints no activation id and archives no history, because nothing about the installed content
+  /// changed — only which of its experiences Runtime answers to. Selecting what is already selected
+  /// is a no-op rather than a rewrite, so a repeated request cannot churn the file the engine
+  /// watches for cache invalidation.</summary>
+  public ActiveSet SelectExperience(string experienceId){
+    if(string.IsNullOrWhiteSpace(experienceId))throw new InvalidOperationException("select_experience_id_required");
+    var target=Path.Combine(root,"active","active-set.json");
+    var active=ReadActiveFile(target,"active_set_unreadable");
+    ValidateActive(active,"active_set_invalid");
+    var package=ActivePackagePath(active);
+    if(!File.Exists(package))throw new InvalidOperationException("active_package_missing");
+    using(var zip=ZipFile.OpenRead(package))
+      if(!ActiveExperienceResolver.TryResolve(zip,experienceId,out _,out var error))throw new InvalidOperationException(error);
+    if(string.Equals(active.ExperienceId,experienceId,StringComparison.Ordinal))return active;
+    active.ExperienceId=experienceId;
+    var temp=target+".tmp";
+    File.WriteAllText(temp,JsonConvert.SerializeObject(active,Formatting.Indented));
+    File.Replace(temp,target,null);
+    return active;
+  }
+  string ActivePackagePath(ActiveSet active)=>Path.Combine(LaneRoot(ParseLane(active.SourceChannel)),active.Source);
   public IReadOnlyList<ActiveSet> ActivationHistory(){var history=HistoryRoot();if(!Directory.Exists(history))return Array.Empty<ActiveSet>();return Directory.GetFiles(history,"act-*.json").Select(path=>{try{return ReadActiveFile(path,"activation_history_unreadable");}catch{return null;}}).Where(value=>value!=null&&ValidActivationId(value.ActivationId)).OrderByDescending(value=>value.ActivatedUtc).ToArray();}
   public PackCandidate Rollback(ISet<string> events=null){var active=ReadActive();if(active!=null&&ValidActivationId(active.ActivationId))return string.IsNullOrWhiteSpace(active.PreviousActivationId)?null:Rollback(active.PreviousActivationId,events);return RollbackLegacy(events);}
   public PackCandidate Rollback(string activationId,ISet<string> events=null){if(!ValidActivationId(activationId))throw new InvalidOperationException("rollback_activation_id_invalid");var previous=ReadActiveFile(Path.Combine(HistoryRoot(),activationId+".json"),"previous_active_set_unreadable");ValidateActive(previous,"previous_active_set_invalid");var lane=ParseLane(previous.SourceChannel);var candidate=InspectLane(Path.Combine(LaneRoot(lane),previous.Source),lane,events);ValidateCandidate(previous,candidate);return ActivateCandidate(candidate,previous.PreviousActivationId,true);}

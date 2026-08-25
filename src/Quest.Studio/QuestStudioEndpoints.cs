@@ -217,6 +217,13 @@ public static class QuestStudioEndpoints
             var result = await studio.ApplyResetAsync(projectId, body, cancellationToken);
             return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
         });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/select-experience", async (string projectId, HttpRequest request, HttpResponse response, StudioSelectExperienceRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.SelectExperienceAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+        });
         app.MapGet("/api/v2/quest-studio/projects/{projectId}/runs/control/{requestId}", (string projectId, string requestId, string? runId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
         {
             NoStore(response);
