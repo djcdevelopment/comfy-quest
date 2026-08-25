@@ -217,7 +217,7 @@ public sealed class RuntimeCreatorRequestTests {
       ProcessResult prepared = RunPowerShell(
           repo, script, new[] { "Prepare", "-NoBuild", "-EvidenceRoot", evidence }
               .Concat(common).ToArray());
-      Assert.Equal(0, prepared.ExitCode);
+      AssertSucceeded("Prepare", prepared);
 
       string runtimeRoot = Path.Combine(root, "BepInEx", "config", "comfy-quest-runtime");
       string config = Path.Combine(
@@ -233,34 +233,34 @@ public sealed class RuntimeCreatorRequestTests {
       ProcessResult buildOn = RunPowerShell(
           repo, script, new[] { "BuildOn", "-WaitSeconds", "10" }.Concat(common).ToArray(),
           controller);
-      Assert.Equal(0, buildOn.ExitCode);
+      AssertSucceeded("BuildOn", buildOn);
       Assert.Contains("Runtime request state: completed", buildOn.Output);
       Assert.True(creatorBuild);
 
       ProcessResult buildOff = RunPowerShell(
           repo, script, new[] { "BuildOff", "-WaitSeconds", "10" }.Concat(common).ToArray(),
           controller);
-      Assert.Equal(0, buildOff.ExitCode);
+      AssertSucceeded("BuildOff", buildOff);
       Assert.Contains("Runtime request state: completed", buildOff.Output);
       Assert.False(creatorBuild);
 
       ProcessResult armed = RunPowerShell(
           repo, script, new[] { "Arm", "-WaitSeconds", "10" }.Concat(common).ToArray(),
           controller);
-      Assert.Equal(0, armed.ExitCode);
+      AssertSucceeded("Arm", armed);
       Assert.Contains("Runtime request state: completed", armed.Output);
       Assert.True(coordinator.Armed);
 
       ProcessResult disarmed = RunPowerShell(
           repo, script, new[] { "Disarm", "-WaitSeconds", "10" }.Concat(common).ToArray(),
           controller);
-      Assert.Equal(0, disarmed.ExitCode);
+      AssertSucceeded("Disarm", disarmed);
       Assert.Contains("Runtime request state: completed", disarmed.Output);
       Assert.False(coordinator.Armed);
 
       ProcessResult closed = RunPowerShell(
           repo, script, new[] { "Close", "-Restore" }.Concat(common).ToArray());
-      Assert.Equal(0, closed.ExitCode);
+      AssertSucceeded("Close", closed);
       Assert.False(File.Exists(Path.Combine(root, "BepInEx", "plugins", "ComfyQuestRuntime.dll")));
       Assert.False(File.Exists(config));
       Assert.True(File.Exists(Path.Combine(evidence, "session.closed.json")));
@@ -360,6 +360,13 @@ public sealed class RuntimeCreatorRequestTests {
     string output = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
     return new ProcessResult(process.ExitCode, output);
   }
+
+  static void AssertSucceeded(string step, ProcessResult result) =>
+      Assert.True(
+          result.ExitCode == 0,
+          $"Creator Session {step} exited {result.ExitCode} instead of 0."
+              + Environment.NewLine + "Captured stdout+stderr:" + Environment.NewLine
+              + result.Output);
 
   sealed record ProcessResult(int ExitCode, string Output);
 }

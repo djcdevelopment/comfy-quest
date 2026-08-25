@@ -416,6 +416,30 @@ builds against the wrong contract.
 CI is unaffected — it restores clean — so gating `Quest.Studio.Tests` in CI is safe. The
 exposure is local and developer-facing.
 
+### D7 — A CI-only failure that could not say why *(medium)*
+
+Found by pushing, not by reading.
+
+`RuntimeCreatorRequestTests.CreatorSessionAndPowerShellSenderDriveTheShippingControllerEndToEnd`
+passes locally and fails on `windows-latest`: `Invoke-CreatorSession.ps1 Prepare` exits 1 in
+`-FixtureMode`. The test drives real `powershell.exe` (5.1), so it is genuinely
+environment-sensitive.
+
+The defect worth recording is not the failure — it is that the failure was **mute**.
+`RunPowerShell` captures stdout and stderr into `ProcessResult.Output` and the assertion was
+`Assert.Equal(0, prepared.ExitCode)`, which discards it. CI could report only
+`Expected: 0, Actual: 1` for a process whose entire explanation had already been collected and
+thrown away. Six assertions in that test shared the shape.
+
+All six now assert through a helper that names the step and prints the captured
+stdout+stderr, so the next run explains itself rather than requiring a local repro that does
+not reproduce. This is the `NFR-EXPLAIN-001` rule applied to the test suite: a failed
+precondition needs a cause, not just a code.
+
+**This finding exists because of E3.** Those nine commits sat unpushed for a day, so CI had
+never seen them. The break was latent the whole time. Unpushed work is untested work, and the
+first push surfaced it immediately.
+
 ---
 
 ## E. Hygiene
@@ -426,7 +450,8 @@ exposure is local and developer-facing.
 - **E2** `Lumberjacks/src/` is an empty directory tree — a `filter-repo` fossil, since
   `PROVENANCE.md:18` lists `Lumberjacks/src/Quest.Studio` among the extraction include paths.
   Harmless, but it reads like a reach-in mount point.
-- **E3** `main` is 9 commits ahead of `origin/main`.
+- **E3** `main` is 9 commits ahead of `origin/main`. **Resolved 2026-08-24** — pushed as
+  `f79a13e..0551acb`, which immediately surfaced D7.
 - **E4** The PDF is a third representation of the page with no drift gate.
 
 ---
@@ -454,6 +479,7 @@ requiring sign-off**, not edits. The rest are mechanical.
 | 14 | Gitignore or remove `.codex-pdf-profile/`; decide the PDF's status (E1, E4) | `.gitignore` | no |
 | 15 | Remove the empty `Lumberjacks/src/` fossil (E2) | — | no |
 | 16 | Give build/test the hash-keyed package cache `Start-QuestStudio.ps1` already uses, or bump the version on every repack (D6) | `README.md`, build/test entrypoints | no |
+| 17 | Diagnose the CI-only `Prepare` exit 1 now that the test reports its output (D7) | `network/mod/ComfyQuestLab.Tests/RuntimeCreatorRequestTests.cs` | no |
 
 All four sign-off items were ruled on 2026-08-24; see the sign-off record in
 [`creator-os-build-strategy.md`](creator-os-build-strategy.md). Lane vocabulary is now defined
