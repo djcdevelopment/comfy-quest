@@ -237,6 +237,10 @@ implementation gaps are known and named — not partially and invisibly repaired
 
 ## Lane 1 — Unblock guild scale
 
+**Status: implemented 2026-08-25, not proven.** `queue.guild-runtime`. The selector shipped in the
+preferred shape below; no installed game has selected and played a second experience yet, which is
+Lane 4's job.
+
 The one product change that matters. Preferred shape, deliberately small:
 
 - additive nullable `experience_id` on the active state — the same additive-field pattern
@@ -257,6 +261,10 @@ stop and record the finding rather than expanding scope in flight.
 ---
 
 ## Lane 2 — Make the evidence loop trustworthy
+
+**Status: implemented 2026-08-25, not proven.** `queue.receipt-retention`. Run-control receipts
+are partitioned by run so a burst on one cannot reach another's chain; both stores archive by
+moving the exact bytes; the only place evidence is destroyed writes a receipt naming what went.
 
 Audit C3 is high severity on evidence-integrity grounds, which changes *why* this lane matters,
 not where it sits.
@@ -331,7 +339,15 @@ only if a second consumer needs the server-join harness.
 
 ## Lane 4 — Drive the real `4A / guild-scale-runtime` exit and call the seat
 
-Only after Lanes 1-3, and only with the evidence the readiness gate names.
+**Status: unblocked 2026-08-25.** Lanes 0-3 are done — 1 and 2 implemented, 3 ruled and recorded —
+so this is the next lane, and the first that cannot proceed without the installed game.
+`queue.full-width-journey` is the work item.
+
+Only after Lanes 1-3, and only with the evidence the readiness gate names. Four work items are
+`implemented` and unproven going in — portfolio, reset, guild runtime, receipt retention — and
+this lane is what converts that state into evidence. `NFR-SEAT-003` governs when the seat may be
+called at all: after automation has driven every applicable step, collected the evidence, and
+fixed and rerun the mechanical failures.
 
 ---
 

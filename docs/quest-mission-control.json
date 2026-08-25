@@ -364,13 +364,13 @@
     },
     {
       "id": "queue.receipt-retention",
-      "state": "ready",
+      "state": "implemented",
       "lane": "4B",
       "requirements": [
         "NFR-OBS-001"
       ],
       "title": "Make the evidence loop trustworthy",
-      "detail": "Give RuntimeReceiptStore explicit retention with archive-or-export before deletion, and make run-control pruning archive rather than discard, scoped so one run's activity cannot evict another run's audit chain. It is ordered before the 4A evidence collection, not after: otherwise the evidence that closes 4A is written to a store that can silently drop members of a correlated proof set.",
+      "detail": "Retention is implemented: run-control receipts are partitioned by run so a burst on one run cannot reach another's chain, both stores archive by moving the exact bytes rather than deleting, and the only place evidence is destroyed writes a receipt naming what went. Promote it only after an installed game run proves a correlated proof set survives a reset burst.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "NFR-OBS-001"
     },
@@ -608,6 +608,7 @@
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
     "Close -Restore restores prior install bytes, not the authored world. During R&D, retain ordinary recoverable world copies; do not turn world packaging into a critical-path project.",
-    "Portfolio and reset/rerun are wired end to end — endpoints, service, store, browser UI, file mailbox, and Runtime poller. What is missing is live-Valheim evidence, not wiring: they stay unpromoted until the real Studio persistence/publication, Runtime exchange, process restart, and installed-Valheim journey complete. Do not spend a seat turn discovering their mechanical defects."
+    "Portfolio and reset/rerun are wired end to end — endpoints, service, store, browser UI, file mailbox, and Runtime poller. What is missing is live-Valheim evidence, not wiring: they stay unpromoted until the real Studio persistence/publication, Runtime exchange, process restart, and installed-Valheim journey complete. Do not spend a seat turn discovering their mechanical defects.",
+    "Receipts are authority, not logs. Retention archives rather than deletes, and the archive bound writes a `receipt_archive_evicted` receipt when it destroys anything — so a gap in a correlated proof set is a fact you can read, never something to infer from absence."
   ]
 }

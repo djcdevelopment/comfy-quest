@@ -109,8 +109,7 @@ internal sealed class QuestStudioRunControl
             return new(false, false, "run_control_identity_invalid", null);
         var root = RuntimeRoot();
         if (root is null) return new(false, false, "valheim_not_found", null, requestId);
-        var path = Path.Combine(root, "receipts", "run-control", requestId + ".json");
-        if (!TryReadReceipt(path, requestId!, out var receipt)) return new(true, true, null, null, requestId);
+        if (!TryReadScopedReceipt(root, runId, requestId!, out var receipt)) return new(true, true, null, null, requestId);
         var receiptRun = receipt!.Preview?.RunId ?? receipt.Result?.PriorRunId;
         if (receiptRun is not null && receiptRun != runId) return new(false, false, "run_control_scope_mismatch", null, requestId);
         var ok = receipt.State is "previewed" or "completed";
@@ -167,12 +166,11 @@ internal sealed class QuestStudioRunControl
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
 
-        var receiptPath = Path.Combine(root, "receipts", "run-control", requestId + ".json");
         var deadline = DateTimeOffset.UtcNow.AddSeconds(8);
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (TryReadReceipt(receiptPath, requestId, out var receipt))
+            if (TryReadScopedReceipt(root, body.RunId, requestId, out var receipt))
                 return new(receipt!.State is "previewed" or "completed", false,
                     receipt.State is "previewed" or "completed" ? null : receipt.Detail ?? receipt.State,
                     receipt, requestId);
@@ -180,6 +178,13 @@ internal sealed class QuestStudioRunControl
         }
         return new(true, true, null, null, requestId);
     }
+
+    /// <summary>Receipts are partitioned by run now (audit C3), so a reader has to know the scope.
+    /// Studio always does — it is in the request it sent. The flat path is still tried afterwards so
+    /// an install holding receipts written before partitioning does not lose them.</summary>
+    static bool TryReadScopedReceipt(string root, string? runId, string requestId, out RuntimeRunControlReceipt? receipt) =>
+        TryReadReceipt(RuntimeRunControlReceipts.ReceiptPath(root, RuntimeRunControlReceipts.Scope(runId!), requestId), requestId, out receipt)
+        || TryReadReceipt(RuntimeRunControlReceipts.LegacyPath(root, requestId), requestId, out receipt);
 
     static bool TryReadReceipt(string path, string requestId, out RuntimeRunControlReceipt? receipt)
     {

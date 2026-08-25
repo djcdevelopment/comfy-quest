@@ -144,6 +144,32 @@ public static class RuntimeRunControlRequestPolicy {
   public static bool CanAddressReceipt(RuntimeRunControlRequest request)=>request!=null&&Safe(request.RequestId,80);
   static bool Safe(string value,int max)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=max&&value.All(c=>char.IsLetterOrDigit(c)||c=='-'||c=='_'||c=='.');
 }
+/// <summary>Where a run-control receipt lives, and how many survive.
+/// <para>Audit C3: the directory was flat and keyed by request id, and pruning ordered <em>all</em>
+/// of it by write time and deleted the tail. A burst of resets on one run therefore evicted an
+/// older run's receipts — the exact clause <c>NFR-OBS-001</c> forbids. Receipts are partitioned by
+/// the run they belong to so that retention is a fact about one run and cannot reach across.</para>
+/// <para>select_experience addresses the activated pack rather than a run, so its receipts share
+/// one <c>pack</c> partition. That is a real scope, not a dumping ground: it is bounded like any
+/// other, and nothing else writes into it.</para></summary>
+public static class RuntimeRunControlReceipts {
+  public const string PackScope="pack";
+  /// <summary>Per run, not in total. The registry keeps up to <c>RuntimeRunRegistry.MaxRuns</c>
+  /// runs with predecessor lineage; a shared cap of 128 across all of them guaranteed runs whose
+  /// reset receipts were gone while their lineage still pointed at them.</summary>
+  public const int MaxPerScope=32;
+  public const int MaxScopes=64;
+  public const int MaxArchived=1024;
+  public static string Scope(string runId)=>ReceiptRetention.SafeScope(runId)?runId:PackScope;
+  public static string Root(string runtimeRoot)=>Path.Combine(Path.GetFullPath(runtimeRoot),"receipts","run-control");
+  public static string ArchiveRoot(string runtimeRoot)=>Path.Combine(Root(runtimeRoot),"archive");
+  public static string ScopeDirectory(string runtimeRoot,string scope)=>Path.Combine(Root(runtimeRoot),Scope(scope));
+  public static string ReceiptPath(string runtimeRoot,string scope,string requestId)=>System.IO.Path.Combine(ScopeDirectory(runtimeRoot,scope),requestId+".json");
+  /// <summary>Where receipts written before partitioning still sit. Readers try the scoped path
+  /// first and fall back here, so an install that already has evidence keeps it.</summary>
+  public static string LegacyPath(string runtimeRoot,string requestId)=>System.IO.Path.Combine(Root(runtimeRoot),requestId+".json");
+}
+
 public sealed class RuntimeRunControlReceipt {
   [JsonProperty("schema")] public string Schema {get;set;}="comfy-quest-runtime-run-control-receipt/v1";
   [JsonProperty("request_id")] public string RequestId {get;set;}
