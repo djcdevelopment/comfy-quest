@@ -47,12 +47,39 @@ public sealed class ReceiptRetentionTests {
       var first = store.Write(Receipt("bind", 0));
       var before = File.ReadAllBytes(first);
       for (var index = 1; index <= RuntimeReceiptStore.MaxLiveReceipts; index++) store.Write(Receipt("bind", index));
+      // Stamp the oldest explicitly: this test is about the bytes surviving the move, not about
+      // how the sweep breaks a timestamp tie.
+      File.SetLastWriteTimeUtc(first, DateTime.UtcNow.AddHours(-1));
       store.Sweep(DateTimeOffset.UtcNow);
 
       Assert.False(File.Exists(first));
       var archived = Path.Combine(root, "receipts", "archive", Path.GetFileName(first));
       Assert.True(File.Exists(archived), "the oldest receipt should have moved, not vanished");
       Assert.Equal(before, File.ReadAllBytes(archived));
+    });
+  }
+
+  /// <summary>A filesystem timestamp is coarse enough that a burst of receipts lands inside one
+  /// tick. CI caught this and a workstation did not: with an ascending name tiebreak the oldest of
+  /// a tied group was kept and a newer one archived, so "newest 512" quietly meant something else.
+  /// Receipt ids lead with a UTC timestamp, so the tiebreak has to run the same direction as the
+  /// write-time sort.</summary>
+  [Fact] public void ReceiptsWrittenInsideOneTimestampTickStillArchiveOldestFirst() {
+    Run(root => {
+      var store = new RuntimeReceiptStore(root);
+      var written = Enumerable.Range(0, RuntimeReceiptStore.MaxLiveReceipts + 8)
+        .Select(index => store.Write(Receipt("gameplay", index))).ToArray();
+      // Every receipt claims the same instant, which is what a fast runner produces anyway.
+      var tick = DateTime.UtcNow.AddMinutes(-1);
+      foreach (var path in written) File.SetLastWriteTimeUtc(path, tick);
+      store.Sweep(DateTimeOffset.UtcNow);
+
+      var archived = Directory.GetFiles(Path.Combine(root, "receipts", "archive"), "*.json")
+        .Select(Path.GetFileName).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+      // Ids lead with a UTC timestamp, so "oldest" is the first 8 by ordinal name.
+      var expected = written.Select(Path.GetFileName)
+        .OrderBy(value => value, StringComparer.Ordinal).Take(8).ToArray();
+      Assert.Equal(expected, archived);
     });
   }
 

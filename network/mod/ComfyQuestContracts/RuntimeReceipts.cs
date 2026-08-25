@@ -71,12 +71,16 @@ public static class ReceiptRetention {
     &&value.All(c=>char.IsLetterOrDigit(c)||c=='-'||c=='_'||c=='.');
 
   /// <summary>Move everything past the retention window into the archive, oldest first. Returns
-  /// how many moved. Ordering and age both come from write time, so nothing is opened.</summary>
+  /// how many moved. Ordering and age both come from write time, so nothing is opened.
+  /// <para>Ties break on name <em>descending</em>, which is the same direction as the write-time
+  /// sort. A filesystem timestamp is coarse enough that a burst of receipts lands inside one tick,
+  /// and an ascending tiebreak there would keep the oldest of the tied group and archive a newer
+  /// one. Receipt ids lead with a UTC timestamp, so descending ordinal is chronological.</para></summary>
   public static int Archive(string liveDirectory,string archiveDirectory,int keep,TimeSpan maxAge,DateTimeOffset now){
     if(string.IsNullOrWhiteSpace(liveDirectory)||!Directory.Exists(liveDirectory))return 0;
     var live=new DirectoryInfo(liveDirectory).GetFiles("*.json")
       .Where(file=>!file.Name.EndsWith(Temp,StringComparison.Ordinal))
-      .OrderByDescending(file=>file.LastWriteTimeUtc).ThenBy(file=>file.Name,StringComparer.Ordinal).ToArray();
+      .OrderByDescending(file=>file.LastWriteTimeUtc).ThenByDescending(file=>file.Name,StringComparer.Ordinal).ToArray();
     var cutoff=maxAge<=TimeSpan.Zero?DateTime.MinValue:now.UtcDateTime-maxAge;
     var moved=0;
     for(var index=0;index<live.Length;index++){
@@ -94,7 +98,7 @@ public static class ReceiptRetention {
     if(string.IsNullOrWhiteSpace(archiveDirectory)||!Directory.Exists(archiveDirectory))return ArchiveEviction.None;
     var archived=new DirectoryInfo(archiveDirectory).GetFiles("*.json",SearchOption.AllDirectories)
       .Where(file=>!file.Name.EndsWith(Temp,StringComparison.Ordinal))
-      .OrderByDescending(file=>file.LastWriteTimeUtc).ThenBy(file=>file.Name,StringComparer.Ordinal).ToArray();
+      .OrderByDescending(file=>file.LastWriteTimeUtc).ThenByDescending(file=>file.Name,StringComparer.Ordinal).ToArray();
     if(archived.Length<=Math.Max(0,keep))return ArchiveEviction.None;
     var doomed=archived.Skip(Math.Max(0,keep)).ToArray();
     var oldest=doomed[doomed.Length-1];
