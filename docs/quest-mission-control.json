@@ -3,7 +3,7 @@
   "page": {
     "id": "comfy-quest-program",
     "title": "Quest Creator OS",
-    "subtitle": "Automate the machine loop. Spend the seat on design, spacing, and play feel.",
+    "subtitle": "Drive the whole vertical slice. Automate the evidence. Spend the seat on creation.",
     "observed_on": "2026-08-24",
     "program_commit": "a07cb62",
     "program_commit_label": "Build guild portfolio and scoped reruns"
@@ -65,12 +65,55 @@
     },
     {
       "id": "env.portfolio-run",
-      "label": "Guild and rerun foundation",
-      "state": "automated",
-      "detail": "Studio now persists a portfolio of versioned guilds, questlines, quests and events with transactional placement and deep-fork import/export. Runtime now owns exact run identity, previewed scoped reset, resumable spawn cleanup, retained prior state, and a fresh per-run successor. Contract, Studio, browser, and net48 build checks pass; no live Valheim proof is claimed yet.",
-      "fact_kind": "contract-and-test-observed"
+      "label": "Guild and rerun implementation",
+      "state": "implemented",
+      "detail": "Portfolio hierarchy and exact run/reset code exist. Automated coverage shows internal and browser behavior, but the feature is not promoted to integrated until the real Studio persistence/publication, Runtime exchange, process restart, and installed-Valheim journey complete.",
+      "fact_kind": "implementation-observed"
     }
   ],
+  "strategy": {
+    "id": "strategy.vertical-slice",
+    "title": "Results through the whole vertical slice",
+    "summary": "Build creator outcomes across Studio, real serialized artifacts, Runtime, installed Valheim, and the evidence return path. Debug individual layers after a real journey exposes a fault; do not substitute model-agreement tests for the journey.",
+    "golden_rule": "Do not break the fleet's momentum by wasting Derek's time in the seat. Be ready before calling him.",
+    "source": "docs/creator-os.md",
+    "source_contains": "## Results-driven operating strategy",
+    "principles": [
+      {
+        "id": "strategy.outcome",
+        "title": "Outcome-sized changes",
+        "detail": "Prefer sweeping, coherent product changes that let a creator do something materially new through the real product over isolated model or infrastructure exercises."
+      },
+      {
+        "id": "strategy.integration",
+        "title": "Integration evidence dominates",
+        "detail": "Automated installed journeys and boundary integration tests outrank unit tests. Unit coverage stays focused on dense logic, safety invariants, and regressions discovered by the real slice."
+      },
+      {
+        "id": "strategy.drive",
+        "title": "Drive the actual surfaces",
+        "detail": "Use browser automation, Valheim lifecycle harnesses, bounded inbox/outbox commands, receipts, logs, screenshots, persisted state, and clean shutdown instead of a human relay."
+      },
+      {
+        "id": "strategy.seat",
+        "title": "Reserve the seat for judgment",
+        "detail": "Derek enters only after mechanical failures are fixed and rerun. His prepared batch is limited to authorship, spatial composition, visual hierarchy, narrative, responsiveness, and play feel."
+      },
+      {
+        "id": "strategy.workbench",
+        "title": "Keep Workbench standalone",
+        "detail": "Use an identity-attested, released Isolate profile that works on a volunteer machine. It never discovers, imports, falls back to, or shares credentials or state with HEARTH or private fleet topology."
+      }
+    ],
+    "readiness_title": "Ready before the seat",
+    "readiness": [
+      "Exact artifacts are built, installed, identity-pinned, launched, and closed by automation.",
+      "The actual Studio GUI, serialized exchange, Runtime, and applicable real-Valheim path have been driven.",
+      "Known mechanical failures and affected restart, stale-state, and recovery paths have been corrected and rerun.",
+      "Screenshots or captures, logs, receipts, hashes, state transitions, and rollback evidence are retained.",
+      "The remaining questions form one concise batch that requires human creation or perception."
+    ]
+  },
   "phases": [
     {
       "id": "phase-1",
@@ -104,7 +147,7 @@
       "number": 4,
       "title": "Dogfood creator portfolio",
       "state": "active",
-      "summary": "The live creator controls and first spatial capture pass. Portfolio hierarchy and scoped rerun are now automated; named anchors and saved-world bundling are the next 4A leverage, followed by multi-experience guild authoring. Live acceptance is batched rather than interrupting construction.",
+      "summary": "Portfolio hierarchy and scoped rerun are implemented. The active work is a full-width guild slice: real Studio publication, multi-experience Runtime selection, prerequisites/unlocks, autonomous installed-Valheim integration, then prepared guild dogfooding. World packaging is deferred.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "The adoption gate is not another generated tutorial"
     },
@@ -113,15 +156,15 @@
       "number": 5,
       "title": "Community-ready artifacts",
       "state": "planned",
-      "summary": "Guild provenance, dependencies, import/export, semantic and world diff, and clean-profile installation follow the local dogfood campaign.",
+      "summary": "After repeated guild authoring stabilizes the contracts, build guild provenance, dependencies, import/export, semantic/world diff, clean-profile installation, and versioned world distribution.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 5 — Community release"
     }
   ],
   "recovery": {
     "id": "creator-os-active",
-    "title": "Guild dogfood operating lane",
-    "summary": "Portfolio and exact rerun foundations are implemented without a seat turn. Build named anchors and world-release leverage next. One later leased session owns deployment, identity, requests, capture transport, proof, and rollback; Derek enters only where authored judgment is the product.",
+    "title": "Prepared human-acceptance lane",
+    "summary": "This checklist is not the development method or the next task queue. It becomes active only after automation has driven the real Studio-to-Valheim slice, corrected mechanical failures, retained evidence, and reduced the remaining work to one batch of human judgments.",
     "cold_load": {
       "id": "recovery.cold-load",
       "title": "Prepare one pinned Creator Session",
@@ -145,7 +188,7 @@
       "source_contains": "The broader dogfood order is",
       "edit_source": "docs/creator-portfolio-requirements.md",
       "edit_source_contains": "### 4A — Dogfood foundation",
-      "suggested_edit": "Build named live anchors and saved-world bundling before asking for the batched 4A acceptance lap; then use the real guild slice and authored world to exercise portfolio placement and exact rerun."
+      "suggested_edit": "First drive a real multi-experience guild through Studio publication, Runtime selection, exact reset/rerun, process restart, and installed-Valheim receipts. Add named anchors only when the authored slice needs them; do not gate R&D on world packaging."
     },
     "expectations": "docs/creator-os-expected.json"
   },
@@ -177,49 +220,73 @@
       "id": "queue.requirements",
       "state": "complete",
       "title": "Adopt the guild-dogfood requirements",
-      "detail": "Functional and non-functional requirements now define the portfolio, questline, event, world bundle, run/reset, release, evidence, safety, and seat-efficiency boundaries.",
+      "detail": "Functional and non-functional requirements define the portfolio, questline, event, run/reset, release, integration-evidence, standalone-Workbench, safety, and seat-efficiency boundaries. World distribution remains specified but deferred.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "## Functional requirements"
     },
     {
       "id": "queue.portfolio",
-      "state": "complete",
+      "state": "implemented",
       "title": "Build the portfolio foundation",
-      "detail": "Studio now presents versioned guilds, questlines, standalone quests, repeatable events, progression bands, search/archive, transactional placement, and deep-fork import/export while project schema 3 remains intact.",
+      "detail": "Studio presents versioned guilds, questlines, standalone quests, repeatable events, progression bands, search/archive, transactional placement, and deep-fork import/export. Promote it only after the real persisted and published journey runs.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### Portfolio and progression"
     },
     {
       "id": "queue.reset",
-      "state": "complete",
+      "state": "implemented",
       "title": "Make clean reruns a product operation",
-      "detail": "Studio and Runtime now preview the exact workflow, timer, action-claim, spawn, notice, reward, world, binding, participant, content, and run scope; confirmed cleanup is resumable and starts a linked successor while prior durable state and rewards remain recoverable.",
+      "detail": "Studio and Runtime implement exact scoped preview, resumable cleanup, retained prior state, and a linked successor run. Promote it only after an installed game run proves the exchange, reset, restart, and rerun path.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "FR-RESET-001"
     },
     {
-      "id": "queue.anchors",
+      "id": "queue.workbench-boundary",
       "state": "ready",
-      "title": "Capture named world anchors",
-      "detail": "Add the bounded game-owned capture contract and fixture-driven Studio integration. Only final adapter acceptance needs a loaded private world.",
+      "title": "Prove the standalone Workbench boundary",
+      "detail": "Before connecting MCP, make the released Isolate profile independently portable, identity-attested, neutral to machine and operator, and incapable of discovering or sharing anything with HEARTH. Drive one disposable command/receipt/teardown slice from clean artifacts.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "NFR-MCP-001"
+    },
+    {
+      "id": "queue.guild-runtime",
+      "state": "ready",
+      "title": "Unlock guild-scale Runtime",
+      "detail": "Implement multi-experience guild artifacts, prerequisites/unlocks, Runtime experience selection, independent run status, and creator-event controls as one coherent Studio-to-Runtime capability.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "### 4A — Dogfood foundation"
+    },
+    {
+      "id": "queue.full-width-journey",
+      "state": "gated",
+      "title": "Drive the installed vertical slice",
+      "detail": "Use the actual Studio GUI, serialized artifacts, process restarts, bounded Valheim controls, receipts, logs, captures, and recovery. Fix and rerun mechanical faults before asking for human acceptance.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "NFR-TEST-001"
+    },
+    {
+      "id": "queue.anchors",
+      "state": "gated",
+      "title": "Add named anchors when authorship needs them",
+      "detail": "Capture point, radius, region, or allowed object anchors through the bounded live-game contract when the first real guild slice needs spatial references. Anchors are not a standalone infrastructure milestone.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "FR-WORLD-001"
     },
     {
-      "id": "queue.world-bundle",
-      "state": "ready",
-      "title": "Package the authored saved world",
-      "detail": "Create a closed-game, versioned and hash-pinned world bundle with identity, compatibility, anchors, linked guild release, atomic install, and rollback. Captures remain optional modules.",
-      "source": "docs/creator-portfolio-requirements.md",
-      "source_contains": "FR-WORLD-003"
-    },
-    {
       "id": "queue.guild-campaign",
-      "state": "gated",
-      "title": "Author the first top-to-bottom guild",
-      "detail": "After the 4A leverage exists, use the real campaign to drive prerequisites, multi-experience Runtime, capability admission, and hundredth-use composition.",
+      "state": "human",
+      "title": "Dogfood the first top-to-bottom guild",
+      "detail": "After autonomous readiness, Derek uses the Creator OS for real questlines and repeatable events. His sitting supplies creative and perceptual judgments; observed blocks drive the next full-width tooling change.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4B — Guild campaign"
+    },
+    {
+      "id": "queue.world-bundle",
+      "state": "deferred",
+      "title": "Package authored saved worlds",
+      "detail": "Do not build versioned `.db`/`.fwl` packaging, inspection, installation, or rollback during active R&D. Activate this only after repeated guild authoring stabilizes the contracts and community distribution becomes the next result.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "This is where versioned `.db`/`.fwl` packaging"
     },
     {
       "id": "queue.phase3-lap",
@@ -243,9 +310,17 @@
       "id": "decision.seat",
       "title": "Seat capacity",
       "question": "What work is allowed to consume Derek's time at the keyboard?",
-      "recommendation": "Only authored choices, spatial judgment, visual review, and play feel. Deployment, relays, capture transport, and proof belong to the machine loop.",
+      "recommendation": "Only a prepared batch of authored choices, spatial judgment, visual review, narrative, responsiveness, and play feel. Deployment, retries, relays, capture transport, and machine proof belong to automation.",
       "source": "docs/creator-os.md",
-      "source_contains": "The seat is for spatial judgment"
+      "source_contains": "Golden rule: do not spend Derek's seat time"
+    },
+    {
+      "id": "decision.proof",
+      "title": "Definition of proof",
+      "question": "What evidence decides whether a feature is ready?",
+      "recommendation": "Automated installed vertical-slice journeys first, boundary integration second, focused unit tests third. Report crossed boundaries and retained evidence rather than test totals.",
+      "source": "docs/creator-os.md",
+      "source_contains": "## Evidence strategy"
     },
     {
       "id": "decision.bar",
@@ -267,9 +342,25 @@
       "id": "decision.dogfood",
       "title": "Adoption path",
       "question": "Do notebook patterns or auto-generation come before guild authoring?",
-      "recommendation": "No. Build the portfolio, anchors, reset/rerun, and world-release foundation; let real guild authoring earn palette, pattern, and generation work from observed need.",
+      "recommendation": "No. Integrate guild-scale Runtime and creator-event flow, then let real guild authoring earn anchors, palette, patterns, generation, and other tooling from observed need.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "They are not substitutes for the authored source"
+    },
+    {
+      "id": "decision.distribution",
+      "title": "R&D versus distribution",
+      "question": "Does versioned world packaging belong on the active R&D path?",
+      "recommendation": "No. Use recoverable local world copies while authoring stabilizes the contracts. Build `.db`/`.fwl` packaging only when community distribution becomes the next result.",
+      "source": "docs/creator-os.md",
+      "source_contains": "Versioned `.db`/`.fwl` packaging"
+    },
+    {
+      "id": "decision.mcp",
+      "title": "Development MCP boundary",
+      "question": "May the turnkey Workbench borrow Derek's private HEARTH gateway or fleet topology?",
+      "recommendation": "Absolutely not. Use an independently released, identity-attested Isolate profile with generated local credentials and no private fallback, path, host, state, or provider coupling.",
+      "source": "docs/creator-os.md",
+      "source_contains": "## Standalone Workbench boundary"
     },
     {
       "id": "decision.fleet",
@@ -337,10 +428,13 @@
     }
   ],
   "cautions": [
+    "Golden rule: do not call Derek into the seat to discover, relay, or retry anything the fleet can build, drive, observe, capture, diagnose, or close itself.",
+    "A passing unit suite proves neither integration nor usability. Drive the installed Studio-to-Valheim journey and retain its real evidence before promoting a feature.",
+    "Never connect by port alone. The development gateway must attest the exact standalone Isolate release and must have no HEARTH, private-machine, or sibling-checkout coupling.",
     "The Creator Session lease owns the shared Valheim installation. Do not run another deployment or Lab mutation beside it.",
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
-    "Close -Restore restores prior install bytes, not the authored world. Treat the backed-up world pair as recovery material until the world-bundle lifecycle is implemented.",
-    "Portfolio and reset/rerun are automated, not yet live accepted. Do not spend a seat turn on them until named anchors and world bundling let one batched 4A lap exercise the complete creator loop."
+    "Close -Restore restores prior install bytes, not the authored world. During R&D, retain ordinary recoverable world copies; do not turn world packaging into a critical-path project.",
+    "Portfolio and reset/rerun are implemented, not yet integrated or autonomously driven through installed Valheim. Do not spend a seat turn discovering their mechanical defects."
   ]
 }

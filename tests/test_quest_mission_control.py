@@ -81,18 +81,30 @@ class QuestMissionControlTests(unittest.TestCase):
             f"Program reconciled through {self.manifest['page']['program_commit']}",
             self.committed,
         )
-        self.assertIn("Automate the machine loop. Spend the seat on design.", self.committed)
+        self.assertIn("Build it. Drive it. Then call the seat.", self.committed)
+        self.assertIn("Results through the whole vertical slice", self.committed)
+        self.assertIn("Integration evidence dominates", self.committed)
+        self.assertIn("Ready before the seat", self.committed)
+        self.assertIn("Prove the standalone Workbench boundary", self.committed)
+        self.assertIn("Package authored saved worlds", self.committed)
         self.assertIn("Safe-top overhead bar verified live", self.committed)
         self.assertIn("First human-spaced module captured", self.committed)
         self.assertIn("Guild dogfooding is the adoption path.", self.committed)
         self.assertIn("Portfolio requirements", self.committed)
         self.assertIn("complete", self.renderer.ALLOWED_QUEUE_STATES)
+        self.assertIn("implemented", self.renderer.ALLOWED_QUEUE_STATES)
+        self.assertIn("deferred", self.renderer.ALLOWED_QUEUE_STATES)
 
     def test_manifest_rejects_duplicate_ids_and_stale_source_pins(self):
         duplicate = copy.deepcopy(self.manifest)
         duplicate["machines"][1]["id"] = duplicate["machines"][0]["id"]
         with self.assertRaisesRegex(self.renderer.MissionControlError, "duplicate stable id"):
             self.renderer.validate_manifest(duplicate)
+
+        duplicate_strategy = copy.deepcopy(self.manifest)
+        duplicate_strategy["strategy"]["principles"][1]["id"] = duplicate_strategy["strategy"]["principles"][0]["id"]
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "duplicate stable id"):
+            self.renderer.validate_manifest(duplicate_strategy)
 
         stale = copy.deepcopy(self.manifest)
         stale["queue"][0]["source_contains"] = "a phrase the handoff cannot contain"

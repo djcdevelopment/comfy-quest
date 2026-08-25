@@ -4,6 +4,103 @@ The scarce resource is the creator's time in the seat. Build, deployment, identi
 checks, bounded world operations, capture transport, and proof collection belong to the
 machine loop. The seat is for spatial judgment, authored choices, and play feel.
 
+**Golden rule: do not spend Derek's seat time discovering machine-observable defects.**
+The fleet, hardware, agents, browsers, game clients, request mailboxes, receipts, logs,
+and capture surfaces scale. Derek's cognitive time does not. Be ready before calling
+him: drive the actual vertical slice, fix what it exposes, rerun it, collect the evidence,
+and reduce the eventual seat request to one prepared batch of genuinely human judgments.
+
+## Results-driven operating strategy
+
+Quest is one product lane in a much larger vertical slice. Quest owns its contracts,
+Studio, Runtime, Lab, creator tools, request/receipt surfaces, and release artifacts.
+Isolate owns the standalone turnkey Workbench and development MCP runtime. Baseline owns
+the cross-product vertical slice and composes exact released artifacts; it is not a reason
+for Quest to reach into sibling source trees. NetworkSense and Lumberjacks provide their
+own released observation, lifecycle, and multiplayer capabilities.
+
+The unit of delivery is a usable creator result across real boundaries, not a layer-local
+model or a test count:
+
+- Implement coherent changes through the contract, Studio GUI/API, serialized artifact,
+  Runtime, installed mod, real Valheim process, and receipt/evidence return path wherever
+  the feature crosses those layers.
+- Drive the actual browser and game-facing surfaces. Preserve screenshots, logs, request
+  and receipt envelopes, installed hashes, process lifecycle evidence, and resulting
+  persisted state. Those observations are more valuable than another mock that agrees
+  with the implementation that created it.
+- Debug downward only when the full-width journey exposes a fault. The existing tools can
+  isolate contract, serialization, filesystem, process, Unity, adapter, network, and UI
+  failures after there is a real failing observation to explain.
+- Prefer sweeping, internally coherent product changes that unlock authoring over a queue
+  of small infrastructure exercises. A change is valuable when the creator can do
+  something materially new through the product.
+
+## Evidence strategy
+
+Evidence priority is deliberately asymmetric:
+
+1. **Automated real vertical-slice journeys.** Build and deploy the exact artifacts,
+   launch the real processes, drive the Studio GUI and bounded in-game controls, observe
+   the installed Runtime, and retain the resulting files, screenshots, logs, and receipts.
+2. **Boundary integration tests.** Exercise actual serialization, process restarts,
+   filesystem exchanges, package consumption, endpoint identity, failure recovery, and
+   state continuity without substituting in-memory doubles for owned boundaries.
+3. **Focused unit tests.** Use them for dense algorithms, safety invariants, parsers,
+   deterministic reducers, and exact regressions found by the higher layers. They support
+   delivery; they never define product completion by themselves.
+
+When a roadmap item ends in a Derek-in-the-seat acceptance, keep new unit coverage lean
+or omit it when it would only restate the new model. Spend that budget making the
+automated harness drive farther through the real GUI/game journey. Report which journey
+ran and what evidence it produced, not how many tests agreed with the code.
+
+Use these proof states without promotion by implication:
+
+- **Implemented:** the product code exists.
+- **Integrated:** the real owned boundaries exchange the intended bytes and state.
+- **Autonomously driven:** the installed application and game journey completed without a
+  human relay and retained evidence.
+- **Ready for seat:** every machine-observable gate is green, rollback is ready, and the
+  remaining questions require human authorship or perception.
+- **Human accepted:** Derek supplied those prepared judgments in one bounded sitting.
+
+## Ready before the seat
+
+Before asking Derek to enter Valheim or operate Studio for acceptance, the implementing
+agent owns all applicable preparation:
+
+- exact build, install, identity, configuration, world/content selection, launch, and
+  clean shutdown;
+- a driven Studio-to-artifact-to-Runtime journey using the actual GUI and exchange files;
+- bounded in-game requests and correlated receipts for every machine-verifiable claim;
+- automatic collection of logs, screenshots or window captures, persisted state, and
+  failure diagnostics;
+- correction and rerun of every known mechanical failure, including first-launch,
+  restart, stale-state, and upgrade paths affected by the change;
+- a recoverable prior state and rehearsed cleanup path; and
+- one concise batch of remaining questions limited to composition, clarity, narrative,
+  spacing, responsiveness, fun, or other human perception.
+
+If those conditions are not met, the agent is not ready to call the seat. Derek is never
+the keyboard relay, screenshot courier, log reader, hash checker, process monitor, or
+manual retry loop for the fleet.
+
+## Standalone Workbench boundary
+
+The development MCP used by this program must be a released Isolate Workbench instance
+that can stand up independently on any volunteer machine. It may not discover, import,
+fall back to, share credentials with, share state with, or carry a runtime reference to
+HEARTH or any other private operator gateway. A responsive localhost port is not
+identity.
+
+Before Quest relies on that surface, a clean-machine acceptance must prove the exact
+Isolate project identity, immutable source/image identity, profile, provider allowlist,
+generated local caller credentials, bounded state roots, and teardown. The volunteer
+profile may not depend on Derek, OMEN, AM4, private hostnames, private paths, sibling
+checkouts, or historical fleet defaults. Quest contributes only bounded product-owned
+commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle harness.
+
 ## Proof level
 
 - `Invoke-CreatorSession.ps1` has an executed fixture-mode lifecycle covering Prepare,
@@ -79,9 +176,35 @@ optional module/source/diff tool rather than a replacement for the world.
 The safe-top follow-up completed on the next normal Valheim launch without a dedicated
 seat session. Automation owned deployment, process/hash ordering, direct window-buffer
 capture, host-band clearance, Disarm, and Close. No F9 press, screenshot relay, console
-command, forced focus, or manual file copy was required. The next creator-scale target is
-the dogfood foundation: portfolio hierarchy, named world anchors, scoped reset/rerun,
-and a versioned saved-world bundle, followed by one real multi-quest guild slice.
+command, forced focus, or manual file copy was required. That is the standard for future
+work: automate the real application journey, then spend the seat only on what the capture
+cannot decide.
+
+## Product roadmap
+
+1. **Integrate the implemented foundation.** Portfolio hierarchy and exact run/reset
+   identity exist. Drive them through the real Studio persistence and publication path,
+   Runtime exchange, process restart, and installed-game receipt path before promoting
+   their proof state.
+2. **Unlock guild-scale execution.** Implement multi-experience guild artifacts,
+   prerequisites and unlocks, Runtime experience selection, independent concurrent run
+   status, and the creator event controls needed to author top-to-bottom guild ideas.
+   Deliver these as full-width Studio-to-Valheim capabilities rather than isolated
+   contract models.
+3. **Make autonomous live integration routine.** Use the standalone Isolate Workbench,
+   existing Valheim lifecycle harnesses, Quest's bounded inbox/outbox, browser driving,
+   direct captures, logs, and receipts to run the installed vertical slice without Derek.
+   Harden the standalone boundary before connecting it; never borrow HEARTH.
+4. **Dogfood real guilds.** Only after the machine loop is ready, Derek authors and runs
+   quests and repeatable creator events using ordinary building language and the current
+   local working world. Add named anchors, event/effect vocabulary, and creator tooling
+   when a real authored idea needs them. Feed observed friction directly into the next
+   sweeping product change and rerun the same journey.
+5. **Stabilize, then distribute.** After repeated guild authoring stabilizes the content,
+   world, anchor, run, and compatibility contracts, build clean-profile community
+   installation and release artifacts. Versioned `.db`/`.fwl` packaging, inspection,
+   installation, and rollback are deliberately deferred until then. Ordinary recoverable
+   world copies are sufficient during R&D.
 
 ## Capacity policy
 
@@ -89,6 +212,11 @@ and a versioned saved-world bundle, followed by one real multi-quest guild slice
   later creative session. They do not gate Creator OS construction.
 - i5 stays off for content-only and spatial work. Start the peer only when the multiplayer
   adapter itself changes.
+- A feature is not complete because its unit tests pass. Promote it only through the
+  implemented, integrated, autonomously driven, ready-for-seat, and human-accepted states
+  that actually apply.
+- If a known automated harness can launch, drive, observe, or close the relevant surface,
+  using Derek for that operation is a test defect, not an acceptance step.
 - A screenshot or checkbox is orientation, not machine proof. Request receipts, active-set
   identity, capture hashes, and `MATCH` are the machine facts.
 - Auto-generation and the planned pattern notebook are optional accelerators. They earn

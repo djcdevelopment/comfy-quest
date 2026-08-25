@@ -24,9 +24,10 @@ that the current v2 pack or Studio schema already implements them.
 
 - A **portfolio** is one creator's local library. It must remain useful with dozens or
   hundreds of artifacts and may contain more than one guild.
-- A **guild** is a releasable authored experience: identity, version, world bundle,
+- A **guild** is a releasable authored experience: identity, version, world association,
   questlines, standalone quests, repeatable events, progression coverage, dependencies,
-  provenance, and release history.
+  provenance, and release history. During R&D the world association may remain local;
+  community distribution eventually binds it to a world bundle.
 - A **questline** orders or branches quests through explicit prerequisites and unlocks.
 - A **quest** is one bounded experience graph with bindings, named anchors, outcomes,
   eligibility, and a retry/reset policy.
@@ -34,7 +35,8 @@ that the current v2 pack or Studio schema already implements them.
   cooldown or cadence, outcome, cleanup, and evidence.
 - A **world bundle** is the closed-game `.db`/`.fwl` pair plus stable world identity,
   compatibility facts, named entry points and anchors, hashes, and the exact guild
-  release it supports. Runtime progress and character state are separate concerns.
+  release it supports. Runtime progress and character state are separate concerns. This
+  is a post-dogfood distribution contract, not an active R&D prerequisite.
 - A **run** is one execution instance with participants, content identity, world and
   binding identity, progress, outcome, evidence, and reset lineage.
 - A **pattern** is optional reusable craft earned from repetition. It is not a new
@@ -103,6 +105,11 @@ rules in prose.
   grows. Bulk operations may not bypass per-artifact validation.
 
 ### World-first authoring
+
+`FR-WORLD-003` through `FR-WORLD-005` preserve the eventual community-distribution
+direction. They are deliberately deferred until repeated guild authoring stabilizes the
+world, anchor, content, and compatibility contracts. Ordinary recoverable world copies
+are sufficient for local R&D and must not gate the creator loop.
 
 - **FR-WORLD-001 — Named live anchors.** From a pinned private-world session, the
   creator must be able to capture a point, radius, region, or allowed object target by
@@ -193,6 +200,11 @@ rules in prose.
 - **NFR-SEAT-002 — Judgment boundary.** Human acceptance is limited to authorship,
   spatial composition, visual hierarchy, narrative tone, and play feel. Identity,
   deployment, state, compatibility, and success/failure are machine verdicts.
+- **NFR-SEAT-003 — Ready before calling.** A Derek-in-the-seat gate may begin only after
+  the implementing agent has built and installed the exact artifacts, driven every
+  applicable browser and real-Valheim step through automation, collected the resulting
+  screenshots/logs/receipts/state, fixed and rerun known mechanical failures, and staged
+  recovery. The remaining questions must be one bounded batch of human judgments.
 - **NFR-SAFE-001 — Recoverability.** Every mutation has an exact target, preflight,
   atomic write or transaction boundary, recoverable prior state, correlated evidence,
   and a tested rollback. Destructive world operations require Valheim closed and explicit
@@ -216,37 +228,59 @@ rules in prose.
 - **NFR-COMPAT-001 — Portability.** Artifacts declare game, mod, contract, world, and
   dependency compatibility. Repository tools derive paths from repository/install
   identity and do not assume Derek's checkout layout.
+- **NFR-MCP-001 — Standalone Workbench.** Development MCP integration uses an
+  independently released Isolate Workbench with exact authenticated project, image,
+  profile, provider, caller, and state identity. It may not discover, import, fall back
+  to, share credentials or state with, or retain runtime references to HEARTH, Derek,
+  OMEN, AM4, private paths, private hosts, or sibling checkouts. A healthy port is not an
+  identity proof, and a volunteer profile must stand up from released artifacts alone.
 - **NFR-USE-001 — Hundredth-use composition.** Common author, play, observe, reset, and
   rerun actions remain visible and keyboard/mouse usable at supported viewport sizes.
   Advanced machinery is available without taxing the normal reading order.
 - **NFR-OBS-001 — Retention.** Receipt and evidence stores have explicit size/age
   retention with archive/export before deletion. Reads stay bounded, and pruning one run
   cannot break another run's audit chain.
-- **NFR-TEST-001 — Split proof.** Pure contracts, Studio workflows, generators, and
-  failure branches are automated. Rehearsal publishes `proof_level`, `disclaimer`, and
-  per-run `limitations`. Only adapter behavior needs a batched live lap, and a human is
-  never used to reproduce a machine-observable assertion.
+- **NFR-TEST-001 — Integration-first proof.** Evidence priority is automated installed
+  Studio-to-artifact-to-Runtime-to-real-Valheim journeys, then boundary integration tests,
+  then focused unit tests for dense algorithms, safety invariants, and exact regressions.
+  A unit test that restates the implementation's model is not product evidence. When a
+  roadmap item ends in a Derek-in-the-seat gate, unit coverage stays lean or absent where
+  it would delay driving the actual GUI/game slice. Rehearsal publishes `proof_level`,
+  `disclaimer`, and per-run `limitations`; no synthetic layer claims live adapter proof.
+- **NFR-TEST-002 — Evidence over counts.** Completion reports name the real journey,
+  installed identity, processes and boundaries crossed, state transitions, retained
+  screenshots/logs/receipts, negative branches, and recovery result. Test totals may
+  support that report but may never substitute for it.
 
 ## Adoption roadmap and exit gates
 
 ### 4A — Dogfood foundation
 
-Build portfolio hierarchy, named live anchors, scoped reset/rerun, and saved-world
-bundling before adding more generated content.
+Integrate the implemented portfolio hierarchy and scoped reset/rerun foundation through
+the actual Studio persistence/publication path, Runtime exchange, process restart, and
+installed Valheim receipt path. Add multi-experience guild artifacts, prerequisites and
+unlocks, Runtime experience selection, independent run status, and the creator-event
+controls needed for one real guild slice. Named anchors enter when that authored slice
+needs spatial references; saved-world packaging does not gate R&D.
 
-Exit: Derek authors a guild slice containing a questline with more than one quest and
-one repeatable event, runs it from a packaged world, resets one completed experience,
-and reruns it under a new run identity. The lap requires no repository edit, console,
-manual file transfer, log reading, or machine-fact relay from Derek.
+Exit: automation drives the real Studio GUI through authoring and publication, launches
+and closes the installed game through the standalone harness, selects and runs more than
+one guild experience, resets one completed experience, reruns it under a new run identity,
+and retains correlated evidence without Derek. The slice is then ready for one bounded
+human judgment session with no repository edit, console, manual file transfer, log
+reading, retry loop, or machine-fact relay.
 
 ### 4B — Guild campaign
 
-Add cross-quest prerequisites/unlocks, multi-experience release and Runtime selection,
-portfolio-wide readiness, and atomic guild/world activation and rollback.
+Use the prepared Creator OS to author a top-to-bottom guild campaign and additional
+repeatable creator events. Expand event/effect vocabulary, named anchors, portfolio-wide
+readiness, and creator controls only where the real campaign exposes a block or repeated
+friction. Each tooling change reruns the same full-width journey before another seat call.
 
 Exit: one top-to-bottom guild campaign covers every progression band the creator declares,
 every included quest/event has rehearsal evidence, and all live-adapter claims used by
-the guild have run receipts. A clean install can play it from its released world bundle.
+the guild have real run receipts. Multiple author-to-rerun cycles complete without using
+Derek as process control, input relay, screenshot courier, or machine observer.
 
 ### 4C — Refinement through use
 
@@ -260,8 +294,10 @@ common loop remains coherent at hundredth-use density.
 
 ### 5 — Community release
 
-Finish provenance, dependencies, permissions, import/export, semantic diff, and the
-community-ready guild artifact after the local dogfood loop is real.
+After the local dogfood loop stabilizes its contracts, finish provenance, dependencies,
+permissions, import/export, semantic diff, clean-profile installation, and the
+community-ready guild artifact. This is where versioned `.db`/`.fwl` packaging,
+inspection, installation, and rollback become active work.
 
 Exit: export one guild, import it into a clean local profile, modify it as a fork, inspect
 the semantic/world diff, install it atomically, and preserve upstream lineage and evidence.
