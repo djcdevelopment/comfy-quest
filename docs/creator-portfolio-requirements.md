@@ -263,12 +263,23 @@ unlocks, Runtime experience selection, independent run status, and the creator-e
 controls needed for one real guild slice. Named anchors enter when that authored slice
 needs spatial references; saved-world packaging does not gate R&D.
 
-Exit: automation drives the real Studio GUI through authoring and publication, launches
-and closes the installed game through the standalone harness, selects and runs more than
-one guild experience, resets one completed experience, reruns it under a new run identity,
-and retains correlated evidence without Derek. The slice is then ready for one bounded
-human judgment session with no repository edit, console, manual file transfer, log
-reading, retry loop, or machine-fact relay.
+Exit: automation drives the real Studio GUI through authoring and publication, selects
+and runs more than one guild experience, maintains independent run state, resets one
+completed experience, reruns it under a new run identity, and retains correlated
+evidence. **Exactly one human action is permitted: launching the game and entering the
+pinned authoring world.** Everything after world entry is machine-owned and completes
+with no repository edit, console command, manual file transfer, log reading, retry loop,
+or machine-fact relay.
+
+The allowance is strictly scoped to launch and world entry. It is not a generic "one
+human intervention" budget, and it does not excuse relaying a console command, copying a
+file, reading a hash or log or receipt back to the machine, pressing a key on
+automation's behalf, retrying a failed mechanical step, or verifying any fact the machine
+can observe — see [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md).
+Automating world entry is a later reduction of this boundary, not a gate on this exit.
+The lane definition of record is
+[`creator-os-phases.json`](creator-os-phases.json) (`4A / guild-scale-runtime`); this
+section is a reference to it, not a competing definition.
 
 ### 4B — Guild campaign
 
