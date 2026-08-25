@@ -54,3 +54,9 @@ Every queue item in that manifest carries a `lane` and a `requirements` list, an
 removing a requirement without a matching ledger entry fails CI** — that is deliberate, not
 friction to route around. Lane vocabulary itself is defined once, in
 `docs/creator-os-phases.json`; other documents reference a lane, they do not define one.
+
+The rules above are the short form. `docs/working-agreements.md` carries the long form with the
+incident behind each one — why choreography is verified by execution, why a check nobody has
+watched fail is a claim, why agreement with your own workstation is not evidence, and what a
+hold means. Read it once before your first substantial change; the rules are cheap and the
+incidents that produced them were not.

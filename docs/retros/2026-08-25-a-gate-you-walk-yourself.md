@@ -59,6 +59,11 @@ minute and it is the difference between a gate and a decoration.
 No new ritual, no new document, no new review step. The repository already has the machinery;
 this is about not skipping the last five seconds of using it.
 
+It is recorded alongside the rest of the working agreements in
+[`../working-agreements.md`](../working-agreements.md), which was published on the same day for
+the same reason: rules kept privately are rules the next person has to re-learn by paying for
+them again.
+
 ## What this does not say
 
 It does not say I should have caught rows 1 and 2 myself. Both were found by a reader arriving

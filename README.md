@@ -42,6 +42,7 @@ The rest of the repository:
 - Demo World minimal tutorial: examples/demo-world/first-portal
 - Rendered mission-control page: docs/quest-mission-control.html
 - R&D opportunity matrix: docs/quest-rd-opportunity-matrix.md
+- Working agreements (how this repository expects to be worked on): docs/working-agreements.md
 - Retrospectives: docs/retros/
 - Repository boundary: BOUNDARY.md
 - Extraction record: PROVENANCE.md
