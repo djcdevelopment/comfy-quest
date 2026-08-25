@@ -44,6 +44,20 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Get-Sha256([string]$Path) {
+    # Deliberately not Get-FileHash: it lives in Microsoft.PowerShell.Utility, and a hosted
+    # runner has been observed failing to resolve it with the module present and its directory
+    # on PSModulePath. Request verification must not depend on module autoloading.
+    # See docs/creator-os-audit-2026-08-24.md D7.
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try {
+            return [System.BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+        } finally { $stream.Dispose() }
+    } finally { $sha.Dispose() }
+}
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 & (Join-Path $repoRoot 'tools\Assert-RepoIdentity.ps1') | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Repository identity check failed.' }
@@ -126,8 +140,7 @@ if ($Lane -eq 'i5') {
             (New-Object System.Text.UTF8Encoding($false)))
         if (Test-Path -LiteralPath $requestPath) { Remove-Item -LiteralPath $requestPath -Force }
         Move-Item -LiteralPath $stagingPath -Destination $requestPath
-        if ((Get-FileHash -Algorithm SHA256 -LiteralPath $localRequest).Hash -ne
-            (Get-FileHash -Algorithm SHA256 -LiteralPath $requestPath).Hash) {
+        if ((Get-Sha256 $localRequest) -ne (Get-Sha256 $requestPath)) {
             throw 'Runtime OMEN request SHA256 verification failed.'
         }
     } finally {

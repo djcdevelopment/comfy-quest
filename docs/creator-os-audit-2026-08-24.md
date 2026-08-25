@@ -445,6 +445,12 @@ call site was removed instead: `Get-Sha256` now hashes through
 is the better shape regardless — hashing installed bytes is a precondition for every later
 Creator Session operation, so it should not depend on module autoloading.
 
+**Blast radius.** `Get-FileHash` appears at roughly 20 further call sites across nine other
+scripts — `tools/i5-deploy/`, `tools/quest-runtime/`, `tools/quest-studio/`,
+`tools/questlab-package/`, `tools/release/`. None is exercised by CI, so all carry the same
+latent risk on a hosted runner while looking healthy on a workstation. Only the two scripts on
+the CI path were changed here; the rest are punch item 18.
+
 **This finding exists because of E3.** Those nine commits sat unpushed for a day, so CI had
 never seen them. The break was latent the whole time. Unpushed work is untested work, and the
 first push surfaced it immediately.
@@ -488,7 +494,8 @@ requiring sign-off**, not edits. The rest are mechanical.
 | 14 | Gitignore or remove `.codex-pdf-profile/`; decide the PDF's status (E1, E4) | `.gitignore` | no |
 | 15 | Remove the empty `Lumberjacks/src/` fossil (E2) | — | no |
 | 16 | Give build/test the hash-keyed package cache `Start-QuestStudio.ps1` already uses, or bump the version on every repack (D6) | `README.md`, build/test entrypoints | no |
-| 17 | Diagnose the CI-only `Prepare` exit 1 now that the test reports its output (D7) | `network/mod/ComfyQuestLab.Tests/RuntimeCreatorRequestTests.cs` | no |
+| 17 | Diagnose the CI-only `Prepare` exit 1 now that the test reports its output (D7) | `network/mod/ComfyQuestLab.Tests/RuntimeCreatorRequestTests.cs` | ✅ done — cause was `Get-FileHash` |
+| 18 | Replace the ~20 remaining `Get-FileHash` call sites in scripts CI never runs (D7) | `tools/i5-deploy/`, `tools/quest-runtime/`, `tools/quest-studio/`, `tools/questlab-package/`, `tools/release/` | no |
 
 All four sign-off items were ruled on 2026-08-24; see the sign-off record in
 [`creator-os-build-strategy.md`](creator-os-build-strategy.md). Lane vocabulary is now defined
