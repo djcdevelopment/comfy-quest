@@ -15,3 +15,8 @@ the lap-backlog section it came from. Statuses: `proposed`, `accepted`,
 | [0005](0005-channel-taxonomy-is-not-an-anchor.md) | A channel taxonomy is not an anchor | accepted (deferral clause struck 2026-08-20) |
 | [0006](0006-bounded-recheck-for-adaptive-routes.md) | Bounded recheck for adaptive routes | accepted (awaiting live confirmation) |
 | [0007](0007-lap-gates-are-keyed-to-a-content-profile.md) | Lap gates are keyed to a content profile | accepted |
+| [0008](0008-the-overhead-bar-replaces-the-f9-drawer.md) | The overhead bar replaces the F9 drawer | accepted (extends 0005; verified live) |
+| [0009](0009-the-saved-world-is-the-playable-release-authority.md) | The saved world is the playable release authority | accepted |
+| [0010](0010-world-packaging-is-deferred-out-of-rnd.md) | Versioned world packaging is deferred out of R&D | accepted |
+| [0011](0011-the-workbench-may-not-borrow-a-private-gateway.md) | The Workbench may not borrow a private operator gateway | accepted |
+| [0012](0012-creator-session-world-entry-is-not-field-lab-orchestration.md) | Creator-session world entry is not field-lab orchestration | **proposed** (awaiting sign-off) |

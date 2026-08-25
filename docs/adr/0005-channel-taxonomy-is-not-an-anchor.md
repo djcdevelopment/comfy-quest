@@ -1,7 +1,8 @@
 # 0005 — A channel taxonomy is not an anchor
 
-Status: accepted — one configurable anchor; the composition that carries it is being
-built, not scheduled (amended 2026-08-20, see Decision).
+Status: accepted — one configurable anchor; the composition that carries it is the
+always-present overhead bar, recorded 2026-08-24 in [0008](0008-the-overhead-bar-replaces-the-f9-drawer.md)
+(amended 2026-08-20, see Decision).
 
 ## Context
 
