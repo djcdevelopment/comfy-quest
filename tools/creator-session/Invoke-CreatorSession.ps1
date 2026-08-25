@@ -95,7 +95,17 @@ function Test-ChildPath([string]$Parent, [string]$Child) {
 
 function Get-Sha256([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
-    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+    # Deliberately not Get-FileHash. It lives in Microsoft.PowerShell.Utility, and a hosted
+    # runner has been observed failing to resolve it with the module present and its directory
+    # on PSModulePath. Hashing installed bytes is a precondition for every later operation, so
+    # it must not depend on module autoloading. See docs/creator-os-audit-2026-08-24.md D7.
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try {
+            return [System.BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+        } finally { $stream.Dispose() }
+    } finally { $sha.Dispose() }
 }
 
 function Get-InboxPins([string]$Root) {

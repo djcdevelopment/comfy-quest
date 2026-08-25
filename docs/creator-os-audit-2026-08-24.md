@@ -436,6 +436,15 @@ stdout+stderr, so the next run explains itself rather than requiring a local rep
 not reproduce. This is the `NFR-EXPLAIN-001` rule applied to the test suite: a failed
 precondition needs a cause, not just a code.
 
+**Root cause, after two instrumented CI runs.** `Get-FileHash` was unresolvable on the runner
+*with `Microsoft.PowerShell.Utility` present on disk and its directory on the child's
+`PSModulePath`* — the diagnostics proved both, which refuted the module-path theory rather than
+confirming it. Since the cause sits in the runner's runspace and not in this repository, the
+call site was removed instead: `Get-Sha256` now hashes through
+`System.Security.Cryptography.SHA256`, verified byte-identical to `Get-FileHash` output. That
+is the better shape regardless — hashing installed bytes is a precondition for every later
+Creator Session operation, so it should not depend on module autoloading.
+
 **This finding exists because of E3.** Those nine commits sat unpushed for a day, so CI had
 never seen them. The break was latent the whole time. Unpushed work is untested work, and the
 first push surfaced it immediately.
