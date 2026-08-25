@@ -22,3 +22,6 @@ the lap-backlog section it came from. Statuses: `proposed`, `accepted`,
 | [0012](0012-creator-session-world-entry-is-not-field-lab-orchestration.md) | Creator-session world entry is not field-lab orchestration | accepted |
 | [0013](0013-one-numbering-authority-for-lane-vocabulary.md) | One numbering authority for lane vocabulary | accepted |
 | [0014](0014-one-human-launch-and-entry-is-the-baseline.md) | One human launch and world entry is the baseline | accepted |
+| [0015](0015-the-requirements-ledger-cannot-confer-lane-authority.md) | The requirements ledger records lane authority, it cannot confer it | accepted (extends 0013) |
+| [0016](0016-evidence-retention-archives-it-never-silently-deletes.md) | Evidence retention archives; it never silently deletes | accepted |
+| [0017](0017-an-absent-experience-selector-means-exactly-one.md) | An absent experience selector means exactly one | accepted |

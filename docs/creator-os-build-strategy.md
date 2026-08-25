@@ -399,7 +399,9 @@ python tools/assert_no_reach_in.py
 - **The five invariant checks** each get a negative test proving they fire: an orphaned
   requirement, a dangling requirement id, a lane-less queue item, an unscheduled requirement
   with no disposition, and a requirements-document edit with no ledger change. A check that
-  cannot fail is decoration.
+  cannot fail is decoration — and a check that has never been *observed* failing is a claim,
+  not a check. Run the negative case against the broken version once and watch it go red. See
+  [`retros/2026-08-25-a-gate-you-walk-yourself.md`](retros/2026-08-25-a-gate-you-walk-yourself.md).
 - **Lane 0 exit gate** — walk the ten questions against the authoritative surfaces only.
 - **Lane vocabulary** — `docs/creator-os-phases.json` must parse, ids and slugs must be unique,
   and every requirement id it cites must exist in the requirements document. Prose that
