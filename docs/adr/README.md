@@ -19,4 +19,6 @@ the lap-backlog section it came from. Statuses: `proposed`, `accepted`,
 | [0009](0009-the-saved-world-is-the-playable-release-authority.md) | The saved world is the playable release authority | accepted |
 | [0010](0010-world-packaging-is-deferred-out-of-rnd.md) | Versioned world packaging is deferred out of R&D | accepted |
 | [0011](0011-the-workbench-may-not-borrow-a-private-gateway.md) | The Workbench may not borrow a private operator gateway | accepted |
-| [0012](0012-creator-session-world-entry-is-not-field-lab-orchestration.md) | Creator-session world entry is not field-lab orchestration | **proposed** (awaiting sign-off) |
+| [0012](0012-creator-session-world-entry-is-not-field-lab-orchestration.md) | Creator-session world entry is not field-lab orchestration | accepted |
+| [0013](0013-one-numbering-authority-for-lane-vocabulary.md) | One numbering authority for lane vocabulary | accepted |
+| [0014](0014-one-human-launch-and-entry-is-the-baseline.md) | One human launch and world entry is the baseline | accepted |

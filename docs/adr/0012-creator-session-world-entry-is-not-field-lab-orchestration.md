@@ -1,12 +1,12 @@
 # 0012 — Creator-session world entry is not field-lab orchestration
 
-Status: **proposed** — awaiting sign-off. This record changes a repository ownership boundary
-and must not be treated as in force until accepted.
+Status: accepted 2026-08-24 — signed off with every constraint below intact. This record
+changes a repository ownership boundary; widening it requires superseding this record.
 
 ## Context
 
-Lane 4A's exit requires that automation "launches and closes the installed game through the
-standalone harness". There is no launcher in this repository. The only `valheim.exe` reference
+Lane 4A's exit *required*, at the time this was written, that automation "launches and closes
+the installed game through the standalone harness". There is no launcher in this repository. The only `valheim.exe` reference
 anywhere is an existence check at `tools/creator-session/Invoke-CreatorSession.ps1:84`.
 
 Investigation of the sibling repositories established four facts:
@@ -76,10 +76,11 @@ The implementation is bounded. Every constraint is a requirement, not a guidelin
   requires superseding this record.
 - Do not create the three sibling publishing lanes for this. Revisit only if a second consumer
   needs the server-join harness.
-- This record does **not** gate lane 4A. The truthful current baseline is `NFR-SEAT-001`'s
-  existing allowance: one human launch and world-entry step is permitted, and after that point
-  the Creator Session owns the mechanical workflow. Automating world entry is a *subsequent
-  reduction of the remaining human boundary*, not something that retroactively invalidates the
-  machine-owned workflow that already exists.
+- This record does **not** gate lane `4A / guild-scale-runtime`.
+  [0014](0014-one-human-launch-and-entry-is-the-baseline.md) makes one human launch and world
+  entry the baseline, so automating world entry is a *subsequent reduction of the remaining
+  human boundary* rather than a prerequisite for proving anything else.
+- The decision here is not who owns `Start-Process`. It is **where the abstraction ends** — and
+  the constraint list is the boundary, not the launch call.
 - `BOUNDARY.md` needs no inbound artifact row under this decision, because nothing is consumed.
-  If sign-off goes the other way, it needs its first one.
+  Its six artifact contracts stay outbound-only.

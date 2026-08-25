@@ -1,0 +1,134 @@
+{
+  "schema": "comfy-quest-creator-os-phases/v1",
+  "adopted_on": "2026-08-24",
+  "authority": "This file is the single definition of Creator OS lane vocabulary. Other documents may reference a lane by id or slug; they may not define, renumber, or redefine one. A prose description that disagrees with this file is stale prose, not a competing definition.",
+  "rationale": "Three incompatible 'Phase 3' / 'Phase 4' meanings were live at once across docs/creator-os.md, docs/five-intent-program-plan.md, and docs/quest-mission-control.json. A bare ordinal is semantically weak and an agent can execute the wrong work from it. Lanes therefore carry a stable slug as well as an id, and the slug is the safer thing to cite.",
+  "citation_rule": "Cite a lane as `4A / guild-scale-runtime`, not as `Phase 4`.",
+
+  "human_boundary": {
+    "id": "one-launch-and-entry",
+    "allowance": "Exactly one human action is permitted per creator session: launching the game and entering the pinned authoring world. Everything after world entry is machine-owned.",
+    "scope_is_strict": true,
+    "strictness_note": "The allowance is specifically launch and world entry. It is NOT a generic 'one human intervention' budget. Read as a generic allowance it becomes an escape hatch for any single piece of missing automation, which is precisely the failure it exists to prevent.",
+    "not_permitted_under_this_allowance": [
+      "relaying a console command",
+      "copying a file",
+      "reading a hash, log, or receipt back to the machine",
+      "pressing a key on automation's behalf",
+      "retrying a failed mechanical step",
+      "verifying any fact the machine can observe"
+    ],
+    "requirement": "NFR-SEAT-001",
+    "decision": "docs/adr/0014-one-human-launch-and-entry-is-the-baseline.md",
+    "future": "Automating world entry is a later reduction of this boundary, not a prerequisite for any lane exit. See docs/adr/0012-creator-session-world-entry-is-not-field-lab-orchestration.md."
+  },
+
+  "not_a_gate_in_any_lane": [
+    {
+      "subject": "saved-world packaging",
+      "detail": "Versioned .db/.fwl packaging, inspection, installation, and rollback are not a gate in 4A or 4B. They are owned by lane 5.",
+      "decision": "docs/adr/0010-world-packaging-is-deferred-out-of-rnd.md",
+      "requirements": ["FR-WORLD-003", "FR-WORLD-004", "FR-WORLD-005"]
+    }
+  ],
+
+  "lanes": [
+    {
+      "id": "4A",
+      "slug": "guild-scale-runtime",
+      "title": "Guild-scale runtime",
+      "question": "Can Creator OS operate a guild?",
+      "state": "active",
+      "in_scope": [
+        "multi-experience guild artifacts",
+        "Runtime experience selection without ambiguity",
+        "independent run state for simultaneous experiences",
+        "prerequisites and unlocks",
+        "the complete creator-to-installed-runtime loop"
+      ],
+      "out_of_scope": [
+        "saved-world packaging",
+        "named anchors, unless the authored slice needs spatial references",
+        "sustained authoring volume — that is 4B",
+        "automated launch and world entry — permitted but not required; see human_boundary"
+      ],
+      "exit": "Automation drives the real Studio GUI through authoring and publication; selects and runs more than one guild experience; maintains independent run state; resets one completed experience and reruns it under a new run identity; and retains correlated evidence. The one permitted human action is launching the game and entering the pinned world. Everything after entry completes without a repository edit, console command, manual file transfer, log read, retry loop, or machine-fact relay.",
+      "failure_mode": "The architecture cannot express or execute a guild.",
+      "requirements": ["FR-RUN-001", "FR-PORT-003", "FR-AUTH-005", "FR-RESET-003", "NFR-SEAT-001", "NFR-SEAT-003"]
+    },
+    {
+      "id": "4B",
+      "slug": "sustained-creator-campaign",
+      "title": "Sustained creator campaign",
+      "question": "Can I actually use Creator OS to build a guild over time?",
+      "state": "planned",
+      "in_scope": [
+        "repeated author, validate, play, observe, rerun cycles",
+        "accumulated evidence across many runs",
+        "portfolio operation at real density",
+        "proof that the system survives continued use"
+      ],
+      "out_of_scope": [
+        "saved-world packaging",
+        "new capability that no authored need has demanded"
+      ],
+      "exit": "One top-to-bottom guild campaign covers every progression band the creator declares; every included quest and event has rehearsal evidence; every live-adapter claim the guild uses has a real run receipt; and multiple author-to-rerun cycles complete without using the seat as process control, input relay, screenshot courier, or machine observer.",
+      "failure_mode": "The architecture works once and degrades, or authoring it is intolerable.",
+      "requirements": ["FR-PORT-001", "FR-PORT-004", "FR-PORT-005", "FR-EVID-001", "FR-EVID-002", "NFR-OBS-001", "NFR-USE-001"]
+    },
+    {
+      "id": "4C",
+      "slug": "optional-acceleration",
+      "title": "Optional acceleration and generation",
+      "question": "Which repetitions have earned tooling?",
+      "state": "planned",
+      "in_scope": [
+        "patterns promoted from structures the campaign actually repeated",
+        "optional generation using the same contracts and validators",
+        "contextual friction capture"
+      ],
+      "out_of_scope": [
+        "anything that becomes required to make a quest",
+        "acceleration not traceable to an observed repetition"
+      ],
+      "exit": "Multiple full author-to-rerun cycles complete without a seat turn for machine work; every accepted tooling change links back to an authored need and forward to rerun evidence; and the common loop stays coherent at hundredth-use density.",
+      "failure_mode": "Tooling is built for imagined rather than observed need.",
+      "requirements": ["FR-OPT-001", "FR-OPT-002", "FR-EVID-003"]
+    },
+    {
+      "id": "5",
+      "slug": "distribution-release",
+      "title": "Distribution and release",
+      "question": "Can someone else receive, inspect, and run what was built?",
+      "state": "planned",
+      "in_scope": [
+        "guild release artifact with provenance and dependencies",
+        "import, fork lineage, and semantic diff",
+        "clean-profile installation",
+        "versioned .db/.fwl world packaging, inspection, installation, and rollback"
+      ],
+      "out_of_scope": [],
+      "exit": "Export one guild, import it into a clean local profile, modify it as a fork, inspect the semantic and world diff, install it atomically, and preserve upstream lineage and evidence.",
+      "failure_mode": "The work is only runnable on the machine that made it.",
+      "requirements": ["FR-REL-001", "FR-REL-002", "FR-REL-003", "FR-WORLD-003", "FR-WORLD-004", "FR-WORLD-005"]
+    }
+  ],
+
+  "superseded_numbering": [
+    {
+      "source": "docs/five-intent-program-plan.md",
+      "was": "Phase 4 = Quest Lab spellbook",
+      "note": "Superseded by the adoption-path pivot of 2026-08-24. The program-overview table is marked superseded in place."
+    },
+    {
+      "source": "docs/creator-os.md",
+      "was": "Product roadmap item 3 = Make autonomous live integration routine",
+      "note": "A numbered list in prose, not a lane definition. It describes work, not a phase; it must not be cited as 'Phase 3'."
+    },
+    {
+      "source": "docs/quest-mission-control.json",
+      "was": "phases[] 1-5, where 3 = Adaptive event semantics",
+      "note": "A program snapshot with its own historical numbering. Lane vocabulary for current work comes from this file."
+    }
+  ]
+}

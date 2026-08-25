@@ -1,8 +1,10 @@
 # Creator OS build strategy
 
-Status: proposed execution order, 2026-08-24. Derived from
-[`creator-os-audit-2026-08-24.md`](creator-os-audit-2026-08-24.md). Items marked **sign-off**
-are recommendations, not adopted decisions.
+Status: adopted execution order, 2026-08-24. Derived from
+[`creator-os-audit-2026-08-24.md`](creator-os-audit-2026-08-24.md). All four sign-off items
+were ruled on the same day — see Sign-off record below. Lane vocabulary is defined in
+[`creator-os-phases.json`](creator-os-phases.json), which is the sole authority
+(ADR [0013](adr/0013-one-numbering-authority-for-lane-vocabulary.md)).
 
 ## The conclusion this rests on
 
@@ -21,7 +23,7 @@ Three verified examples:
   pins, expiry, allowlists, and correlated receipts. New machine-owned operations are cheap to
   add and hard to get wrong.
 
-So the strategy is not "build 4A". It is: **stop the roadmap from misreporting itself, remove
+So the strategy is not "build `4A / guild-scale-runtime`". It is: **stop the roadmap from misreporting itself, remove
 the single check that blocks guild scale, make the evidence loop trustworthy, and resolve the
 one dependency this repository cannot satisfy on its own.**
 
@@ -161,7 +163,8 @@ Give `RuntimeReceiptStore` explicit retention with archive-or-export before dele
 `RuntimeRunControlController.PruneReceipts` archive rather than discard — scoping its pruning
 so one run's activity cannot evict another run's audit chain.
 
-**Ordering consequence worth naming:** Lane 2 must land before Lane 4 collects the 4A evidence.
+**Ordering consequence worth naming:** Lane 2 must land before Lane 4 collects the
+`4A / guild-scale-runtime` evidence.
 Otherwise the evidence that closes 4A is itself written to a store that can silently drop
 members of a correlated proof set.
 
@@ -169,21 +172,22 @@ members of a correlated proof set.
 
 ## Lane 3 — Resolve the autonomy boundary
 
-### Lane 3a — Reconcile the 4A exit with NFR-SEAT-001 *(sign-off; do first)*
+### Lane 3a — The human boundary *(APPROVED 2026-08-24 — ADR 0014)*
 
-The truthful current baseline is the allowance the requirements already grant: **one human
-launch and world-entry step is permitted; after that point the Creator Session owns the
-mechanical workflow.** This is already what the Creator Session loop does — step 2 is explicitly
-"the only keyboard step needed".
+**Exactly one human action is permitted per creator session: launching the game and entering
+the pinned authoring world. Everything after entry is machine-owned.**
 
-Automating world entry is a **subsequent reduction of the remaining human boundary**, not
-something that retroactively makes the existing machine-owned workflow invalid.
+The allowance is **strictly scoped to launch and world entry**. It is not a generic "one human
+intervention" budget — read that way it becomes an escape hatch for whichever automation is
+missing that week. See [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md) for
+the full non-permitted list.
 
-**Lane 3a is independent of Lane 3b and must not be blocked on the ownership decision.**
+Automating world entry is a **subsequent reduction of the human boundary**, not a prerequisite
+for proving anything else. Lane 3a was independent of Lane 3b and did not wait on it.
 
-### Lane 3b — Creator-world entry belongs to comfy-quest *(sign-off)*
+### Lane 3b — Creator-world entry belongs to comfy-quest *(APPROVED 2026-08-24 — ADR 0012 accepted)*
 
-Recommended, subject to Derek's sign-off. The boundary is defined **semantically**, not as
+Signed off with every constraint intact. The boundary is defined **semantically**, not as
 "comfy-quest may launch Valheim":
 
 > **Creator-session world entry** — placing the already-owned creator Runtime into a
@@ -223,7 +227,7 @@ only if a second consumer needs the server-join harness.
 
 ---
 
-## Lane 4 — Drive the real 4A exit and call the seat
+## Lane 4 — Drive the real `4A / guild-scale-runtime` exit and call the seat
 
 Only after Lanes 1-3, and only with the evidence the readiness gate names.
 
@@ -242,20 +246,25 @@ in the ledger so the next agent does not re-derive them:
 
 ---
 
-## Sign-off boundary
+## Sign-off record
 
-Audit recommendations do not silently become adopted architectural decisions. Anything that
-changes:
+Audit recommendations do not silently become adopted architectural decisions. Four required a
+ruling, and all four were signed off on **2026-08-24**:
 
-- the meaning of 4A / 4B;
-- the canonical phase vocabulary;
-- the allowed human boundary;
-- repository ownership boundaries
+| Decision | Ruling | Recorded in |
+| --- | --- | --- |
+| Human-entry allowance | Approved — exactly one launch/world-entry action, strictly scoped | [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md) |
+| 4A / 4B reconciliation | Approved — 4A is guild-scale capability, 4B is sustained campaign | [`creator-os-phases.json`](creator-os-phases.json) |
+| Canonical phase vocabulary | Approved, plus **one numbering authority** | [ADR 0013](adr/0013-one-numbering-authority-for-lane-vocabulary.md) |
+| Creator-world-entry ownership | Approved and accepted, all constraints intact | [ADR 0012](adr/0012-creator-session-world-entry-is-not-field-lab-orchestration.md) |
 
-is Derek's decision. In the punch list that is items 1-4, and ADR `0012` ships as `proposed`,
-not `accepted`.
+The four reinforce each other. 4A no longer waits on launch automation, so it can concentrate
+on guild-scale runtime; 4B concentrates on sustained use; world-entry automation can later move
+into comfy-quest without becoming a 4A gate; and field-lab stays cleanly outside the boundary.
 
-Everything else is mechanical repair of surfaces that already claim to be authoritative.
+Future changes to the meaning of a lane, the lane vocabulary, the human boundary, or a
+repository ownership boundary need the same sign-off, and widening ADR 0012 or 0014 requires
+superseding them.
 
 ---
 
@@ -274,6 +283,9 @@ python tools/assert_no_reach_in.py
   with no disposition, and a requirements-document edit with no ledger change. A check that
   cannot fail is decoration.
 - **Lane 0 exit gate** — walk the ten questions against the authoritative surfaces only.
+- **Lane vocabulary** — `docs/creator-os-phases.json` must parse, ids and slugs must be unique,
+  and every requirement id it cites must exist in the requirements document. Prose that
+  *redefines* a lane rather than referencing it should eventually fail a check.
 
 Lanes 1-4 are not verified by this pass, by design. Their verification is the integration-first
 ladder the roadmap already specifies, and it starts with the real Studio-to-Valheim journey

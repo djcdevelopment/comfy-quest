@@ -420,10 +420,10 @@ requiring sign-off**, not edits. The rest are mechanical.
 
 | # | Item | File | Sign-off |
 | --- | --- | --- | --- |
-| 1 | Amend the 4A exit to NFR-SEAT-001's one-launch allowance | `docs/creator-portfolio-requirements.md:266-271` | **yes** |
-| 2 | Reconcile the 4A/4B scope tables (B2) | `docs/five-intent-program-plan.md:110-111` | **yes** |
-| 3 | One phase vocabulary across the three roadmaps (B1) | all three | **yes** |
-| 4 | Creator-world-entry ownership (ADR 0012) | `docs/adr/0012-*.md` | **yes** |
+| 1 | Amend the 4A exit to the one-launch allowance | `docs/creator-portfolio-requirements.md:266-271` | ✅ signed off 08-24 (ADR 0014); prose edit pending |
+| 2 | Reconcile the 4A/4B scope tables (B2) | `docs/five-intent-program-plan.md:110-111` | ✅ signed off 08-24; authority now `creator-os-phases.json` |
+| 3 | One phase vocabulary across the three roadmaps (B1) | `docs/creator-os-phases.json` | ✅ signed off 08-24 (ADR 0013) |
+| 4 | Creator-world-entry ownership (ADR 0012) | `docs/adr/0012-*.md` | ✅ accepted 08-24 |
 | 5 | `fetch-depth: 0` on the `quest` job (A1) | `.github/workflows/ci.yml:32` | no |
 | 6 | Add `Quest.Studio.Tests` to CI; decide on E2E (A2) | `.github/workflows/ci.yml` | no |
 | 7 | Requirements ledger + five invariant checks (C1, C2, C4, C6) | `docs/creator-requirements-ledger.json`, `tools/render_quest_mission_control.py`, new test | no |
@@ -437,5 +437,6 @@ requiring sign-off**, not edits. The rest are mechanical.
 | 15 | Remove the empty `Lumberjacks/src/` fossil (E2) | — | no |
 | 16 | Give build/test the hash-keyed package cache `Start-QuestStudio.ps1` already uses, or bump the version on every repack (D6) | `README.md`, build/test entrypoints | no |
 
-Audit recommendations do not silently become adopted architectural decisions. See the sign-off
-boundary in [`creator-os-build-strategy.md`](creator-os-build-strategy.md).
+All four sign-off items were ruled on 2026-08-24; see the sign-off record in
+[`creator-os-build-strategy.md`](creator-os-build-strategy.md). Lane vocabulary is now defined
+once, in [`creator-os-phases.json`](creator-os-phases.json).
