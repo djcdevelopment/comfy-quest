@@ -8,6 +8,80 @@
     "program_commit": "a07cb62",
     "program_commit_label": "Build guild portfolio and scoped reruns"
   },
+  "reading_order": [
+    {
+      "id": "reading.handoff",
+      "position": 1,
+      "role": "Cold start",
+      "detail": "Where things stand, what is next, what is open.",
+      "source": "docs/handoff-2026-08-24.md",
+      "source_contains": "## Where things stand"
+    },
+    {
+      "id": "reading.strategy",
+      "position": 2,
+      "role": "The plan",
+      "detail": "Lane order, the program invariant, and what each lane may not do.",
+      "source": "docs/creator-os-build-strategy.md",
+      "source_contains": "## The program invariant"
+    },
+    {
+      "id": "reading.lanes",
+      "position": 3,
+      "role": "Lane vocabulary",
+      "detail": "The only definition of a lane, and the human boundary.",
+      "source": "docs/creator-os-phases.json",
+      "source_contains": "This file is the single definition of Creator OS lane vocabulary"
+    },
+    {
+      "id": "reading.ledger",
+      "position": 4,
+      "role": "Requirement dispositions",
+      "detail": "Who is accountable for each of the 47 requirements right now.",
+      "source": "docs/creator-requirements-ledger.json",
+      "source_contains": "disposition of record for every FR-/NFR- identifier"
+    },
+    {
+      "id": "reading.queue",
+      "position": 5,
+      "role": "Work queue",
+      "detail": "Every work item with its lane and requirement lineage.",
+      "source": "docs/quest-mission-control.json",
+      "source_contains": "comfy-quest-mission-control/v1"
+    },
+    {
+      "id": "reading.operating",
+      "position": 6,
+      "role": "Operating strategy",
+      "detail": "Why the loop is shaped this way, and the golden rule.",
+      "source": "docs/creator-os.md",
+      "source_contains": "Golden rule: do not spend Derek's seat time"
+    },
+    {
+      "id": "reading.requirements",
+      "position": 7,
+      "role": "What is required",
+      "detail": "The 47 FR-/NFR- requirements themselves.",
+      "source": "docs/creator-portfolio-requirements.md",
+      "source_contains": "## Functional requirements"
+    },
+    {
+      "id": "reading.decisions",
+      "position": 8,
+      "role": "Decisions",
+      "detail": "Append-only; a reversal needs a superseding record.",
+      "source": "docs/adr/README.md",
+      "source_contains": "Records are append-only; a reversal gets a new record."
+    },
+    {
+      "id": "reading.findings",
+      "position": 9,
+      "role": "Findings",
+      "detail": "What was wrong on 2026-08-24, with `file:line` receipts.",
+      "source": "docs/creator-os-audit-2026-08-24.md",
+      "source_contains": "## Punch list"
+    }
+  ],
   "machines": [
     {
       "id": "omen",

@@ -197,9 +197,26 @@ lane: gaps are named, not smoothed.
 
 **Gate result: passed.** No answer required reconciling contradictory documents by hand.
 
+**One correction to that walk.** It was taken by a reader who already knew which files to
+open — which is the assumption the gate exists to remove. The entry path did not reach any of
+these surfaces: `README.md` and `docs/handoff-2026-08-20.md` both pointed a cold reader at
+`docs/creator-os.md`, and that file mentioned neither this strategy, nor the lane vocabulary,
+nor the ledger. The chain technically existed, but it ran through a document marked *do not
+use for current state*.
+
+That is fixed, and fixed the same way as everything else here — by making it fail rather than
+by writing more prose. `docs/handoff-2026-08-24.md` is the current cold start.
+`docs/quest-mission-control.json` declares the authority chain once under `reading_order`,
+each entry carrying an ordinary source pin. `README.md` and `docs/creator-os.md` each carry a
+fenced pointer block, and `validate_reading_order` fails the drift gate if either advertises a
+different set, a different order, or a file whose pin has moved. Adding an authority without
+updating both blocks fails. Leaving a pointer aimed at a superseded handoff fails — that exact
+case is the negative test.
+
 ### What Lane 0 changed, and what it deliberately did not
 
-Applied: the 4A exit prose now matches [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md);
+Applied: a cold-start handoff and a pinned authority reading order, so entering through the
+front door reaches the rest of this list; the 4A exit prose now matches [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md);
 the program invariant is executable, with a tracked ledger of all 47 requirement ids, `lane`
 and `requirements` on every queue item, five checks in `validate_manifest`, and a negative test
 per check; the Phase-3 lap is stale in the manifest and in its runbook, and the renderer emits

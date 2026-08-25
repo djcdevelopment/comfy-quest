@@ -10,6 +10,25 @@ checkout.
 
 ## Start here
 
+Creator OS work has one authority chain, read in this order. It is declared once in
+`docs/quest-mission-control.json` under `reading_order` and checked on every render, so a
+renamed authority or a stale pointer fails the drift gate rather than misleading the next
+reader.
+
+<!-- reading-order:begin -->
+1. `docs/handoff-2026-08-24.md` — **Cold start.** Where things stand, what is next, what is open.
+2. `docs/creator-os-build-strategy.md` — **The plan.** Lane order, the program invariant, and what each lane may not do.
+3. `docs/creator-os-phases.json` — **Lane vocabulary.** The only definition of a lane, and the human boundary.
+4. `docs/creator-requirements-ledger.json` — **Requirement dispositions.** Who is accountable for each of the 47 requirements right now.
+5. `docs/quest-mission-control.json` — **Work queue.** Every work item with its lane and requirement lineage.
+6. `docs/creator-os.md` — **Operating strategy.** Why the loop is shaped this way, and the golden rule.
+7. `docs/creator-portfolio-requirements.md` — **What is required.** The 47 FR-/NFR- requirements themselves.
+8. `docs/adr/README.md` — **Decisions.** Append-only; a reversal needs a superseding record.
+9. `docs/creator-os-audit-2026-08-24.md` — **Findings.** What was wrong on 2026-08-24, with `file:line` receipts.
+<!-- reading-order:end -->
+
+The rest of the repository:
+
 - Quest Lab plugin: network/mod/ComfyQuestLab
 - Runtime plugin: network/mod/ComfyQuestRuntime
 - Shared contract package: network/mod/ComfyQuestContracts
@@ -21,8 +40,7 @@ checkout.
 - Split-proof release runbook: docs/runbooks/QUEST-RELEASE.md
 - OMEN Studio-to-Runtime acceptance: docs/runbooks/I2-QUESTPACK-OMEN.md
 - Demo World minimal tutorial: examples/demo-world/first-portal
-- Living Creator OS and seat mission control: docs/quest-mission-control.html
-- Creator portfolio functional/non-functional baseline: docs/creator-portfolio-requirements.md
+- Rendered mission-control page: docs/quest-mission-control.html
 - R&D opportunity matrix: docs/quest-rd-opportunity-matrix.md
 - Repository boundary: BOUNDARY.md
 - Extraction record: PROVENANCE.md

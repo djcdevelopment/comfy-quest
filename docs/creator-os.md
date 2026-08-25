@@ -1,5 +1,24 @@
 # Creator OS
 
+> **This file is the operating strategy — why the loop is shaped the way it is. It is not
+> the plan, the lane vocabulary, or the work queue.** Those are separate authorities, and a
+> cold start reads them in this order:
+>
+> <!-- reading-order:begin -->
+> 1. `docs/handoff-2026-08-24.md` — **Cold start.** Where things stand, what is next, what is open.
+> 2. `docs/creator-os-build-strategy.md` — **The plan.** Lane order, the program invariant, and what each lane may not do.
+> 3. `docs/creator-os-phases.json` — **Lane vocabulary.** The only definition of a lane, and the human boundary.
+> 4. `docs/creator-requirements-ledger.json` — **Requirement dispositions.** Who is accountable for each of the 47 requirements right now.
+> 5. `docs/quest-mission-control.json` — **Work queue.** Every work item with its lane and requirement lineage.
+> 6. `docs/creator-os.md` — **Operating strategy.** Why the loop is shaped this way, and the golden rule.
+> 7. `docs/creator-portfolio-requirements.md` — **What is required.** The 47 FR-/NFR- requirements themselves.
+> 8. `docs/adr/README.md` — **Decisions.** Append-only; a reversal needs a superseding record.
+> 9. `docs/creator-os-audit-2026-08-24.md` — **Findings.** What was wrong on 2026-08-24, with `file:line` receipts.
+> <!-- reading-order:end -->
+>
+> The order is declared in `docs/quest-mission-control.json` under `reading_order` and
+> checked on every render.
+
 The scarce resource is the creator's time in the seat. Build, deployment, identity
 checks, bounded world operations, capture transport, and proof collection belong to the
 machine loop. The seat is for spatial judgment, authored choices, and play feel.

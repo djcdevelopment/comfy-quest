@@ -91,7 +91,11 @@ class QuestMissionControlTests(unittest.TestCase):
         self.assertIn("Safe-top overhead bar verified live", self.committed)
         self.assertIn("First human-spaced module captured", self.committed)
         self.assertIn("Guild dogfooding is the adoption path.", self.committed)
-        self.assertIn("Portfolio requirements", self.committed)
+        # The page carries the declared authority chain rather than its own hand-kept links.
+        self.assertIn("Authority reading order", self.committed)
+        for item in self.manifest["reading_order"]:
+            self.assertIn(item["role"], self.committed)
+            self.assertIn(item["source"], self.committed)
         self.assertIn("complete", self.renderer.ALLOWED_QUEUE_STATES)
         self.assertIn("implemented", self.renderer.ALLOWED_QUEUE_STATES)
         self.assertIn("deferred", self.renderer.ALLOWED_QUEUE_STATES)
@@ -307,6 +311,75 @@ class RoadmapSurfaceTests(unittest.TestCase):
         phases = json.loads((REPO / "docs" / "creator-os-phases.json").read_text(encoding="utf-8"))
         self.assertTrue(phases["human_boundary"]["scope_is_strict"])
         self.assertNotIn("standalone harness", phases["lanes"][0]["exit"])
+
+    def test_the_authority_reading_order_cannot_go_stale(self):
+        # The reason this exists: handoff-2026-08-20.md went stale while README.md and
+        # creator-os.md still pointed a cold reader at it. Pointers are pinned now.
+        declared = [item["source"] for item in self.manifest["reading_order"]]
+        self.assertEqual(list(range(1, len(declared) + 1)), [item["position"] for item in self.manifest["reading_order"]])
+        self.assertEqual(len(declared), len(set(declared)))
+        self.assertEqual("docs/handoff-2026-08-24.md", declared[0])
+        for source in declared:
+            with self.subTest(source=source):
+                self.assertTrue((REPO / source).is_file(), source)
+
+        # Both advertisements must match the declaration, in order.
+        for relative in self.renderer.POINTER_FILES:
+            with self.subTest(pointer=relative):
+                advertised = self.renderer.pointer_block(REPO / relative)
+                self.assertEqual(declared, [source for _, source in advertised])
+
+        # Adding an authority without updating the pointers fails ...
+        added = copy.deepcopy(self.manifest)
+        added["reading_order"].append(
+            {
+                "id": "reading.extra",
+                "position": len(declared) + 1,
+                "role": "Extra",
+                "detail": "An authority nobody advertised.",
+                "source": "docs/creator-os-audit-2026-08-24.md",
+                "source_contains": "## Punch list",
+            }
+        )
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"advertises a stale reading order"
+        ):
+            self.renderer.validate_manifest(added)
+
+        # ... and so does reordering it, because read order is the point.
+        swapped = copy.deepcopy(self.manifest)
+        swapped["reading_order"][0], swapped["reading_order"][1] = (
+            swapped["reading_order"][1],
+            swapped["reading_order"][0],
+        )
+        with self.assertRaisesRegex(self.renderer.MissionControlError, r"position"):
+            self.renderer.validate_manifest(swapped)
+
+        # A renamed or moved authority fails on its own source pin.
+        moved = copy.deepcopy(self.manifest)
+        moved["reading_order"][1]["source_contains"] = "a heading the plan cannot contain"
+        with self.assertRaisesRegex(self.renderer.MissionControlError, r"source pin is stale"):
+            self.renderer.validate_manifest(moved)
+
+    def test_the_superseded_handoff_points_at_the_current_one(self):
+        old = (REPO / "docs" / "handoff-2026-08-20.md").read_text(encoding="utf-8")[:2000]
+        self.assertIn("HISTORICAL", old)
+        self.assertIn("docs/handoff-2026-08-24.md", old)
+
+    def test_the_handoff_lists_every_open_ruling(self):
+        # The handoff names the parked ids so it cannot quietly fall behind the ledger.
+        handoff = (REPO / "docs" / "handoff-2026-08-24.md").read_text(encoding="utf-8")
+        ledger = self.renderer.load_requirements_ledger()
+        parked = sorted(
+            item["id"] for item in ledger["requirements"] if item["disposition"] == "parked"
+        )
+        self.assertTrue(parked)
+        for requirement_id in parked:
+            with self.subTest(requirement=requirement_id):
+                self.assertIn(requirement_id, handoff)
+        # And it names the next executable task, which is the question a cold start asks first.
+        self.assertIn("queue.guild-runtime", handoff)
+        self.assertIn("RuntimeCharmBinding.cs:45", handoff)
 
     def test_the_caution_says_what_the_environment_entry_says(self):
         # Audit B8: the caution sent a reader hunting for wiring that exists.
