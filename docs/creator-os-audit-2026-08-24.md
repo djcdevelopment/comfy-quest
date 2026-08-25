@@ -473,7 +473,7 @@ first push surfaced it immediately.
 
 ## Punch list
 
-Ordered for execution. Items 1-4 change adopted product baselines and are **recommendations
+Status as of `2a39469` (CI green). Ordered for execution. Items 1-4 change adopted product baselines and are **recommendations
 requiring sign-off**, not edits. The rest are mechanical.
 
 | # | Item | File | Sign-off |
@@ -482,17 +482,17 @@ requiring sign-off**, not edits. The rest are mechanical.
 | 2 | Reconcile the 4A/4B scope tables (B2) | `docs/five-intent-program-plan.md:110-111` | ✅ signed off 08-24; authority now `creator-os-phases.json` |
 | 3 | One phase vocabulary across the three roadmaps (B1) | `docs/creator-os-phases.json` | ✅ signed off 08-24 (ADR 0013) |
 | 4 | Creator-world-entry ownership (ADR 0012) | `docs/adr/0012-*.md` | ✅ accepted 08-24 |
-| 5 | `fetch-depth: 0` on the `quest` job (A1) | `.github/workflows/ci.yml:32` | no |
-| 6 | Add `Quest.Studio.Tests` to CI; decide on E2E (A2) | `.github/workflows/ci.yml` | no |
+| 5 | `fetch-depth: 0` on the `quest` job (A1) | `.github/workflows/ci.yml:32` | ✅ done, verified green in CI |
+| 6 | Add `Quest.Studio.Tests` to CI (A2) | `.github/workflows/ci.yml` | ✅ done — 101 tests green in CI. E2E still ungated: open |
 | 7 | Requirements ledger + five invariant checks (C1, C2, C4, C6) | `docs/creator-requirements-ledger.json`, `tools/render_quest_mission_control.py`, new test | no |
 | 8 | Mark the Phase-3 lap stale; add `phase3_lap.state` (B7) | runbook, manifest, renderer | no |
 | 9 | Reword `cautions[7]` to match `environment[4]` (B8) | `docs/quest-mission-control.json` | no |
 | 10 | Add `Arm`/`Disarm`/`GalleryRebuild` to commands (B9) | `docs/quest-mission-control.json` | no |
-| 11 | Mark superseded documents (B4) | the four documents listed in B4 | no |
+| 11 | Mark superseded documents (B4) | the four documents listed in B4 | ✅ done |
 | 12 | Assert the replacement table matched; delete dead entries (A3, A4) | `tools/render_quest_mission_control.py:588-622` | no |
 | 13 | Validate `machines` / `environment` state enums (A6) | same file | no |
-| 14 | Gitignore or remove `.codex-pdf-profile/`; decide the PDF's status (E1, E4) | `.gitignore` | no |
-| 15 | Remove the empty `Lumberjacks/src/` fossil (E2) | — | no |
+| 14 | Gitignore `.codex-pdf-profile/` and the PDF (E1, E4) | `.gitignore` | ✅ done |
+| 15 | Remove the empty `Lumberjacks/src/` fossil (E2) | — | ✅ done |
 | 16 | Give build/test the hash-keyed package cache `Start-QuestStudio.ps1` already uses, or bump the version on every repack (D6) | `README.md`, build/test entrypoints | no |
 | 17 | Diagnose the CI-only `Prepare` exit 1 now that the test reports its output (D7) | `network/mod/ComfyQuestLab.Tests/RuntimeCreatorRequestTests.cs` | ✅ done — cause was `Get-FileHash` |
 | 18 | Replace the ~20 remaining `Get-FileHash` call sites in scripts CI never runs (D7) | `tools/i5-deploy/`, `tools/quest-runtime/`, `tools/quest-studio/`, `tools/questlab-package/`, `tools/release/` | no |
