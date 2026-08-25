@@ -771,6 +771,16 @@ def render(manifest: dict[str, Any]) -> str:
         for item in manifest["commands"]
     )
 
+    # Each lane already declares the question it answers and how it fails. Both were in the
+    # vocabulary and rendered nowhere, so the page showed what is next and never why any of it
+    # exists. A reader who cannot see the question cannot tell whether the work still serves it.
+    lanes = json.loads(read_text(PHASES))
+    lane_items = "".join(
+        f'<li><span>{html.escape(lane["id"])}</span><p><strong>{html.escape(lane["question"])}</strong>'
+        f'<small>Fails if: {html.escape(lane["failure_mode"])}</small></p></li>'
+        for lane in lanes["lanes"]
+    )
+
     reading_items = "".join(
         f'<li><span>{item["position"]}</span><p><strong>{html.escape(item["role"])}</strong> '
         f'{html.escape(item["detail"])} {source_link(item["source"], item["source"])}</p></li>'
@@ -937,6 +947,7 @@ def render(manifest: dict[str, Any]) -> str:
   <section id="decisions" class="section" aria-labelledby="decisions-title"><div class="section-head"><div><span class="eyebrow">Resolved direction</span><h2 id="decisions-title">Decisions in force</h2></div><p>These constraints keep machine work scalable and protect the only capacity that does not scale with hardware.</p></div><div class="decision-grid">{decision_cards}</div></section>
 
   <section id="commands" class="section" aria-labelledby="commands-title"><div class="section-head"><div><span class="eyebrow">Reference, not a seat primer</span><h2 id="commands-title">Machine-owned entrypoints</h2></div><p>These remain for automation and diagnostics. They are not a checklist Derek must relay. This page cannot arm Runtime, mutate Valheim, or execute repository tools.</p></div><div class="command-list">{command_cards}</div><p><a href="http://127.0.0.1:8085/quest-studio">Open Quest Studio on this machine</a> · <a href="../README.md">Repository README</a></p>
+    <article class="panel flow-panel"><span class="eyebrow">Why any of this</span><h3>{html.escape(lanes["citation_rule"])}</h3><p>Every lane answers one question and fails one way. Cite a lane by slug, never by bare ordinal.</p><ol class="reading-order">{lane_items}</ol>{source_link("docs/creator-os-phases.json", "Lane vocabulary")}</article>
     <article class="panel flow-panel"><span class="eyebrow">Cold start</span><h3>Authority reading order</h3><p>One declared chain. A renamed authority or a stale pointer fails the drift gate rather than misleading the next reader.</p><ol class="reading-order">{reading_items}</ol></article></section>
 
   <section class="section" aria-labelledby="cautions-title"><div class="section-head"><div><span class="eyebrow">Do not relearn these</span><h2 id="cautions-title">Guardrails</h2></div></div><ul class="cautions">{caution_items}</ul></section>

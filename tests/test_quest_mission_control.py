@@ -318,7 +318,7 @@ class RoadmapSurfaceTests(unittest.TestCase):
         declared = [item["source"] for item in self.manifest["reading_order"]]
         self.assertEqual(list(range(1, len(declared) + 1)), [item["position"] for item in self.manifest["reading_order"]])
         self.assertEqual(len(declared), len(set(declared)))
-        self.assertEqual("docs/handoff-2026-08-24.md", declared[0])
+        self.assertEqual("docs/PLAN.md", declared[0])
         for source in declared:
             with self.subTest(source=source):
                 self.assertTrue((REPO / source).is_file(), source)
@@ -360,6 +360,50 @@ class RoadmapSurfaceTests(unittest.TestCase):
         moved["reading_order"][1]["source_contains"] = "a heading the plan cannot contain"
         with self.assertRaisesRegex(self.renderer.MissionControlError, r"source pin is stale"):
             self.renderer.validate_manifest(moved)
+
+    def test_the_reading_order_answers_why_before_what(self):
+        # The chain shipped with nine authorities and not one of them said why any of it
+        # exists: a cold reader following it exactly learned the plan, the lanes, the ledger
+        # and the queue, and never the thing they serve. The ethos is position 2 now, and
+        # pinned on its own thesis so deleting that sentence fails the gate rather than
+        # quietly leaving the program without a stated purpose.
+        order = self.manifest["reading_order"]
+        plan = order[0]
+        self.assertEqual("docs/PLAN.md", plan["source"])
+        self.assertEqual(
+            "Design for composition, not for impressive primitives", plan["source_contains"])
+        ethos = next(item for item in order if item["source"] == "docs/five-intent-program-plan.md")
+        self.assertEqual("the machine absorbs the complexity", ethos["source_contains"])
+        self.assertIn("Why", ethos["role"])
+        # It precedes every what-and-what-next authority in the chain.
+        positions = {item["source"]: item["position"] for item in order}
+        for later in (
+            "docs/creator-os-build-strategy.md",
+            "docs/creator-os-phases.json",
+            "docs/creator-requirements-ledger.json",
+            "docs/quest-mission-control.json",
+        ):
+            with self.subTest(after=later):
+                self.assertLess(ethos["position"], positions[later])
+
+    def test_every_lane_states_the_question_it_answers(self):
+        # Both fields were in the vocabulary from the start and rendered nowhere.
+        lanes = json.loads((REPO / "docs" / "creator-os-phases.json").read_text(encoding="utf-8"))
+        for lane in lanes["lanes"]:
+            with self.subTest(lane=lane["id"]):
+                self.assertTrue(lane["question"].strip().endswith("?"))
+                self.assertTrue(lane["failure_mode"].strip())
+                self.assertIn(lane["question"], self.committed)
+                self.assertIn(lane["failure_mode"], self.committed)
+
+    def test_the_handoff_names_what_this_repository_does_not_hold(self):
+        # The five source design intents live in the baseline repository. A reader who assumes
+        # they are here reconstructs them from the plan, which cites and does not restate them.
+        handoff = (REPO / "docs" / "handoff-2026-08-24.md").read_text(encoding="utf-8")
+        self.assertIn("What this repository does not hold", handoff)
+        self.assertIn("docs/arch/01..05", handoff)
+        # And it tells a cold agent to check its checkout before trusting any of it.
+        self.assertIn("check your checkout", handoff.lower())
 
     def test_the_superseded_handoff_points_at_the_current_one(self):
         old = (REPO / "docs" / "handoff-2026-08-20.md").read_text(encoding="utf-8")[:2000]

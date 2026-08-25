@@ -16,15 +16,17 @@ renamed authority or a stale pointer fails the drift gate rather than misleading
 reader.
 
 <!-- reading-order:begin -->
-1. `docs/handoff-2026-08-24.md` — **Cold start.** Where things stand, what is next, what is open.
-2. `docs/creator-os-build-strategy.md` — **The plan.** Lane order, the program invariant, and what each lane may not do.
-3. `docs/creator-os-phases.json` — **Lane vocabulary.** The only definition of a lane, and the human boundary.
-4. `docs/creator-requirements-ledger.json` — **Requirement dispositions.** Who is accountable for each of the 47 requirements right now.
-5. `docs/quest-mission-control.json` — **Work queue.** Every work item with its lane and requirement lineage.
-6. `docs/creator-os.md` — **Operating strategy.** Why the loop is shaped this way, and the golden rule.
-7. `docs/creator-portfolio-requirements.md` — **What is required.** The 47 FR-/NFR- requirements themselves.
-8. `docs/adr/README.md` — **Decisions.** Append-only; a reversal needs a superseding record.
-9. `docs/creator-os-audit-2026-08-24.md` — **Findings.** What was wrong on 2026-08-24, with `file:line` receipts.
+1. `docs/PLAN.md` — **The plan.** Goal, where we are, what happens next, and what needs Derek. Read this alone and you know the program.
+2. `docs/handoff-2026-08-24.md` — **Session record.** What the 2026-08-24/25 sessions did, the environment traps, and the cold-start checks.
+3. `docs/five-intent-program-plan.md` — **Why this exists.** The ethos the whole program is judged against, and the six rules that govern every lane.
+4. `docs/creator-os-build-strategy.md` — **The plan.** Lane order, the program invariant, and what each lane may not do.
+5. `docs/creator-os-phases.json` — **Lane vocabulary.** The only definition of a lane, and the human boundary.
+6. `docs/creator-requirements-ledger.json` — **Requirement dispositions.** Who is accountable for each of the 47 requirements right now.
+7. `docs/quest-mission-control.json` — **Work queue.** Every work item with its lane and requirement lineage.
+8. `docs/creator-os.md` — **Operating strategy.** Why the loop is shaped this way, and the golden rule.
+9. `docs/creator-portfolio-requirements.md` — **What is required.** The 47 FR-/NFR- requirements themselves.
+10. `docs/adr/README.md` — **Decisions.** Append-only; a reversal needs a superseding record.
+11. `docs/creator-os-audit-2026-08-24.md` — **Findings.** What was wrong on 2026-08-24, with `file:line` receipts.
 <!-- reading-order:end -->
 
 The rest of the repository:

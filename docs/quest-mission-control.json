@@ -10,16 +10,32 @@
   },
   "reading_order": [
     {
-      "id": "reading.handoff",
+      "id": "reading.plan",
       "position": 1,
-      "role": "Cold start",
-      "detail": "Where things stand, what is next, what is open.",
+      "role": "The plan",
+      "detail": "Goal, where we are, what happens next, and what needs Derek. Read this alone and you know the program.",
+      "source": "docs/PLAN.md",
+      "source_contains": "Design for composition, not for impressive primitives"
+    },
+    {
+      "id": "reading.handoff",
+      "position": 2,
+      "role": "Session record",
+      "detail": "What the 2026-08-24/25 sessions did, the environment traps, and the cold-start checks.",
       "source": "docs/handoff-2026-08-24.md",
       "source_contains": "## Where things stand"
     },
     {
+      "id": "reading.why",
+      "position": 3,
+      "role": "Why this exists",
+      "detail": "The ethos the whole program is judged against, and the six rules that govern every lane.",
+      "source": "docs/five-intent-program-plan.md",
+      "source_contains": "the machine absorbs the complexity"
+    },
+    {
       "id": "reading.strategy",
-      "position": 2,
+      "position": 4,
       "role": "The plan",
       "detail": "Lane order, the program invariant, and what each lane may not do.",
       "source": "docs/creator-os-build-strategy.md",
@@ -27,7 +43,7 @@
     },
     {
       "id": "reading.lanes",
-      "position": 3,
+      "position": 5,
       "role": "Lane vocabulary",
       "detail": "The only definition of a lane, and the human boundary.",
       "source": "docs/creator-os-phases.json",
@@ -35,7 +51,7 @@
     },
     {
       "id": "reading.ledger",
-      "position": 4,
+      "position": 6,
       "role": "Requirement dispositions",
       "detail": "Who is accountable for each of the 47 requirements right now.",
       "source": "docs/creator-requirements-ledger.json",
@@ -43,7 +59,7 @@
     },
     {
       "id": "reading.queue",
-      "position": 5,
+      "position": 7,
       "role": "Work queue",
       "detail": "Every work item with its lane and requirement lineage.",
       "source": "docs/quest-mission-control.json",
@@ -51,7 +67,7 @@
     },
     {
       "id": "reading.operating",
-      "position": 6,
+      "position": 8,
       "role": "Operating strategy",
       "detail": "Why the loop is shaped this way, and the golden rule.",
       "source": "docs/creator-os.md",
@@ -59,7 +75,7 @@
     },
     {
       "id": "reading.requirements",
-      "position": 7,
+      "position": 9,
       "role": "What is required",
       "detail": "The 47 FR-/NFR- requirements themselves.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -67,7 +83,7 @@
     },
     {
       "id": "reading.decisions",
-      "position": 8,
+      "position": 10,
       "role": "Decisions",
       "detail": "Append-only; a reversal needs a superseding record.",
       "source": "docs/adr/README.md",
@@ -75,7 +91,7 @@
     },
     {
       "id": "reading.findings",
-      "position": 9,
+      "position": 11,
       "role": "Findings",
       "detail": "What was wrong on 2026-08-24, with `file:line` receipts.",
       "source": "docs/creator-os-audit-2026-08-24.md",
