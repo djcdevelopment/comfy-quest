@@ -341,6 +341,17 @@ public sealed class RuntimeCreatorRequestTests {
       RedirectStandardError = true,
       CreateNoWindow = true,
     };
+    // Hosted runners set PSModulePath for PowerShell 7, which leaves Windows PowerShell 5.1
+    // unable to resolve its own default modules -- Get-FileHash lives in
+    // Microsoft.PowerShell.Utility under the 5.1 system module path. Without this the script
+    // dies with CommandNotFoundException on CI while passing on any ordinary workstation.
+    string systemModules = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.System),
+        "WindowsPowerShell", "v1.0", "Modules");
+    string modulePath = Environment.GetEnvironmentVariable("PSModulePath") ?? string.Empty;
+    if (modulePath.IndexOf(systemModules, StringComparison.OrdinalIgnoreCase) < 0)
+      modulePath = modulePath.Length == 0 ? systemModules : modulePath + ";" + systemModules;
+    start.Environment["PSModulePath"] = modulePath;
     foreach (string value in new[] {
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script }.Concat(arguments))
       start.ArgumentList.Add(value);
@@ -358,7 +369,11 @@ public sealed class RuntimeCreatorRequestTests {
       throw new TimeoutException("PowerShell Creator Session integration timed out");
     }
     string output = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
-    return new ProcessResult(process.ExitCode, output);
+    string utility = Path.Combine(systemModules, "Microsoft.PowerShell.Utility");
+    string diagnostics = "PSModulePath given to the child: " + modulePath
+        + Environment.NewLine + "System module root exists: " + Directory.Exists(systemModules)
+        + Environment.NewLine + "Microsoft.PowerShell.Utility exists: " + Directory.Exists(utility);
+    return new ProcessResult(process.ExitCode, output, diagnostics);
   }
 
   static void AssertSucceeded(string step, ProcessResult result) =>
@@ -366,7 +381,8 @@ public sealed class RuntimeCreatorRequestTests {
           result.ExitCode == 0,
           $"Creator Session {step} exited {result.ExitCode} instead of 0."
               + Environment.NewLine + "Captured stdout+stderr:" + Environment.NewLine
-              + result.Output);
+              + result.Output
+              + Environment.NewLine + result.Diagnostics);
 
-  sealed record ProcessResult(int ExitCode, string Output);
+  sealed record ProcessResult(int ExitCode, string Output, string Diagnostics);
 }
