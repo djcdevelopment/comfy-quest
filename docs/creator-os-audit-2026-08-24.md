@@ -27,8 +27,18 @@ auditor's judgment, not a repository classification.
   `docs/quest-mission-control.{html,json}`, `tests/test_quest_mission_control.py`,
   `tools/render_quest_mission_control.py` modified; `.codex-pdf-profile/` and
   `docs/quest-mission-control.pdf` untracked.
-- **Consequence:** findings A3, A4, and A5 describe renderer code that was *uncommitted* at
-  audit time. Re-verify those receipts if that change lands or is discarded.
+- **What that change is** (investigated 2026-08-24): one coherent edit made between 12:26 and
+  12:47, ~50 minutes after `1fef480`, adding the results-driven operating strategy — five new
+  sections in `creator-os.md`, a `strategy` block plus `implemented`/`deferred` queue states in
+  the renderer and manifest, a regenerated page, and updated test assertions. It is
+  self-consistent and green: drift gate `OK`, 316 Python tests pass. A PDF was exported from it
+  at 13:10. It is the change that produced the documents this audit was asked to review.
+- **Consequences for these findings:**
+  - A3's dead replacement entries were *killed by that change*, not stale from age — see A3.
+  - The autonomous-launch clause in the 4A exit (finding B3) was **added** by that change and
+    has never been committed. ADR 0014 therefore corrects an in-flight draft rather than
+    overturning an adopted baseline.
+  - The replacement table itself is pre-existing and committed; only its deadness is new.
 - `main` was 9 commits ahead of `origin/main`.
 
 ---
@@ -64,9 +74,17 @@ local cutter and ungated everywhere else.
 ### A3 — The renderer patches its own template with an unasserted find/replace table *(medium)*
 
 `tools/render_quest_mission_control.py:588-622` applies 34 string replacements to the finished
-document. At least four are dead: the outputs of "Cold-load first. Create second.",
-"Now · recovery acceptance", "Keep the canonical build unchanged", and "Last handoff" are all
-absent from the rendered page, so those keys never matched.
+document. At least four are currently dead.
+
+**And the way they died is the finding.** They were *live at `1fef480`*: the committed HTML
+contains "Automate the machine loop. Spend the seat on design." and "Creator OS rebase", which
+are the outputs of the `"Cold-load first. Create second."` and `"Now · recovery acceptance"`
+keys. The uncommitted change described in Provenance rewrote those strings *directly in the
+template* and updated the test to match — and left the replacement entries orphaned. Nothing
+noticed, because nothing asserts a replacement fired.
+
+So this is not a table that accumulated stale entries over time. It is a table that a single
+ordinary edit silently disconnected.
 
 The remainder are load-bearing and nothing asserts they matched. The template emits a
 `<select>` with `id="cold-verdict"` and `value="obvious"`, and the table rewrites both to
