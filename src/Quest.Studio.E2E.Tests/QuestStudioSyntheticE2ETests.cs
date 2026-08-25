@@ -7,11 +7,21 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using ComfyQuestContracts;
 using Microsoft.Playwright;
+using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
 namespace Comfy.Quest.Studio.E2E.Tests;
+
+public sealed class InstalledGuildFactAttribute : FactAttribute
+{
+    public InstalledGuildFactAttribute()
+    {
+        if (Environment.GetEnvironmentVariable("COMFY_QUEST_INSTALLED_GUILD_E2E") != "1")
+            Skip = "Set COMFY_QUEST_INSTALLED_GUILD_E2E=1 through Invoke-QuestStudioGuildJourney.ps1 to use the installed game.";
+    }
+}
 
 public sealed class QuestStudioSyntheticE2ETests
 {
@@ -481,6 +491,716 @@ public sealed class QuestStudioSyntheticE2ETests
         }
     }
 
+    [Fact]
+    public async Task Guild_journey_drives_locked_B_then_A_to_B_to_A_scoped_reset_and_retention()
+    {
+        var repoRoot = FindRepoRoot();
+        var run = SyntheticRun.Create(repoRoot, SentinelName, SentinelContents);
+        StudioHost? host = null;
+        IPlaywright? playwright = null;
+        IBrowser? browser = null;
+        IBrowserContext? context = null;
+        IPage? page = null;
+        SyntheticGuildRuntime? runtime = null;
+        var consoleErrors = new ConcurrentQueue<string>();
+        var failedRequests = new ConcurrentQueue<string>();
+        var httpErrors = new ConcurrentQueue<string>();
+        var traceStopped = false;
+        var succeeded = false;
+
+        try
+        {
+            host = await StudioHost.StartAsync(repoRoot, run);
+            playwright = await Playwright.CreateAsync();
+            browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+            {
+                Headless = Environment.GetEnvironmentVariable("COMFY_QUEST_E2E_HEADED") != "1"
+            });
+            context = await browser.NewContextAsync(new BrowserNewContextOptions
+            {
+                ViewportSize = new ViewportSize { Width = 1600, Height = 1000 }
+            });
+            await context.Tracing.StartAsync(new TracingStartOptions { Screenshots = true, Snapshots = true, Sources = true });
+            page = await context.NewPageAsync();
+            page.SetDefaultTimeout(15_000);
+            page.Console += (_, message) =>
+            {
+                if (message.Type == "error") consoleErrors.Enqueue($"console: {message.Text}");
+            };
+            page.PageError += (_, error) => consoleErrors.Enqueue($"pageerror: {error}");
+            page.RequestFailed += (_, request) => failedRequests.Enqueue($"{request.Method} {request.Url}: {request.Failure}");
+            page.Response += (_, response) =>
+            {
+                if (response.Status >= 400) httpErrors.Enqueue($"{response.Status} {response.Request.Method} {response.Url}");
+            };
+            page.Dialog += async (_, dialog) => await dialog.AcceptAsync("Synthetic Guild");
+
+            await page.GotoAsync(host.StudioUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await WaitForTextAsync(page.Locator("#project-list"), "No quests yet", "empty guild portfolio");
+            if (!await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"))
+                await page.Locator("#library-toggle").ClickAsync();
+            await WaitUntilAsync(
+                () => page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"),
+                "open guild library");
+            await page.Locator("#create-guild").ClickAsync();
+            await WaitForTextAsync(page.Locator("#selected-guild-name"), "Synthetic Guild settings", "selected guild editor");
+            var guildId = await page.EvaluateAsync<string>("() => selectedGuildId");
+
+            var a = await CreateGuildJourneyStepAsync(page, guildId, "Guild Quest A");
+            var b = await CreateGuildJourneyStepAsync(page, guildId, "Guild Quest B");
+            await page.Locator($"[data-select-guild='{guildId}']").ClickAsync();
+            var prerequisite = page.Locator($"[data-guild-prerequisite='{b.ProjectId}']");
+            await WaitForCountAsync(prerequisite, 1, "B prerequisite control");
+            await prerequisite.SelectOptionAsync(new[] { new SelectOptionValue { Value = a.ProjectId } });
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild progression saved", "saved A before B prerequisite");
+
+            await page.Locator("#certify-guild").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack certified", "multi-experience guild certification");
+            await WaitForTextAsync(page.Locator("#status-detail"), "2 experiences", "two certified experiences");
+            await page.Locator("#publish-guild").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack published", "multi-experience guild publication", 30_000);
+            await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 1, "one guild questpack");
+            await page.Locator("#library-close").ClickAsync();
+            await WaitUntilAsync(
+                async () => !await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"),
+                "closed guild library before Runtime controls");
+
+            runtime = SyntheticGuildRuntime.Start(run, a.ExperienceId, b.ExperienceId);
+            Assert.Equal(a.ExperienceId, runtime.PrerequisiteOf(b.ExperienceId));
+            await page.EvaluateAsync("() => refreshRunState()");
+            await page.Locator("[data-stage='observe']").ClickAsync();
+            await WaitUntilAsync(async () => !await page.Locator("#find-bindings").IsDisabledAsync(), "fresh synthetic world binding control");
+            await page.Locator("#find-bindings").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Binding candidates ready", "bounded candidate scan");
+            Assert.Equal(1, await page.Locator("#binding-candidate option").CountAsync());
+
+            // B is still the selected project. The same control that will later accept it must
+            // first expose Runtime's fail-closed prerequisite receipt.
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Binding rejected", "locked B refusal");
+            await WaitForTextAsync(page.Locator("#status-detail"), "experience_prerequisite_incomplete", "exact prerequisite diagnostic");
+            Assert.Null(runtime.CurrentBinding);
+            Assert.Empty(runtime.RunsFor(b.ExperienceId));
+
+            await OpenProjectAsync(page, a.ProjectId);
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "A bind and start");
+            var firstA = Assert.Single(runtime.RunsFor(a.ExperienceId));
+            Assert.Equal("complete", firstA.Outcome);
+
+            await OpenProjectAsync(page, b.ProjectId);
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "B unlock and start");
+            var firstB = Assert.Single(runtime.RunsFor(b.ExperienceId));
+            Assert.Equal("complete", firstB.Outcome);
+            Assert.NotEqual(firstA.RunId, firstB.RunId);
+
+            await OpenProjectAsync(page, a.ProjectId);
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "return from B to A");
+            Assert.Equal(firstA.RunId, Assert.Single(runtime.RunsFor(a.ExperienceId)).RunId);
+            Assert.Equal(firstB.RunId, Assert.Single(runtime.RunsFor(b.ExperienceId)).RunId);
+            runtime.ThrowIfFaulted();
+
+            await WaitUntilAsync(async () => !await page.Locator("#preview-reset").IsDisabledAsync(), "A scoped reset control");
+            await page.Locator("#preview-reset").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Reset preview ready", "A reset preview");
+            await page.Locator("#confirm-reset").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Clean rerun ready", "A reset successor");
+            var aRuns = runtime.RunsFor(a.ExperienceId);
+            Assert.Equal(2, aRuns.Count);
+            var successorA = Assert.Single(aRuns, value => value.Status == "active");
+            Assert.Equal(firstA.RunId, successorA.PredecessorRunId);
+            Assert.NotEqual(firstA.RunId, successorA.RunId);
+
+            await OpenProjectAsync(page, b.ProjectId);
+            Assert.Equal(firstB.RunId, Assert.Single(runtime.RunsFor(b.ExperienceId)).RunId);
+            var browserBRun = await page.EvaluateAsync<string>("() => runState.runs[0].run_id");
+            Assert.Equal(firstB.RunId, browserBRun);
+
+            await OpenProjectAsync(page, a.ProjectId);
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "successor A rerun");
+            successorA = Assert.Single(runtime.RunsFor(a.ExperienceId), value => value.Status == "active");
+            Assert.Equal("complete", successorA.Outcome);
+
+            var retained = runtime.CrossRetentionBoundary(successorA.RunId, firstB.RunId);
+            var archivedVisible = await page.EvaluateAsync<bool>(
+                "async x => (await api(`/api/v2/quest-studio/projects/${x.projectId}/runs/control/${x.requestId}?runId=${x.runId}`)).receipt.request_id === x.requestId",
+                new { projectId = a.ProjectId, requestId = retained.ArchivedRequestId, runId = successorA.RunId });
+            var otherExperienceVisible = await page.EvaluateAsync<bool>(
+                "async x => (await api(`/api/v2/quest-studio/projects/${x.projectId}/runs/control/${x.requestId}?runId=${x.runId}`)).receipt.request_id === x.requestId",
+                new { projectId = b.ProjectId, requestId = retained.OtherExperienceRequestId, runId = firstB.RunId });
+            Assert.True(archivedVisible, "Studio could not retrieve A's exact archived receipt.");
+            Assert.True(otherExperienceVisible, "A's retention burst broke B's correlated receipt chain.");
+            Assert.Equal(retained.ArchivedBytes, File.ReadAllBytes(retained.ArchivedPath));
+
+            while (await page.EvaluateAsync<int>("() => bindingChanges.length") > 0)
+            {
+                var before = await page.EvaluateAsync<int>("() => bindingChanges.length");
+                await page.Locator("#restore-binding").ClickAsync();
+                await WaitUntilAsync(async () => await page.EvaluateAsync<int>("() => bindingChanges.length") == before - 1,
+                    "LIFO binding restoration");
+            }
+            Assert.Null(runtime.CurrentBinding);
+            runtime.ThrowIfFaulted();
+
+            Assert.DoesNotContain(consoleErrors, value =>
+                !value.Contains("Failed to load resource: the server responded with a status of 400", StringComparison.Ordinal));
+            Assert.Empty(failedRequests);
+            Assert.Collection(httpErrors, value =>
+            {
+                Assert.StartsWith("400 POST ", value);
+                Assert.EndsWith("/runs/bind", value);
+            });
+            Assert.False(host.HasExited);
+
+            await context.Tracing.StopAsync(new TracingStopOptions { Path = run.TracePath });
+            traceStopped = true;
+            succeeded = true;
+        }
+        catch
+        {
+            await CaptureFailureArtifactsAsync(page, context, run, consoleErrors, failedRequests, httpErrors, traceStopped);
+            traceStopped = true;
+            throw;
+        }
+        finally
+        {
+            if (runtime is not null) await runtime.DisposeAsync();
+            if (!traceStopped && context is not null)
+            {
+                try { await context.Tracing.StopAsync(new TracingStopOptions { Path = run.TracePath }); }
+                catch { }
+            }
+            if (context is not null) await context.DisposeAsync();
+            if (browser is not null) await browser.DisposeAsync();
+            playwright?.Dispose();
+            if (host is not null) await host.DisposeAsync();
+            var keep = Environment.GetEnvironmentVariable("COMFY_QUEST_E2E_KEEP_ARTIFACTS") == "1";
+            if (succeeded && !keep) TryDelete(run.Root);
+            else _output.WriteLine($"SYNTHETIC GUILD E2E artifacts preserved: {run.Root}");
+        }
+    }
+
+    [InstalledGuildFact]
+    public async Task Installed_guild_journey_proves_A_to_B_to_A_reset_retention_and_recovery()
+    {
+        var repoRoot = FindRepoRoot();
+        var run = SyntheticRun.CreateInstalled(repoRoot);
+        var sessionId = RequiredEnvironment("COMFY_QUEST_CREATOR_SESSION_ID");
+        var expectedWorld = RequiredEnvironment("COMFY_QUEST_E2E_WORLD_UID");
+        var expectedMachine = RequiredEnvironment("COMFY_QUEST_E2E_MACHINE");
+        StudioHost? host = null;
+        IPlaywright? playwright = null;
+        IBrowser? browser = null;
+        IBrowserContext? context = null;
+        IPage? page = null;
+        var consoleErrors = new ConcurrentQueue<string>();
+        var failedRequests = new ConcurrentQueue<string>();
+        var httpErrors = new ConcurrentQueue<string>();
+        var traceStopped = false;
+
+        try
+        {
+            host = await StudioHost.StartAsync(repoRoot, run);
+            playwright = await Playwright.CreateAsync();
+            browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+            {
+                Headless = Environment.GetEnvironmentVariable("COMFY_QUEST_E2E_HEADED") != "1"
+            });
+            context = await browser.NewContextAsync(new BrowserNewContextOptions
+            {
+                ViewportSize = new ViewportSize { Width = 1600, Height = 1000 }
+            });
+            await context.Tracing.StartAsync(new TracingStartOptions { Screenshots = true, Snapshots = true, Sources = true });
+            page = await context.NewPageAsync();
+            page.SetDefaultTimeout(15_000);
+            page.Console += (_, message) =>
+            {
+                if (message.Type == "error") consoleErrors.Enqueue($"console: {message.Text}");
+            };
+            page.PageError += (_, error) => consoleErrors.Enqueue($"pageerror: {error}");
+            page.RequestFailed += (_, request) => failedRequests.Enqueue($"{request.Method} {request.Url}: {request.Failure}");
+            page.Response += (_, response) =>
+            {
+                if (response.Status >= 400) httpErrors.Enqueue($"{response.Status} {response.Request.Method} {response.Url}");
+            };
+            page.Dialog += async (_, dialog) => await dialog.AcceptAsync("Full-width Journey");
+
+            await page.GotoAsync(host.StudioUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await WaitUntilAsync(() => page.EvaluateAsync<bool>("() => catalog !== null && portfolio !== null"), "installed Studio boot", 30_000);
+            if (!await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"))
+                await page.Locator("#library-toggle").ClickAsync();
+            await page.Locator("#create-guild").ClickAsync();
+            await WaitForTextAsync(page.Locator("#selected-guild-name"), "Full-width Journey settings", "installed guild editor");
+            var guildId = await page.EvaluateAsync<string>("() => selectedGuildId");
+
+            var a = await CreateGuildJourneyStepAsync(page, guildId, "Installed Guild Quest A");
+            var b = await CreateGuildJourneyStepAsync(page, guildId, "Installed Guild Quest B");
+            await page.Locator($"[data-select-guild='{guildId}']").ClickAsync();
+            var prerequisite = page.Locator($"[data-guild-prerequisite='{b.ProjectId}']");
+            await WaitForCountAsync(prerequisite, 1, "installed B prerequisite control");
+            await prerequisite.SelectOptionAsync(new[] { new SelectOptionValue { Value = a.ProjectId } });
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild progression saved", "installed A before B prerequisite");
+            await page.Locator("#certify-guild").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack certified", "installed guild certification");
+            await page.Locator("#publish-guild").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack published", "installed immutable guild publication", 30_000);
+            var production = WaitForPack(run.RuntimeRoot, QuestPackLane.Production, guildId, TimeSpan.FromSeconds(30));
+            await EvidenceShotAsync(page, run, "01-authored-published");
+
+            WriteJson(Path.Combine(run.Root, "human-action-required.json"), new
+            {
+                schema = "comfy-quest-human-action/v1",
+                action = "Launch Valheim and enter the pinned ComfyQuestDemo authoring world.",
+                count = 1,
+                session_id = sessionId,
+                expected_machine = expectedMachine,
+                expected_world_uid = expectedWorld,
+                ready_utc = DateTimeOffset.UtcNow,
+                guild_id = guildId,
+                experience_a = a.ExperienceId,
+                experience_b = b.ExperienceId,
+            });
+            _output.WriteLine("HUMAN ACTION READY: launch Valheim and enter ComfyQuestDemo. Everything after world entry is automatic.");
+
+            await WaitForInstalledWorldAsync(run.RuntimeRoot, expectedMachine, expectedWorld, TimeSpan.FromMinutes(120));
+            await InvokeCreatorSessionAsync(repoRoot, "Arm", sessionId, run.ValheimRoot, expectedMachine, expectedWorld, run.Root);
+            await WaitUntilAsync(() => Task.FromResult(FreshArmed(run.RuntimeRoot, expectedMachine)), "armed installed dev channel", 30_000);
+
+            await page.Locator($"[data-select-guild='{guildId}']").ClickAsync();
+            await page.Locator("#play-guild").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack sent to the game", "installed guild dev transfer", 30_000);
+            await WaitUntilAsync(() => Task.FromResult(ActiveGuild(run.RuntimeRoot, guildId)), "installed guild activation", 30_000);
+            var active = new QuestPackStore(run.RuntimeRoot).ReadActive();
+            Assert.Equal(production.ContentHash, active.ContentHash);
+            Assert.Equal("dev", active.SourceChannel);
+            var dev = WaitForPack(run.RuntimeRoot, QuestPackLane.Dev, guildId, TimeSpan.FromSeconds(10));
+            Assert.Equal(production.ContentHash, dev.ContentHash);
+
+            await page.Locator("#library-close").ClickAsync();
+            await page.Locator("[data-stage='observe']").ClickAsync();
+            await WaitUntilAsync(async () => !await page.Locator("#find-bindings").IsDisabledAsync(), "installed binding controls", 30_000);
+            await page.Locator("#find-bindings").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Binding candidates ready", "installed bounded candidate scan", 30_000);
+            Assert.InRange(await page.Locator("#binding-candidate option").CountAsync(), 1, RuntimeBindingCoordinator.MaxCandidates);
+            var bindingZdo = await page.Locator("#binding-candidate").InputValueAsync();
+
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Binding rejected", "installed locked B refusal", 30_000);
+            await WaitForTextAsync(page.Locator("#status-detail"), "experience_prerequisite_incomplete", "installed exact prerequisite diagnostic");
+            Assert.Empty(RunsFor(run.RuntimeRoot, b.ExperienceId));
+            var prerequisiteRefusal = await WaitForRuntimeReceiptAsync(run.RuntimeRoot,
+                value => value.Operation == "bind_selected_experience" && value.Status == "rejected"
+                    && value.ExperienceId == b.ExperienceId && value.BindingZdo == bindingZdo,
+                "content-correlated prerequisite refusal");
+            Assert.Equal(active.ActivationId, prerequisiteRefusal.Receipt.ActivationId);
+            Assert.Equal(active.ContentHash, prerequisiteRefusal.Receipt.ContentHash);
+            Assert.Equal(expectedWorld, prerequisiteRefusal.Receipt.WorldId);
+            Assert.StartsWith("experience_prerequisite_incomplete:", prerequisiteRefusal.Receipt.Error);
+            await EvidenceShotAsync(page, run, "02-locked-b");
+
+            await OpenProjectAsync(page, a.ProjectId);
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "installed A start", 30_000);
+            var firstA = await WaitForRunAsync(run.RuntimeRoot, a.ExperienceId, value => value.Outcome == "complete", "installed A completion");
+            Assert.Equal(bindingZdo, firstA.Scope.BindingZdo);
+            Assert.Equal(expectedWorld, firstA.Scope.WorldId);
+            await EvidenceShotAsync(page, run, "03-a-complete");
+
+            await OpenProjectAsync(page, b.ProjectId);
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "installed B unlock", 30_000);
+            var firstB = await WaitForRunAsync(run.RuntimeRoot, b.ExperienceId, value => value.Outcome == "complete", "installed B completion");
+            Assert.NotEqual(firstA.RunId, firstB.RunId);
+            var bPreviewRequest = await RequestPreviewAsync(page, b.ProjectId, firstB.RunId);
+            await EvidenceShotAsync(page, run, "04-b-complete");
+
+            await OpenProjectAsync(page, a.ProjectId);
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "installed return to A", 30_000);
+            Assert.Equal(firstA.RunId, Assert.Single(RunsFor(run.RuntimeRoot, a.ExperienceId)).RunId);
+            Assert.Equal(firstB.RunId, Assert.Single(RunsFor(run.RuntimeRoot, b.ExperienceId)).RunId);
+            await EvidenceShotAsync(page, run, "05-return-a");
+
+            await WaitUntilAsync(async () => !await page.Locator("#preview-reset").IsDisabledAsync(), "installed A reset control", 30_000);
+            await page.Locator("#preview-reset").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Reset preview ready", "installed A reset preview", 30_000);
+            await page.Locator("#confirm-reset").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Clean rerun ready", "installed A reset successor", 30_000);
+            var successorA = await WaitForRunAsync(run.RuntimeRoot, a.ExperienceId,
+                value => value.Status == "active" && value.PredecessorRunId == firstA.RunId, "installed A successor identity");
+            Assert.NotEqual(firstA.RunId, successorA.RunId);
+            Assert.Equal(firstB.RunId, Assert.Single(RunsFor(run.RuntimeRoot, b.ExperienceId)).RunId);
+            await EvidenceShotAsync(page, run, "06-a-reset");
+
+            await page.Locator("#bind-experience").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "installed A successor rerun", 30_000);
+            successorA = await WaitForRunAsync(run.RuntimeRoot, a.ExperienceId,
+                value => value.RunId == successorA.RunId && value.Outcome == "complete", "installed A successor completion");
+            await EvidenceShotAsync(page, run, "07-a-rerun");
+
+            var successorScope = RuntimeRunControlReceipts.ScopeDirectory(run.RuntimeRoot, successorA.RunId);
+            var initialReceipts = Directory.Exists(successorScope) ? Directory.GetFiles(successorScope, "*.json").Length : 0;
+            Assert.Equal(0, initialReceipts);
+            string? archivedRequest = null;
+            byte[]? archivedBytes = null;
+            for (var index = 0; index <= RuntimeRunControlReceipts.MaxPerScope; index++)
+            {
+                var requestId = await RequestPreviewAsync(page, a.ProjectId, successorA.RunId);
+                if (archivedRequest is null)
+                {
+                    archivedRequest = requestId;
+                    archivedBytes = File.ReadAllBytes(RuntimeRunControlReceipts.ReceiptPath(run.RuntimeRoot, successorA.RunId, requestId));
+                }
+            }
+            var archivedPath = RuntimeRunControlReceipts.ArchivedReceiptPath(run.RuntimeRoot, successorA.RunId, archivedRequest!);
+            await WaitUntilAsync(() => Task.FromResult(File.Exists(archivedPath)), "installed archived reset receipt", 30_000);
+            Assert.Equal(archivedBytes, File.ReadAllBytes(archivedPath));
+            Assert.Equal(RuntimeRunControlReceipts.MaxPerScope, Directory.GetFiles(successorScope, "*.json").Length);
+            Assert.True(await ReceiptVisibleAsync(page, a.ProjectId, successorA.RunId, archivedRequest!));
+            Assert.True(await ReceiptVisibleAsync(page, b.ProjectId, firstB.RunId, bPreviewRequest));
+            Assert.Equal(firstB.RunId, Assert.Single(RunsFor(run.RuntimeRoot, b.ExperienceId)).RunId);
+            await EvidenceShotAsync(page, run, "08-retained-proof");
+
+            var bindingChangeIds = await page.EvaluateAsync<string[]>("() => bindingChanges.map(value => value.change_id)");
+            Assert.Equal(4, bindingChangeIds.Length);
+            while (await page.EvaluateAsync<int>("() => bindingChanges.length") > 0)
+            {
+                var before = await page.EvaluateAsync<int>("() => bindingChanges.length");
+                await page.Locator("#restore-binding").ClickAsync();
+                await WaitUntilAsync(async () => await page.EvaluateAsync<int>("() => bindingChanges.length") == before - 1,
+                    "installed LIFO binding restoration", 30_000);
+            }
+            Assert.All(bindingChangeIds, changeId =>
+                Assert.Equal("restored", JsonConvert.DeserializeObject<RuntimeBindingChange>(File.ReadAllText(
+                    Path.Combine(run.RuntimeRoot, "state", "binding-changes", changeId + ".json")))?.State));
+
+            CaptureInstalledEvidence(run, production, dev, active, a, b, firstA, firstB, successorA,
+                prerequisiteRefusal, archivedRequest!, archivedPath, bPreviewRequest, bindingChangeIds);
+            Assert.Empty(failedRequests);
+            Assert.Contains(httpErrors, value => value.EndsWith("/runs/bind", StringComparison.Ordinal));
+            Assert.DoesNotContain(httpErrors, value => !value.EndsWith("/runs/bind", StringComparison.Ordinal));
+            Assert.DoesNotContain(consoleErrors, value =>
+                !value.Contains("Failed to load resource: the server responded with a status of 400", StringComparison.Ordinal));
+            Assert.False(host.HasExited);
+
+            await context.Tracing.StopAsync(new TracingStopOptions { Path = run.TracePath });
+            traceStopped = true;
+            WriteJson(Path.Combine(run.Root, "machine-lap-complete.json"), new
+            {
+                schema = "comfy-quest-installed-guild-proof/v1",
+                completed_utc = DateTimeOffset.UtcNow,
+                session_id = sessionId,
+                guild_id = guildId,
+                content_hash = active.ContentHash,
+                world_uid = expectedWorld,
+                binding_zdo = bindingZdo,
+                prerequisite_refusal = true,
+                a_to_b_to_a = true,
+                selective_reset = true,
+                predecessor_run_id = firstA.RunId,
+                successor_run_id = successorA.RunId,
+                other_experience_run_id = firstB.RunId,
+                retained_receipt = Path.GetRelativePath(run.Root, Path.Combine(run.Root, "proof", "archived-a-reset.json")),
+                binding_changes_restored = bindingChangeIds.Length,
+            });
+            _output.WriteLine($"INSTALLED GUILD E2E proof preserved: {run.Root}");
+        }
+        catch
+        {
+            await CaptureFailureArtifactsAsync(page, context, run, consoleErrors, failedRequests, httpErrors, traceStopped);
+            traceStopped = true;
+            throw;
+        }
+        finally
+        {
+            if (!traceStopped && context is not null)
+            {
+                try { await context.Tracing.StopAsync(new TracingStopOptions { Path = run.TracePath }); }
+                catch { }
+            }
+            if (context is not null) await context.DisposeAsync();
+            if (browser is not null) await browser.DisposeAsync();
+            playwright?.Dispose();
+            if (host is not null) await host.DisposeAsync();
+        }
+    }
+
+    static async Task<(string ProjectId, string ExperienceId)> CreateGuildJourneyStepAsync(IPage page, string guildId, string title)
+    {
+        await page.Locator("#template").SelectOptionAsync("guild-journey");
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "New quest", Exact = true }).ClickAsync();
+        await WaitForInputValueAsync(page.Locator("#title"), "Guild Journey Step", title + " template");
+        await WaitForTextAsync(page.Locator("#author-state"), "1 advanced steps", title + " engine-start beat");
+        await FillAndBlurAsync(page.Locator("#title"), title);
+        await WaitForExactTextAsync(page.Locator("#save-label"), "Saved", title + " autosave");
+        var projectId = await page.EvaluateAsync<string>("() => project.project_id");
+        var experienceId = await page.EvaluateAsync<string>("() => project.experience_id");
+        if (!await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"))
+        {
+            await page.Locator("#library-toggle").ClickAsync();
+            await WaitUntilAsync(
+                () => page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"),
+                title + " library reopen");
+        }
+        var guildEditor = page.Locator("#guild-editor");
+        if (await guildEditor.EvaluateAsync<bool>("element => element.open"))
+            await page.Locator("#guild-editor > summary").ClickAsync();
+        var actions = page.Locator(".library-actions");
+        if (!await actions.EvaluateAsync<bool>("element => element.open"))
+        {
+            await page.Locator("#library-panel").EvaluateAsync("element => element.scrollTop = element.scrollHeight");
+            await page.Locator(".library-actions > summary").ClickAsync();
+        }
+        await page.Locator("#project-placement").SelectOptionAsync(guildId + "|standalone||quest");
+        await page.Locator("#place-project").ClickAsync();
+        await WaitUntilAsync(
+            () => page.EvaluateAsync<bool>($"() => placements.some(x => x.project_id === '{projectId}' && x.guild_id === '{guildId}')"),
+            title + " guild placement");
+        return (projectId, experienceId);
+    }
+
+    static async Task OpenProjectAsync(IPage page, string projectId)
+    {
+        if (!await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"))
+        {
+            await page.Locator("#library-toggle").ClickAsync();
+            await WaitUntilAsync(
+                () => page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"),
+                "library for project " + projectId);
+        }
+        await page.Locator($"[data-project='{projectId}']").ClickAsync();
+        await WaitUntilAsync(() => page.EvaluateAsync<bool>($"() => project?.project_id === '{projectId}'"), "project " + projectId);
+        await page.EvaluateAsync("() => refreshRunState()");
+        await page.Locator("[data-stage='observe']").ClickAsync();
+        await WaitUntilAsync(async () => !await page.Locator("#find-bindings").IsDisabledAsync(), "fresh run controls for " + projectId);
+    }
+
+    static string RequiredEnvironment(string name)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new InvalidOperationException($"Installed guild E2E requires {name}.")
+            : value;
+    }
+
+    static async Task EvidenceShotAsync(IPage page, SyntheticRun run, string name) =>
+        await page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            Path = Path.Combine(run.Root, name + ".png"),
+            FullPage = true,
+        });
+
+    static PackCandidate WaitForPack(string runtimeRoot, QuestPackLane lane, string packId, TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        do
+        {
+            var store = new QuestPackStore(runtimeRoot);
+            var candidates = lane == QuestPackLane.Dev ? store.CheckDevInbox() : store.CheckInbox();
+            var candidate = candidates.Where(value => value.Manifest?.PackId == packId)
+                .OrderByDescending(value => File.GetLastWriteTimeUtc(value.Path)).FirstOrDefault();
+            if (candidate is not null)
+            {
+                Assert.True(candidate.IsValid, string.Join("; ", candidate.Diagnostics.Select(value => value.Code + ":" + value.Message)));
+                return candidate;
+            }
+            Thread.Sleep(100);
+        } while (DateTimeOffset.UtcNow < deadline);
+        throw new XunitException($"Timed out waiting for {lane} pack {packId}.");
+    }
+
+    static async Task WaitForInstalledWorldAsync(string runtimeRoot, string expectedMachine, string expectedWorld, TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        var store = new RuntimeRunStatusStore(runtimeRoot);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var status = store.Read();
+            var fresh = status is not null && status.ObservedUtc >= DateTimeOffset.UtcNow.AddSeconds(-3)
+                && status.ObservedUtc <= DateTimeOffset.UtcNow.AddSeconds(1);
+            if (fresh && string.Equals(status!.Machine, expectedMachine, StringComparison.OrdinalIgnoreCase)
+                && status.WorldUid == expectedWorld) return;
+            await Task.Delay(250);
+        }
+        throw new XunitException($"Timed out waiting for {expectedMachine}/{expectedWorld} world entry.");
+    }
+
+    static bool FreshArmed(string runtimeRoot, string expectedMachine)
+    {
+        var status = new RuntimeDevChannelStatusStore(runtimeRoot).Read();
+        return status is not null && status.Armed
+            && string.Equals(Environment.MachineName, expectedMachine, StringComparison.OrdinalIgnoreCase)
+            && status.ObservedUtc >= DateTimeOffset.UtcNow.AddSeconds(-3)
+            && status.ObservedUtc <= DateTimeOffset.UtcNow.AddSeconds(1);
+    }
+
+    static bool ActiveGuild(string runtimeRoot, string guildId)
+    {
+        var status = new RuntimeDevChannelStatusStore(runtimeRoot).Read();
+        return status is not null && status.Armed
+            && status.ActivePackId == guildId && !string.IsNullOrWhiteSpace(status.ActiveContentHash);
+    }
+
+    static async Task InvokeCreatorSessionAsync(string repoRoot, string action, string sessionId,
+        string valheimRoot, string expectedMachine, string expectedWorld, string evidenceRoot)
+    {
+        var start = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            WorkingDirectory = repoRoot,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        foreach (var value in new[]
+        {
+            "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+            Path.Combine(repoRoot, "tools", "creator-session", "Invoke-CreatorSession.ps1"),
+            action, "-SessionId", sessionId, "-ValheimRoot", valheimRoot,
+            "-ExpectedMachine", expectedMachine, "-WorldUid", expectedWorld,
+            "-WaitSeconds", "60"
+        }) start.ArgumentList.Add(value);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start Creator Session arm request.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        await File.WriteAllTextAsync(Path.Combine(evidenceRoot, "creator-session-" + action.ToLowerInvariant() + ".stdout.log"), await stdout);
+        await File.WriteAllTextAsync(Path.Combine(evidenceRoot, "creator-session-" + action.ToLowerInvariant() + ".stderr.log"), await stderr);
+        if (process.ExitCode != 0)
+            throw new XunitException($"Creator Session {action} failed with exit code {process.ExitCode}.");
+    }
+
+    static IReadOnlyList<RuntimeRunRecord> RunsFor(string runtimeRoot, string experienceId) =>
+        new RuntimeRunRegistry(runtimeRoot).List().Where(value => value.Scope.ExperienceId == experienceId)
+            .OrderBy(value => value.StartedUtc).ToArray();
+
+    static async Task<RuntimeRunRecord> WaitForRunAsync(string runtimeRoot, string experienceId,
+        Func<RuntimeRunRecord, bool> predicate, string description)
+    {
+        RuntimeRunRecord? found = null;
+        await WaitUntilAsync(() =>
+        {
+            found = RunsFor(runtimeRoot, experienceId).SingleOrDefault(predicate);
+            return Task.FromResult(found is not null);
+        }, description, 30_000);
+        return found!;
+    }
+
+    static async Task<RuntimeReceiptEvidence> WaitForRuntimeReceiptAsync(string runtimeRoot,
+        Func<RuntimeReceipt, bool> predicate, string description)
+    {
+        RuntimeReceiptEvidence? found = null;
+        await WaitUntilAsync(() =>
+        {
+            foreach (var path in new RuntimeReceiptStore(runtimeRoot).List(RuntimeReceiptStore.MaxListLimit))
+            {
+                try
+                {
+                    var receipt = JsonConvert.DeserializeObject<RuntimeReceipt>(File.ReadAllText(path));
+                    if (receipt is not null && predicate(receipt)) { found = new(receipt, path); break; }
+                }
+                catch { }
+            }
+            return Task.FromResult(found is not null);
+        }, description, 30_000);
+        return found!;
+    }
+
+    static async Task<string> RequestPreviewAsync(IPage page, string projectId, string runId)
+    {
+        var response = await page.EvaluateAsync<JsonElement>(
+            "async x => await api(`/api/v2/quest-studio/projects/${x.projectId}/runs/reset`,{method:'POST',body:JSON.stringify({run_id:x.runId})})",
+            new { projectId, runId });
+        Assert.True(response.GetProperty("ok").GetBoolean(), response.TryGetProperty("error", out var error) ? error.GetString() : "preview rejected");
+        var requestId = response.GetProperty("request_id").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(requestId));
+        if (response.GetProperty("queued").GetBoolean())
+            await WaitUntilAsync(() => ReceiptVisibleAsync(page, projectId, runId, requestId!), "queued reset preview receipt", 30_000);
+        return requestId!;
+    }
+
+    static Task<bool> ReceiptVisibleAsync(IPage page, string projectId, string runId, string requestId) =>
+        page.EvaluateAsync<bool>(
+            "async x => {let d=await api(`/api/v2/quest-studio/projects/${x.projectId}/runs/control/${x.requestId}?runId=${x.runId}`);return d.receipt?.request_id===x.requestId}",
+            new { projectId, runId, requestId });
+
+    static void CaptureInstalledEvidence(SyntheticRun run, PackCandidate production, PackCandidate dev, ActiveSet active,
+        (string ProjectId, string ExperienceId) a, (string ProjectId, string ExperienceId) b,
+        RuntimeRunRecord firstA, RuntimeRunRecord firstB, RuntimeRunRecord successorA,
+        RuntimeReceiptEvidence prerequisiteRefusal, string archivedRequest, string archivedPath,
+        string bPreviewRequest, IReadOnlyList<string> bindingChangeIds)
+    {
+        var proof = Path.Combine(run.Root, "proof");
+        Directory.CreateDirectory(proof);
+        Copy(production.Path, "guild.production.questpack");
+        Copy(dev.Path, "guild.dev.questpack");
+        Copy(Path.Combine(run.RuntimeRoot, "active", "active-set.json"), "active-set.json");
+        Copy(Path.Combine(run.RuntimeRoot, "state", "runs.json"), "run-registry.json");
+        Copy(Path.Combine(run.RuntimeRoot, "status", "runs.json"), "run-status.json");
+        Copy(Path.Combine(run.RuntimeRoot, "status", "dev-channel.json"), "dev-channel-status.json");
+        Copy(prerequisiteRefusal.Path, "prerequisite-refusal.json");
+        Copy(archivedPath, "archived-a-reset.json");
+        Copy(RuntimeRunControlReceipts.ReceiptPath(run.RuntimeRoot, firstB.RunId, bPreviewRequest), "b-correlated-preview.json");
+        foreach (var changeId in bindingChangeIds)
+            Copy(Path.Combine(run.RuntimeRoot, "state", "binding-changes", changeId + ".json"), "binding-" + changeId + ".json");
+
+        var receiptRoot = Path.Combine(run.RuntimeRoot, "receipts");
+        var receiptIndex = 0;
+        foreach (var path in Directory.Exists(receiptRoot)
+                     ? Directory.GetFiles(receiptRoot, "*.json", SearchOption.TopDirectoryOnly)
+                     : Array.Empty<string>())
+        {
+            RuntimeReceipt? receipt;
+            try { receipt = JsonConvert.DeserializeObject<RuntimeReceipt>(File.ReadAllText(path)); }
+            catch { continue; }
+            if (receipt is null || receipt.ContentHash != active.ContentHash
+                || receipt.ExperienceId != a.ExperienceId && receipt.ExperienceId != b.ExperienceId) continue;
+            Copy(path, $"runtime-receipt-{receiptIndex++:D3}-{Path.GetFileName(path)}");
+        }
+        Assert.True(receiptIndex > 0, "No content-correlated Runtime receipts were captured.");
+        WriteJson(Path.Combine(proof, "identity-summary.json"), new
+        {
+            schema = "comfy-quest-installed-guild-identity/v1",
+            active.PackId,
+            active.Version,
+            active.ContentHash,
+            active.ActivationId,
+            active.Source,
+            active.SourceChannel,
+            experience_a = a.ExperienceId,
+            experience_b = b.ExperienceId,
+            prerequisite = new { experience = b.ExperienceId, requires = a.ExperienceId },
+            prerequisite_refusal_receipt = prerequisiteRefusal.Receipt.Id,
+            first_a_run = firstA.RunId,
+            first_b_run = firstB.RunId,
+            successor_a_run = successorA.RunId,
+            successor_a_predecessor = successorA.PredecessorRunId,
+            archived_a_request = archivedRequest,
+            b_correlated_request = bPreviewRequest,
+            binding_changes = bindingChangeIds,
+        });
+
+        void Copy(string source, string name)
+        {
+            Assert.True(File.Exists(source), "Evidence source missing: " + source);
+            File.Copy(source, Path.Combine(proof, name), overwrite: false);
+        }
+    }
+
+    static void WriteJson(string path, object value)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(value, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        }) + Environment.NewLine);
+    }
+
     static async Task FillAndBlurAsync(ILocator locator, string value)
     {
         await locator.FillAsync(value);
@@ -784,6 +1504,371 @@ public sealed class QuestStudioSyntheticE2ETests
                 Path.Combine(root, "playwright-trace.zip"), Path.Combine(root, "failure.png"),
                 Path.Combine(root, "failure-dom.html"), Path.Combine(root, "browser-errors.log"),
                 Path.Combine(root, "studio.stdout.log"), Path.Combine(root, "studio.stderr.log"));
+        }
+
+        public static SyntheticRun CreateInstalled(string repoRoot)
+        {
+            var root = Path.GetFullPath(RequiredEnvironment("COMFY_QUEST_E2E_EVIDENCE_ROOT"));
+            var valheim = Path.GetFullPath(RequiredEnvironment("COMFY_QUEST_E2E_VALHEIM_ROOT"));
+            if (!File.Exists(Path.Combine(valheim, "valheim.exe")))
+                throw new InvalidOperationException("Installed guild E2E Valheim root has no valheim.exe.");
+            var state = Path.Combine(root, "studio-state");
+            var runtime = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+            var downloads = Path.Combine(root, "browser-downloads");
+            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(state);
+            Directory.CreateDirectory(downloads);
+            return new(root, state, valheim, runtime, Path.Combine(runtime, "inbox"), downloads,
+                Path.Combine(root, "playwright-trace.zip"), Path.Combine(root, "failure.png"),
+                Path.Combine(root, "failure-dom.html"), Path.Combine(root, "browser-errors.log"),
+                Path.Combine(root, "studio.stdout.log"), Path.Combine(root, "studio.stderr.log"));
+        }
+    }
+
+    sealed record RetentionProof(
+        string ArchivedRequestId,
+        string ArchivedPath,
+        byte[] ArchivedBytes,
+        string OtherExperienceRequestId);
+
+    sealed record RuntimeReceiptEvidence(RuntimeReceipt Receipt, string Path);
+
+    sealed class SyntheticGuildRuntime : IAsyncDisposable
+    {
+        const string WorldUid = "424242";
+        const string BindingZdo = "42:7";
+        readonly SyntheticRun _run;
+        readonly ActiveSet _active;
+        readonly IReadOnlyDictionary<string, ExperienceDocument> _documents;
+        readonly RuntimeRunCoordinator _runs;
+        readonly RuntimeBindingCoordinator _bindings;
+        readonly SyntheticBindingAdapter _adapter = new();
+        readonly RuntimeRunStatusStore _status;
+        readonly RuntimeReceiptStore _receipts;
+        readonly CancellationTokenSource _stop = new();
+        readonly Task _pump;
+        Exception? _fault;
+
+        SyntheticGuildRuntime(SyntheticRun run, string experienceA, string experienceB)
+        {
+            _run = run;
+            SyntheticRuntimeFixture.AssertOwnedRoot(run, SentinelName, SentinelContents);
+            var store = new QuestPackStore(run.RuntimeRoot);
+            var candidate = Assert.Single(store.CheckInbox());
+            Assert.True(candidate.IsValid, string.Join("; ", candidate.Diagnostics.Select(value => value.Code)));
+            store.LoadLatest();
+            _active = store.ReadActive();
+            _documents = ReadExperiences(candidate);
+            Assert.Equal(new[] { experienceA, experienceB }.OrderBy(value => value, StringComparer.Ordinal),
+                _documents.Keys.OrderBy(value => value, StringComparer.Ordinal));
+            _runs = new RuntimeRunCoordinator(run.RuntimeRoot);
+            _bindings = new RuntimeBindingCoordinator(run.RuntimeRoot, _adapter, _runs.Registry);
+            _status = new RuntimeRunStatusStore(run.RuntimeRoot);
+            _receipts = new RuntimeReceiptStore(run.RuntimeRoot);
+            WriteStatus();
+            _pump = Task.Run(PumpAsync);
+        }
+
+        public static SyntheticGuildRuntime Start(SyntheticRun run, string experienceA, string experienceB) =>
+            new(run, experienceA, experienceB);
+
+        public RuntimeBindingReference? CurrentBinding
+        {
+            get
+            {
+                var value = _adapter.Read(BindingZdo);
+                return string.IsNullOrWhiteSpace(value?.ExperienceId) ? null : value;
+            }
+        }
+
+        public IReadOnlyList<RuntimeRunRecord> RunsFor(string experienceId) =>
+            _runs.Registry.List().Where(value => value.Scope.ExperienceId == experienceId)
+                .OrderBy(value => value.StartedUtc).ToArray();
+
+        public string PrerequisiteOf(string experienceId) =>
+            Assert.Single(_documents[experienceId].Prerequisites);
+
+        public void ThrowIfFaulted()
+        {
+            if (_fault is not null) throw new XunitException("Synthetic Runtime mailbox failed: " + _fault);
+        }
+
+        async Task PumpAsync()
+        {
+            try
+            {
+                while (!_stop.IsCancellationRequested)
+                {
+                    AnswerMailbox();
+                    WriteStatus();
+                    await Task.Delay(40, _stop.Token);
+                }
+            }
+            catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+            catch (Exception error)
+            {
+                _fault = error;
+                try { File.WriteAllText(Path.Combine(_run.Root, "synthetic-runtime-error.log"), error.ToString()); }
+                catch { }
+            }
+        }
+
+        void AnswerMailbox()
+        {
+            var mailbox = Path.Combine(_run.RuntimeRoot, "requests", "run-control.json");
+            if (!File.Exists(mailbox)) return;
+            RuntimeRunControlRequest? request = null;
+            try
+            {
+                request = JsonConvert.DeserializeObject<RuntimeRunControlRequest>(File.ReadAllText(mailbox));
+                File.Delete(mailbox);
+                RuntimeRunControlRequestPolicy.Validate(request, DateTimeOffset.UtcNow, out var validationError);
+                if (validationError is not null) throw new InvalidOperationException(validationError);
+                if (!string.Equals(request!.ExpectedMachine, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("runtime_machine_mismatch");
+                if (request.ExpectedWorldUid != WorldUid) throw new InvalidOperationException("runtime_world_mismatch");
+
+                switch (request.Operation)
+                {
+                    case "list_binding_candidates":
+                        WriteReceipt(request, "completed", "binding_candidates_ready", candidates: _bindings.Candidates());
+                        break;
+                    case "bind_selected_experience":
+                        Bind(request);
+                        break;
+                    case "restore_binding":
+                        WriteReceipt(request, "completed", "binding_restored",
+                            change: _bindings.Restore(request.BindingZdo, request.BindingChangeId, WorldUid, DateTimeOffset.UtcNow));
+                        break;
+                    case "preview_reset":
+                        WriteReceipt(request, "previewed", "reset_preview_ready",
+                            preview: _runs.Preview(request.RunId, DateTimeOffset.UtcNow, SyntheticSpawnResetAdapter.Instance));
+                        break;
+                    case "apply_reset":
+                        var result = _runs.Apply(request.RunId, request.PreviewToken, DateTimeOffset.UtcNow,
+                            SyntheticSpawnResetAdapter.Instance);
+                        WriteReceipt(request, result.State == "completed" ? "completed" : "failed", result.Detail ?? result.State,
+                            result: result);
+                        break;
+                    default:
+                        throw new InvalidOperationException("run_control_operation_invalid");
+                }
+            }
+            catch (Exception error)
+            {
+                if (request is not null && RuntimeRunControlRequestPolicy.CanAddressReceipt(request))
+                    WriteReceipt(request, "rejected", error.Message);
+            }
+        }
+
+        void Bind(RuntimeRunControlRequest request)
+        {
+            if (!_documents.TryGetValue(request.ExperienceId ?? string.Empty, out var document))
+                throw new InvalidOperationException("active_experience_not_in_pack");
+            _active.ExperienceId = document.Id;
+            var change = _bindings.Bind(request.BindingZdo, WorldUid, _active, document, DateTimeOffset.UtcNow);
+            var run = _runs.Resolve(new RuntimeRunScope
+            {
+                WorldId = WorldUid,
+                ExperienceId = document.Id,
+                BindingZdo = request.BindingZdo,
+                ParticipantIds = new List<string> { "synthetic-player" },
+                ContentHash = _active.ContentHash,
+            }, DateTimeOffset.UtcNow);
+            _runs.Registry.MarkOutcome(run.RunId, "complete", DateTimeOffset.UtcNow);
+            WriteReceipt(request, "completed", "experience_bound:" + document.Id, change: change);
+        }
+
+        void WriteStatus()
+        {
+            _status.Write(new RuntimeRunStatusDocument
+            {
+                ObservedUtc = DateTimeOffset.UtcNow,
+                Machine = Environment.MachineName,
+                WorldUid = WorldUid,
+                Runs = _runs.Registry.List().Select(value => new RuntimeRunStatusEntry
+                {
+                    RunId = value.RunId,
+                    ScopeId = value.ScopeId,
+                    ExperienceId = value.Scope.ExperienceId,
+                    BindingZdo = value.Scope.BindingZdo,
+                    ParticipantIds = value.Scope.ParticipantIds,
+                    ContentHash = value.Scope.ContentHash,
+                    StageId = value.Outcome is null ? "start" : null,
+                    Outcome = value.Outcome,
+                    RewardPolicy = value.RewardPolicy,
+                }).ToArray(),
+            });
+        }
+
+        void WriteReceipt(RuntimeRunControlRequest request, string state, string detail,
+            RuntimeResetPreview? preview = null, RuntimeResetResult? result = null,
+            IReadOnlyList<RuntimeBindingCandidate>? candidates = null, RuntimeBindingChange? change = null)
+        {
+            var receipt = new RuntimeRunControlReceipt
+            {
+                RequestId = request.RequestId,
+                Operation = request.Operation,
+                State = state,
+                Detail = detail,
+                Machine = Environment.MachineName,
+                WorldUid = WorldUid,
+                CompletedUtc = DateTimeOffset.UtcNow,
+                Preview = preview,
+                Result = result,
+                BindingCandidates = candidates,
+                BindingChange = change,
+            };
+            WriteControlReceipt(RuntimeRunControlReceipts.Scope(request.RunId), receipt, prune: true);
+            var addressed = result?.NewRunId ?? request.RunId;
+            var run = string.IsNullOrWhiteSpace(addressed) ? null : _runs.Registry.Find(addressed);
+            _receipts.Write(new RuntimeReceipt
+            {
+                Operation = request.Operation,
+                Status = state,
+                Error = state is "completed" or "previewed" ? null : detail,
+                RunId = run?.RunId ?? addressed,
+                WorldId = run?.Scope.WorldId ?? change?.WorldId,
+                ExperienceId = run?.Scope.ExperienceId ?? request.ExperienceId ?? change?.Applied?.ExperienceId,
+                ContentHash = run?.Scope.ContentHash ?? change?.Applied?.ContentHash,
+                BindingZdo = run?.Scope.BindingZdo ?? request.BindingZdo,
+                CorrelationId = change?.ChangeId ?? result?.ResetId ?? preview?.PreviewToken ?? request.RequestId,
+                CandidateCount = candidates?.Count ?? 0,
+                Diagnostics = Array.Empty<ContractDiagnostic>(),
+            });
+            WriteStatus();
+        }
+
+        string WriteControlReceipt(string scope, RuntimeRunControlReceipt receipt, bool prune)
+        {
+            var path = RuntimeRunControlReceipts.ReceiptPath(_run.RuntimeRoot, scope, receipt.RequestId);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var temporary = path + ".tmp";
+            File.WriteAllText(temporary, JsonConvert.SerializeObject(receipt, Formatting.Indented));
+            if (File.Exists(path)) File.Replace(temporary, path, null);
+            else File.Move(temporary, path);
+            if (prune)
+                ReceiptRetention.Archive(
+                    RuntimeRunControlReceipts.ScopeDirectory(_run.RuntimeRoot, scope),
+                    RuntimeRunControlReceipts.ArchiveScopeDirectory(_run.RuntimeRoot, scope),
+                    RuntimeRunControlReceipts.MaxPerScope, TimeSpan.Zero, DateTimeOffset.UtcNow);
+            return path;
+        }
+
+        public RetentionProof CrossRetentionBoundary(string runA, string runB)
+        {
+            var scopeA = RuntimeRunControlReceipts.Scope(runA);
+            var liveA = RuntimeRunControlReceipts.ScopeDirectory(_run.RuntimeRoot, scopeA);
+            var initial = Directory.Exists(liveA) ? Directory.GetFiles(liveA, "*.json").Length : 0;
+            var toWrite = Math.Max(1, RuntimeRunControlReceipts.MaxPerScope - initial + 1);
+            string? firstId = null;
+            byte[]? firstBytes = null;
+            for (var index = 0; index < toWrite; index++)
+            {
+                var requestId = $"retention-a-{index:D3}";
+                var receipt = RetentionReceipt(requestId, runA, index);
+                var path = WriteControlReceipt(scopeA, receipt, prune: false);
+                File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(-10).AddMilliseconds(index * 10));
+                if (index == 0)
+                {
+                    firstId = requestId;
+                    firstBytes = File.ReadAllBytes(path);
+                }
+                ReceiptRetention.Archive(liveA, RuntimeRunControlReceipts.ArchiveScopeDirectory(_run.RuntimeRoot, scopeA),
+                    RuntimeRunControlReceipts.MaxPerScope, TimeSpan.Zero, DateTimeOffset.UtcNow);
+            }
+            var archivedPath = RuntimeRunControlReceipts.ArchivedReceiptPath(_run.RuntimeRoot, scopeA, firstId!);
+            Assert.True(File.Exists(archivedPath), "The boundary-crossing A receipt was not archived.");
+            Assert.Equal(RuntimeRunControlReceipts.MaxPerScope, Directory.GetFiles(liveA, "*.json").Length);
+
+            const string otherId = "retention-b-still-readable";
+            var bPath = WriteControlReceipt(RuntimeRunControlReceipts.Scope(runB), RetentionReceipt(otherId, runB, 0), prune: true);
+            Assert.True(File.Exists(bPath));
+            return new(firstId!, archivedPath, firstBytes!, otherId);
+        }
+
+        static RuntimeRunControlReceipt RetentionReceipt(string requestId, string runId, int sequence) => new()
+        {
+            RequestId = requestId,
+            Operation = "preview_reset",
+            State = "previewed",
+            Detail = "retention_boundary_proof",
+            Machine = Environment.MachineName,
+            WorldUid = WorldUid,
+            CompletedUtc = DateTimeOffset.UtcNow.AddMilliseconds(sequence),
+            Preview = new RuntimeResetPreview
+            {
+                PreviewToken = "retention-proof-" + sequence,
+                RunId = runId,
+                ScopeId = "retention-scope",
+                CreatedUtc = DateTimeOffset.UtcNow,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5),
+                SnapshotHash = "retention",
+                Snapshot = new RuntimeResetSnapshot(),
+            },
+        };
+
+        static IReadOnlyDictionary<string, ExperienceDocument> ReadExperiences(PackCandidate candidate)
+        {
+            using var archive = ZipFile.OpenRead(candidate.Path);
+            return archive.Entries
+                .Where(value => value.FullName.StartsWith("experiences/", StringComparison.Ordinal)
+                    && value.FullName.EndsWith(".json", StringComparison.Ordinal))
+                .Select(value =>
+                {
+                    using var reader = new StreamReader(value.Open());
+                    var compiled = ExperienceCompiler.CompileProductionJson(reader.ReadToEnd());
+                    Assert.Empty(compiled.Diagnostics);
+                    return Assert.IsType<ExperienceDocument>(compiled.Document);
+                })
+                .ToDictionary(value => value.Id, StringComparer.Ordinal);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _stop.Cancel();
+            try { await _pump; }
+            catch (OperationCanceledException) { }
+            _stop.Dispose();
+        }
+
+        sealed class SyntheticBindingAdapter : IRuntimeBindingAdapter
+        {
+            readonly object _gate = new();
+            RuntimeBindingReference _current = new();
+
+            public IReadOnlyList<RuntimeBindingCandidate> ListCandidates() => new[]
+            {
+                new RuntimeBindingCandidate { BindingZdo = BindingZdo, TargetKind = "sign", Label = "Synthetic authoring sign", DistanceMetres = 2.5 },
+            };
+
+            public RuntimeBindingReference Read(string bindingZdo)
+            {
+                lock (_gate) return Clone(_current);
+            }
+
+            public bool TryWrite(string bindingZdo, RuntimeBindingReference reference, out string error)
+            {
+                lock (_gate) _current = Clone(reference);
+                error = string.Empty;
+                return true;
+            }
+
+            static RuntimeBindingReference Clone(RuntimeBindingReference? value) => new()
+            {
+                PackId = value?.PackId,
+                ExperienceId = value?.ExperienceId,
+                BindingId = value?.BindingId,
+                Version = value?.Version,
+                ContentHash = value?.ContentHash,
+            };
+        }
+
+        sealed class SyntheticSpawnResetAdapter : IRuntimeSpawnResetAdapter
+        {
+            public static readonly SyntheticSpawnResetAdapter Instance = new();
+            public RuntimeSpawnResetObservation Inspect(SpawnedObject value) => new() { State = "already_absent" };
+            public RuntimeSpawnResetObservation Cleanup(SpawnedObject value) => new() { State = "already_absent" };
         }
     }
 

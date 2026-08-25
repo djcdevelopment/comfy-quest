@@ -5,6 +5,8 @@ namespace Comfy.Quest.Studio;
 
 public sealed record StudioRunResetRequest(string RunId, string? PreviewToken = null, bool ConfirmReset = false);
 public sealed record StudioSelectExperienceRequest(string? ExperienceId);
+public sealed record StudioBindExperienceRequest(string? ExperienceId, string? BindingZdo);
+public sealed record StudioRestoreBindingRequest(string? BindingZdo, string? BindingChangeId);
 public sealed record StudioRunStatusView(
     int SchemaVersion,
     bool Available,
@@ -46,7 +48,12 @@ internal sealed class QuestStudioRunControl
             var info = new FileInfo(path);
             if (!info.Exists || info.Length is <= 0 or > MaxStatusBytes)
                 return new(1, true, false, "runtime_run_status_missing", null, null, Array.Empty<RuntimeRunStatusEntry>());
-            status = JsonConvert.DeserializeObject<RuntimeRunStatusDocument>(File.ReadAllText(path));
+            // Runtime replaces this heartbeat atomically while Studio polls it. Read with delete
+            // sharing so a dashboard refresh cannot make Runtime's next File.Replace fail on Windows.
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            status = JsonConvert.DeserializeObject<RuntimeRunStatusDocument>(reader.ReadToEnd());
         }
         catch { return new(1, true, false, "runtime_run_status_unreadable", null, null, Array.Empty<RuntimeRunStatusEntry>()); }
         if (status?.Schema != "comfy-quest-runtime-run-status/v1")
@@ -80,7 +87,7 @@ internal sealed class QuestStudioRunControl
     /// <summary>Bind one experience of the activated pack. A guild ships several experiences in one
     /// pack and Runtime will not guess between them, so this is how the creator says which one is
     /// being played without republishing. It addresses the pack rather than a run, and so carries
-    /// no run scope — the reason the request policy allows exactly one operation without a run id.</summary>
+    /// no run scope; machine, world, active content, and exact experience remain pinned.</summary>
     public Task<StudioRunControlResult> SelectExperienceAsync(string projectId, StudioSelectExperienceRequest? request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request?.ExperienceId))
@@ -101,11 +108,49 @@ internal sealed class QuestStudioRunControl
         }, cancellationToken);
     }
 
+    public Task<StudioRunControlResult> BindingCandidatesAsync(string projectId, CancellationToken cancellationToken) =>
+        SendPackAsync(projectId, "list_binding_candidates", null, null, null, cancellationToken);
+
+    public Task<StudioRunControlResult> BindExperienceAsync(string projectId, StudioBindExperienceRequest? request, CancellationToken cancellationToken)
+    {
+        var project = _workspace.ReadProject(projectId);
+        if (project is null) return Task.FromResult(new StudioRunControlResult(false, false, "project_missing", null));
+        if (request is null || !string.Equals(request.ExperienceId, project.ExperienceId, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(request.BindingZdo))
+            return Task.FromResult(new StudioRunControlResult(false, false, "binding_selection_required", null));
+        return SendPackAsync(projectId, "bind_selected_experience", request.ExperienceId, request.BindingZdo, null, cancellationToken);
+    }
+
+    public Task<StudioRunControlResult> RestoreBindingAsync(string projectId, StudioRestoreBindingRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.BindingZdo) || string.IsNullOrWhiteSpace(request.BindingChangeId))
+            return Task.FromResult(new StudioRunControlResult(false, false, "binding_restore_identity_required", null));
+        return SendPackAsync(projectId, "restore_binding", null, request.BindingZdo, request.BindingChangeId, cancellationToken);
+    }
+
+    Task<StudioRunControlResult> SendPackAsync(string projectId, string operation, string? experienceId,
+        string? bindingZdo, string? bindingChangeId, CancellationToken cancellationToken)
+    {
+        if (_workspace.ReadProject(projectId) is null)
+            return Task.FromResult(new StudioRunControlResult(false, false, "project_missing", null));
+        var status = Status(projectId);
+        if (!status.Available || !status.Connected)
+            return Task.FromResult(new StudioRunControlResult(false, false, status.Error ?? "runtime_disconnected", null));
+        var now = DateTimeOffset.UtcNow;
+        return DispatchAsync(RuntimeRoot()!, new RuntimeRunControlRequest
+        {
+            RequestId = RequestId(operation, now), Operation = operation,
+            CreatedUtc = now.ToString("O"), ExpiresUtc = now.AddMinutes(2).ToString("O"),
+            ExpectedMachine = status.Machine!, ExpectedWorldUid = status.WorldUid!,
+            ExperienceId = experienceId, BindingZdo = bindingZdo, BindingChangeId = bindingChangeId,
+        }, cancellationToken);
+    }
+
     public StudioRunControlResult Receipt(string projectId, string? requestId, string? runId)
     {
         if (_workspace.ReadProject(projectId) is null) return new(false, false, "project_missing", null);
         var identity = new RuntimeRunControlRequest { RequestId = requestId };
-        if (!RuntimeRunControlRequestPolicy.CanAddressReceipt(identity) || string.IsNullOrWhiteSpace(runId))
+        if (!RuntimeRunControlRequestPolicy.CanAddressReceipt(identity))
             return new(false, false, "run_control_identity_invalid", null);
         var root = RuntimeRoot();
         if (root is null) return new(false, false, "valheim_not_found", null, requestId);
@@ -180,10 +225,11 @@ internal sealed class QuestStudioRunControl
     }
 
     /// <summary>Receipts are partitioned by run now (audit C3), so a reader has to know the scope.
-    /// Studio always does — it is in the request it sent. The flat path is still tried afterwards so
-    /// an install holding receipts written before partitioning does not lose them.</summary>
+    /// Studio always does — it is in the request it sent. Retention moves old bytes to the same
+    /// partition under archive, and the legacy flat path remains readable for pre-partition installs.</summary>
     static bool TryReadScopedReceipt(string root, string? runId, string requestId, out RuntimeRunControlReceipt? receipt) =>
         TryReadReceipt(RuntimeRunControlReceipts.ReceiptPath(root, RuntimeRunControlReceipts.Scope(runId!), requestId), requestId, out receipt)
+        || TryReadReceipt(RuntimeRunControlReceipts.ArchivedReceiptPath(root, RuntimeRunControlReceipts.Scope(runId!), requestId), requestId, out receipt)
         || TryReadReceipt(RuntimeRunControlReceipts.LegacyPath(root, requestId), requestId, out receipt);
 
     static bool TryReadReceipt(string path, string requestId, out RuntimeRunControlReceipt? receipt)

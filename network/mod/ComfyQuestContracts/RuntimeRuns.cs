@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using Newtonsoft.Json;
 
 public sealed class RuntimeRunScope {
@@ -133,16 +134,39 @@ public sealed class RuntimeRunControlRequest {
   /// <summary>Which experience of the activated pack to bind. Additive and nullable: the two reset
   /// operations never carry it, and select_experience is refused without it.</summary>
   [JsonProperty("experience_id",NullValueHandling=NullValueHandling.Ignore)] public string ExperienceId {get;set;}
+  [JsonProperty("binding_zdo",NullValueHandling=NullValueHandling.Ignore)] public string BindingZdo {get;set;}
+  [JsonProperty("binding_change_id",NullValueHandling=NullValueHandling.Ignore)] public string BindingChangeId {get;set;}
   [JsonProperty("confirm_reset")] public bool ConfirmReset {get;set;}
 }
 public static class RuntimeRunControlRequestPolicy {
-  /// <summary>The allowlist. select_experience addresses the activated pack rather than a run, so
-  /// it is the one operation that carries no run id — and the only one that carries an experience.
-  /// The operation is checked before identity now, because what counts as identity depends on it.</summary>
-  public static readonly IReadOnlyList<string> Operations=new[]{"preview_reset","apply_reset","select_experience"};
-  public static bool Validate(RuntimeRunControlRequest request,DateTimeOffset now,out string error){if(request==null||request.Schema!=RuntimeRunControlRequest.CurrentSchema){error="request_schema_invalid";return false;}if(!Operations.Contains(request.Operation)){error="operation_not_allowlisted";return false;}var selecting=request.Operation=="select_experience";if(!Safe(request.RequestId,80)||!Safe(request.ExpectedMachine,80)||(!selecting&&!Safe(request.RunId,96))||!long.TryParse(request.ExpectedWorldUid,NumberStyles.Integer,CultureInfo.InvariantCulture,out var world)||world==0){error="request_identity_invalid";return false;}if(selecting&&!Safe(request.ExperienceId,80)){error="experience_selection_required";return false;}if(!selecting&&!string.IsNullOrWhiteSpace(request.ExperienceId)){error="experience_selection_not_allowed";return false;}if(request.Operation=="apply_reset"&&(!request.ConfirmReset||!Safe(request.PreviewToken,80))){error="reset_confirmation_required";return false;}if(!DateTimeOffset.TryParse(request.CreatedUtc,CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out var created)||!DateTimeOffset.TryParse(request.ExpiresUtc,CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out var expires)||created<now.AddMinutes(-30)||created>now.AddMinutes(1)||expires<=now||expires<=created||expires>now.AddMinutes(10)){error="request_time_invalid";return false;}error=null;return true;}
+  /// <summary>The allowlist. Reset operations address one exact run; selection and binding
+  /// operations address the activated pack and therefore carry no run id. The operation is checked
+  /// before identity because the permitted identity fields depend on it.</summary>
+  public static readonly IReadOnlyList<string> Operations=new[]{"preview_reset","apply_reset","select_experience","list_binding_candidates","bind_selected_experience","restore_binding"};
+  public static bool Validate(RuntimeRunControlRequest request,DateTimeOffset now,out string error){
+    if(request==null||request.Schema!=RuntimeRunControlRequest.CurrentSchema){error="request_schema_invalid";return false;}
+    if(!Operations.Contains(request.Operation)){error="operation_not_allowlisted";return false;}
+    var reset=request.Operation is "preview_reset" or "apply_reset";
+    var select=request.Operation=="select_experience";
+    var bind=request.Operation=="bind_selected_experience";
+    var restore=request.Operation=="restore_binding";
+    if(!Safe(request.RequestId,80)||!Safe(request.ExpectedMachine,80)
+        ||reset&&!Safe(request.RunId,96)||!reset&&!string.IsNullOrWhiteSpace(request.RunId)
+        ||!long.TryParse(request.ExpectedWorldUid,NumberStyles.Integer,CultureInfo.InvariantCulture,out var world)||world==0){error="request_identity_invalid";return false;}
+    if((select||bind)&&!Safe(request.ExperienceId,80)){error="experience_selection_required";return false;}
+    if(!(select||bind)&&!string.IsNullOrWhiteSpace(request.ExperienceId)){error="experience_selection_not_allowed";return false;}
+    if((bind||restore)&&!SafeZdo(request.BindingZdo)){error="binding_identity_required";return false;}
+    if(!(bind||restore)&&!string.IsNullOrWhiteSpace(request.BindingZdo)){error="binding_identity_not_allowed";return false;}
+    if(restore&&!Safe(request.BindingChangeId,80)){error="binding_change_required";return false;}
+    if(!restore&&!string.IsNullOrWhiteSpace(request.BindingChangeId)){error="binding_change_not_allowed";return false;}
+    if(request.Operation=="apply_reset"&&(!request.ConfirmReset||!Safe(request.PreviewToken,80))){error="reset_confirmation_required";return false;}
+    if(request.Operation!="apply_reset"&&(request.ConfirmReset||!string.IsNullOrWhiteSpace(request.PreviewToken))){error="reset_confirmation_not_allowed";return false;}
+    if(!DateTimeOffset.TryParse(request.CreatedUtc,CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out var created)||!DateTimeOffset.TryParse(request.ExpiresUtc,CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out var expires)||created<now.AddMinutes(-30)||created>now.AddMinutes(1)||expires<=now||expires<=created||expires>now.AddMinutes(10)){error="request_time_invalid";return false;}
+    error=null;return true;
+  }
   public static bool CanAddressReceipt(RuntimeRunControlRequest request)=>request!=null&&Safe(request.RequestId,80);
   static bool Safe(string value,int max)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=max&&value.All(c=>char.IsLetterOrDigit(c)||c=='-'||c=='_'||c=='.');
+  static bool SafeZdo(string value){if(string.IsNullOrWhiteSpace(value)||value.Length>80)return false;var parts=value.Split(':');return parts.Length==2&&long.TryParse(parts[0],NumberStyles.Integer,CultureInfo.InvariantCulture,out _)&&uint.TryParse(parts[1],NumberStyles.None,CultureInfo.InvariantCulture,out _);}
 }
 /// <summary>Where a run-control receipt lives, and how many survive.
 /// <para>Audit C3: the directory was flat and keyed by request id, and pruning ordered <em>all</em>
@@ -164,7 +188,9 @@ public static class RuntimeRunControlReceipts {
   public static string Root(string runtimeRoot)=>Path.Combine(Path.GetFullPath(runtimeRoot),"receipts","run-control");
   public static string ArchiveRoot(string runtimeRoot)=>Path.Combine(Root(runtimeRoot),"archive");
   public static string ScopeDirectory(string runtimeRoot,string scope)=>Path.Combine(Root(runtimeRoot),Scope(scope));
+  public static string ArchiveScopeDirectory(string runtimeRoot,string scope)=>Path.Combine(ArchiveRoot(runtimeRoot),Scope(scope));
   public static string ReceiptPath(string runtimeRoot,string scope,string requestId)=>System.IO.Path.Combine(ScopeDirectory(runtimeRoot,scope),requestId+".json");
+  public static string ArchivedReceiptPath(string runtimeRoot,string scope,string requestId)=>System.IO.Path.Combine(ArchiveScopeDirectory(runtimeRoot,scope),requestId+".json");
   /// <summary>Where receipts written before partitioning still sit. Readers try the scoped path
   /// first and fall back here, so an install that already has evidence keeps it.</summary>
   public static string LegacyPath(string runtimeRoot,string requestId)=>System.IO.Path.Combine(Root(runtimeRoot),requestId+".json");
@@ -181,6 +207,8 @@ public sealed class RuntimeRunControlReceipt {
   [JsonProperty("completed_utc")] public DateTimeOffset CompletedUtc {get;set;}
   [JsonProperty("preview",NullValueHandling=NullValueHandling.Ignore)] public RuntimeResetPreview Preview {get;set;}
   [JsonProperty("result",NullValueHandling=NullValueHandling.Ignore)] public RuntimeResetResult Result {get;set;}
+  [JsonProperty("binding_candidates",NullValueHandling=NullValueHandling.Ignore)] public IReadOnlyList<RuntimeBindingCandidate> BindingCandidates {get;set;}
+  [JsonProperty("binding_change",NullValueHandling=NullValueHandling.Ignore)] public RuntimeBindingChange BindingChange {get;set;}
 }
 
 public sealed class RuntimeRunStatusEntry {
@@ -204,8 +232,20 @@ public sealed class RuntimeRunStatusDocument {
 public sealed class RuntimeRunStatusStore {
   public const int MaxStatusBytes=256*1024; readonly object gate=new();readonly string path;
   public RuntimeRunStatusStore(string runtimeRoot){path=Path.Combine(Path.GetFullPath(runtimeRoot),"status","runs.json");}
-  public void Write(RuntimeRunStatusDocument value){if(!Valid(value))throw new InvalidDataException("run_status_invalid");lock(gate){Directory.CreateDirectory(Path.GetDirectoryName(path));var json=JsonConvert.SerializeObject(value,Formatting.Indented);if(Encoding.UTF8.GetByteCount(json)>MaxStatusBytes)throw new InvalidDataException("run_status_too_large");var temp=path+".tmp";File.WriteAllText(temp,json);if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);}}
-  public RuntimeRunStatusDocument Read(){try{var info=new FileInfo(path);if(!info.Exists||info.Length<=0||info.Length>MaxStatusBytes)return null;var value=JsonConvert.DeserializeObject<RuntimeRunStatusDocument>(File.ReadAllText(path));return Valid(value)?value:null;}catch{return null;}}
+  public void Write(RuntimeRunStatusDocument value){
+    if(!Valid(value))throw new InvalidDataException("run_status_invalid");
+    lock(gate){
+      Directory.CreateDirectory(Path.GetDirectoryName(path));
+      var json=JsonConvert.SerializeObject(value,Formatting.Indented);
+      if(Encoding.UTF8.GetByteCount(json)>MaxStatusBytes)throw new InvalidDataException("run_status_too_large");
+      var temp=path+".tmp-"+Guid.NewGuid().ToString("N");File.WriteAllText(temp,json);
+      try{
+        for(var attempt=0;;attempt++)try{if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);return;}
+          catch(IOException)when(attempt<4){Thread.Sleep(10);}
+      }finally{try{if(File.Exists(temp))File.Delete(temp);}catch{}}
+    }
+  }
+  public RuntimeRunStatusDocument Read(){try{var info=new FileInfo(path);if(!info.Exists||info.Length<=0||info.Length>MaxStatusBytes)return null;using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))using(var reader=new StreamReader(stream)){var value=JsonConvert.DeserializeObject<RuntimeRunStatusDocument>(reader.ReadToEnd());return Valid(value)?value:null;}}catch{return null;}}
   static bool Valid(RuntimeRunStatusDocument value){if(value==null||value.Schema!="comfy-quest-runtime-run-status/v1"||string.IsNullOrWhiteSpace(value.Machine)||value.Machine.Length>80||value.Runs==null||value.Runs.Count>64)return false;if(!string.IsNullOrWhiteSpace(value.WorldUid)&&(!long.TryParse(value.WorldUid,NumberStyles.Integer,CultureInfo.InvariantCulture,out var world)||world==0))return false;var ids=new HashSet<string>(StringComparer.Ordinal);return value.Runs.All(run=>run!=null&&Safe(run.RunId,96)&&ids.Add(run.RunId)&&Safe(run.ScopeId,96)&&Safe(run.ExperienceId,80)&&Safe(run.BindingZdo,80)&&Safe(run.ContentHash,128)&&run.RewardPolicy=="per_run"&&run.ParticipantIds!=null&&run.ParticipantIds.Count>0&&run.ParticipantIds.Count<=16&&run.ParticipantIds.All(id=>Safe(id,80)));}
   static bool Safe(string value,int max)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=max&&value.All(c=>char.IsLetterOrDigit(c)||c=='-'||c=='_'||c==':'||c=='$'||c=='.');
 }

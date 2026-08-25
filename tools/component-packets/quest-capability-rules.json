@@ -623,6 +623,18 @@
     ],
     "EngineEvents": [
       {
+        "Event": "experience_started",
+        "Label": "Quest started",
+        "Instruction": "Begin when this experience is bound to its Charm.",
+        "RuntimeAdapter": "RuntimeExperienceEngine.StartBoundExperience",
+        "TargetPolicy": "none",
+        "FixedTarget": null,
+        "AllowedTargets": [],
+        "RequiredWhereFields": [],
+        "AllowedWhereFields": [],
+        "Privacy": "Only the quest-owned binding identity is retained."
+      },
+      {
         "Event": "timer_elapsed",
         "Label": "Timer elapsed",
         "Instruction": "Wait for a named quest timer.",

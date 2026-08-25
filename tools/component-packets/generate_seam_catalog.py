@@ -670,7 +670,7 @@ def build_runtime_production(
                 or not isinstance(required, list) or not set(required).issubset(allowed)):
             raise CapabilityError(f"{event}: invalid engine where-field policy")
         engine_output.append(row)
-    if seen_engine != {"timer_elapsed", "chat_received"}:
+    if seen_engine != {"experience_started", "timer_elapsed", "chat_received"}:
         raise CapabilityError(f"engine event registry drift: {sorted(seen_engine)}")
     return output, engine_output
 
@@ -1288,11 +1288,11 @@ def render_production_event_catalog(events: list[dict], engine_events: list[dict
         "  public static IReadOnlyList<Definition> All { get { return _all; } }",
         "  public static IReadOnlyList<EngineDefinition> EngineEvents { get { return _engine; } }",
         "  public static int Count { get { return _all.Length; } }",
-        "  public static bool Contains(string name){return !string.IsNullOrWhiteSpace(name)&&_byName.ContainsKey(name);}",
+        "  public static bool Contains(string name){return !string.IsNullOrWhiteSpace(name)&&(_byName.ContainsKey(name)||_engineByName.ContainsKey(name));}",
         "  public static bool IsEngineEvent(string name){return !string.IsNullOrWhiteSpace(name)&&_engineByName.ContainsKey(name);}",
         "  public static bool TryGet(string name,out Definition definition){if(!string.IsNullOrWhiteSpace(name)&&_byName.TryGetValue(name,out definition))return true;definition=default(Definition);return false;}",
         "  public static bool TryGetEngine(string name,out EngineDefinition definition){if(!string.IsNullOrWhiteSpace(name)&&_engineByName.TryGetValue(name,out definition))return true;definition=default(EngineDefinition);return false;}",
-        "  public static ISet<string> CreateSet(){return new HashSet<string>(_byName.Keys,StringComparer.OrdinalIgnoreCase);}",
+        "  public static ISet<string> CreateSet(){var value=new HashSet<string>(_byName.Keys,StringComparer.OrdinalIgnoreCase);value.UnionWith(_engineByName.Keys);return value;}",
         "  public static bool IsAllowedWhere(string eventName,string field){",
         "    if(string.IsNullOrWhiteSpace(field))return false;",
         "    if(TryGet(eventName,out var definition)){foreach(var allowed in definition.AllowedWhereFields)if(string.Equals(allowed,field,StringComparison.OrdinalIgnoreCase))return true;return false;}",

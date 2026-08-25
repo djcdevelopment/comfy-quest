@@ -174,6 +174,7 @@ internal sealed class QuestStudioWorkspace
         templates = new object[]
         {
             new { id = "demo-world-first-portal", label = "Demo World: First Portal", note = "Minimal tutorial: take one portal, see one message, and complete.", minimal_tutorial = true },
+            new { id = "guild-journey", label = "Guild journey step", note = "Begins when bound; useful for composing prerequisite chains." },
             new { id = "blank", label = "Blank local quest", note = "One low-friction local beat." },
             new { id = "signal-circuit", label = "R&D Signal Circuit", note = "One compact lap across chat, timing, inventory, healing, and reward." },
             new { id = "cooperative-ritual", label = "Two Voices, One Rune", note = "Captured 1.6 peer Shout then listen-host sign placement." },
@@ -264,6 +265,7 @@ internal sealed class QuestStudioWorkspace
             var project = (templateId ?? "blank") switch
             {
                 "demo-world-first-portal" => DemoWorldFirstPortalTemplate(projectId, suffix),
+                "guild-journey" => GuildJourneyTemplate(projectId, suffix),
                 "signal-circuit" => SignalCircuitTemplate(projectId, suffix),
                 "cooperative-ritual" => CooperativeTemplate(projectId, suffix),
                 "reward-cleanup" => RewardTemplate(projectId, suffix),
@@ -756,6 +758,22 @@ internal sealed class QuestStudioWorkspace
             {
                 new StudioRoute { Id = "portal-arrival", Priority = 100, Event = "player_teleported", Target = null, Outcome = "complete",
                     Actions = new() { new StudioAction { Id = "message-arrival", Type = "message", Text = "The First Portal answers. Your quest is complete." } } }
+            } }
+        }
+    };
+
+    internal static StudioProjectDocument GuildJourneyTemplate(string projectId, string suffix) => new()
+    {
+        ProjectId = projectId, Revision = 1, UpdatedUtc = DateTimeOffset.UtcNow,
+        PackId = "guild-journey-" + suffix, Version = "1.0.0",
+        ExperienceId = "guild-journey-" + suffix,
+        Title = "Guild Journey Step", BindingTargetKind = "sign", EntryNodeId = "start",
+        Nodes = new()
+        {
+            new StudioNode { Id = "start", Label = "Begin at the Charm", X = 120, Y = 160, Routes = new()
+            {
+                new StudioRoute { Id = "bound", Priority = 100, Event = ExperienceSchema.ExperienceStartedEvent, Outcome = "complete",
+                    Actions = new() { new StudioAction { Id = "message-bound", Type = "message", Text = "The guild journey advances." } } }
             } }
         }
     };
@@ -1336,12 +1354,20 @@ internal static class StudioGraphCompiler
             : (project.BindingTargetKinds ?? new()).Distinct(StringComparer.Ordinal).ToList();
 
     public static byte[] BuildPack(StudioProjectDocument project, string experienceJson, string contentHash)
+        => BuildPack(project.PackId, project.Version,
+            new[] { new KeyValuePair<string, string>(project.ExperienceId, experienceJson) }, contentHash);
+
+    /// <summary>One deterministic archive for a guild. Entry ordering, timestamps, encoding and
+    /// compression are fixed so the same authored inputs produce the same bytes.</summary>
+    public static byte[] BuildPack(string packId, string version,
+        IEnumerable<KeyValuePair<string, string>> experiences, string contentHash)
     {
         using var output = new MemoryStream();
         using (var archive = new ZipArchive(output, ZipArchiveMode.Create, true))
         {
-            Write(archive, "manifest.json", JsonConvert.SerializeObject(new QuestPackManifest { PackId = project.PackId, Version = project.Version, ContentHash = contentHash }, Formatting.Indented));
-            Write(archive, $"experiences/{project.ExperienceId}.json", experienceJson);
+            Write(archive, "manifest.json", JsonConvert.SerializeObject(new QuestPackManifest { PackId = packId, Version = version, ContentHash = contentHash }, Formatting.Indented));
+            foreach (var experience in experiences.OrderBy(value => value.Key, StringComparer.Ordinal))
+                Write(archive, $"experiences/{experience.Key}.json", experience.Value);
         }
         return output.ToArray();
     }

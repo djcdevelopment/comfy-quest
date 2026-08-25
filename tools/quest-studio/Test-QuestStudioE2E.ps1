@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$DotNet,
+    [string]$Filter,
     [switch]$Headed,
     [switch]$KeepArtifacts,
     [switch]$SkipBrowserInstall
@@ -108,8 +109,20 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Playwright Chromium install failed with exit code $LASTEXITCODE." }
     }
 
-    Write-Host 'Running synthetic Studio E2E (browser + host + questpack + contract receipts)...'
-    & $dotnetExe test $testProject --configuration Release --no-build --logger 'console;verbosity=detailed'
+    if ([string]::IsNullOrWhiteSpace($Filter)) {
+        Write-Host 'Running synthetic Studio E2E (browser + host + questpack + contract receipts)...'
+    } else {
+        Write-Host "Running selected Studio E2E: $Filter"
+    }
+    $testArguments = @(
+        'test', $testProject,
+        '--configuration', 'Release',
+        '--no-build',
+        '--logger', 'console;verbosity=detailed')
+    if (-not [string]::IsNullOrWhiteSpace($Filter)) {
+        $testArguments += @('--filter', $Filter)
+    }
+    & $dotnetExe @testArguments
     $testExit = $LASTEXITCODE
 } finally {
     foreach ($name in $variables) {

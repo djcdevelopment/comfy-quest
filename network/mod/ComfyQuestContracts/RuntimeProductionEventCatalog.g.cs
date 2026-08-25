@@ -66,6 +66,7 @@ public static class RuntimeProductionEventCatalog {
     new Definition("sign_written", "RuntimeKillPatches.SignWritten", "automated-contract", null, "optional", null, new string[0], false, false, new string[0], new Dictionary<string,string>(), new[] { "Sign.SetText(string)" }),
   };
   static readonly EngineDefinition[] _engine = new[] {
+    new EngineDefinition("experience_started", "Quest started", "Begin when this experience is bound to its Charm.", "RuntimeExperienceEngine.StartBoundExperience", "none", null, new string[0], new string[0], new string[0], "Only the quest-owned binding identity is retained."),
     new EngineDefinition("timer_elapsed", "Timer elapsed", "Wait for a named quest timer.", "DurableTimerStore", "none", null, new string[0], new[] { "timer_id" }, new[] { "timer_id" }, "Only the quest-owned timer identifier is retained."),
     new EngineDefinition("chat_received", "Receive chat", "Receive a non-empty normal or shout message from a selected actor role.", "RuntimeCooperativePatches.EmitChat", "closed", null, new[] { "normal", "shout" }, new[] { "actor_role" }, new[] { "actor_role" }, "Message text, sender identity, and player name are never persisted."),
   };
@@ -76,11 +77,11 @@ public static class RuntimeProductionEventCatalog {
   public static IReadOnlyList<Definition> All { get { return _all; } }
   public static IReadOnlyList<EngineDefinition> EngineEvents { get { return _engine; } }
   public static int Count { get { return _all.Length; } }
-  public static bool Contains(string name){return !string.IsNullOrWhiteSpace(name)&&_byName.ContainsKey(name);}
+  public static bool Contains(string name){return !string.IsNullOrWhiteSpace(name)&&(_byName.ContainsKey(name)||_engineByName.ContainsKey(name));}
   public static bool IsEngineEvent(string name){return !string.IsNullOrWhiteSpace(name)&&_engineByName.ContainsKey(name);}
   public static bool TryGet(string name,out Definition definition){if(!string.IsNullOrWhiteSpace(name)&&_byName.TryGetValue(name,out definition))return true;definition=default(Definition);return false;}
   public static bool TryGetEngine(string name,out EngineDefinition definition){if(!string.IsNullOrWhiteSpace(name)&&_engineByName.TryGetValue(name,out definition))return true;definition=default(EngineDefinition);return false;}
-  public static ISet<string> CreateSet(){return new HashSet<string>(_byName.Keys,StringComparer.OrdinalIgnoreCase);}
+  public static ISet<string> CreateSet(){var value=new HashSet<string>(_byName.Keys,StringComparer.OrdinalIgnoreCase);value.UnionWith(_engineByName.Keys);return value;}
   public static bool IsAllowedWhere(string eventName,string field){
     if(string.IsNullOrWhiteSpace(field))return false;
     if(TryGet(eventName,out var definition)){foreach(var allowed in definition.AllowedWhereFields)if(string.Equals(allowed,field,StringComparison.OrdinalIgnoreCase))return true;return false;}

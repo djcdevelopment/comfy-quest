@@ -13,7 +13,9 @@ public static class ExperienceSchema {
   public const int MaxTriggerLeaves = 128;
   public const int MaxActions = 256;
   public const int MaxExpressionDepth = 3;
+  public const int MaxPrerequisites = 64;
   public const string TimerElapsedEvent = "timer_elapsed";
+  public const string ExperienceStartedEvent = "experience_started";
   public const string ChatReceivedEvent = CooperativeEventContract.ChatReceivedEvent;
   public const string PlayerDiedEvent = ProgressionEventContract.PlayerDiedEvent;
 }
@@ -26,6 +28,7 @@ public sealed class ExperienceDocument {
   [JsonProperty("stages")] public List<ExperienceStage> Stages { get; set; }
   [JsonProperty("bindings")] public List<ExperienceBinding> Bindings { get; set; }
   [JsonProperty("anchors", NullValueHandling=NullValueHandling.Ignore)] public List<ExperienceAnchor> Anchors { get; set; }
+  [JsonProperty("prerequisites", NullValueHandling=NullValueHandling.Ignore)] public List<string> Prerequisites { get; set; }
 }
 
 /// <summary>A named authored position creators can reference from spatial predicates.</summary>
@@ -199,6 +202,16 @@ public static class ExperienceCompiler {
     if (d == null) { e.Add(new("document.empty", "$", "Experience is empty.")); return; }
     if (d.Schema != ExperienceSchema.Id) e.Add(new("schema.unsupported", "$.schema", $"Expected {ExperienceSchema.Id}."));
     if (string.IsNullOrWhiteSpace(d.Id)) e.Add(new("id.required", "$.id", "A stable experience id is required."));
+    var prerequisites = d.Prerequisites ?? new();
+    if (prerequisites.Count > ExperienceSchema.MaxPrerequisites)
+      e.Add(new("prerequisites.bounds", "$.prerequisites", "At most 64 prerequisite experience ids are allowed."));
+    var prerequisiteIds = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var prerequisite in prerequisites) {
+      if (!Stable(prerequisite) || !prerequisiteIds.Add(prerequisite))
+        e.Add(new("prerequisite.invalid", "$.prerequisites", "Prerequisite experience ids must be unique stable identifiers."));
+      else if (string.Equals(prerequisite, d.Id, StringComparison.Ordinal))
+        e.Add(new("prerequisite.self", "$.prerequisites", "An experience cannot require itself."));
+    }
     var stages = d.Stages ?? new();
     if (stages.Count == 0 || stages.Count > ExperienceSchema.MaxStages) e.Add(new("stages.bounds", "$.stages", "An experience requires 1..64 stages."));
     var ids = new HashSet<string>(StringComparer.Ordinal);

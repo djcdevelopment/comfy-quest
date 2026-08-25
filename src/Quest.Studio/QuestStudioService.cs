@@ -128,6 +128,114 @@ public sealed class QuestStudioService
         var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(bundle, _host.Json);
         return StudioDownloadResult.Success(guild.GuildId + ".questguild.json", "application/vnd.comfy.questguild+json", bytes);
     }
+    public StudioGuildCertificationResult CertifyGuild(string guildId)
+    {
+        var compiled = CompileGuild(guildId);
+        return compiled.Ok
+            ? StudioGuildCertificationResult.Success(compiled.ContentHash!, compiled.Experiences!.Keys.OrderBy(value => value, StringComparer.Ordinal).ToArray())
+            : StudioGuildCertificationResult.Fail(compiled.Error!, compiled.Diagnostics);
+    }
+    public async Task<StudioGuildPublishResult> PublishGuildAsync(string guildId, StudioPublishRequest? request, CancellationToken cancellationToken)
+    {
+        var guild = _portfolio.ReadGuild(guildId);
+        if (guild is null) return StudioGuildPublishResult.Fail("guild_missing");
+        if (request is null || request.ExpectedRevision != guild.Revision)
+            return StudioGuildPublishResult.RevisionConflict(guild);
+        var compiled = CompileGuild(guildId);
+        if (!compiled.Ok) return StudioGuildPublishResult.Fail(compiled.Error!, compiled.Diagnostics);
+        var bytes = StudioGraphCompiler.BuildPack(guild.GuildId, guild.Version, compiled.Experiences!, compiled.ContentHash!);
+        await using var stream = new MemoryStream(bytes, writable: false);
+        var receipt = await _publisher.PublishAsync(stream, $"{guild.GuildId}-{guild.Version}.questpack", cancellationToken);
+        return receipt.Ok
+            ? StudioGuildPublishResult.Success(receipt.Status, receipt, guild, compiled.ContentHash!, compiled.Experiences!.Keys.OrderBy(value => value, StringComparer.Ordinal).ToArray())
+            : StudioGuildPublishResult.Fail(receipt.Error!, receipt.Diagnostics ?? Array.Empty<ContractDiagnostic>(), receipt);
+    }
+
+    public async Task<StudioGuildPublishResult> PlayGuildAsync(string guildId, StudioPublishRequest? request, CancellationToken cancellationToken)
+    {
+        var guild = _portfolio.ReadGuild(guildId);
+        if (guild is null) return StudioGuildPublishResult.Fail("guild_missing");
+        if (request is null || request.ExpectedRevision != guild.Revision)
+            return StudioGuildPublishResult.RevisionConflict(guild);
+        var valheim = _host.FindValheim();
+        if (valheim is null) return StudioGuildPublishResult.Fail("valheim_not_found");
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var devStatus = new RuntimeDevChannelStatusStore(runtimeRoot).Read();
+        var now = DateTimeOffset.UtcNow;
+        var devConnected = devStatus is not null && devStatus.ObservedUtc <= now.AddSeconds(1)
+            && devStatus.ObservedUtc >= now.AddSeconds(-3);
+        if (!devConnected) return StudioGuildPublishResult.Fail("dev_channel_disconnected");
+        if (devStatus!.Armed != true) return StudioGuildPublishResult.Fail("dev_channel_not_armed");
+        var compiled = CompileGuild(guildId);
+        if (!compiled.Ok) return StudioGuildPublishResult.Fail(compiled.Error!, compiled.Diagnostics);
+        var bytes = StudioGraphCompiler.BuildPack(guild.GuildId, guild.Version, compiled.Experiences!, compiled.ContentHash!);
+        await using var stream = new MemoryStream(bytes, writable: false);
+        var shortHash = compiled.ContentHash!.Substring(0, 12);
+        var filename = $"{guild.GuildId}-{guild.Version}-r{guild.Revision}-{shortHash}.questpack";
+        var receipt = await _publisher.PublishDevAsync(stream, filename, cancellationToken);
+        return receipt.Ok
+            ? StudioGuildPublishResult.Success(receipt.Status, receipt, guild, compiled.ContentHash!, compiled.Experiences!.Keys.OrderBy(value => value, StringComparer.Ordinal).ToArray())
+            : StudioGuildPublishResult.Fail(receipt.Error!, receipt.Diagnostics ?? Array.Empty<ContractDiagnostic>(), receipt);
+    }
+
+    CompiledGuild CompileGuild(string guildId)
+    {
+        var guild = _portfolio.ReadGuild(guildId);
+        if (guild is null) return CompiledGuild.Fail("guild_missing");
+        var artifacts = guild.StandaloneQuests.Concat(guild.Events)
+            .Concat(guild.Questlines.SelectMany(value => value.Quests)).ToArray();
+        if (artifacts.Length == 0) return CompiledGuild.Fail("guild_empty",
+            new[] { new ContractDiagnostic("guild.empty", "$.artifacts", "A guild pack requires at least one quest or event.") });
+        var diagnostics = new List<ContractDiagnostic>();
+        var projects = new Dictionary<string, StudioProjectDocument>(StringComparer.Ordinal);
+        foreach (var artifact in artifacts.OrderBy(value => value.ProjectId, StringComparer.Ordinal))
+        {
+            var project = _workspace.ReadProject(artifact.ProjectId);
+            if (project is null)
+            {
+                diagnostics.Add(new("guild.project_missing", "$.artifacts." + artifact.ProjectId, "The assigned Studio project does not exist."));
+                continue;
+            }
+            projects[artifact.ProjectId] = project;
+        }
+        if (diagnostics.Count > 0) return CompiledGuild.Fail("guild_project_missing", diagnostics);
+        var duplicateExperiences = projects.Values.GroupBy(value => value.ExperienceId, StringComparer.Ordinal)
+            .Where(group => group.Count() != 1).ToArray();
+        foreach (var duplicate in duplicateExperiences)
+            diagnostics.Add(new("guild.experience_duplicate", "$.experiences." + duplicate.Key, "Every project in a guild must compile to a unique experience id."));
+        if (diagnostics.Count > 0) return CompiledGuild.Fail("guild_experience_duplicate", diagnostics);
+
+        var experienceByProject = projects.ToDictionary(value => value.Key, value => value.Value.ExperienceId, StringComparer.Ordinal);
+        var experiences = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var artifact in artifacts.OrderBy(value => value.ProjectId, StringComparer.Ordinal))
+        {
+            var project = projects[artifact.ProjectId];
+            var certification = StudioGraphCompiler.Compile(project);
+            if (!certification.Ok)
+            {
+                diagnostics.AddRange(certification.Diagnostics.Select(value => new ContractDiagnostic(
+                    value.Code, "$.projects." + artifact.ProjectId + value.Path.TrimStart('$'), value.Message)));
+                continue;
+            }
+            var prerequisites = artifact.PrerequisiteProjectIds ?? new List<string>();
+            var missing = prerequisites.Where(value => !experienceByProject.ContainsKey(value)).ToArray();
+            foreach (var prerequisite in missing)
+                diagnostics.Add(new("guild.prerequisite_missing", "$.artifacts." + artifact.ProjectId + ".prerequisite_project_ids", "Prerequisite project '" + prerequisite + "' is not part of this guild."));
+            if (missing.Length > 0) continue;
+            certification.Document!.Prerequisites = prerequisites.Count == 0
+                ? null
+                : prerequisites.Select(value => experienceByProject[value]).OrderBy(value => value, StringComparer.Ordinal).ToList();
+            var json = JsonConvert.SerializeObject(certification.Document, Formatting.Indented);
+            var contract = ExperienceCompiler.CompileProductionJson(json);
+            diagnostics.AddRange(contract.Diagnostics.Select(value => new ContractDiagnostic(
+                value.Code, "$.projects." + artifact.ProjectId + value.Path.TrimStart('$'), value.Message)));
+            if (contract.IsValid) experiences[project.ExperienceId] = json;
+        }
+        if (diagnostics.Count > 0) return CompiledGuild.Fail("guild_graph_invalid", diagnostics);
+        var entries = experiences.OrderBy(value => value.Key, StringComparer.Ordinal)
+            .Select(value => new KeyValuePair<string, byte[]>("experiences/" + value.Key + ".json", Encoding.UTF8.GetBytes(value.Value)));
+        return CompiledGuild.Success(experiences, QuestPackContent.ComputeHash(entries));
+    }
     public StudioRunStatusView RunStatus(string projectId) => _runControl.Status(projectId);
     public Task<StudioRunControlResult> PreviewResetAsync(string projectId, StudioRunResetRequest? request, CancellationToken cancellationToken) =>
         _runControl.PreviewAsync(projectId, request, cancellationToken);
@@ -135,6 +243,12 @@ public sealed class QuestStudioService
         _runControl.ApplyAsync(projectId, request, cancellationToken);
     public Task<StudioRunControlResult> SelectExperienceAsync(string projectId, StudioSelectExperienceRequest? request, CancellationToken cancellationToken) =>
         _runControl.SelectExperienceAsync(projectId, request, cancellationToken);
+    public Task<StudioRunControlResult> BindingCandidatesAsync(string projectId, CancellationToken cancellationToken) =>
+        _runControl.BindingCandidatesAsync(projectId, cancellationToken);
+    public Task<StudioRunControlResult> BindExperienceAsync(string projectId, StudioBindExperienceRequest? request, CancellationToken cancellationToken) =>
+        _runControl.BindExperienceAsync(projectId, request, cancellationToken);
+    public Task<StudioRunControlResult> RestoreBindingAsync(string projectId, StudioRestoreBindingRequest? request, CancellationToken cancellationToken) =>
+        _runControl.RestoreBindingAsync(projectId, request, cancellationToken);
     public StudioRunControlResult RunControlReceipt(string projectId, string? requestId, string? runId) =>
         _runControl.Receipt(projectId, requestId, runId);
 
@@ -166,7 +280,7 @@ public sealed class QuestStudioService
     public StudioProjectDocument CreateProject(string? templateId)
     {
         var project = _workspace.CreateProject(templateId);
-        var effectiveTemplate = templateId is "demo-world-first-portal" or "signal-circuit" or "cooperative-ritual" or "reward-cleanup" or "desperate-defense" ? templateId : "blank";
+        var effectiveTemplate = templateId is "demo-world-first-portal" or "guild-journey" or "signal-circuit" or "cooperative-ritual" or "reward-cleanup" or "desperate-defense" ? templateId : "blank";
         _usage.RecordProject("create", "accepted", project, effectiveTemplate);
         return project;
     }
@@ -553,6 +667,53 @@ public sealed class QuestStudioService
         using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
         writer.Write(content);
     }
+}
+
+internal sealed record CompiledGuild(
+    bool Ok,
+    string? Error,
+    IReadOnlyDictionary<string, string>? Experiences,
+    string? ContentHash,
+    IReadOnlyList<ContractDiagnostic> Diagnostics)
+{
+    public static CompiledGuild Success(IReadOnlyDictionary<string, string> experiences, string contentHash) =>
+        new(true, null, experiences, contentHash, Array.Empty<ContractDiagnostic>());
+    public static CompiledGuild Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
+        new(false, error, null, null, diagnostics ?? Array.Empty<ContractDiagnostic>());
+}
+
+public sealed record StudioGuildCertificationResult(
+    bool Ok,
+    string Status,
+    string? Error,
+    string? ContentHash,
+    IReadOnlyList<string> ExperienceIds,
+    IReadOnlyList<ContractDiagnostic> Diagnostics)
+{
+    public static StudioGuildCertificationResult Success(string contentHash, IReadOnlyList<string> experienceIds) =>
+        new(true, "certified", null, contentHash, experienceIds, Array.Empty<ContractDiagnostic>());
+    public static StudioGuildCertificationResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
+        new(false, "rejected", error, null, Array.Empty<string>(), diagnostics ?? Array.Empty<ContractDiagnostic>());
+}
+
+public sealed record StudioGuildPublishResult(
+    bool Ok,
+    bool Conflict,
+    string Status,
+    string? Error,
+    QuestPackPublishReceipt? Receipt,
+    StudioGuildDocument? Guild,
+    string? ContentHash,
+    IReadOnlyList<string> ExperienceIds,
+    IReadOnlyList<ContractDiagnostic> Diagnostics)
+{
+    public static StudioGuildPublishResult Success(string status, QuestPackPublishReceipt receipt, StudioGuildDocument guild,
+        string contentHash, IReadOnlyList<string> experienceIds) =>
+        new(true, false, status, null, receipt, guild, contentHash, experienceIds, Array.Empty<ContractDiagnostic>());
+    public static StudioGuildPublishResult RevisionConflict(StudioGuildDocument guild) =>
+        new(false, true, "conflict", "revision_conflict", null, guild, null, Array.Empty<string>(), Array.Empty<ContractDiagnostic>());
+    public static StudioGuildPublishResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null, QuestPackPublishReceipt? receipt = null) =>
+        new(false, false, "rejected", error, receipt, null, null, Array.Empty<string>(), diagnostics ?? Array.Empty<ContractDiagnostic>());
 }
 
 public sealed record QuestStudioProject(

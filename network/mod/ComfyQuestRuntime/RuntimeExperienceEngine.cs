@@ -960,6 +960,37 @@ sealed class RuntimeExperienceEngine {
 
   public RuntimeRunCoordinator RunCoordinator() => runs;
 
+  /// <summary>Emit the one engine-owned lifecycle fact after a recoverable binding write. The
+  /// exact ZDO source pins evaluation to the object the request named; ordinary experiences that
+  /// do not subscribe to this fact remain bound and wait for their authored player event.</summary>
+  public bool StartBoundExperience(string bindingZdo, out string error) {
+    error = null;
+    try {
+      if (!TryLoad(out var active, out error)) return false;
+      var parts = (bindingZdo ?? string.Empty).Split(':');
+      if (parts.Length != 2 || !long.TryParse(parts[0], out var user)
+          || !uint.TryParse(parts[1], out var objectId)) { error = "binding_identity_invalid"; return false; }
+      var zdo = ZDOMan.instance?.GetZDO(new ZDOID(user, objectId));
+      var view = zdo == null ? null : ZNetScene.instance?.FindInstance(zdo);
+      var reference = zdo == null ? null : Read(zdo);
+      if (zdo == null || view == null || !view.IsOwner() || reference == null
+          || reference.PackId != active.PackId || reference.ExperienceId != active.Document.Id
+          || reference.Version != active.Version
+          || !string.Equals(reference.ContentHash, active.ContentHash, StringComparison.OrdinalIgnoreCase)) {
+        error = "binding_start_scope_mismatch";
+        return false;
+      }
+      var started = new RuntimeEvent {
+        Name = ExperienceSchema.ExperienceStartedEvent,
+        SourceId = bindingZdo,
+        At = DateTimeOffset.UtcNow,
+      };
+      RuntimeObservation.StampLocalPlayer(started);
+      OnEvent(started);
+      return true;
+    } catch (Exception e) { error = "experience_start_failed:" + e.GetType().Name; return false; }
+  }
+
   public void ClearRunEphemera(string stateKey) {
     if(!string.IsNullOrWhiteSpace(stateKey))rechecks.Remove(stateKey);
   }

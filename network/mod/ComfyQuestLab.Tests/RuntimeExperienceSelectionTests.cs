@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using ComfyQuestContracts;
 using Xunit;
@@ -134,6 +135,40 @@ public sealed class RuntimeExperienceSelectionTests {
     });
   }
 
+  [Fact] public async Task SelectionRetriesAcrossABoundedWindowsReader() {
+    var root = Path.Combine(Path.GetTempPath(), "comfy-select-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(Path.Combine(root, "inbox"));
+    try {
+      WritePack(Path.Combine(root, "inbox", "guild.questpack"), "1.0.0",
+        ("experiences/a.json", Named("alpha")), ("experiences/b.json", Named("beta")));
+      var store = new QuestPackStore(root);
+      store.LoadLatest(Events);
+      var path = Path.Combine(root, "active", "active-set.json");
+      var reader = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+      var replacement = Task.Run(() => store.SelectExperience("beta"));
+      await Task.Delay(15);
+      reader.Dispose();
+      Assert.Equal("beta", (await replacement).ExperienceId);
+      Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path), "*.tmp-*"));
+    } finally { try { Directory.Delete(root, true); } catch { } }
+  }
+
+  [Fact] public void FailedBindingRecoveryCanRestoreAnAbsentSelectorButNotANewerActivation() {
+    Run(root => {
+      WritePack(Path.Combine(root, "inbox", "guild.questpack"), "1.0.0",
+        ("experiences/a.json", Named("alpha")), ("experiences/b.json", Named("beta")));
+      var store = new QuestPackStore(root);
+      store.LoadLatest(Events);
+      var activation = ReadActive(root).ActivationId;
+      store.SelectExperience("beta");
+      Assert.Null(store.RestoreExperienceSelection(activation, null).ExperienceId);
+      store.SelectExperience("alpha");
+      Assert.Equal("active_activation_mismatch", Assert.Throws<InvalidOperationException>(
+        () => store.RestoreExperienceSelection("act-20260825T120000000Z-deadbeef", "beta")).Message);
+      Assert.Equal("alpha", ReadActive(root).ExperienceId);
+    });
+  }
+
   /// <summary>A new revision may not contain the selected experience, so activation clears the
   /// selector rather than carrying a stale one forward. An explicit re-selection is cheap; a
   /// silently wrong binding is not.</summary>
@@ -209,10 +244,10 @@ public sealed class RuntimeExperienceSelectionTests {
 
   [Fact] public void SelectExperienceIsAllowlistedAndCarriesNoRun() {
     var now = DateTimeOffset.Parse("2026-08-25T12:00:00Z");
-    Assert.Equal(new[] { "preview_reset", "apply_reset", "select_experience" },
+    Assert.Equal(new[] { "preview_reset", "apply_reset", "select_experience", "list_binding_candidates", "bind_selected_experience", "restore_binding" },
       RuntimeRunControlRequestPolicy.Operations);
 
-    // It addresses the activated pack, not a run, so it is the one operation without a run id.
+    // It addresses the activated pack, not a run, as do the bounded binding operations below.
     Assert.True(RuntimeRunControlRequestPolicy.Validate(Request(now, "select_experience", experienceId: "beta"), now, out var error), error);
     Assert.False(RuntimeRunControlRequestPolicy.Validate(Request(now, "select_experience"), now, out error));
     Assert.Equal("experience_selection_required", error);
@@ -225,6 +260,17 @@ public sealed class RuntimeExperienceSelectionTests {
     Assert.Equal("request_identity_invalid", error);
     Assert.False(RuntimeRunControlRequestPolicy.Validate(Request(now, "install_pack", runId: "run-1"), now, out error));
     Assert.Equal("operation_not_allowlisted", error);
+    Assert.True(RuntimeRunControlRequestPolicy.Validate(Request(now, "list_binding_candidates"), now, out error), error);
+    var bind = Request(now, "bind_selected_experience", experienceId: "beta");
+    bind.BindingZdo = "10:20";
+    Assert.True(RuntimeRunControlRequestPolicy.Validate(bind, now, out error), error);
+    var restore = Request(now, "restore_binding");
+    restore.BindingZdo = "10:20";
+    restore.BindingChangeId = "binding-20260825T120000000Z-deadbeef";
+    Assert.True(RuntimeRunControlRequestPolicy.Validate(restore, now, out error), error);
+    restore.ExperienceId = "beta";
+    Assert.False(RuntimeRunControlRequestPolicy.Validate(restore, now, out error));
+    Assert.Equal("experience_selection_not_allowed", error);
   }
 
   static RuntimeRunControlRequest Request(DateTimeOffset now, string operation, string runId = null, string experienceId = null) => new() {

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Newtonsoft.Json;
 
 public sealed class RuntimeDevChannelStatus {
@@ -40,10 +41,15 @@ public sealed class RuntimeDevChannelStatusStore {
       throw new InvalidOperationException("dev_channel_status_schema_invalid");
     lock (gate) {
       Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
-      var temp = path + ".tmp";
+      var temp = path + ".tmp-" + Guid.NewGuid().ToString("N");
       File.WriteAllText(temp, JsonConvert.SerializeObject(status, Formatting.Indented));
-      if (File.Exists(path)) File.Replace(temp, path, null);
-      else File.Move(temp, path);
+      try {
+        for (var attempt = 0; ; attempt++) try {
+          if (File.Exists(path)) File.Replace(temp, path, null);
+          else File.Move(temp, path);
+          return;
+        } catch (IOException) when (attempt < 4) { Thread.Sleep(10); }
+      } finally { try { if (File.Exists(temp)) File.Delete(temp); } catch { } }
     }
   }
 
@@ -51,7 +57,11 @@ public sealed class RuntimeDevChannelStatusStore {
     try {
       var info = new FileInfo(path);
       if (!info.Exists || info.Length is < 0 or > MaxStatusBytes) return null;
-      var status = JsonConvert.DeserializeObject<RuntimeDevChannelStatus>(File.ReadAllText(path));
+      RuntimeDevChannelStatus status;
+      using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+          FileShare.ReadWrite | FileShare.Delete))
+      using (var reader = new StreamReader(stream))
+        status = JsonConvert.DeserializeObject<RuntimeDevChannelStatus>(reader.ReadToEnd());
       return status?.Schema == "comfy-quest-dev-channel-status/v1" ? status : null;
     } catch { return null; }
   }

@@ -442,7 +442,7 @@
         "NFR-TEST-001"
       ],
       "title": "Drive the installed vertical slice",
-      "detail": "Use the actual Studio GUI, serialized artifacts, process restarts, bounded Valheim controls, receipts, logs, captures, and recovery. Fix and rerun mechanical faults before asking for human acceptance.",
+      "detail": "The machine driver now authors and production-publishes A and prerequisite-locked B through the actual Studio GUI, waits at the one launch/world-entry boundary, activates the same guild through the armed dev channel, drives B refusal and A -> B -> A, selectively resets and reruns A, crosses receipt retention by exactly one, captures correlated proof, and restores binding changes LIFO. Synthetic browser proof is green; this item remains gated until the installed lap and human seat gate produce live evidence.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "NFR-TEST-001"
     },

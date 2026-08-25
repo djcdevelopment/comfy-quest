@@ -101,6 +101,32 @@ public static class QuestStudioEndpoints
             if (!host.Authorize(request)) return Forbidden(host);
             return Download(response, studio.ExportGuild(guildId), host);
         });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/certify", (string guildId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.CertifyGuild(guildId);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Error == "guild_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/publish", async (string guildId, HttpRequest request, HttpResponse response, StudioPublishRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.PublishGuildAsync(guildId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error == "guild_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/play", async (string guildId, HttpRequest request, HttpResponse response, StudioPublishRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.PlayGuildAsync(guildId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error == "guild_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
         app.MapGet("/api/v2/quest-studio/projects", (HttpRequest request, HttpResponse response, QuestStudioService studio) =>
         {
             NoStore(response);
@@ -222,6 +248,27 @@ public static class QuestStudioEndpoints
             NoStore(response);
             if (!host.Authorize(request)) return Forbidden(host);
             var result = await studio.SelectExperienceAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/binding-candidates", async (string projectId, HttpRequest request, HttpResponse response, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.BindingCandidatesAsync(projectId, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/bind", async (string projectId, HttpRequest request, HttpResponse response, StudioBindExperienceRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.BindExperienceAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/restore-binding", async (string projectId, HttpRequest request, HttpResponse response, StudioRestoreBindingRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.RestoreBindingAsync(projectId, body, cancellationToken);
             return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
         });
         app.MapGet("/api/v2/quest-studio/projects/{projectId}/runs/control/{requestId}", (string projectId, string requestId, string? runId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>

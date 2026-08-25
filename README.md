@@ -91,7 +91,7 @@ to an ordered list of low-friction quest beats: say, shout, drop, pick up, equip
 consume, regain health, or wait. A beat can repeat up to 16 times, optionally inside a
 time window. **Browse player actions** adds a searchable, school-filtered view of all 34
 creator-safe Grimoire meanings, all backed by fail-closed Runtime adapters and available
-for production authoring. The two engine events stay separate from that creator
+for production authoring. The three engine events stay separate from that creator
 vocabulary. The 91
 low-level assembly seams never become authoring choices.
 
@@ -186,6 +186,16 @@ their trace, screenshot, DOM, browser errors, host logs, and synthetic filesyste
 This is local-only synthetic E2E evidence. It does not prove Unity, BepInEx, Harmony
 patches, hotkeys, or genuine Valheim events; the OMEN acceptance run remains the live
 proof for those adapters.
+
+The installed 4A journey has its own clean-checkout driver:
+
+    tools/quest-studio/Invoke-QuestStudioGuildJourney.ps1
+
+It claims the install through Creator Session, drives guild authoring and immutable
+publication before asking for the one launch/world-entry action, then owns activation,
+prerequisite refusal, A -> B -> A, scoped reset/rerun, exact retention proof, screenshots,
+and LIFO binding recovery. The Creator Session deliberately remains owned after the
+machine lap so the contiguous human seat gate can happen before `Close`.
 
 The interim packages-local feed exists only until the first public 0.4.0 NuGet
 publication and exact consumer repin.

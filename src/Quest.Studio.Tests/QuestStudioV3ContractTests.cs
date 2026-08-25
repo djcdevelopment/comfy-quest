@@ -37,9 +37,9 @@ public sealed class QuestStudioV3ContractTests : IDisposable
         Assert.All(creatorEvents, value =>
             Assert.Equal(value.GetProperty("production_available").GetBoolean(), value.GetProperty("addable").GetBoolean()));
 
-        Assert.Equal(2, engineEvents.Length);
+        Assert.Equal(3, engineEvents.Length);
         Assert.Equal(
-            new[] { "chat_received", "timer_elapsed" },
+            new[] { "chat_received", "experience_started", "timer_elapsed" },
             engineEvents.Select(value => value.GetProperty("name").GetString()).OrderBy(value => value, StringComparer.Ordinal));
         Assert.All(engineEvents, value =>
         {
@@ -49,7 +49,7 @@ public sealed class QuestStudioV3ContractTests : IDisposable
 
         Assert.Equal(34, CreatorEventCatalog.Count);
         Assert.Equal(34, RuntimeProductionEventCatalog.Count);
-        Assert.Equal(2, RuntimeProductionEventCatalog.EngineEvents.Count);
+        Assert.Equal(3, RuntimeProductionEventCatalog.EngineEvents.Count);
         Assert.All(creatorEvents, value =>
         {
             var name = value.GetProperty("name").GetString()!;

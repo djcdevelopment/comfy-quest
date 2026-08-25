@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using Newtonsoft.Json;
 
 public sealed class RuntimeEvent {
@@ -323,7 +324,80 @@ public sealed class QuestPackStore {
   public PackCandidate Inspect(string path,ISet<string> events=null)=>InspectLane(path,QuestPackLane.Production,events);
   public PackCandidate InspectDev(string path,ISet<string> events=null)=>InspectLane(path,QuestPackLane.Dev,events);
   IReadOnlyList<PackCandidate> CheckLane(QuestPackLane lane,ISet<string> events){var inbox=LaneRoot(lane);if(!Directory.Exists(inbox))return Array.Empty<PackCandidate>();return Directory.GetFiles(inbox,"*.questpack").Select(x=>InspectLane(x,lane,events)).ToArray();}
-  PackCandidate InspectLane(string path,QuestPackLane lane,ISet<string> events){var production=events==null;events??=RuntimeProductionEventCatalog.CreateSet();var errors=new List<ContractDiagnostic>();var titles=new List<string>();var full=Path.GetFullPath(path);if(!string.Equals(Path.GetDirectoryName(full),LaneRoot(lane),StringComparison.OrdinalIgnoreCase))errors.Add(new("pack.path","$",lane==QuestPackLane.Dev?"Pack must be directly inside the runtime dev inbox.":"Pack must be directly inside the runtime inbox."));QuestPackManifest manifest=null;string sha=null,contentHash=null;try{sha=HashFile(full);using var zip=ZipFile.OpenRead(full);if(zip.Entries.Count>MaxArchiveEntries)errors.Add(new("pack.entries","$","Archive exceeds 512 entries."));long expanded=0;foreach(var entry in zip.Entries){if(entry.Length>MaxExpandedBytes-expanded){errors.Add(new("pack.expanded_size","$","Archive expands beyond 8 MiB."));break;}expanded+=entry.Length;if(!SafeEntry(entry.FullName))errors.Add(new("pack.path","$","Unsafe or unsupported archive entry."));}var manifests=zip.Entries.Where(x=>x.FullName=="manifest.json").ToArray();if(manifests.Length!=1)throw new InvalidDataException("Exactly one manifest.json is required");if(manifests[0].Length>MaxManifestBytes)errors.Add(new("pack.manifest_size","$.manifest","Manifest exceeds 64 KiB."));using(var reader=new StreamReader(manifests[0].Open()))manifest=JsonConvert.DeserializeObject<QuestPackManifest>(reader.ReadToEnd());var experiences=zip.Entries.Where(x=>x.FullName.StartsWith("experiences/",StringComparison.Ordinal)&&x.FullName.EndsWith(".json",StringComparison.Ordinal)).OrderBy(x=>x.FullName,StringComparer.Ordinal).ToArray();var contentEntries=new List<KeyValuePair<string,byte[]>>();foreach(var item in experiences){if(item.Length>ExperienceSchema.MaxDocumentBytes){errors.Add(new("document.size",item.FullName,"Experience exceeds 1 MiB."));continue;}using var input=item.Open();using var bytes=new MemoryStream();input.CopyTo(bytes);contentEntries.Add(new(item.FullName,bytes.ToArray()));}contentHash=QuestPackContent.ComputeHash(contentEntries);foreach(var item in contentEntries){var json=System.Text.Encoding.UTF8.GetString(item.Value);var compiled=production?ExperienceCompiler.CompileProductionJson(json):ExperienceCompiler.CompileJson(json,events);errors.AddRange(compiled.Diagnostics);if(!string.IsNullOrWhiteSpace(compiled.Document?.Title))titles.Add(compiled.Document.Title);}if(experiences.Length==0)errors.Add(new("pack.experiences","$","Pack has no experience documents."));if(manifest==null||manifest.Schema!="comfy-quest-pack/v2"||string.IsNullOrWhiteSpace(manifest.PackId)||!SemanticVersion.TryParse(manifest.Version,out _))errors.Add(new("pack.manifest","$.manifest","Pack schema, id, and semantic version are required."));if(manifest!=null&&!string.IsNullOrWhiteSpace(manifest.ContentHash)&&!string.Equals(manifest.ContentHash,contentHash,StringComparison.OrdinalIgnoreCase))errors.Add(new("pack.hash","$.manifest.content_hash","Declared canonical content hash does not match experience documents."));}catch(Exception e){errors.Add(new("pack.read","$",e.Message));}return new(){Path=full,Manifest=manifest,Sha256=sha,ContentHash=contentHash,Lane=lane,Diagnostics=errors,Titles=titles};}
+  PackCandidate InspectLane(string path,QuestPackLane lane,ISet<string> events){
+    var production=events==null;
+    events??=RuntimeProductionEventCatalog.CreateSet();
+    var errors=new List<ContractDiagnostic>();
+    var titles=new List<string>();
+    var documents=new List<ExperienceDocument>();
+    var full=Path.GetFullPath(path);
+    if(!string.Equals(Path.GetDirectoryName(full),LaneRoot(lane),StringComparison.OrdinalIgnoreCase))
+      errors.Add(new("pack.path","$",lane==QuestPackLane.Dev
+        ?"Pack must be directly inside the runtime dev inbox."
+        :"Pack must be directly inside the runtime inbox."));
+    QuestPackManifest manifest=null;
+    string sha=null,contentHash=null;
+    try{
+      sha=HashFile(full);
+      using var zip=ZipFile.OpenRead(full);
+      if(zip.Entries.Count>MaxArchiveEntries)errors.Add(new("pack.entries","$","Archive exceeds 512 entries."));
+      long expanded=0;
+      foreach(var entry in zip.Entries){
+        if(entry.Length>MaxExpandedBytes-expanded){errors.Add(new("pack.expanded_size","$","Archive expands beyond 8 MiB."));break;}
+        expanded+=entry.Length;
+        if(!SafeEntry(entry.FullName))errors.Add(new("pack.path","$","Unsafe or unsupported archive entry."));
+      }
+      var manifests=zip.Entries.Where(x=>x.FullName=="manifest.json").ToArray();
+      if(manifests.Length!=1)throw new InvalidDataException("Exactly one manifest.json is required");
+      if(manifests[0].Length>MaxManifestBytes)errors.Add(new("pack.manifest_size","$.manifest","Manifest exceeds 64 KiB."));
+      using(var reader=new StreamReader(manifests[0].Open()))manifest=JsonConvert.DeserializeObject<QuestPackManifest>(reader.ReadToEnd());
+      var experiences=zip.Entries.Where(x=>x.FullName.StartsWith("experiences/",StringComparison.Ordinal)&&x.FullName.EndsWith(".json",StringComparison.Ordinal)).OrderBy(x=>x.FullName,StringComparer.Ordinal).ToArray();
+      var contentEntries=new List<KeyValuePair<string,byte[]>>();
+      foreach(var item in experiences){
+        if(item.Length>ExperienceSchema.MaxDocumentBytes){errors.Add(new("document.size",item.FullName,"Experience exceeds 1 MiB."));continue;}
+        using var input=item.Open();
+        using var bytes=new MemoryStream();
+        input.CopyTo(bytes);
+        contentEntries.Add(new(item.FullName,bytes.ToArray()));
+      }
+      contentHash=QuestPackContent.ComputeHash(contentEntries);
+      foreach(var item in contentEntries){
+        var json=System.Text.Encoding.UTF8.GetString(item.Value);
+        var compiled=production?ExperienceCompiler.CompileProductionJson(json):ExperienceCompiler.CompileJson(json,events);
+        errors.AddRange(compiled.Diagnostics);
+        if(compiled.Document!=null)documents.Add(compiled.Document);
+        if(!string.IsNullOrWhiteSpace(compiled.Document?.Title))titles.Add(compiled.Document.Title);
+      }
+      ValidatePrerequisites(documents,errors);
+      if(experiences.Length==0)errors.Add(new("pack.experiences","$","Pack has no experience documents."));
+      if(manifest==null||manifest.Schema!="comfy-quest-pack/v2"||string.IsNullOrWhiteSpace(manifest.PackId)||!SemanticVersion.TryParse(manifest.Version,out _))
+        errors.Add(new("pack.manifest","$.manifest","Pack schema, id, and semantic version are required."));
+      if(manifest!=null&&!string.IsNullOrWhiteSpace(manifest.ContentHash)&&!string.Equals(manifest.ContentHash,contentHash,StringComparison.OrdinalIgnoreCase))
+        errors.Add(new("pack.hash","$.manifest.content_hash","Declared canonical content hash does not match experience documents."));
+    }catch(Exception e){errors.Add(new("pack.read","$",e.Message));}
+    return new(){Path=full,Manifest=manifest,Sha256=sha,ContentHash=contentHash,Lane=lane,Diagnostics=errors,Titles=titles};
+  }
+
+  static void ValidatePrerequisites(IReadOnlyList<ExperienceDocument> documents,List<ContractDiagnostic> errors){
+    var unique=documents.Where(value=>value!=null&&!string.IsNullOrWhiteSpace(value.Id))
+      .GroupBy(value=>value.Id,StringComparer.Ordinal).ToArray();
+    foreach(var duplicate in unique.Where(group=>group.Count()!=1))
+      errors.Add(new("prerequisite.experience_duplicate","$.experiences","Experience ids must be unique within a pack."));
+    var byId=unique.Where(group=>group.Count()==1).ToDictionary(group=>group.Key,group=>group.Single(),StringComparer.Ordinal);
+    foreach(var document in byId.Values)
+      foreach(var prerequisite in document.Prerequisites??new List<string>())
+        if(!byId.ContainsKey(prerequisite))
+          errors.Add(new("prerequisite.missing","$.experiences."+document.Id+".prerequisites","Prerequisite '"+prerequisite+"' is not present in this pack."));
+    var state=new Dictionary<string,int>(StringComparer.Ordinal);
+    foreach(var id in byId.Keys.OrderBy(value=>value,StringComparer.Ordinal))Visit(id);
+
+    void Visit(string id){
+      if(state.TryGetValue(id,out var known)){if(known==1)errors.Add(new("prerequisite.cycle","$.experiences."+id+".prerequisites","Prerequisite graph contains a cycle."));return;}
+      state[id]=1;
+      foreach(var dependency in byId[id].Prerequisites??new List<string>())if(byId.ContainsKey(dependency))Visit(dependency);
+      state[id]=2;
+    }
+  }
   static bool SafeEntry(string name){if(string.IsNullOrWhiteSpace(name)||name.Contains("\\")||name.Contains("..")||Path.IsPathRooted(name))return false;if(name=="manifest.json")return true;return (name.StartsWith("experiences/",StringComparison.Ordinal)||name.StartsWith("quests/",StringComparison.Ordinal))&&name.EndsWith(".json",StringComparison.Ordinal)&&name.Count(c=>c=='/')==1;}
   public IReadOnlyList<PackCandidate> ListVersions(ISet<string> events=null)=>CheckInbox(events).Where(x=>x.IsValid).OrderByDescending(x=>SemanticVersion.Parse(x.Manifest.Version)).ThenBy(x=>x.Manifest.PackId,StringComparer.Ordinal).ToArray();
   // An already-current latest returns without re-activating: an idle repeat press must not
@@ -339,20 +413,28 @@ public sealed class QuestPackStore {
   /// changed — only which of its experiences Runtime answers to. Selecting what is already selected
   /// is a no-op rather than a rewrite, so a repeated request cannot churn the file the engine
   /// watches for cache invalidation.</summary>
-  public ActiveSet SelectExperience(string experienceId){
-    if(string.IsNullOrWhiteSpace(experienceId))throw new InvalidOperationException("select_experience_id_required");
+  public ActiveSet SelectExperience(string experienceId)=>SetExperienceSelection(experienceId,null,false);
+  /// <summary>Undo a selector changed as one step of a failed binding transaction. The activation
+  /// identity makes this incapable of overwriting a newer content activation; null restores the
+  /// unselected state used by a freshly activated guild pack.</summary>
+  public ActiveSet RestoreExperienceSelection(string expectedActivationId,string experienceId){
+    if(!ValidActivationId(expectedActivationId))throw new InvalidOperationException("active_activation_id_invalid");
+    return SetExperienceSelection(experienceId,expectedActivationId,true);
+  }
+  ActiveSet SetExperienceSelection(string experienceId,string expectedActivationId,bool allowEmpty){
+    if(!allowEmpty&&string.IsNullOrWhiteSpace(experienceId))throw new InvalidOperationException("select_experience_id_required");
     var target=Path.Combine(root,"active","active-set.json");
     var active=ReadActiveFile(target,"active_set_unreadable");
     ValidateActive(active,"active_set_invalid");
+    if(expectedActivationId!=null&&!string.Equals(active.ActivationId,expectedActivationId,StringComparison.Ordinal))
+      throw new InvalidOperationException("active_activation_mismatch");
     var package=ActivePackagePath(active);
     if(!File.Exists(package))throw new InvalidOperationException("active_package_missing");
-    using(var zip=ZipFile.OpenRead(package))
+    if(!string.IsNullOrWhiteSpace(experienceId))using(var zip=ZipFile.OpenRead(package))
       if(!ActiveExperienceResolver.TryResolve(zip,experienceId,out _,out var error))throw new InvalidOperationException(error);
     if(string.Equals(active.ExperienceId,experienceId,StringComparison.Ordinal))return active;
     active.ExperienceId=experienceId;
-    var temp=target+".tmp";
-    File.WriteAllText(temp,JsonConvert.SerializeObject(active,Formatting.Indented));
-    File.Replace(temp,target,null);
+    WriteActiveFile(target,JsonConvert.SerializeObject(active,Formatting.Indented));
     return active;
   }
   string ActivePackagePath(ActiveSet active)=>Path.Combine(LaneRoot(ParseLane(active.SourceChannel)),active.Source);
@@ -360,10 +442,11 @@ public sealed class QuestPackStore {
   public PackCandidate Rollback(ISet<string> events=null){var active=ReadActive();if(active!=null&&ValidActivationId(active.ActivationId))return string.IsNullOrWhiteSpace(active.PreviousActivationId)?null:Rollback(active.PreviousActivationId,events);return RollbackLegacy(events);}
   public PackCandidate Rollback(string activationId,ISet<string> events=null){if(!ValidActivationId(activationId))throw new InvalidOperationException("rollback_activation_id_invalid");var previous=ReadActiveFile(Path.Combine(HistoryRoot(),activationId+".json"),"previous_active_set_unreadable");ValidateActive(previous,"previous_active_set_invalid");var lane=ParseLane(previous.SourceChannel);var candidate=InspectLane(Path.Combine(LaneRoot(lane),previous.Source),lane,events);ValidateCandidate(previous,candidate);return ActivateCandidate(candidate,previous.PreviousActivationId,true);}
   void EnsureNoCollisions(IReadOnlyList<PackCandidate> valid){var collision=valid.GroupBy(x=>x.Manifest.PackId+"\n"+x.Manifest.Version,StringComparer.Ordinal).Any(g=>g.Select(x=>x.ContentHash).Distinct(StringComparer.OrdinalIgnoreCase).Count()>1);if(collision)throw new InvalidOperationException("same_version_hash_collision");}
-  PackCandidate ActivateCandidate(PackCandidate chosen,string previousActivationId=null,bool previousSpecified=false){var active=Path.Combine(root,"active");Directory.CreateDirectory(active);var target=Path.Combine(active,"active-set.json");var current=ReadActiveFile(target,"active_set_unreadable");if(current!=null){Archive(current);if(!previousSpecified)previousActivationId=current.ActivationId;}var activated=DateTimeOffset.UtcNow;var activationId="act-"+activated.ToString("yyyyMMdd'T'HHmmssfff'Z'",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N").Substring(0,8);var json=JsonConvert.SerializeObject(new ActiveSet{Schema="comfy-quest-active-set/v1",PackId=chosen.Manifest.PackId,Version=chosen.Manifest.Version,ContentHash=chosen.ContentHash,PackageSha256=chosen.Sha256,Source=Path.GetFileName(chosen.Path),ActivatedUtc=activated,ActivationId=activationId,SourceChannel=LaneName(chosen.Lane),PreviousActivationId=previousActivationId},Formatting.Indented);var temp=Path.Combine(active,"active-set.json.tmp");File.WriteAllText(temp,json);if(File.Exists(target))File.Replace(temp,target,Path.Combine(active,"active-set.previous.json"));else File.Move(temp,target);return chosen;}
+  PackCandidate ActivateCandidate(PackCandidate chosen,string previousActivationId=null,bool previousSpecified=false){var active=Path.Combine(root,"active");Directory.CreateDirectory(active);var target=Path.Combine(active,"active-set.json");var current=ReadActiveFile(target,"active_set_unreadable");if(current!=null){Archive(current);if(!previousSpecified)previousActivationId=current.ActivationId;}var activated=DateTimeOffset.UtcNow;var activationId="act-"+activated.ToString("yyyyMMdd'T'HHmmssfff'Z'",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N").Substring(0,8);var json=JsonConvert.SerializeObject(new ActiveSet{Schema="comfy-quest-active-set/v1",PackId=chosen.Manifest.PackId,Version=chosen.Manifest.Version,ContentHash=chosen.ContentHash,PackageSha256=chosen.Sha256,Source=Path.GetFileName(chosen.Path),ActivatedUtc=activated,ActivationId=activationId,SourceChannel=LaneName(chosen.Lane),PreviousActivationId=previousActivationId},Formatting.Indented);WriteActiveFile(target,json,Path.Combine(active,"active-set.previous.json"));return chosen;}
   PackCandidate RollbackLegacy(ISet<string> events){var previousPath=Path.Combine(root,"active","active-set.previous.json");if(!File.Exists(previousPath))return null;var previous=ReadActiveFile(previousPath,"previous_active_set_unreadable");ValidateActive(previous,"previous_active_set_invalid");var lane=ParseLane(previous.SourceChannel);var candidate=InspectLane(Path.Combine(LaneRoot(lane),previous.Source),lane,events);ValidateCandidate(previous,candidate);return ActivateCandidate(candidate,previous.PreviousActivationId,true);}
   void Archive(ActiveSet value){if(value==null||!ValidActivationId(value.ActivationId))return;var history=HistoryRoot();Directory.CreateDirectory(history);var target=Path.Combine(history,value.ActivationId+".json");if(!File.Exists(target))File.WriteAllText(target,JsonConvert.SerializeObject(value,Formatting.Indented));var readable=Directory.GetFiles(history,"act-*.json").Select(path=>{try{return new{Path=path,Value=ReadActiveFile(path,"activation_history_unreadable")};}catch{return null;}}).Where(item=>item!=null&&item.Value!=null&&ValidActivationId(item.Value.ActivationId)).OrderByDescending(item=>item.Value.ActivatedUtc).ToArray();foreach(var stale in readable.Skip(MaxActivationHistory))File.Delete(stale.Path);}
-  ActiveSet ReadActiveFile(string path,string error){if(!File.Exists(path))return null;try{return JsonConvert.DeserializeObject<ActiveSet>(File.ReadAllText(path));}catch(Exception e){throw new InvalidOperationException(error,e);}}
+  ActiveSet ReadActiveFile(string path,string error){if(!File.Exists(path))return null;try{string json=null;for(var attempt=0;attempt<5;attempt++){try{using var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);using var reader=new StreamReader(stream);json=reader.ReadToEnd();break;}catch(IOException)when(attempt<4){Thread.Sleep(10);}catch(UnauthorizedAccessException)when(attempt<4){Thread.Sleep(10);}}return JsonConvert.DeserializeObject<ActiveSet>(json);}catch(Exception e){throw new InvalidOperationException(error,e);}}
+  static void WriteActiveFile(string target,string json,string backup=null){var temp=target+".tmp-"+Guid.NewGuid().ToString("N");try{File.WriteAllText(temp,json);for(var attempt=0;;attempt++){try{if(File.Exists(target))File.Replace(temp,target,backup);else File.Move(temp,target);return;}catch(IOException)when(attempt<4){Thread.Sleep(10);}catch(UnauthorizedAccessException)when(attempt<4){Thread.Sleep(10);}}}finally{try{if(File.Exists(temp))File.Delete(temp);}catch{}}}
   void ValidateActive(ActiveSet value,string error){if(value==null||value.Schema!="comfy-quest-active-set/v1"||value.Source!=Path.GetFileName(value.Source))throw new InvalidOperationException(error);}
   static void ValidateCandidate(ActiveSet expected,PackCandidate candidate){if(!candidate.IsValid||candidate.Manifest.PackId!=expected.PackId||candidate.Manifest.Version!=expected.Version||!string.Equals(candidate.ContentHash,expected.ContentHash,StringComparison.OrdinalIgnoreCase)||!string.Equals(candidate.Sha256,expected.PackageSha256,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("previous_active_content_mismatch");}
   string LaneRoot(QuestPackLane lane)=>Path.Combine(root,lane==QuestPackLane.Dev?"inbox-dev":"inbox");

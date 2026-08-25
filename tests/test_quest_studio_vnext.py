@@ -440,7 +440,7 @@ class QuestStudioVNextTests(unittest.TestCase):
         script = raw_constant("Js")
         self.assertIn("function requestContext()", script)
         self.assertIn("function isCurrentContext(context)", script)
-        self.assertIn("operationSequences={rehearsal:0,certify:0,runtime:0,runs:0,project:0}", script)
+        self.assertIn("operationSequences={rehearsal:0,certify:0,runtime:0,runs:0,project:0,guild:0}", script)
         self.assertIn("function beginOperation(name)", script)
         self.assertIn("function isLatestOperation(name,sequence)", script)
         for function_name in ("runRehearsal", "certify", "refreshRuntime"):
@@ -454,6 +454,16 @@ class QuestStudioVNextTests(unittest.TestCase):
         compiled = compiled[: compiled.index("\n")]
         self.assertIn("await certify(false)", compiled)
         self.assertNotIn("if(!compiledJson)", compiled)
+
+        self.assertIn("function guildRequestContext(guild)", script)
+        self.assertIn("function isCurrentGuildContext(context)", script)
+        for function_name in ("runGuildCertification", "publishSelectedGuild", "playSelectedGuild"):
+            body = script[script.index(f"function {function_name}") :]
+            body = body[: body.index("\n")]
+            self.assertIn("guildRequestContext(guild)", body, function_name)
+            self.assertIn("isCurrentGuildContext(context)", body, function_name)
+            self.assertIn("beginOperation('guild')", body, function_name)
+            self.assertIn("isLatestOperation('guild',sequence)", body, function_name)
 
     def test_project_gets_and_mutations_do_not_overwrite_intervening_edits(self) -> None:
         script = raw_constant("Js")

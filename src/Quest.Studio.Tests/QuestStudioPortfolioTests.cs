@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.IO.Compression;
 using Comfy.Quest.Studio;
+using ComfyQuestContracts;
 using Microsoft.AspNetCore.Http;
 using Xunit;
 
@@ -168,6 +170,95 @@ public sealed class QuestStudioPortfolioTests : IDisposable
     }
 
     [Fact]
+    public async Task GuildPrerequisitesPublishAsOneDeterministicSelectablePack()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var service = CreateService(valheim);
+        var first = service.CreateProject("blank");
+        var second = service.CreateProject("blank");
+        var guild = service.CreateGuild(new StudioGuildCreateRequest("Wayfinder Journey", "Derek"));
+        var placed = service.PlaceProject(guild.GuildId, new(guild.Revision, first.ProjectId, "quest", "questline", "main", null));
+        placed = service.PlaceProject(guild.GuildId, new(placed.Guild!.Revision, second.ProjectId, "quest", "questline", "main", null));
+        Assert.True(placed.Ok, placed.Error);
+        guild = placed.Guild!;
+        var artifacts = Assert.Single(guild.Questlines).Quests;
+        artifacts[1].PrerequisiteProjectIds.Add(first.ProjectId);
+        var saved = service.SaveGuild(guild.GuildId, new(guild.Revision, guild));
+        Assert.True(saved.Ok, saved.Error);
+        guild = saved.Guild!;
+
+        var certified = service.CertifyGuild(guild.GuildId);
+        Assert.True(certified.Ok, certified.Error);
+        Assert.Equal(new[] { first.ExperienceId, second.ExperienceId }.OrderBy(value => value, StringComparer.Ordinal), certified.ExperienceIds);
+        var published = await service.PublishGuildAsync(guild.GuildId, new StudioPublishRequest(guild.Revision), CancellationToken.None);
+        Assert.True(published.Ok, published.Error);
+        var again = await service.PublishGuildAsync(guild.GuildId, new StudioPublishRequest(guild.Revision), CancellationToken.None);
+        Assert.True(again.Ok, again.Error);
+        Assert.True(again.Receipt!.AlreadyPresent);
+        Assert.Equal(published.ContentHash, again.ContentHash);
+
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var candidate = Assert.Single(new QuestPackStore(runtimeRoot).CheckInbox());
+        Assert.True(candidate.IsValid, string.Join(";", candidate.Diagnostics.Select(value => value.Code)));
+        var store = new QuestPackStore(runtimeRoot);
+        store.LoadLatest();
+        Assert.Equal(2, store.ActiveExperienceIds().Count);
+        using var archive = ZipFile.OpenRead(candidate.Path);
+        var secondEntry = archive.GetEntry("experiences/" + second.ExperienceId + ".json")!;
+        using var reader = new StreamReader(secondEntry.Open());
+        using var document = JsonDocument.Parse(reader.ReadToEnd());
+        Assert.Equal(first.ExperienceId, Assert.Single(document.RootElement.GetProperty("prerequisites").EnumerateArray()).GetString());
+
+        var cycle = Clone(guild);
+        Assert.Single(cycle.Questlines).Quests[0].PrerequisiteProjectIds.Add(second.ProjectId);
+        Assert.Equal("guild_prerequisite_cycle", service.SaveGuild(guild.GuildId, new(guild.Revision, cycle)).Error);
+
+        var duplicated = service.DuplicateGuild(guild.GuildId, new(guild.Revision));
+        Assert.True(duplicated.Ok, duplicated.Error);
+        var clonedArtifacts = Artifacts(duplicated.Guild!).ToArray();
+        var clonedSecond = Assert.Single(clonedArtifacts, value => value.PrerequisiteProjectIds.Count == 1);
+        Assert.Contains(clonedSecond.PrerequisiteProjectIds[0], clonedArtifacts.Select(value => value.ProjectId));
+        Assert.DoesNotContain(first.ProjectId, clonedSecond.PrerequisiteProjectIds);
+    }
+
+    [Fact]
+    public async Task GuildPlayUsesTheArmedDevLaneWithoutWeakeningImmutablePublish()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var service = CreateService(valheim);
+        var project = service.CreateProject("guild-journey");
+        var guild = service.CreateGuild(new StudioGuildCreateRequest("Live Guild", "Derek"));
+        var placed = service.PlaceProject(guild.GuildId, new(guild.Revision, project.ProjectId, "quest", "questline", "main", null));
+        Assert.True(placed.Ok, placed.Error);
+        guild = placed.Guild!;
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+
+        var disconnected = await service.PlayGuildAsync(guild.GuildId, new StudioPublishRequest(guild.Revision), CancellationToken.None);
+        Assert.False(disconnected.Ok);
+        Assert.Equal("dev_channel_disconnected", disconnected.Error);
+
+        var coordinator = new RuntimeDevChannelCoordinator(runtimeRoot);
+        coordinator.Arm(DateTimeOffset.UtcNow);
+        var played = await service.PlayGuildAsync(guild.GuildId, new StudioPublishRequest(guild.Revision), CancellationToken.None);
+
+        Assert.True(played.Ok, played.Error);
+        Assert.Equal("dev", played.Receipt!.Channel);
+        Assert.Single(played.ExperienceIds);
+        Assert.False(Directory.Exists(Path.Combine(runtimeRoot, "inbox")));
+        var candidate = Assert.Single(new QuestPackStore(runtimeRoot).CheckDevInbox());
+        Assert.True(candidate.IsValid, string.Join(";", candidate.Diagnostics.Select(value => value.Code)));
+        Assert.Contains($"-r{guild.Revision}-", played.Receipt.Filename, StringComparison.Ordinal);
+
+        var published = await service.PublishGuildAsync(guild.GuildId, new StudioPublishRequest(guild.Revision), CancellationToken.None);
+        Assert.True(published.Ok, published.Error);
+        Assert.Equal("production", published.Receipt!.Channel);
+        Assert.Single(new QuestPackStore(runtimeRoot).CheckInbox());
+        Assert.Equal(played.ContentHash, published.ContentHash);
+    }
+
+    [Fact]
     public void InterruptedCrossGuildMoveFinishesForwardFromItsJournal()
     {
         var service = CreateService();
@@ -219,9 +310,9 @@ public sealed class QuestStudioPortfolioTests : IDisposable
         Assert.Equal("portfolio_unreadable", error.Message);
     }
 
-    QuestStudioService CreateService()
+    QuestStudioService CreateService(string? valheim = null)
     {
-        var host = new FakeHost(_root);
+        var host = new FakeHost(_root, valheim);
         return new QuestStudioService(host, new QuestPackPublisher(host));
     }
 
@@ -253,10 +344,10 @@ public sealed class QuestStudioPortfolioTests : IDisposable
         if (Directory.Exists(_root)) Directory.Delete(_root, true);
     }
 
-    sealed class FakeHost(string stateDirectory) : IQuestStudioHost
+    sealed class FakeHost(string stateDirectory, string? valheim = null) : IQuestStudioHost
     {
         public string StateDirectory { get; } = stateDirectory;
-        public string? FindValheim() => null;
+        public string? FindValheim() => valheim;
         public bool Authorize(HttpRequest request) => true;
         public JsonSerializerOptions Json { get; } = HostJson();
     }

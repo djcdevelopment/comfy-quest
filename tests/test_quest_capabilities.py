@@ -77,7 +77,7 @@ class QuestCapabilityManifestTests(unittest.TestCase):
     def test_creator_vocabulary_and_runtime_availability_are_separate(self) -> None:
         self.assertEqual(
             self.manifest["RuntimeCounts"],
-            {"ProductionEvents": 34, "ProductionWitnesses": 57, "EngineEvents": 2},
+            {"ProductionEvents": 34, "ProductionWitnesses": 57, "EngineEvents": 3},
         )
         creator = {row["Name"]: row for row in self.manifest["CreatorEvents"]}
         production = {
@@ -128,7 +128,7 @@ class QuestCapabilityManifestTests(unittest.TestCase):
         )
         self.assertEqual(set(), set(creator) - set(production))
         self.assertEqual(
-            {"timer_elapsed", "chat_received"},
+            {"experience_started", "timer_elapsed", "chat_received"},
             {row["Event"] for row in self.manifest["EngineEvents"]},
         )
         for name, row in creator.items():

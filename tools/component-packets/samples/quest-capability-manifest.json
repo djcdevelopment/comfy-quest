@@ -15,7 +15,7 @@
   "RuntimeCounts": {
     "ProductionEvents": 34,
     "ProductionWitnesses": 57,
-    "EngineEvents": 2
+    "EngineEvents": 3
   },
   "CreatorSafeEvents": [
     "attack_blocked",
@@ -1709,6 +1709,18 @@
     }
   ],
   "EngineEvents": [
+    {
+      "Event": "experience_started",
+      "Label": "Quest started",
+      "Instruction": "Begin when this experience is bound to its Charm.",
+      "RuntimeAdapter": "RuntimeExperienceEngine.StartBoundExperience",
+      "TargetPolicy": "none",
+      "FixedTarget": null,
+      "AllowedTargets": [],
+      "RequiredWhereFields": [],
+      "AllowedWhereFields": [],
+      "Privacy": "Only the quest-owned binding identity is retained."
+    },
     {
       "Event": "timer_elapsed",
       "Label": "Timer elapsed",

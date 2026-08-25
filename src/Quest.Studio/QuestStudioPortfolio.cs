@@ -64,6 +64,9 @@ public sealed class StudioGuildArtifact
     public string ProjectId { get; set; } = string.Empty;
     public string Kind { get; set; } = "quest";
     public string? ProgressionBandId { get; set; }
+    /// <summary>AND prerequisites expressed in stable project identity. Guild publication maps
+    /// these to the corresponding experience ids in the one canonical pack.</summary>
+    public List<string> PrerequisiteProjectIds { get; set; } = new();
     /// <summary>Phase 4A reset semantics: a successor run receives fresh action claims.</summary>
     public string RewardPolicy { get; set; } = "per_run";
 }
@@ -379,7 +382,12 @@ internal sealed class QuestStudioPortfolioStore
                 SourceVersion = source.Version,
             };
             foreach (var artifact in Artifacts(clone))
+            {
                 if (projectIds.TryGetValue(artifact.ProjectId, out var replacement)) artifact.ProjectId = replacement;
+                artifact.PrerequisiteProjectIds = (artifact.PrerequisiteProjectIds ?? new())
+                    .Select(value => projectIds.TryGetValue(value, out var mapped) ? mapped : value)
+                    .ToList();
+            }
             var error = ValidateGuild(clone, checkGlobalMembership: true);
             if (error is not null) throw new InvalidDataException(error);
             AtomicWrite(GuildPath(clone.GuildId), clone, create: true);
@@ -454,7 +462,17 @@ internal sealed class QuestStudioPortfolioStore
             if (artifact is null || !SafeId(artifact.ProjectId) || !projects.Add(artifact.ProjectId)) return "guild_artifact_duplicate";
             if (artifact.Kind is not ("quest" or "event") || artifact.RewardPolicy != "per_run") return "guild_artifact_policy_invalid";
             if (artifact.ProgressionBandId is not null && !bands.Contains(artifact.ProgressionBandId)) return "progression_band_missing";
+            if (artifact.PrerequisiteProjectIds is null || artifact.PrerequisiteProjectIds.Count > ExperienceSchema.MaxPrerequisites
+                || artifact.PrerequisiteProjectIds.Any(value => !SafeId(value))
+                || artifact.PrerequisiteProjectIds.Distinct(StringComparer.Ordinal).Count() != artifact.PrerequisiteProjectIds.Count
+                || artifact.PrerequisiteProjectIds.Contains(artifact.ProjectId, StringComparer.Ordinal))
+                return "guild_prerequisite_invalid";
         }
+        if (artifacts.SelectMany(value => value.PrerequisiteProjectIds).Any(value => !projects.Contains(value))) return "guild_prerequisite_missing";
+        var dependencies = artifacts.ToDictionary(value => value.ProjectId, value => value.PrerequisiteProjectIds, StringComparer.Ordinal);
+        var dependencyState = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var projectId in projects.OrderBy(value => value, StringComparer.Ordinal))
+            if (Visit(projectId)) return "guild_prerequisite_cycle";
         if (value.Events.Any(item => item.Kind != "event") || value.StandaloneQuests.Any(item => item.Kind != "quest") || value.Questlines.Any(line => line.Quests.Any(item => item.Kind != "quest"))) return "guild_artifact_kind_invalid";
         if (checkGlobalMembership)
         {
@@ -462,6 +480,15 @@ internal sealed class QuestStudioPortfolioStore
             if (artifacts.Any(item => ownedElsewhere.Contains(item.ProjectId))) return "project_already_assigned";
         }
         return null;
+
+        bool Visit(string projectId)
+        {
+            if (dependencyState.TryGetValue(projectId, out var known)) return known == 1;
+            dependencyState[projectId] = 1;
+            foreach (var prerequisite in dependencies[projectId]) if (Visit(prerequisite)) return true;
+            dependencyState[projectId] = 2;
+            return false;
+        }
     }
 
     static IEnumerable<StudioGuildArtifact> Artifacts(StudioGuildDocument guild) =>

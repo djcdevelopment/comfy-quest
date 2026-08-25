@@ -122,6 +122,64 @@ public sealed class QuestStudioRunControlTests : IDisposable
     }
 
     [Fact]
+    public async Task BindingControlsPinTheCandidateExperienceAndRecoveryChange()
+    {
+        var (service, runtimeRoot, project) = CreateService();
+        WriteStatus(runtimeRoot, project.ExperienceId);
+        var candidateWatcher = AnswerOnce(runtimeRoot, request => new RuntimeRunControlReceipt
+        {
+            RequestId = request.RequestId, Operation = request.Operation, State = "completed",
+            Machine = "OMEN", WorldUid = "123", CompletedUtc = DateTimeOffset.UtcNow,
+            BindingCandidates = new[] { new RuntimeBindingCandidate { BindingZdo = "10:20", TargetKind = "sign", Label = "Runestone", DistanceMetres = 3 } },
+        });
+        var candidates = await service.BindingCandidatesAsync(project.ProjectId, CancellationToken.None);
+        var candidateRequest = await candidateWatcher;
+        Assert.True(candidates.Ok, candidates.Error);
+        Assert.Equal("10:20", Assert.Single(candidates.Receipt!.BindingCandidates!).BindingZdo);
+        Assert.Equal("list_binding_candidates", candidateRequest.Operation);
+        Assert.Null(candidateRequest.RunId);
+        Assert.Null(candidateRequest.ExperienceId);
+
+        var change = new RuntimeBindingChange
+        {
+            ChangeId = "binding-20260825T120000000Z-deadbeef", BindingZdo = "10:20", WorldId = "123", State = "applied",
+            CreatedUtc = DateTimeOffset.UtcNow, Previous = new(), Applied = new RuntimeBindingReference
+            {
+                PackId = "guild", ExperienceId = project.ExperienceId, BindingId = "default", Version = "1.0.0",
+                ContentHash = new string('a', 64),
+            },
+        };
+        var bindWatcher = AnswerOnce(runtimeRoot, request => new RuntimeRunControlReceipt
+        {
+            RequestId = request.RequestId, Operation = request.Operation, State = "completed",
+            Machine = "OMEN", WorldUid = "123", CompletedUtc = DateTimeOffset.UtcNow, BindingChange = change,
+        });
+        var bound = await service.BindExperienceAsync(project.ProjectId,
+            new StudioBindExperienceRequest(project.ExperienceId, "10:20"), CancellationToken.None);
+        var bindRequest = await bindWatcher;
+        Assert.True(bound.Ok, bound.Error);
+        Assert.Equal(change.ChangeId, bound.Receipt!.BindingChange!.ChangeId);
+        Assert.Equal("bind_selected_experience", bindRequest.Operation);
+        Assert.Equal(project.ExperienceId, bindRequest.ExperienceId);
+        Assert.Equal("10:20", bindRequest.BindingZdo);
+        Assert.Null(bindRequest.RunId);
+
+        change.State = "restored";
+        var restoreWatcher = AnswerOnce(runtimeRoot, request => new RuntimeRunControlReceipt
+        {
+            RequestId = request.RequestId, Operation = request.Operation, State = "completed",
+            Machine = "OMEN", WorldUid = "123", CompletedUtc = DateTimeOffset.UtcNow, BindingChange = change,
+        });
+        var restored = await service.RestoreBindingAsync(project.ProjectId,
+            new StudioRestoreBindingRequest("10:20", change.ChangeId), CancellationToken.None);
+        var restoreRequest = await restoreWatcher;
+        Assert.True(restored.Ok, restored.Error);
+        Assert.Equal("restore_binding", restoreRequest.Operation);
+        Assert.Equal(change.ChangeId, restoreRequest.BindingChangeId);
+        Assert.Null(restoreRequest.ExperienceId);
+    }
+
+    [Fact]
     public async Task ARunOutsideTheSelectedProjectCannotReachTheMailbox()
     {
         var (service, runtimeRoot, project) = CreateService();
@@ -171,6 +229,42 @@ public sealed class QuestStudioRunControlTests : IDisposable
         var traversal = service.RunControlReceipt(project.ProjectId, "../runs", "run-exact");
         Assert.False(traversal.Ok);
         Assert.Equal("run_control_identity_invalid", traversal.Error);
+    }
+
+    [Fact]
+    public void QueuedReceiptPollingFindsTheExactArchivedRunPartition()
+    {
+        var (service, runtimeRoot, project) = CreateService();
+        const string requestId = "studio-preview-reset-archived";
+        var path = RuntimeRunControlReceipts.ArchivedReceiptPath(runtimeRoot, "run-exact", requestId);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var exactBytes = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new RuntimeRunControlReceipt
+        {
+            RequestId = requestId,
+            Operation = "preview_reset",
+            State = "previewed",
+            Machine = "OMEN",
+            WorldUid = "123",
+            CompletedUtc = DateTimeOffset.UtcNow,
+            Preview = new RuntimeResetPreview
+            {
+                PreviewToken = "rstp-archived",
+                RunId = "run-exact",
+                ScopeId = "scope-exact",
+                CreatedUtc = DateTimeOffset.UtcNow,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5),
+                SnapshotHash = "snapshot-hash",
+                Snapshot = new RuntimeResetSnapshot(),
+            },
+        }, HostJson()));
+        File.WriteAllBytes(path, exactBytes);
+
+        var result = service.RunControlReceipt(project.ProjectId, requestId, "run-exact");
+
+        Assert.True(result.Ok, result.Error);
+        Assert.False(result.Queued);
+        Assert.Equal("rstp-archived", result.Receipt!.Preview!.PreviewToken);
+        Assert.Equal(exactBytes, File.ReadAllBytes(path));
     }
 
     (QuestStudioService Service, string RuntimeRoot, StudioProjectDocument Project) CreateService()
