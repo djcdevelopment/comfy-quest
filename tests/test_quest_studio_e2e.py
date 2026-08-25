@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "src" / "Quest.Studio.E2E.Tests" / "Quest.Studio.E2E.Tests.csproj"
 TEST = ROOT / "src" / "Quest.Studio.E2E.Tests" / "QuestStudioSyntheticE2ETests.cs"
 RUNNER = ROOT / "tools" / "quest-studio" / "Test-QuestStudioE2E.ps1"
+INSTALLED_DRIVER = ROOT / "tools" / "quest-studio" / "Invoke-QuestStudioGuildJourney.ps1"
 README = ROOT / "README.md"
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 
@@ -135,6 +136,13 @@ class QuestStudioE2ETests(unittest.TestCase):
             "quest-studio-e2e\\host",
         ):
             self.assertIn(expected, source)
+
+    def test_installed_driver_splats_named_test_parameters(self) -> None:
+        source = INSTALLED_DRIVER.read_text(encoding="utf-8")
+        self.assertIn("$testParameters = @{", source)
+        self.assertIn("KeepArtifacts = $true", source)
+        self.assertIn("@testParameters", source)
+        self.assertNotIn("@arguments", source)
 
     def test_synthetic_e2e_stays_local_only_and_documented_as_non_live_proof(self) -> None:
         readme = README.read_text(encoding="utf-8")

@@ -79,13 +79,14 @@ try {
     [Environment]::SetEnvironmentVariable('COMFY_QUEST_E2E_WORLD_UID', $WorldUid, 'Process')
     [Environment]::SetEnvironmentVariable('COMFY_QUEST_E2E_MACHINE', $ExpectedMachine, 'Process')
 
-    $arguments = @(
-        '-Filter', 'FullyQualifiedName=Comfy.Quest.Studio.E2E.Tests.QuestStudioSyntheticE2ETests.Installed_guild_journey_proves_A_to_B_to_A_reset_retention_and_recovery',
-        '-KeepArtifacts')
-    if ($DotNet) { $arguments += @('-DotNet', $DotNet) }
-    if ($Headed) { $arguments += '-Headed' }
-    if ($SkipBrowserInstall) { $arguments += '-SkipBrowserInstall' }
-    & (Join-Path $repoRoot 'tools\quest-studio\Test-QuestStudioE2E.ps1') @arguments
+    $testParameters = @{
+        Filter = 'FullyQualifiedName=Comfy.Quest.Studio.E2E.Tests.QuestStudioSyntheticE2ETests.Installed_guild_journey_proves_A_to_B_to_A_reset_retention_and_recovery'
+        KeepArtifacts = $true
+    }
+    if ($DotNet) { $testParameters.DotNet = $DotNet }
+    if ($Headed) { $testParameters.Headed = $true }
+    if ($SkipBrowserInstall) { $testParameters.SkipBrowserInstall = $true }
+    & (Join-Path $repoRoot 'tools\quest-studio\Test-QuestStudioE2E.ps1') @testParameters
     if ($LASTEXITCODE -ne 0) {
         throw "Installed guild journey failed with exit code $LASTEXITCODE. The Creator Session remains owned for evidence-preserving recovery."
     }
