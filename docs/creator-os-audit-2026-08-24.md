@@ -478,19 +478,19 @@ requiring sign-off**, not edits. The rest are mechanical.
 
 | # | Item | File | Sign-off |
 | --- | --- | --- | --- |
-| 1 | Amend the 4A exit to the one-launch allowance | `docs/creator-portfolio-requirements.md:266-271` | ✅ signed off 08-24 (ADR 0014); prose edit pending |
+| 1 | Amend the 4A exit to the one-launch allowance | `docs/creator-portfolio-requirements.md:266-282` | ✅ done — prose applied; the strictness clause is asserted |
 | 2 | Reconcile the 4A/4B scope tables (B2) | `docs/five-intent-program-plan.md:110-111` | ✅ signed off 08-24; authority now `creator-os-phases.json` |
 | 3 | One phase vocabulary across the three roadmaps (B1) | `docs/creator-os-phases.json` | ✅ signed off 08-24 (ADR 0013) |
 | 4 | Creator-world-entry ownership (ADR 0012) | `docs/adr/0012-*.md` | ✅ accepted 08-24 |
 | 5 | `fetch-depth: 0` on the `quest` job (A1) | `.github/workflows/ci.yml:32` | ✅ done, verified green in CI |
 | 6 | Add `Quest.Studio.Tests` to CI (A2) | `.github/workflows/ci.yml` | ✅ done — 101 tests green in CI. E2E still ungated: open |
-| 7 | Requirements ledger + five invariant checks (C1, C2, C4, C6) | `docs/creator-requirements-ledger.json`, `tools/render_quest_mission_control.py`, new test | no |
-| 8 | Mark the Phase-3 lap stale; add `phase3_lap.state` (B7) | runbook, manifest, renderer | no |
-| 9 | Reword `cautions[7]` to match `environment[4]` (B8) | `docs/quest-mission-control.json` | no |
-| 10 | Add `Arm`/`Disarm`/`GalleryRebuild` to commands (B9) | `docs/quest-mission-control.json` | no |
+| 7 | Requirements ledger + five invariant checks (C1, C2, C4, C6) | `docs/creator-requirements-ledger.json`, `tools/render_quest_mission_control.py`, new test | ✅ done — 47 ids dispositioned; five checks plus lineage, each with a negative test |
+| 8 | Mark the Phase-3 lap stale; add `phase3_lap.state` (B7) | runbook, manifest, renderer | ✅ done — renderer emits no sequence for a stale lap; queue card is `gated` |
+| 9 | Reword `cautions[7]` to match `environment[4]` (B8) | `docs/quest-mission-control.json` | ✅ done |
+| 10 | Add `Arm`/`Disarm`/`GalleryRebuild` to commands (B9) | `docs/quest-mission-control.json` | ✅ done — all ten verbs, checked against the script's own `ValidateSet` |
 | 11 | Mark superseded documents (B4) | the four documents listed in B4 | ✅ done |
-| 12 | Assert the replacement table matched; delete dead entries (A3, A4) | `tools/render_quest_mission_control.py:588-622` | no |
-| 13 | Validate `machines` / `environment` state enums (A6) | same file | no |
+| 12 | Assert the replacement table matched; delete dead entries (A3, A4) | `tools/render_quest_mission_control.py` | ✅ done — **six** dead groups, not four; every group now pins its match count |
+| 13 | Validate `machines` / `environment` state enums (A6) | same file | ✅ done |
 | 14 | Gitignore `.codex-pdf-profile/` and the PDF (E1, E4) | `.gitignore` | ✅ done |
 | 15 | Remove the empty `Lumberjacks/src/` fossil (E2) | — | ✅ done |
 | 16 | Give build/test the hash-keyed package cache `Start-QuestStudio.ps1` already uses, or bump the version on every repack (D6) | `README.md`, build/test entrypoints | no |
@@ -500,3 +500,17 @@ requiring sign-off**, not edits. The rest are mechanical.
 All four sign-off items were ruled on 2026-08-24; see the sign-off record in
 [`creator-os-build-strategy.md`](creator-os-build-strategy.md). Lane vocabulary is now defined
 once, in [`creator-os-phases.json`](creator-os-phases.json).
+
+**Lane 0 closed 2026-08-24.** Items 1-15 and 17 are done; the exit-gate walk is recorded in
+[`creator-os-build-strategy.md`](creator-os-build-strategy.md). Three items stay open and are
+deliberately **not** Lane 0 work: item 16 (hash-keyed package cache for build/test, or a version
+bump on every repack), item 18 (~20 remaining `Get-FileHash` call sites in nine scripts CI never
+runs), and gating the Playwright E2E suite in CI. All three carry ledger entries -- item 16
+under `NFR-INTEGRITY-001`, item 18 alongside it as the same latent-on-a-hosted-runner risk, and
+E2E coverage under `NFR-TEST-001`.
+
+**Two corrections to this report, found while applying it.** A3 estimated "at least four" dead
+replacement entries; the real count is **six groups** (eight literals). And C2 named FR-EVID-001
+as scheduled by no lane -- `creator-os-phases.json`, written after this audit, assigns it to
+`4B / sustained-creator-campaign`, so that third of C2 was stale by the time it was applied.
+FR-LOOP-003 and FR-RUN-002 remain exactly as C2 described and are `parked` in the ledger.

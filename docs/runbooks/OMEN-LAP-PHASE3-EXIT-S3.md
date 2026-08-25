@@ -1,5 +1,27 @@
 # OMEN lap runbook — session 3, the Phase 3 exit verdicts
 
+> **STALE — blocked pending re-derivation. Do not run it.** Steps 3 and 4 below tell the
+> seat to open the F9 drawer and aim through it.
+> [ADR 0008](../adr/0008-the-overhead-bar-replaces-the-f9-drawer.md) replaced that drawer
+> with one always-present overhead bar that F9 expands or minimizes, so those beats
+> describe controls that no longer exist.
+>
+> **The reason this needs a marker at all is the defect.** The lap passes every structural
+> check the repository has — five ordered steps, exactly three verdicts, correct beat
+> preconditions — while describing a UI that was replaced four days after it was written.
+> Syntactic validation cannot see that. Freshness is therefore recorded state:
+> `phase3_lap.state` in `docs/quest-mission-control.json` is `stale`, and the mission-control
+> renderer refuses to emit the sequence at all rather than present it as seat-ready.
+>
+> **Before this is run again:** re-derive the sequence against the current overhead-bar
+> interaction and a fresh Studio rehearsal of the exact project being played, the same way
+> the beats below were derived. `AGENTS.md`: choreography is verified by execution, not by
+> review. Three seat sessions have already been burned on sequences that had never been
+> executed.
+>
+> The three verdicts themselves are still wanted. It is the choreography that expired, not
+> the questions.
+
 **Derived, not written.** The beat order below comes from three machine sources, and no
 step is here because someone remembered it:
 

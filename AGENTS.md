@@ -47,3 +47,10 @@ flow, program phase/status, open decision, machine role, or acceptance evidence.
 does, update `docs/quest-mission-control.json` and regenerate the living HTML; unrelated
 commits do not require a cosmetic edit. `python tools/render_quest_mission_control.py
 --check` is part of the normal drift gate.
+
+Every queue item in that manifest carries a `lane` and a `requirements` list, and every
+`FR-`/`NFR-` identifier in `docs/creator-portfolio-requirements.md` carries a disposition in
+`docs/creator-requirements-ledger.json`. The same drift gate enforces both, so **adding or
+removing a requirement without a matching ledger entry fails CI** — that is deliberate, not
+friction to route around. Lane vocabulary itself is defined once, in
+`docs/creator-os-phases.json`; other documents reference a lane, they do not define one.

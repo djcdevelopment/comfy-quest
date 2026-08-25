@@ -194,15 +194,21 @@
   },
   "phase3_lap": {
     "title": "Parked Phase 3 exit lap",
-    "summary": "This remains a valid, source-derived five-step lap with exactly three human verdicts. Batch it into a later creative sitting; do not interrupt Creator OS construction for it.",
+    "summary": "The three combat-feel verdicts are still wanted. This lap script is not the way to collect them: it is stale and must not be run as written.",
     "source": "docs/runbooks/OMEN-LAP-PHASE3-EXIT-S3.md",
     "sequence_heading": "Sequence",
-    "verdicts_heading": "The three verdicts"
+    "verdicts_heading": "The three verdicts",
+    "state": "stale",
+    "stale_reason": "Steps 3 and 4 tell the seat to open the F9 drawer and aim. ADR 0008 replaced that drawer with one always-present overhead bar that F9 expands or minimizes, so the script describes controls that no longer exist. It passes structural validation anyway — five steps, three verdicts — which is why freshness is recorded state here rather than inferred from shape.",
+    "rederive_before_running": "Re-derive the sequence against the current overhead-bar interaction and a fresh Studio rehearsal of the exact project before any seat time is booked. Choreography is verified by execution, not by review.",
+    "decision": "docs/adr/0008-the-overhead-bar-replaces-the-f9-drawer.md"
   },
   "queue": [
     {
       "id": "queue.live-lap",
       "state": "complete",
+      "lane": "pre-lane",
+      "requirements": [],
       "title": "Safe-top overhead bar verified live",
       "detail": "Automation deployed the hash-pinned y=92 build, directly captured the full compact bar below the host band, preserved foreground and minimized state, and closed the session. Derek supplied only the ordinary out/in lifecycle cues.",
       "source": "docs/creator-os.md",
@@ -211,6 +217,8 @@
     {
       "id": "queue.first-godbuild",
       "state": "complete",
+      "lane": "pre-lane",
+      "requirements": [],
       "title": "First human-spaced module captured",
       "detail": "The early-progression shelter is checked in as capture, blueprint, typed plan, SVG preview, and manifest. Live BuildOn/Capture/Inspect/BuildOff passed; replay remains available when a later authored need calls for cloning the module.",
       "source": "docs/creator-os.md",
@@ -219,6 +227,8 @@
     {
       "id": "queue.requirements",
       "state": "complete",
+      "lane": "pre-lane",
+      "requirements": [],
       "title": "Adopt the guild-dogfood requirements",
       "detail": "Functional and non-functional requirements define the portfolio, questline, event, run/reset, release, integration-evidence, standalone-Workbench, safety, and seat-efficiency boundaries. World distribution remains specified but deferred.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -227,6 +237,12 @@
     {
       "id": "queue.portfolio",
       "state": "implemented",
+      "lane": "4A",
+      "requirements": [
+        "FR-PORT-002",
+        "FR-PORT-003",
+        "FR-AUTH-006"
+      ],
       "title": "Build the portfolio foundation",
       "detail": "Studio presents versioned guilds, questlines, standalone quests, repeatable events, progression bands, search/archive, transactional placement, and deep-fork import/export. Promote it only after the real persisted and published journey runs.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -235,6 +251,12 @@
     {
       "id": "queue.reset",
       "state": "implemented",
+      "lane": "4A",
+      "requirements": [
+        "FR-RESET-001",
+        "FR-RESET-002",
+        "FR-RESET-003"
+      ],
       "title": "Make clean reruns a product operation",
       "detail": "Studio and Runtime implement exact scoped preview, resumable cleanup, retained prior state, and a linked successor run. Promote it only after an installed game run proves the exchange, reset, restart, and rerun path.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -243,6 +265,11 @@
     {
       "id": "queue.workbench-boundary",
       "state": "ready",
+      "lane": "unassigned",
+      "lane_note": "Audit C4: the standalone Workbench has no place in the 4A/4B/4C/5 vocabulary and no exit gate, while docs/creator-os.md makes it a precondition for the autonomous integration 4A depends on. Placing it in a lane changes what that lane covers, so it is Derek's ruling, not this manifest's.",
+      "requirements": [
+        "NFR-MCP-001"
+      ],
       "title": "Prove the standalone Workbench boundary",
       "detail": "Before connecting MCP, make the released Isolate profile independently portable, identity-attested, neutral to machine and operator, and incapable of discovering or sharing anything with HEARTH. Drive one disposable command/receipt/teardown slice from clean artifacts.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -251,6 +278,11 @@
     {
       "id": "queue.guild-runtime",
       "state": "ready",
+      "lane": "4A",
+      "requirements": [
+        "FR-RUN-001",
+        "FR-AUTH-005"
+      ],
       "title": "Unlock guild-scale Runtime",
       "detail": "Implement multi-experience guild artifacts, prerequisites/unlocks, Runtime experience selection, independent run status, and creator-event controls as one coherent Studio-to-Runtime capability.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -259,6 +291,13 @@
     {
       "id": "queue.full-width-journey",
       "state": "gated",
+      "lane": "4A",
+      "requirements": [
+        "FR-LOOP-001",
+        "NFR-SEAT-001",
+        "NFR-SEAT-003",
+        "NFR-TEST-001"
+      ],
       "title": "Drive the installed vertical slice",
       "detail": "Use the actual Studio GUI, serialized artifacts, process restarts, bounded Valheim controls, receipts, logs, captures, and recovery. Fix and rerun mechanical faults before asking for human acceptance.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -267,6 +306,11 @@
     {
       "id": "queue.anchors",
       "state": "gated",
+      "lane": "4A",
+      "requirements": [
+        "FR-WORLD-001",
+        "FR-WORLD-002"
+      ],
       "title": "Add named anchors when authorship needs them",
       "detail": "Capture point, radius, region, or allowed object anchors through the bounded live-game contract when the first real guild slice needs spatial references. Anchors are not a standalone infrastructure milestone.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -275,6 +319,15 @@
     {
       "id": "queue.guild-campaign",
       "state": "human",
+      "lane": "4B",
+      "requirements": [
+        "FR-PORT-001",
+        "FR-PORT-004",
+        "FR-PORT-005",
+        "FR-EVID-001",
+        "FR-EVID-002",
+        "NFR-USE-001"
+      ],
       "title": "Dogfood the first top-to-bottom guild",
       "detail": "After autonomous readiness, Derek uses the Creator OS for real questlines and repeatable events. His sitting supplies creative and perceptual judgments; observed blocks drive the next full-width tooling change.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -283,6 +336,12 @@
     {
       "id": "queue.world-bundle",
       "state": "deferred",
+      "lane": "5",
+      "requirements": [
+        "FR-WORLD-003",
+        "FR-WORLD-004",
+        "FR-WORLD-005"
+      ],
       "title": "Package authored saved worlds",
       "detail": "Do not build versioned `.db`/`.fwl` packaging, inspection, installation, or rollback during active R&D. Activate this only after repeated guild authoring stabilizes the contracts and community distribution becomes the next result.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -290,15 +349,25 @@
     },
     {
       "id": "queue.phase3-lap",
-      "state": "human",
+      "state": "gated",
+      "lane": "pre-lane",
+      "requirements": [
+        "NFR-SEAT-003"
+      ],
       "title": "Batch the Phase 3 feel verdicts",
-      "detail": "Take the desperate-defense judgments together during a later creative sitting; the machine checks stay with the harness and this does not gate the dogfood foundation.",
+      "detail": "The desperate-defense judgments are still wanted, but the session-3 lap script is stale: it aims through the F9 drawer that ADR 0008 replaced with the overhead bar. Re-derive the sequence against the current interaction before booking seat time; this does not gate the dogfood foundation.",
       "source": "docs/creator-os.md",
       "source_contains": "Phase 3's remaining combat-feel verdicts are parked"
     },
     {
       "id": "queue.community",
       "state": "gated",
+      "lane": "5",
+      "requirements": [
+        "FR-REL-001",
+        "FR-REL-002",
+        "FR-REL-003"
+      ],
       "title": "Release community-ready guild artifacts",
       "detail": "Provenance, dependencies, permissions, import/export, semantic/world diff, and clean-profile installation follow the local guild campaign.",
       "source": "docs/creator-portfolio-requirements.md",
@@ -385,6 +454,12 @@
       "detail": "Read-only validation of the lease, machine, world, session, and installed payload hashes."
     },
     {
+      "id": "command.gallery-rebuild",
+      "label": "Rebuild the Lab gallery",
+      "detail": "Identify, rebuild, and re-evidence the gallery profile before a capture beat.",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 GalleryRebuild -SessionId <id> -Profile <profile>"
+    },
+    {
       "id": "command.build-on",
       "label": "Enable private build mode",
       "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 BuildOn -SessionId <id>",
@@ -415,6 +490,18 @@
       "detail": "Before leaving the loaded world: disable and verify both no-cost/all-pieces and god mode."
     },
     {
+      "id": "command.arm",
+      "label": "Arm the private world",
+      "detail": "Flip the Runtime safety config for the pinned private world. Arming does not start the game.",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Arm -SessionId <id>"
+    },
+    {
+      "id": "command.disarm",
+      "label": "Disarm the private world",
+      "detail": "Return the Runtime safety config to its unarmed state after the authored beat.",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Disarm -SessionId <id>"
+    },
+    {
       "id": "command.close",
       "label": "Close Creator Session",
       "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Close -SessionId <id> -Restore",
@@ -435,6 +522,6 @@
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
     "Close -Restore restores prior install bytes, not the authored world. During R&D, retain ordinary recoverable world copies; do not turn world packaging into a critical-path project.",
-    "Portfolio and reset/rerun are implemented, not yet integrated or autonomously driven through installed Valheim. Do not spend a seat turn discovering their mechanical defects."
+    "Portfolio and reset/rerun are wired end to end — endpoints, service, store, browser UI, file mailbox, and Runtime poller. What is missing is live-Valheim evidence, not wiring: they stay unpromoted until the real Studio persistence/publication, Runtime exchange, process restart, and installed-Valheim journey complete. Do not spend a seat turn discovering their mechanical defects."
   ]
 }

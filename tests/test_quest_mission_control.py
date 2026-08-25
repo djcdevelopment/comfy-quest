@@ -154,8 +154,43 @@ class QuestMissionControlTests(unittest.TestCase):
         self.assertIn("Press F10", sequence[1])
         plain_cast_step = " ".join(re.sub(r"[*`]", "", sequence[2]).split())
         self.assertIn("Press once more to CAST", plain_cast_step)
-        self.assertIn("press <code>`</code> once", self.committed)
-        self.assertIn("Press <code>`</code> once more", self.committed)
+
+    def test_a_stale_lap_cannot_be_presented_as_a_seat_sequence(self):
+        # Audit B7. The runbook still parses into the exact shape the old gate checked --
+        # five ordered steps, three verdicts -- while aiming through an F9 drawer ADR 0008
+        # removed. Shape is not freshness, so the page refuses it on recorded state.
+        phase3 = self.manifest["phase3_lap"]
+        self.assertEqual("stale", phase3["state"])
+        runbook = self.renderer.source_path(phase3["source"]).read_text(encoding="utf-8")[:2000]
+        self.assertIn("STALE", runbook)
+        self.assertIn("Do not run it", runbook)
+
+        self.assertIn("stale, do not run it", self.committed)
+        self.assertIn("controls that no longer exist", self.committed)
+        self.assertIn("Before it is run:", self.committed)
+        for gone in (
+            "press <code>`</code> once",
+            "Press <code>`</code> once more",
+            "Press F10",
+            '<ol class="derived-sequence">',
+            "Exactly three human verdicts",
+        ):
+            self.assertNotIn(gone, self.committed)
+
+        # The queue card is the other surface that could read as seat-ready.
+        card = next(item for item in self.manifest["queue"] if item["id"] == "queue.phase3-lap")
+        self.assertEqual("gated", card["state"])
+        self.assertIn("stale", card["detail"])
+
+        # A lap with no recorded freshness is refused outright, and a seat-ready one still
+        # renders its sequence -- so this is a real branch, not a permanently dark one.
+        unstated = copy.deepcopy(self.manifest)
+        del unstated["phase3_lap"]["state"]
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "phase3_lap.state"):
+            self.renderer.validate_manifest(unstated)
+        fresh = copy.deepcopy(self.manifest)
+        fresh["phase3_lap"]["state"] = "seat-ready"
+        self.assertIn('<ol class="derived-sequence">', self.renderer.render(fresh))
 
     def test_expected_receipts_come_from_creator_os_contract(self):
         path = self.renderer.source_path(self.manifest["recovery"]["expectations"])
@@ -242,6 +277,341 @@ class QuestMissionControlTests(unittest.TestCase):
         self.assertNotIn(b"\r\n", raw)
         parsed = json.loads(raw.decode("utf-8"))
         self.assertEqual(self.renderer.SCHEMA, parsed["schema"])
+
+class RoadmapSurfaceTests(unittest.TestCase):
+    """The mechanical repairs from the 2026-08-24 audit that are not the invariant."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.renderer = load_renderer()
+        cls.manifest = cls.renderer.load_manifest()
+        cls.committed = OUTPUT.read_text(encoding="utf-8")
+
+    def test_the_4a_exit_agrees_with_the_recorded_human_boundary(self):
+        # Audit item 1 / ADR 0014. The exit used to require automation that "launches and
+        # closes the installed game through the standalone harness"; nothing here can do that.
+        requirements = (REPO / "docs" / "creator-portfolio-requirements.md").read_text(
+            encoding="utf-8"
+        )
+        section = requirements[requirements.index("### 4A") : requirements.index("### 4B")]
+        self.assertNotIn("standalone harness", section)
+        self.assertIn("Exactly one human action is permitted", section)
+        self.assertIn("launching the game and entering the", section)
+        self.assertIn("0014-one-human-launch-and-entry-is-the-baseline.md", section)
+        # Strictly launch and entry, not a generic one-intervention budget.
+        self.assertIn("not a generic", section)
+        for excluded in ("relaying a console command", "retrying a failed mechanical step"):
+            self.assertIn(excluded, section)
+
+        phases = json.loads((REPO / "docs" / "creator-os-phases.json").read_text(encoding="utf-8"))
+        self.assertTrue(phases["human_boundary"]["scope_is_strict"])
+        self.assertNotIn("standalone harness", phases["lanes"][0]["exit"])
+
+    def test_the_caution_says_what_the_environment_entry_says(self):
+        # Audit B8: the caution sent a reader hunting for wiring that exists.
+        caution = self.manifest["cautions"][7]
+        environment = self.manifest["environment"][4]
+        self.assertEqual("implemented", environment["state"])
+        self.assertNotIn("not yet integrated", caution)
+        self.assertIn("wired end to end", caution)
+        self.assertIn("live-Valheim evidence", caution)
+        for stage in ("persistence/publication", "Runtime exchange", "process restart"):
+            self.assertIn(stage, caution)
+            self.assertIn(stage, environment["detail"])
+
+    def test_the_command_reference_lists_every_creator_session_verb(self):
+        # Audit B9: Arm, Disarm, and GalleryRebuild were missing from the reference while the
+        # page's own proof chain asserted runtime_arm and runtime_disarm.
+        script = (REPO / "tools" / "creator-session" / "Invoke-CreatorSession.ps1").read_text(
+            encoding="utf-8"
+        )
+        declared = re.search(r"\[ValidateSet\(([^)]*)\)\]", script).group(1)
+        verbs = set(re.findall(r"'([A-Za-z]+)'", declared))
+        self.assertEqual(10, len(verbs))
+        listed = {
+            verb
+            for verb in verbs
+            for command in self.manifest["commands"]
+            if f"Invoke-CreatorSession.ps1 {verb}" in command["command"]
+        }
+        self.assertEqual(verbs, listed)
+        for verb in ("Arm", "Disarm", "GalleryRebuild"):
+            self.assertIn(verb, listed)
+
+    def test_the_post_render_replacement_table_must_match(self):
+        # Audit A3: the table was live at 1fef480 and one ordinary template edit disconnected
+        # four of its keys, because nothing asserted a replacement fired.
+        source = RENDERER.read_text(encoding="utf-8")
+        for dead in (
+            "Now · recovery acceptance",
+            "Cold-load first. Create second.",
+            "Checkpoint A · immutable world judgment",
+            "Keep the canonical build unchanged",
+            "Last handoff",
+            'href="handoff-2026-08-20.md"',
+        ):
+            self.assertNotIn(dead, source)
+        # Audit A4: the table runs over manifest content, so a generic key can start matching
+        # text nobody meant to rewrite. That now fails too.
+        colliding = copy.deepcopy(self.manifest)
+        colliding["queue"][0]["detail"] += " Project source."
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "matched 2 times"):
+            self.renderer.render(colliding)
+
+    def test_machine_and_environment_states_are_validated(self):
+        # Audit A6: badge() fell back to state.title() and emitted an unstyled badge.
+        self.assertEqual({"ready", "online", "on-demand"}, self.renderer.ALLOWED_MACHINE_STATES)
+        for group, allowed in (
+            ("machines", self.renderer.ALLOWED_MACHINE_STATES),
+            ("environment", self.renderer.ALLOWED_ENVIRONMENT_STATES),
+        ):
+            with self.subTest(group=group):
+                for item in self.manifest[group]:
+                    self.assertIn(item["state"], allowed)
+                broken = copy.deepcopy(self.manifest)
+                broken[group][0]["state"] = "provisional"
+                with self.assertRaisesRegex(
+                    self.renderer.MissionControlError, f"invalid {group} state"
+                ):
+                    self.renderer.validate_manifest(broken)
+        stylesheet = RENDERER.read_text(encoding="utf-8")
+        for state in self.renderer.ALLOWED_ENVIRONMENT_STATES:
+            self.assertIn(f".status-{state}", stylesheet)
+
+
+class ProgramInvariantTests(unittest.TestCase):
+    """No executable roadmap item without lineage; no active requirement without a disposition.
+
+    Audit C6 is the origin: work items carried no `lane` or `requirements` field, so the
+    validator could not detect a work item belonging to no lane (C4) or a requirement no work
+    item claimed (C2). Each of the five failures below has a test that proves it fires; a
+    check that cannot fail is decoration.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.renderer = load_renderer()
+        cls.manifest = cls.renderer.load_manifest()
+        cls.ledger = cls.renderer.load_requirements_ledger()
+        cls.lanes = cls.renderer.load_lane_vocabulary()
+        cls.document_ids = cls.renderer.requirement_ids()
+
+    def check(self, *, manifest=None, ledger=None, lanes=None, document_ids=None):
+        self.renderer.validate_program_invariant(
+            copy.deepcopy(self.manifest if manifest is None else manifest),
+            ledger=copy.deepcopy(self.ledger if ledger is None else ledger),
+            lanes=copy.deepcopy(self.lanes if lanes is None else lanes),
+            document_ids=set(self.document_ids if document_ids is None else document_ids),
+        )
+
+    def entry(self, ledger, requirement_id):
+        return next(item for item in ledger["requirements"] if item["id"] == requirement_id)
+
+    def work_item(self, manifest, item_id):
+        return next(item for item in manifest["queue"] if item["id"] == item_id)
+
+    # --- the repository itself ------------------------------------------------------
+
+    def test_the_repository_satisfies_the_invariant(self):
+        self.check()
+        self.assertEqual(47, len(self.document_ids))
+        self.assertEqual(47, len(self.ledger["requirements"]))
+        self.assertEqual(
+            self.document_ids, {item["id"] for item in self.ledger["requirements"]}
+        )
+        self.assertEqual(
+            {"active", "parked", "deferred", "met"},
+            set(self.renderer.REQUIREMENT_DISPOSITIONS),
+        )
+        for item in self.manifest["queue"]:
+            with self.subTest(item=item["id"]):
+                self.assertIn(
+                    item["lane"], self.lanes["lane_ids"] | self.lanes["non_lane"]
+                )
+                self.assertIsInstance(item["requirements"], list)
+
+    def test_the_ledger_records_the_findings_lane_zero_deliberately_did_not_fix(self):
+        # The scope fence: D2, D5, C5 and their neighbours get a disposition here, not a repair.
+        for requirement_id, finding in (
+            ("FR-AUTH-001", "D5"),
+            ("FR-LOOP-002", "D4"),
+            ("FR-LOOP-003", "C2"),
+            ("FR-RUN-002", "C2"),
+            ("NFR-INTEGRITY-001", "D6"),
+            ("NFR-BOUND-001", "C5"),
+            ("NFR-MCP-001", "C4"),
+        ):
+            with self.subTest(requirement=requirement_id):
+                entry = self.entry(self.ledger, requirement_id)
+                self.assertEqual("parked", entry["disposition"])
+                self.assertIn(finding, entry["reason"] + entry.get("note", ""))
+        workbench = self.work_item(self.manifest, "queue.workbench-boundary")
+        self.assertEqual("unassigned", workbench["lane"])
+        self.assertIn("C4", workbench["lane_note"])
+
+    def test_met_requires_evidence_that_exists(self):
+        met = [item for item in self.ledger["requirements"] if item["disposition"] == "met"]
+        self.assertTrue(met)
+        for item in met:
+            with self.subTest(requirement=item["id"]):
+                self.assertTrue(item["evidence"])
+                for reference in item["evidence"]:
+                    self.assertTrue((REPO / reference).is_file(), reference)
+        broken = copy.deepcopy(self.ledger)
+        self.entry(broken, "NFR-SEC-001")["evidence"] = ["tools/there-is-no-such-gate.py"]
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "source does not exist"):
+            self.check(ledger=broken)
+
+    # --- check 1 ---------------------------------------------------------------------
+
+    def test_an_active_requirement_claimed_by_no_work_item_fails(self):
+        orphaned = copy.deepcopy(self.manifest)
+        self.work_item(orphaned, "queue.guild-runtime")["requirements"] = ["FR-AUTH-005"]
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError,
+            r"active requirement FR-RUN-001 is claimed by no work item in lane 4A",
+        ):
+            self.check(manifest=orphaned)
+
+    def test_an_active_requirement_claimed_only_outside_its_lane_fails(self):
+        # "In a named lane" is the substance of `active`: a claim from another lane is not one.
+        misplaced = copy.deepcopy(self.manifest)
+        self.work_item(misplaced, "queue.guild-runtime")["requirements"] = ["FR-AUTH-005"]
+        self.work_item(misplaced, "queue.guild-campaign")["requirements"].append("FR-RUN-001")
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"FR-RUN-001 is claimed by no work item in lane 4A"
+        ):
+            self.check(manifest=misplaced)
+
+    # --- check 2 ---------------------------------------------------------------------
+
+    def test_a_work_item_referencing_a_nonexistent_requirement_fails(self):
+        dangling = copy.deepcopy(self.manifest)
+        self.work_item(dangling, "queue.reset")["requirements"].append("FR-RESET-004")
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError,
+            r"queue\.reset\) references requirement FR-RESET-004, which is in no ledger entry",
+        ):
+            self.check(manifest=dangling)
+
+    # --- check 3 ---------------------------------------------------------------------
+
+    def test_a_work_item_with_no_lane_disposition_fails(self):
+        laneless = copy.deepcopy(self.manifest)
+        del self.work_item(laneless, "queue.portfolio")["lane"]
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"queue\.portfolio\) has no lane disposition"
+        ):
+            self.check(manifest=laneless)
+
+        invented = copy.deepcopy(self.manifest)
+        self.work_item(invented, "queue.portfolio")["lane"] = "4D"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"claims unknown lane '4D'"
+        ):
+            self.check(manifest=invented)
+
+        # `unassigned` records a gap; it may not excuse one.
+        silent = copy.deepcopy(self.manifest)
+        del self.work_item(silent, "queue.workbench-boundary")["lane_note"]
+        with self.assertRaisesRegex(self.renderer.MissionControlError, r"lane_note"):
+            self.check(manifest=silent)
+
+        # `pre-lane` is for finished or blocked pre-vocabulary work, not schedulable work.
+        backdated = copy.deepcopy(self.manifest)
+        self.work_item(backdated, "queue.guild-runtime")["lane"] = "pre-lane"
+        with self.assertRaisesRegex(self.renderer.MissionControlError, r"is `pre-lane` but"):
+            self.check(manifest=backdated)
+
+    def test_an_executable_work_item_must_carry_requirement_lineage(self):
+        # The other half of the invariant, and the half C6 named as the structural cause.
+        bare = copy.deepcopy(self.manifest)
+        self.work_item(bare, "queue.workbench-boundary")["requirements"] = []
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"is executable but claims no requirement"
+        ):
+            self.check(manifest=bare)
+
+    # --- check 4 ---------------------------------------------------------------------
+
+    def test_a_requirement_with_no_explicit_disposition_fails(self):
+        unstated = copy.deepcopy(self.ledger)
+        del self.entry(unstated, "FR-LOOP-003")["disposition"]
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError,
+            r"requirement FR-LOOP-003 lacks an explicit disposition",
+        ):
+            self.check(ledger=unstated)
+
+        invented = copy.deepcopy(self.ledger)
+        self.entry(invented, "FR-LOOP-003")["disposition"] = "in-progress"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"'in-progress' is not one of"
+        ):
+            self.check(ledger=invented)
+
+    def test_a_disposition_without_its_companion_field_fails(self):
+        # "parked" with no reason is the shape this exists to stop: an unscheduled requirement
+        # that looks dispositioned.
+        for requirement_id, field in (
+            ("FR-LOOP-003", "reason"),
+            ("FR-RUN-001", "lane"),
+            ("FR-REL-001", "phase"),
+            ("NFR-SEC-001", "evidence"),
+        ):
+            with self.subTest(requirement=requirement_id):
+                stripped = copy.deepcopy(self.ledger)
+                del self.entry(stripped, requirement_id)[field]
+                with self.assertRaises(self.renderer.MissionControlError):
+                    self.check(ledger=stripped)
+
+    def test_the_ledger_may_not_move_a_requirement_between_lanes(self):
+        # docs/creator-os-phases.json is the sole lane authority (ADR 0013). Re-lanning a
+        # requirement here would be a scope change wearing a bookkeeping disguise.
+        moved = copy.deepcopy(self.ledger)
+        self.entry(moved, "FR-RUN-001")["lane"] = "4B"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError,
+            r"FR-RUN-001 is owned by lane 4A in the lane vocabulary",
+        ):
+            self.check(ledger=moved)
+
+    # --- check 5 ---------------------------------------------------------------------
+
+    def test_a_requirements_document_edit_with_no_ledger_change_fails(self):
+        # The anti-reintroduction clause. The ledger stores the extracted id set, so editing
+        # the requirements document alone fails the gate the way a stale source pin does.
+        added = set(self.document_ids) | {"FR-PORT-006"}
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError,
+            r"in the document with no ledger entry: \['FR-PORT-006'\]",
+        ):
+            self.check(document_ids=added)
+
+        removed = set(self.document_ids) - {"FR-RESET-002"}
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError,
+            r"in the ledger but no longer in the document: \['FR-RESET-002'\]",
+        ):
+            self.check(document_ids=removed)
+
+    def test_the_lane_vocabulary_may_not_cite_a_requirement_that_does_not_exist(self):
+        cited = self.lanes["cited"]
+        self.assertTrue(cited)
+        self.assertLessEqual(cited, self.document_ids)
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"cites requirements that no longer exist"
+        ):
+            self.check(document_ids=set(self.document_ids) - {next(iter(cited))})
+
+    def test_the_invariant_runs_inside_the_ordinary_manifest_gate(self):
+        # It has to fire in CI, not only when someone calls it directly.
+        broken = copy.deepcopy(self.manifest)
+        del self.work_item(broken, "queue.portfolio")["lane"]
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"has no lane disposition"
+        ):
+            self.renderer.validate_manifest(broken)
 
 
 if __name__ == "__main__":

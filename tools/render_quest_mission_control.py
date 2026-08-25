@@ -19,10 +19,32 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[1]
 SOURCE = REPO / "docs" / "quest-mission-control.json"
 OUTPUT = REPO / "docs" / "quest-mission-control.html"
+LEDGER = REPO / "docs" / "creator-requirements-ledger.json"
+PHASES = REPO / "docs" / "creator-os-phases.json"
+REQUIREMENTS = REPO / "docs" / "creator-portfolio-requirements.md"
 SCHEMA = "comfy-quest-mission-control/v1"
+LEDGER_SCHEMA = "comfy-quest-creator-requirements-ledger/v1"
 SESSION_SCHEMA = "comfy-quest-mission-control-session/v2"
 ALLOWED_PHASE_STATES = {"complete", "active", "planned"}
 ALLOWED_QUEUE_STATES = {"complete", "implemented", "ready", "human", "gated", "deferred"}
+# badge() and the status-dot stylesheet only style these. An unlisted value renders an
+# unstyled badge or a grey dot and says nothing about it (audit A6).
+ALLOWED_MACHINE_STATES = {"ready", "online", "on-demand"}
+ALLOWED_ENVIRONMENT_STATES = {"confirmed", "implemented", "automated", "attention"}
+# A seat lap with no recorded freshness renders as an actionable sequence. Session 3's lap
+# passed structural validation while describing controls ADR 0008 removed (audit B7), so
+# freshness is state here, not an inference from shape.
+ALLOWED_LAP_STATES = {"seat-ready", "stale"}
+# The closed disposition set, and the companion field each one has to carry. `met` takes a
+# list of repository paths; the rest take text.
+REQUIREMENT_DISPOSITIONS = {
+    "active": "lane",
+    "parked": "reason",
+    "deferred": "phase",
+    "met": "evidence",
+}
+REQUIREMENT_ID = re.compile(r"\b(?:FR|NFR)-[A-Z]+-\d+\b")
+BOLD_REQUIREMENT_ID = re.compile(r"\*\*((?:FR|NFR)-[A-Z]+-\d+)\b")
 
 
 class MissionControlError(RuntimeError):
@@ -73,6 +95,191 @@ def validate_source_pin(item: dict[str, Any], where: str) -> None:
     marker = require_text(item.get("source_contains"), f"{where}.source_contains")
     if marker not in read_text(path):
         raise MissionControlError(f"{where} source pin is stale: {marker!r} not found in {path.relative_to(REPO)}")
+
+
+def requirement_ids(path: Path = REQUIREMENTS) -> set[str]:
+    """The authoritative id set, extracted from the uniform bold form the document uses."""
+    found = set(BOLD_REQUIREMENT_ID.findall(read_text(path)))
+    if not found:
+        raise MissionControlError(f"no requirement identifiers found in {path.relative_to(REPO)}")
+    return found
+
+
+def load_lane_vocabulary(path: Path = PHASES) -> dict[str, Any]:
+    """Lane ids, the declared non-lane work-item values, and per-requirement lane ownership."""
+    try:
+        value = json.loads(read_text(path))
+    except json.JSONDecodeError as exc:
+        raise MissionControlError(f"invalid lane vocabulary JSON: {exc}") from exc
+    lanes = require_list(value.get("lanes"), "lane vocabulary lanes")
+    lane_ids: list[str] = []
+    owned: dict[str, str] = {}
+    for index, lane in enumerate(lanes):
+        if not isinstance(lane, dict):
+            raise MissionControlError(f"lanes[{index}] must be an object")
+        lane_id = require_text(lane.get("id"), f"lanes[{index}].id")
+        require_text(lane.get("slug"), f"lanes[{index}].slug")
+        lane_ids.append(lane_id)
+        for position, requirement in enumerate(lane.get("requirements", [])):
+            owned[require_text(requirement, f"lanes[{index}].requirements[{position}]")] = lane_id
+    if len(set(lane_ids)) != len(lane_ids):
+        raise MissionControlError("lane vocabulary contains a duplicate lane id")
+    work = value.get("work_item_lane_values")
+    if not isinstance(work, dict):
+        raise MissionControlError("lane vocabulary must declare work_item_lane_values")
+    non_lane: set[str] = set()
+    for index, item in enumerate(require_list(work.get("non_lane_dispositions"), "non_lane_dispositions")):
+        if not isinstance(item, dict):
+            raise MissionControlError(f"non_lane_dispositions[{index}] must be an object")
+        non_lane.add(require_text(item.get("value"), f"non_lane_dispositions[{index}].value"))
+        require_text(item.get("meaning"), f"non_lane_dispositions[{index}].meaning")
+        require_text(item.get("rule"), f"non_lane_dispositions[{index}].rule")
+    collision = non_lane & set(lane_ids)
+    if collision:
+        raise MissionControlError(f"non-lane disposition collides with a lane id: {sorted(collision)}")
+    return {
+        "lane_ids": set(lane_ids),
+        "non_lane": non_lane,
+        "owned": owned,
+        "cited": set(REQUIREMENT_ID.findall(read_text(path))),
+    }
+
+
+def load_requirements_ledger(path: Path = LEDGER) -> dict[str, Any]:
+    try:
+        value = json.loads(read_text(path))
+    except json.JSONDecodeError as exc:
+        raise MissionControlError(f"invalid requirements ledger JSON: {exc}") from exc
+    if not isinstance(value, dict) or value.get("schema") != LEDGER_SCHEMA:
+        raise MissionControlError(f"requirements ledger schema must be {LEDGER_SCHEMA}")
+    return value
+
+
+def validate_program_invariant(
+    manifest: dict[str, Any],
+    *,
+    ledger: dict[str, Any] | None = None,
+    lanes: dict[str, Any] | None = None,
+    document_ids: set[str] | None = None,
+) -> None:
+    """No executable roadmap item without lineage; no active requirement without a disposition.
+
+    Five failures have to be reachable, and each one has a negative test:
+    an active requirement claimed by no work item; a work item citing a requirement that does
+    not exist; a work item with no lane disposition; a requirement with no explicit
+    disposition; and a requirements-document edit with no matching ledger change.
+    """
+    ledger = load_requirements_ledger() if ledger is None else ledger
+    lanes = load_lane_vocabulary() if lanes is None else lanes
+    document_ids = requirement_ids() if document_ids is None else document_ids
+    lane_ids = lanes["lane_ids"]
+
+    missing_citation = sorted(lanes["cited"] - document_ids)
+    if missing_citation:
+        raise MissionControlError(
+            f"lane vocabulary cites requirements that no longer exist: {missing_citation}"
+        )
+
+    # Check 4 - every requirement carries an explicit disposition and its companion field.
+    entries: dict[str, dict[str, Any]] = {}
+    for index, entry in enumerate(require_list(ledger.get("requirements"), "ledger.requirements")):
+        where = f"ledger.requirements[{index}]"
+        if not isinstance(entry, dict):
+            raise MissionControlError(f"{where} must be an object")
+        entry_id = require_text(entry.get("id"), f"{where}.id")
+        if entry_id in entries:
+            raise MissionControlError(f"duplicate requirement in ledger: {entry_id}")
+        disposition = entry.get("disposition")
+        if disposition not in REQUIREMENT_DISPOSITIONS:
+            raise MissionControlError(
+                f"requirement {entry_id} lacks an explicit disposition: {disposition!r} is not "
+                f"one of {sorted(REQUIREMENT_DISPOSITIONS)}"
+            )
+        companion = REQUIREMENT_DISPOSITIONS[disposition]
+        if companion == "evidence":
+            for position, reference in enumerate(
+                require_list(entry.get("evidence"), f"{where}.evidence")
+            ):
+                source_path(require_text(reference, f"{where}.evidence[{position}]"))
+        else:
+            require_text(entry.get(companion), f"{where}.{companion}")
+        if disposition == "active" and entry["lane"] not in lane_ids:
+            raise MissionControlError(
+                f"requirement {entry_id} is active in unknown lane {entry['lane']!r}"
+            )
+        if disposition == "deferred" and entry["phase"] not in lane_ids:
+            raise MissionControlError(
+                f"requirement {entry_id} defers to unknown lane {entry['phase']!r}"
+            )
+        entries[entry_id] = entry
+
+    # Check 5 - the anti-reintroduction clause. Editing the requirements document without
+    # touching the ledger fails here, the way a stale source_contains pin fails when prose moves.
+    if set(entries) != document_ids:
+        added = sorted(document_ids - set(entries))
+        dropped = sorted(set(entries) - document_ids)
+        raise MissionControlError(
+            "requirements document and ledger disagree; "
+            f"in the document with no ledger entry: {added}; "
+            f"in the ledger but no longer in the document: {dropped}"
+        )
+
+    # The lane vocabulary wins where it names an owner. This ledger may record a disposition;
+    # it may not move a requirement between lanes.
+    for entry_id, lane_id in lanes["owned"].items():
+        entry = entries[entry_id]
+        claimed = entry.get("lane") or entry.get("phase")
+        if claimed != lane_id:
+            raise MissionControlError(
+                f"requirement {entry_id} is owned by lane {lane_id} in the lane vocabulary but "
+                f"the ledger records {entry['disposition']} / {claimed!r}"
+            )
+
+    claims: dict[str, set[str]] = {}
+    for index, item in enumerate(manifest["queue"]):
+        where = f"queue[{index}] ({item.get('id')})"
+
+        # Check 3 - a work item with no lane disposition.
+        lane = item.get("lane")
+        if not isinstance(lane, str) or not lane.strip():
+            raise MissionControlError(f"{where} has no lane disposition")
+        if lane not in lane_ids and lane not in lanes["non_lane"]:
+            raise MissionControlError(
+                f"{where} claims unknown lane {lane!r}; the vocabulary is "
+                f"{sorted(lane_ids)} plus {sorted(lanes['non_lane'])}"
+            )
+        if lane == "unassigned":
+            require_text(item.get("lane_note"), f"queue[{index}].lane_note")
+        if lane == "pre-lane" and item.get("state") not in {"complete", "gated"}:
+            raise MissionControlError(
+                f"{where} is `pre-lane` but its state is {item.get('state')!r}; pre-lane is for "
+                "completed or blocked pre-vocabulary work, not for schedulable work"
+            )
+
+        # Check 2 - a work item referencing a requirement that does not exist.
+        claimed = item.get("requirements")
+        if not isinstance(claimed, list):
+            raise MissionControlError(f"{where} must carry a requirements list, even if empty")
+        for position, entry_id in enumerate(claimed):
+            require_text(entry_id, f"queue[{index}].requirements[{position}]")
+            if entry_id not in entries:
+                raise MissionControlError(
+                    f"{where} references requirement {entry_id}, which is in no ledger entry"
+                )
+            claims.setdefault(entry_id, set()).add(lane)
+
+        # The other half of the invariant: no executable item without lineage.
+        if item.get("state") != "complete" and not claimed:
+            raise MissionControlError(f"{where} is executable but claims no requirement")
+
+    # Check 1 - an active requirement claimed by no work item in its lane.
+    for entry_id, entry in entries.items():
+        if entry["disposition"] != "active":
+            continue
+        if entry["lane"] not in claims.get(entry_id, set()):
+            raise MissionControlError(
+                f"active requirement {entry_id} is claimed by no work item in lane {entry['lane']}"
+            )
 
 
 def validate_manifest(value: Any) -> None:
@@ -167,17 +374,38 @@ def validate_manifest(value: Any) -> None:
     source_path(require_text(phase3.get("source"), "phase3_lap.source"))
     require_text(phase3.get("sequence_heading"), "phase3_lap.sequence_heading")
     require_text(phase3.get("verdicts_heading"), "phase3_lap.verdicts_heading")
+    lap_state = phase3.get("state")
+    if lap_state not in ALLOWED_LAP_STATES:
+        raise MissionControlError(
+            f"phase3_lap.state must be one of {sorted(ALLOWED_LAP_STATES)}; a lap with no "
+            "recorded freshness renders as an actionable sequence"
+        )
+    if lap_state == "stale":
+        require_text(phase3.get("stale_reason"), "phase3_lap.stale_reason")
+        require_text(phase3.get("rederive_before_running"), "phase3_lap.rederive_before_running")
+        source_path(require_text(phase3.get("decision"), "phase3_lap.decision"))
 
+    allowed_states = {
+        "machines": ALLOWED_MACHINE_STATES,
+        "environment": ALLOWED_ENVIRONMENT_STATES,
+    }
     for key in ("machines", "environment"):
         for index, item in enumerate(value[key]):
             require_text(item.get("label"), f"{key}[{index}].label")
-            require_text(item.get("state"), f"{key}[{index}].state")
+            state = require_text(item.get("state"), f"{key}[{index}].state")
+            if state not in allowed_states[key]:
+                raise MissionControlError(
+                    f"invalid {key} state at {key}[{index}]: {state!r} has no badge or status "
+                    f"style, so it would render unlabelled"
+                )
             require_text(item.get("detail"), f"{key}[{index}].detail")
             require_text(item.get("fact_kind"), f"{key}[{index}].fact_kind")
 
     for index, command in enumerate(value["commands"]):
         require_text(command.get("command"), f"commands[{index}].command")
     require_list(value.get("cautions"), "cautions")
+
+    validate_program_invariant(value)
 
 
 def markdown_section(path: Path, heading: str) -> list[str]:
@@ -347,13 +575,17 @@ def render(manifest: dict[str, Any]) -> str:
     revision_source = read_text(source_path(revision["source"]))
     phase3 = manifest["phase3_lap"]
     phase3_source = source_path(phase3["source"])
-    phase3_steps = list_items(markdown_section(phase3_source, phase3["sequence_heading"]), ordered=True)
-    phase3_verdicts = list_items(markdown_section(phase3_source, phase3["verdicts_heading"]), ordered=False)
+    phase3_is_stale = phase3["state"] == "stale"
+    phase3_steps: list[str] = []
+    phase3_verdicts: list[str] = []
+    if not phase3_is_stale:
+        phase3_steps = list_items(markdown_section(phase3_source, phase3["sequence_heading"]), ordered=True)
+        phase3_verdicts = list_items(markdown_section(phase3_source, phase3["verdicts_heading"]), ordered=False)
     if len(creator_steps) != 6:
         raise MissionControlError(f"Creator Session loop must remain six derived steps, found {len(creator_steps)}")
     if len(revision_steps) < 2 or revision["source_sequence"] not in revision_source:
         raise MissionControlError("Portfolio dogfood loop must remain a source-declared sequence")
-    if len(phase3_steps) != 5 or len(phase3_verdicts) != 3:
+    if not phase3_is_stale and (len(phase3_steps) != 5 or len(phase3_verdicts) != 3):
         raise MissionControlError("Phase 3 runbook must expose five sequence steps and exactly three seat verdicts")
 
     expectations_relative = manifest["recovery"]["expectations"]
@@ -442,10 +674,32 @@ def render(manifest: dict[str, Any]) -> str:
     )
 
     caution_items = "".join(f"<li>{html.escape(item)}</li>" for item in manifest["cautions"])
-    phase3_sequence = "".join(
-        f'<li><span>{index}</span><p>{inline_markdown(step)}</p></li>' for index, step in enumerate(phase3_steps, 1)
-    )
-    phase3_judgments = "".join(f"<li>{inline_markdown(item)}</li>" for item in phase3_verdicts)
+    if phase3_is_stale:
+        # Refuse to render a stale lap as something a seat could follow. The steps are not
+        # emitted at all: a reader who can see them will follow them.
+        phase3_panel = (
+            '<details class="future"><summary>Parked Phase 3 exit lap · stale, do not run it'
+            '</summary><div>'
+            f'<p class="guardrail"><strong>Blocked.</strong> {html.escape(phase3["stale_reason"])}</p>'
+            f'<p>{html.escape(phase3["summary"])}</p>'
+            f'<p><strong>Before it is run:</strong> {html.escape(phase3["rederive_before_running"])}</p>'
+            f'{source_link(phase3["decision"], "Superseding decision")} '
+            f'{source_link(phase3["source"], "Stale runbook")}</div></details>'
+        )
+    else:
+        phase3_sequence = "".join(
+            f'<li><span>{index}</span><p>{inline_markdown(step)}</p></li>'
+            for index, step in enumerate(phase3_steps, 1)
+        )
+        phase3_judgments = "".join(f"<li>{inline_markdown(item)}</li>" for item in phase3_verdicts)
+        phase3_panel = (
+            '<details class="future"><summary>Preview the derived Phase 3 exit lap</summary><div>'
+            f'<p>{html.escape(phase3["summary"])}</p>'
+            f'<ol class="derived-sequence">{phase3_sequence}</ol>'
+            '<h3>Exactly three human verdicts</h3>'
+            f'<ul class="judgment-list">{phase3_judgments}</ul>'
+            f'{source_link(phase3["source"], "Derived runbook")}</div></details>'
+        )
 
     css = r'''
 :root{color-scheme:dark;--ink:#f5f1e8;--muted:#aaa99f;--dim:#74766f;--panel:#111713;--panel-2:#18201b;--panel-3:#202b24;--line:#344139;--gold:#e9a83f;--gold-soft:#ffd98b;--green:#65d68b;--violet:#c9a7ff;--red:#ff8b7d;--blue:#7fc8ff;--shadow:0 18px 50px rgba(0,0,0,.34);--radius:18px}
@@ -573,7 +827,7 @@ def render(manifest: dict[str, Any]) -> str:
   <section id="program" class="section" aria-labelledby="program-title"><div class="section-head"><div><span class="eyebrow">Five-intent program</span><h2 id="program-title">Guild dogfooding is the adoption path.</h2></div><p>Phase state is a cited program snapshot, not a live inference from checkboxes.</p></div><ol class="phase-list">{phases}</ol></section>
 
   <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">Adoption path</span><h2 id="queue-title">Integrate guild scale, drive it, then dogfood</h2></div><p>Portfolio and rerun are implemented. Standalone automation and guild-scale Runtime come next; world packaging waits until R&D stabilizes.</p></div><div class="queue-grid">{queue_cards}</div>
-    <details class="future"><summary>Preview the derived Phase 3 exit lap</summary><div><p>{html.escape(phase3["summary"])}</p><ol class="derived-sequence">{phase3_sequence}</ol><h3>Exactly three human verdicts</h3><ul class="judgment-list">{phase3_judgments}</ul>{source_link(phase3["source"], "Derived runbook")}</div></details>
+    {phase3_panel}
   </section>
 
   <section id="decisions" class="section" aria-labelledby="decisions-title"><div class="section-head"><div><span class="eyebrow">Resolved direction</span><h2 id="decisions-title">Decisions in force</h2></div><p>These constraints keep machine work scalable and protect the only capacity that does not scale with hardware.</p></div><div class="decision-grid">{decision_cards}</div></section>
@@ -585,43 +839,40 @@ def render(manifest: dict[str, Any]) -> str:
 <footer class="footer"><div class="shell footer-row"><span>Generated from tracked status and cited repository sources · manifest {source_hash}</span><span>Local session schema: {SESSION_SCHEMA}</span></div></footer>
 <script>{js}</script>
 </body></html>'''
-    replacements = {
-        "Now · recovery acceptance": "Creator OS rebase",
-        "Now \ufffd recovery acceptance": "Creator OS rebase",
-        "Cold-load first. Create second.": "Automate the machine loop. Spend the seat on design.",
-        "Checkmarks, the cold-load verdict, and notes": "Checkmarks, the seat-capacity verdict, and notes",
-        "cold-verdict": "lane-verdict",
-        'value="obvious"': 'value="no-relay"',
-        'value="not-obvious"': 'value="needed-relay"',
-        "Yes · immediately obvious": "No manual relay needed",
-        "Yes \ufffd immediately obvious": "No manual relay needed",
-        "No · not immediately obvious": "Manual relay was needed",
-        "No \ufffd not immediately obvious": "Manual relay was needed",
-        "Mixed · explain in notes": "Mixed; explain in notes",
-        "Mixed \ufffd explain in notes": "Mixed; explain in notes",
-        "Checkpoint A · immutable world judgment": "Checkpoint A · session ownership",
-        "Checkpoint A \ufffd immutable world judgment": "Checkpoint A · session ownership",
-        "Keep the canonical build unchanged": "Own deployment, identity, and rollback",
-        "Checkpoint B · source-derived creator loop": "Checkpoint B · source-derived Creator Session",
-        "Checkpoint B \ufffd source-derived creator loop": "Checkpoint B · source-derived Creator Session",
-        "begin the imported-fork path where its source says it begins. If recovery leaves the character elsewhere, record that state; do not invent a reset or silently skip the ascent beat.": "Prepare establishes every machine, world, session, install-hash, and backup precondition used by later steps. Do not substitute a human file relay or console command.",
-        "Checkpoint C · same fork, changed content": "Checkpoint C · portfolio dogfood",
-        "Checkpoint C \ufffd same fork, changed content": "Checkpoint C · portfolio dogfood",
-        "Bounded suggested edit": "Dogfood foundation gate",
-        "Project source": "Operating source",
-        "Acceptance evidence": "Machine evidence",
-        "The product’s expected proof chain": "The Creator OS expected proof chain",
-        "The product\ufffds expected proof chain": "The Creator OS expected proof chain",
-        "These receipt assertions come directly from the checked-in Demo World contract. Run-specific identities are deliberately not pinned.": "These assertions come from the checked-in Creator OS contract. Run-specific identities and hashes are deliberately not pinned.",
-        "Use Runtime receipts and the Studio cockpit for machine facts; preserve Derek’s exact words for the human judgment.": "Use correlated receipts, installed hashes, capture authority, and MATCH for machine facts; preserve exact seat observations only for human judgment.",
-        "Use Runtime receipts and the Studio cockpit for machine facts; preserve Derek\ufffds exact words for the human judgment.": "Use correlated receipts, installed hashes, capture authority, and MATCH for machine facts; preserve exact seat observations only for human judgment.",
-        "Last handoff": "Creator OS operating notes",
-        'href="handoff-2026-08-20.md"': 'href="creator-os.md"',
-        "‘can’t answer why’": "'can't answer why'",
-        "\ufffdcan\ufffdt answer why\ufffd": "'can't answer why'",
-    }
-    for old, new in replacements.items():
-        rendered = rendered.replace(old, new)
+    # Post-render substitutions, applied in order. Every group must match exactly the
+    # recorded number of times: a table nobody asserts on is a table an ordinary template
+    # edit disconnects silently (audit A3), and a generic key can also start matching
+    # manifest text that was never meant to be rewritten (audit A4). Multiple spellings in
+    # one group are encoding fallbacks for the same string, not separate rules.
+    replacements: tuple[tuple[tuple[str, ...], str, int], ...] = (
+        (('Checkmarks, the cold-load verdict, and notes',), 'Checkmarks, the seat-capacity verdict, and notes', 1),
+        (('cold-verdict',), 'lane-verdict', 2),
+        (('value="obvious"',), 'value="no-relay"', 1),
+        (('value="not-obvious"',), 'value="needed-relay"', 1),
+        (('Yes · immediately obvious', 'Yes � immediately obvious'), 'No manual relay needed', 1),
+        (('No · not immediately obvious', 'No � not immediately obvious'), 'Manual relay was needed', 1),
+        (('Mixed · explain in notes', 'Mixed � explain in notes'), 'Mixed; explain in notes', 1),
+        (('Checkpoint B · source-derived creator loop', 'Checkpoint B � source-derived creator loop'), 'Checkpoint B · source-derived Creator Session', 1),
+        (('begin the imported-fork path where its source says it begins. If recovery leaves the character elsewhere, record that state; do not invent a reset or silently skip the ascent beat.',), 'Prepare establishes every machine, world, session, install-hash, and backup precondition used by later steps. Do not substitute a human file relay or console command.', 1),
+        (('Checkpoint C · same fork, changed content', 'Checkpoint C � same fork, changed content'), 'Checkpoint C · portfolio dogfood', 1),
+        (('Bounded suggested edit',), 'Dogfood foundation gate', 1),
+        (('Project source',), 'Operating source', 1),
+        (('Acceptance evidence',), 'Machine evidence', 1),
+        (('The product’s expected proof chain', 'The product�s expected proof chain'), 'The Creator OS expected proof chain', 1),
+        (('These receipt assertions come directly from the checked-in Demo World contract. Run-specific identities are deliberately not pinned.',), 'These assertions come from the checked-in Creator OS contract. Run-specific identities and hashes are deliberately not pinned.', 1),
+        (('Use Runtime receipts and the Studio cockpit for machine facts; preserve Derek’s exact words for the human judgment.', 'Use Runtime receipts and the Studio cockpit for machine facts; preserve Derek�s exact words for the human judgment.'), 'Use correlated receipts, installed hashes, capture authority, and MATCH for machine facts; preserve exact seat observations only for human judgment.', 1),
+        (('‘can’t answer why’', '�can�t answer why�'), "'can't answer why'", 1),
+    )
+    for spellings, replacement, expected in replacements:
+        matched = sum(rendered.count(spelling) for spelling in spellings)
+        if matched != expected:
+            raise MissionControlError(
+                f"post-render replacement {spellings[0]!r} matched {matched} times, "
+                f"expected {expected}: the template no longer emits it, or manifest text "
+                "now collides with it"
+            )
+        for spelling in spellings:
+            rendered = rendered.replace(spelling, replacement)
     return rendered.replace("\ufffd", "·")
 
 

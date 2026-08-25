@@ -5,6 +5,22 @@
   "rationale": "Three incompatible 'Phase 3' / 'Phase 4' meanings were live at once across docs/creator-os.md, docs/five-intent-program-plan.md, and docs/quest-mission-control.json. A bare ordinal is semantically weak and an agent can execute the wrong work from it. Lanes therefore carry a stable slug as well as an id, and the slug is the safer thing to cite.",
   "citation_rule": "Cite a lane as `4A / guild-scale-runtime`, not as `Phase 4`.",
 
+  "work_item_lane_values": {
+    "note": "The `lane` field on a docs/quest-mission-control.json queue item must be one of the lane ids above, or one of the explicit non-lane values below. These are not lanes and must never be cited as one; they exist so that `no lane` is always a recorded disposition rather than a missing field. Adding a lane is a sign-off matter; adding a non-lane disposition is not.",
+    "non_lane_dispositions": [
+      {
+        "value": "pre-lane",
+        "meaning": "The work item was completed before this vocabulary was adopted on 2026-08-24. It is a historical record, not schedulable work.",
+        "rule": "Permitted only on a queue item whose state is `complete`, or on a parked remnant of pre-vocabulary work that carries its own blocked state."
+      },
+      {
+        "value": "unassigned",
+        "meaning": "No lane claims this work item, and assigning one would change what a lane covers.",
+        "rule": "Requires a `lane_note` naming the open question and who must rule on it. This value records a gap; it does not excuse one."
+      }
+    ]
+  },
+
   "human_boundary": {
     "id": "one-launch-and-entry",
     "allowance": "Exactly one human action is permitted per creator session: launching the game and entering the pinned authoring world. Everything after world entry is machine-owned.",

@@ -63,14 +63,21 @@ Condition 5 is the anti-reintroduction clause, and it is what makes the rest dur
 the ledger stores the extracted id set, editing the requirements document without touching the
 ledger fails the gate — exactly the way a `source_contains` pin already fails when prose moves.
 
-**Mechanism**, built on machinery that already exists:
+**Mechanism** — built 2026-08-24 on machinery that already existed:
 
-- add `requirements: []` and a `lane` field to queue items in
+- `requirements: []` and a `lane` field on every queue item in
   `docs/quest-mission-control.json`;
-- add a tracked `docs/creator-requirements-ledger.json` mapping each of the 47 ids to
-  disposition, lane, and evidence;
-- extend `validate_manifest` in `tools/render_quest_mission_control.py` with the five checks;
-- run it in the existing drift gate, alongside `--check`.
+- a tracked [`docs/creator-requirements-ledger.json`](creator-requirements-ledger.json) mapping
+  all 47 ids to disposition, lane, and evidence;
+- `validate_program_invariant` in `tools/render_quest_mission_control.py`, called from
+  `validate_manifest`, so the checks run in the Python suite and therefore in CI.
+
+Two rules keep the ledger from becoming a second vocabulary. Where
+[`creator-os-phases.json`](creator-os-phases.json) names a requirement under a lane, the ledger
+must record that same lane — moving one fails the gate. Where it does not, the ledger may record
+a disposition but may **not** invent a lane assignment, because that changes what a lane covers
+and needs the sign-off below. A work item with no lane says so explicitly, with a note naming
+who must rule; `no lane` is a recorded disposition, never a missing field.
 
 **Disposition vocabulary** — a closed, validated set, mirroring `ALLOWED_QUEUE_STATES`:
 `active` (claimed by a queue item in a named lane) · `parked` (deliberately unscheduled, reason
@@ -80,6 +87,8 @@ reference required).
 ---
 
 ## Lane 0 — Make the roadmap tell the truth
+
+**Status: complete, 2026-08-24.** Exit gate walked below.
 
 Repairs **authority surfaces only**: traceability, CI and drift machinery, ADR ownership, stale
 documentation, and roadmap truthfulness. Establishes the program invariant as executable
@@ -130,6 +139,51 @@ answer all ten of these without archaeology:
 **If any answer still requires reconciling multiple contradictory documents by hand, Lane 0 is
 not complete.** The deliverable is not more documentation — it is a self-consistent,
 mechanically checked control plane.
+
+### Lane 0 exit gate — walked 2026-08-24
+
+Walked cold, through the authoritative surfaces only. Every answer resolves from one surface;
+where a second is listed it agrees mechanically rather than by reading.
+
+| # | Question | Answer | Surface |
+| --- | --- | --- | --- |
+| 1 | What is being built now? | Lane 1: a bounded `select_experience` selector | Lane 1 below; `queue.guild-runtime` (`ready`, lane `4A`) |
+| 2 | Why is it next? | It is the single check blocking guild scale — the contract layer already compiles *N* experiences | "The conclusion this rests on" above; audit D1 |
+| 3 | Which requirements does it satisfy? | `FR-RUN-001`, `FR-AUTH-005` | `queue.guild-runtime.requirements`; both `active` / `4A` in the ledger |
+| 4 | What decision authorized its shape? | Lane 1 below, with explicit non-goals; vocabulary fixed by [ADR 0013](adr/0013-one-numbering-authority-for-lane-vocabulary.md) | this file; `queue.guild-runtime.source` |
+| 5 | What is explicitly deferred? | 10 `deferred` and 10 `parked` requirements, each with an owning lane or a reason | [`creator-requirements-ledger.json`](creator-requirements-ledger.json) |
+| 6 | What evidence proves the preceding capability exists? | The live Creator Session proof chain, plus 9 `met` requirements whose evidence paths are checked to exist | `creator-os-expected.json`; ledger `met` entries |
+| 7 | What exact evidence will close the current lane? | Lane 4A's `exit` | [`creator-os-phases.json`](creator-os-phases.json); the requirements-document 4A exit now agrees |
+| 8 | Which actions require Derek? | One launch and world entry per session, and nothing else | `human_boundary` in the vocabulary; [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md) |
+| 9 | Which operations are machine-owned? | All ten Creator Session verbs, checked against the script's own `ValidateSet` | `commands` in the manifest; `not_permitted_under_this_allowance` |
+| 10 | What is the next executable task? | `queue.guild-runtime` | the manifest queue |
+
+Question 10 is the one that would have been ambiguous. Two items sit in state `ready`:
+`queue.guild-runtime` and `queue.workbench-boundary`. The second now carries lane `unassigned`
+with a `lane_note` saying so and naming who must rule on it, so "ready but not next" is a
+recorded fact rather than something the reader has to infer. That is the shape of the whole
+lane: gaps are named, not smoothed.
+
+**Gate result: passed.** No answer required reconciling contradictory documents by hand.
+
+### What Lane 0 changed, and what it deliberately did not
+
+Applied: the 4A exit prose now matches [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md);
+the program invariant is executable, with a tracked ledger of all 47 requirement ids, `lane`
+and `requirements` on every queue item, five checks in `validate_manifest`, and a negative test
+per check; the Phase-3 lap is stale in the manifest and in its runbook, and the renderer emits
+no sequence for a stale lap; `cautions[7]` says what `environment[4]` says; the command
+reference lists all ten verbs; the post-render replacement table pins its match counts and has
+lost six dead groups; `machines[].state` and `environment[].state` are validated.
+
+Not applied, on purpose: audit D2 (duplicated allowlist with different comparers), D4 (Creator
+Session cannot drive run control), D5 (asymmetric schema acceptance), C5 (advisory
+`MaxProjects`), D6 / punch item 16 (content-mutable interim package), punch item 18 (~20
+`Get-FileHash` call sites CI never runs), and the ungated Playwright suite. Each carries a
+ledger entry naming the finding. They are small and tempting, which is exactly why they were
+left: the property worth having after Lane 0 is that the roadmap can be trusted *and* the
+implementation gaps are known and named — not partially and invisibly repaired.
+
 
 ---
 

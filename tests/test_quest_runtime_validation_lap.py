@@ -316,11 +316,17 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         # precondition chain (see SEAT_BEATS), not against a phrase that broke once.
         for path in sorted((ROOT / "docs" / "runbooks").glob("*.md")):
             source = path.read_text(encoding="utf-8")
-            if "HISTORICAL" in source[:2000]:
-                # Quarantined scripts are exempt, but must say plainly they are not to be run.
-                with self.subTest(historical=path.name):
-                    self.assertIn("Do not run it", source[:2000])
+            head = source[:2000]
+            # Two quarantine markers, one rule. HISTORICAL is a superseded script kept for the
+            # record; STALE is a script whose choreography expired under it (audit B7). Either
+            # way it must say plainly that it is not to be run.
+            if "HISTORICAL" in head or "STALE" in head:
+                with self.subTest(quarantined=path.name):
+                    self.assertIn("Do not run it", head)
+            if "HISTORICAL" in head:
                 continue
+            # A stale script still has to pass the beat rule: it is blocked on choreography
+            # that expired, not licensed to describe an impossible order.
             with self.subTest(runbook=path.name):
                 self.assertEqual([], seat_beat_problems(source))
 
