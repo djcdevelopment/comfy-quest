@@ -35,14 +35,23 @@ ALLOWED_ENVIRONMENT_STATES = {"confirmed", "implemented", "automated", "attentio
 # passed structural validation while describing controls ADR 0008 removed (audit B7), so
 # freshness is state here, not an inference from shape.
 ALLOWED_LAP_STATES = {"seat-ready", "stale"}
-# The closed disposition set, and the companion field each one has to carry. `met` takes a
-# list of repository paths; the rest take text.
+# The closed disposition set, and the companion fields each one has to carry. `evidence` is a
+# list of repository paths; the rest are text. `parked` needs two: why it is parked, and the
+# ruling that has not been made. Without the second it becomes a catch-all for future work,
+# blocked work, abandoned work, and work that is merely not in this lane.
 REQUIREMENT_DISPOSITIONS = {
-    "active": "lane",
-    "parked": "reason",
-    "deferred": "phase",
-    "met": "evidence",
+    "active": ("lane", "lane_authority"),
+    "parked": ("reason", "pending_ruling"),
+    "deferred": ("phase", "lane_authority"),
+    "met": ("evidence",),
 }
+# Where a lane recorded in the ledger came from. Never "the ledger": it is a recorder, not a
+# scheduler. `queue-realization` reads the lane off a work item already scheduled there, and
+# only `active` may use it -- a future lane can only come from the phase authority.
+LANE_AUTHORITIES = {"phase-authority", "queue-realization"}
+# A ledger entry with no lane carries none of these. That is what stops a parked requirement
+# from drifting toward its apparently obvious destination.
+LANELESS_DISPOSITIONS = {"parked", "met"}
 REQUIREMENT_ID = re.compile(r"\b(?:FR|NFR)-[A-Z]+-\d+\b")
 BOLD_REQUIREMENT_ID = re.compile(r"\*\*((?:FR|NFR)-[A-Z]+-\d+)\b")
 
@@ -124,22 +133,28 @@ def load_lane_vocabulary(path: Path = PHASES) -> dict[str, Any]:
             owned[require_text(requirement, f"lanes[{index}].requirements[{position}]")] = lane_id
     if len(set(lane_ids)) != len(lane_ids):
         raise MissionControlError("lane vocabulary contains a duplicate lane id")
-    work = value.get("work_item_lane_values")
+    work = value.get("work_item_lane_assignment_values")
     if not isinstance(work, dict):
-        raise MissionControlError("lane vocabulary must declare work_item_lane_values")
-    non_lane: set[str] = set()
-    for index, item in enumerate(require_list(work.get("non_lane_dispositions"), "non_lane_dispositions")):
+        raise MissionControlError("lane vocabulary must declare work_item_lane_assignment_values")
+    assignment_states: set[str] = set()
+    for index, item in enumerate(require_list(work.get("assignment_states"), "assignment_states")):
         if not isinstance(item, dict):
-            raise MissionControlError(f"non_lane_dispositions[{index}] must be an object")
-        non_lane.add(require_text(item.get("value"), f"non_lane_dispositions[{index}].value"))
-        require_text(item.get("meaning"), f"non_lane_dispositions[{index}].meaning")
-        require_text(item.get("rule"), f"non_lane_dispositions[{index}].rule")
-    collision = non_lane & set(lane_ids)
+            raise MissionControlError(f"assignment_states[{index}] must be an object")
+        assignment_states.add(require_text(item.get("value"), f"assignment_states[{index}].value"))
+        require_text(item.get("meaning"), f"assignment_states[{index}].meaning")
+        # The eligibility rule is what keeps an assignment state from becoming an opt-out, and
+        # `not` is what keeps a reader from citing it as a lane.
+        require_text(item.get("rule"), f"assignment_states[{index}].rule")
+        require_text(item.get("not"), f"assignment_states[{index}].not")
+    collision = assignment_states & set(lane_ids)
     if collision:
-        raise MissionControlError(f"non-lane disposition collides with a lane id: {sorted(collision)}")
+        raise MissionControlError(
+            f"lane assignment state collides with a lane id: {sorted(collision)}; an assignment "
+            "state is not a lane and may never be readable as one"
+        )
     return {
         "lane_ids": set(lane_ids),
-        "non_lane": non_lane,
+        "assignment_states": assignment_states,
         "owned": owned,
         "cited": set(REQUIREMENT_ID.findall(read_text(path))),
     }
@@ -195,21 +210,52 @@ def validate_program_invariant(
                 f"requirement {entry_id} lacks an explicit disposition: {disposition!r} is not "
                 f"one of {sorted(REQUIREMENT_DISPOSITIONS)}"
             )
-        companion = REQUIREMENT_DISPOSITIONS[disposition]
-        if companion == "evidence":
-            for position, reference in enumerate(
-                require_list(entry.get("evidence"), f"{where}.evidence")
-            ):
-                source_path(require_text(reference, f"{where}.evidence[{position}]"))
-        else:
-            require_text(entry.get(companion), f"{where}.{companion}")
-        if disposition == "active" and entry["lane"] not in lane_ids:
+        for companion in REQUIREMENT_DISPOSITIONS[disposition]:
+            if companion == "evidence":
+                for position, reference in enumerate(
+                    require_list(entry.get("evidence"), f"{where}.evidence")
+                ):
+                    source_path(require_text(reference, f"{where}.evidence[{position}]"))
+            else:
+                require_text(entry.get(companion), f"{where}.{companion}")
+        if disposition in LANELESS_DISPOSITIONS:
+            stray = sorted({"lane", "phase", "lane_authority"} & set(entry))
+            if stray:
+                raise MissionControlError(
+                    f"requirement {entry_id} is {disposition} and carries {stray}; a "
+                    f"{disposition} requirement has no lane, which is what keeps it from "
+                    "drifting toward its apparently obvious destination"
+                )
+            entries[entry_id] = entry
+            continue
+        recorded = entry["lane"] if disposition == "active" else entry["phase"]
+        if recorded not in lane_ids:
+            if recorded in lanes["assignment_states"]:
+                raise MissionControlError(
+                    f"requirement {entry_id} records {recorded!r} as a lane; that is a work-item "
+                    "lane assignment state, not a lane, and it schedules nothing"
+                )
+            raise MissionControlError(f"requirement {entry_id} records unknown lane {recorded!r}")
+        authority = entry["lane_authority"]
+        if authority not in LANE_AUTHORITIES:
             raise MissionControlError(
-                f"requirement {entry_id} is active in unknown lane {entry['lane']!r}"
+                f"requirement {entry_id} names unknown lane_authority {authority!r}; the ledger "
+                "may record where a lane came from, never that it came from the ledger"
             )
-        if disposition == "deferred" and entry["phase"] not in lane_ids:
+        if disposition == "deferred" and authority != "phase-authority":
             raise MissionControlError(
-                f"requirement {entry_id} defers to unknown lane {entry['phase']!r}"
+                f"requirement {entry_id} is deferred to {recorded} on {authority!r} authority; a "
+                "future lane can only come from the phase authority"
+            )
+        if authority == "phase-authority" and lanes["owned"].get(entry_id) != recorded:
+            raise MissionControlError(
+                f"requirement {entry_id} claims phase authority for lane {recorded}, but the "
+                f"lane vocabulary records {lanes['owned'].get(entry_id)!r}"
+            )
+        if authority == "queue-realization" and entry_id in lanes["owned"]:
+            raise MissionControlError(
+                f"requirement {entry_id} is owned by lane {lanes['owned'][entry_id]} in the lane "
+                "vocabulary, so its lane_authority is phase-authority, not queue-realization"
             )
         entries[entry_id] = entry
 
@@ -224,8 +270,8 @@ def validate_program_invariant(
             f"in the ledger but no longer in the document: {dropped}"
         )
 
-    # The lane vocabulary wins where it names an owner. This ledger may record a disposition;
-    # it may not move a requirement between lanes.
+    # The lane vocabulary wins wherever it names an owner. This ledger records a disposition;
+    # it never moves a requirement between lanes, and never places one the vocabulary has not.
     for entry_id, lane_id in lanes["owned"].items():
         entry = entries[entry_id]
         claimed = entry.get("lane") or entry.get("phase")
@@ -243,10 +289,10 @@ def validate_program_invariant(
         lane = item.get("lane")
         if not isinstance(lane, str) or not lane.strip():
             raise MissionControlError(f"{where} has no lane disposition")
-        if lane not in lane_ids and lane not in lanes["non_lane"]:
+        if lane not in lane_ids and lane not in lanes["assignment_states"]:
             raise MissionControlError(
                 f"{where} claims unknown lane {lane!r}; the vocabulary is "
-                f"{sorted(lane_ids)} plus {sorted(lanes['non_lane'])}"
+                f"{sorted(lane_ids)} plus assignment states {sorted(lanes['assignment_states'])}"
             )
         if lane == "unassigned":
             require_text(item.get("lane_note"), f"queue[{index}].lane_note")

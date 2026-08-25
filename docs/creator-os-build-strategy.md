@@ -72,12 +72,40 @@ ledger fails the gate — exactly the way a `source_contains` pin already fails 
 - `validate_program_invariant` in `tools/render_quest_mission_control.py`, called from
   `validate_manifest`, so the checks run in the Python suite and therefore in CI.
 
-Two rules keep the ledger from becoming a second vocabulary. Where
-[`creator-os-phases.json`](creator-os-phases.json) names a requirement under a lane, the ledger
-must record that same lane — moving one fails the gate. Where it does not, the ledger may record
-a disposition but may **not** invent a lane assignment, because that changes what a lane covers
-and needs the sign-off below. A work item with no lane says so explicitly, with a note naming
-who must rule; `no lane` is a recorded disposition, never a missing field.
+**Authority runs one way**, and the ledger sits in the middle of it as a recorder:
+
+> requirements → phase authority → ledger recording → queue realization → evidence
+
+[`creator-os-phases.json`](creator-os-phases.json) is the phase and scheduling authority; it
+alone decides which lane owns a requirement. Where it names one, the ledger mirrors it and
+disagreeing fails the gate. Where it does not, the ledger may record a disposition but may
+**not** invent a lane. Every lane the ledger names carries a `lane_authority` saying where it
+came from — `phase-authority`, or `queue-realization` where a work item already scheduled in
+that lane claims it — and neither source is the ledger. A future lane can only come from the
+phase authority, so `deferred` may not read one off a queue item. `parked` and `met` carry no
+lane at all, which is what stops a parked requirement from drifting toward its apparently
+obvious destination.
+
+`parked` has exactly one meaning: **the requirement is still recognized and relevant, but
+scheduling or advancement needs a ruling nobody has made.** It therefore requires a
+`pending_ruling` naming the missing decision. The ledger also records what `parked` is *not* —
+future-but-decided work, externally blocked work, abandoned or superseded requirements,
+implementation-complete-but-unproven work, and work merely outside the current lane — each with
+the representation that already covers it. Without that list, `parked` becomes "not now", and
+the ledger stops meaning anything.
+
+`met` stays deliberately hard to earn: gated evidence at the requirement's own proof standard,
+with no unresolved audit finding against it. Code existing is not evidence, and neither is an
+end-to-end path that looks wired. `NFR-INTEGRITY-001` stays parked while D6 is open, and
+`FR-RESET-001` / `FR-RESET-002` stay active in 4A even though the path is built, because 4A's
+exit is what collects their proof.
+
+A work item with no lane says so explicitly, with a note naming who must rule. `pre-lane` and
+`unassigned` are **lane assignment states, not lanes**: they carry no scope, no exit, no
+requirements, and no place in any order of work, and the validator refuses them anywhere a lane
+id is expected. Readiness and lane assignment stay independent dimensions — `queue.workbench-boundary`
+is `ready` **and** `unassigned` **and** annotated with the ruling it waits on, which is three
+useful facts that a single `blocked` would have destroyed.
 
 **Disposition vocabulary** — a closed, validated set, mirroring `ALLOWED_QUEUE_STATES`:
 `active` (claimed by a queue item in a named lane) · `parked` (deliberately unscheduled, reason
@@ -88,7 +116,10 @@ reference required).
 
 ## Lane 0 — Make the roadmap tell the truth
 
-**Status: complete, 2026-08-24.** Exit gate walked below.
+**Status: complete, 2026-08-24.** Exit gate walked below, then reviewed and closed the
+same day. The review changed no disposition and repaired no fenced finding; it tightened
+what the vocabulary *means* so that later lanes consuming the ledger cannot widen it by
+reading it loosely.
 
 Repairs **authority surfaces only**: traceability, CI and drift machinery, ADR ownership, stale
 documentation, and roadmap truthfulness. Establishes the program invariant as executable

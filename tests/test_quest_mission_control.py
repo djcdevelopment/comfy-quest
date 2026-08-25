@@ -2,6 +2,7 @@ import copy
 import importlib.util
 import json
 import re
+import tempfile
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
@@ -426,7 +427,7 @@ class ProgramInvariantTests(unittest.TestCase):
         for item in self.manifest["queue"]:
             with self.subTest(item=item["id"]):
                 self.assertIn(
-                    item["lane"], self.lanes["lane_ids"] | self.lanes["non_lane"]
+                    item["lane"], self.lanes["lane_ids"] | self.lanes["assignment_states"]
                 )
                 self.assertIsInstance(item["requirements"], list)
 
@@ -572,9 +573,28 @@ class ProgramInvariantTests(unittest.TestCase):
         self.entry(moved, "FR-RUN-001")["lane"] = "4B"
         with self.assertRaisesRegex(
             self.renderer.MissionControlError,
-            r"FR-RUN-001 is owned by lane 4A in the lane vocabulary",
+            r"FR-RUN-001 claims phase authority for lane 4B, but the lane vocabulary records '4A'",
         ):
             self.check(ledger=moved)
+
+        # Nor may it drop a requirement out of the lane that owns it by parking it. That is
+        # the quiet version of the same move, and it is the one worth catching.
+        dropped = copy.deepcopy(self.ledger)
+        entry = self.entry(dropped, "FR-RUN-001")
+        entry.clear()
+        entry.update(
+            {
+                "id": "FR-RUN-001",
+                "disposition": "parked",
+                "reason": "looks like it can wait",
+                "pending_ruling": "whether it can wait",
+            }
+        )
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError,
+            r"FR-RUN-001 is owned by lane 4A in the lane vocabulary but the ledger records parked",
+        ):
+            self.check(ledger=dropped)
 
     # --- check 5 ---------------------------------------------------------------------
 
@@ -603,6 +623,182 @@ class ProgramInvariantTests(unittest.TestCase):
             self.renderer.MissionControlError, r"cites requirements that no longer exist"
         ):
             self.check(document_ids=set(self.document_ids) - {next(iter(cited))})
+
+    # --- the ledger is a recorder, not a scheduler ----------------------------------
+
+    def test_the_ledger_cannot_confer_lane_authority(self):
+        # Authority runs one way: requirements -> phase authority -> ledger -> queue -> evidence.
+        # Every lane the ledger names points at where it came from, and neither source is here.
+        for entry in self.ledger["requirements"]:
+            if entry["disposition"] in {"active", "deferred"}:
+                with self.subTest(requirement=entry["id"]):
+                    self.assertIn(entry["lane_authority"], self.renderer.LANE_AUTHORITIES)
+
+        silent = copy.deepcopy(self.ledger)
+        del self.entry(silent, "FR-RESET-001")["lane_authority"]
+        with self.assertRaisesRegex(self.renderer.MissionControlError, r"lane_authority"):
+            self.check(ledger=silent)
+
+        invented = copy.deepcopy(self.ledger)
+        self.entry(invented, "FR-RESET-001")["lane_authority"] = "ledger"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"never that it came from the ledger"
+        ):
+            self.check(ledger=invented)
+
+        # Claiming phase authority the vocabulary did not grant.
+        overreach = copy.deepcopy(self.ledger)
+        self.entry(overreach, "FR-RESET-001")["lane_authority"] = "phase-authority"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"claims phase authority for lane 4A"
+        ):
+            self.check(ledger=overreach)
+
+        # And the reverse: quietly demoting a vocabulary-owned requirement to a queue reading.
+        demoted = copy.deepcopy(self.ledger)
+        self.entry(demoted, "FR-RUN-001")["lane_authority"] = "queue-realization"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"is owned by lane 4A in the lane vocabulary"
+        ):
+            self.check(ledger=demoted)
+
+    def test_a_future_lane_can_only_come_from_the_phase_authority(self):
+        # `deferred` is the disposition most tempting to guess at, so it takes no shortcut.
+        for entry in self.ledger["requirements"]:
+            if entry["disposition"] == "deferred":
+                with self.subTest(requirement=entry["id"]):
+                    self.assertEqual("phase-authority", entry["lane_authority"])
+                    self.assertEqual(entry["phase"], self.lanes["owned"][entry["id"]])
+        guessed = copy.deepcopy(self.ledger)
+        self.entry(guessed, "FR-REL-001")["lane_authority"] = "queue-realization"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"a future lane can only come from the phase authority"
+        ):
+            self.check(ledger=guessed)
+
+    def test_a_parked_or_met_requirement_carries_no_lane(self):
+        # This is the mechanical form of "do not helpfully schedule the obvious ones".
+        for entry in self.ledger["requirements"]:
+            if entry["disposition"] in {"parked", "met"}:
+                with self.subTest(requirement=entry["id"]):
+                    self.assertNotIn("lane", entry)
+                    self.assertNotIn("phase", entry)
+                    self.assertNotIn("lane_authority", entry)
+        for requirement_id in ("NFR-MCP-001", "NFR-SEC-001"):
+            with self.subTest(requirement=requirement_id):
+                drifting = copy.deepcopy(self.ledger)
+                self.entry(drifting, requirement_id)["lane"] = "4A"
+                with self.assertRaisesRegex(
+                    self.renderer.MissionControlError, r"has no lane, which is what keeps it"
+                ):
+                    self.check(ledger=drifting)
+
+    # --- `parked` has one meaning ----------------------------------------------------
+
+    def test_parked_must_name_the_ruling_it_is_waiting_on(self):
+        # "Recognized and relevant, but scheduling requires a ruling that has not been made."
+        # A park with no missing decision is one of the excluded states in disguise.
+        parked = [item for item in self.ledger["requirements"] if item["disposition"] == "parked"]
+        self.assertTrue(parked)
+        for entry in parked:
+            with self.subTest(requirement=entry["id"]):
+                self.assertTrue(entry["pending_ruling"].strip())
+                self.assertNotEqual(entry["pending_ruling"], entry["reason"])
+        vague = copy.deepcopy(self.ledger)
+        del self.entry(vague, "NFR-TEST-002")["pending_ruling"]
+        with self.assertRaisesRegex(self.renderer.MissionControlError, r"pending_ruling"):
+            self.check(ledger=vague)
+
+    def test_the_park_definition_names_what_it_is_not(self):
+        # The exclusions are the load-bearing half: without them `parked` becomes "not now".
+        parked = self.ledger["dispositions"]["parked"]
+        self.assertIn("requires an explicit ruling that has not yet been made", parked["meaning"])
+        excluded = {item["state"]: item["use"] for item in parked["not_this"]}
+        for state in (
+            "future but already decided work",
+            "externally blocked work",
+            "intentionally abandoned work",
+            "superseded requirements",
+            "implementation-complete but awaiting evidence",
+            "work merely outside the current lane",
+        ):
+            with self.subTest(state=state):
+                self.assertIn(state, excluded)
+                self.assertTrue(excluded[state].strip())
+        # Each exclusion points at a representation that already exists; no new vocabulary.
+        self.assertIn("deferred", excluded["future but already decided work"])
+        self.assertIn("active", excluded["implementation-complete but awaiting evidence"])
+
+    def test_met_stays_conservative(self):
+        # Code existing is not evidence, and a contradicted requirement is not met.
+        met = self.ledger["dispositions"]["met"]
+        self.assertIn("Code existing is not evidence", met["check"])
+        self.assertIn("unresolved audit finding", met["check"])
+        for contradicted in ("NFR-INTEGRITY-001", "NFR-BOUND-001"):
+            with self.subTest(requirement=contradicted):
+                self.assertEqual("parked", self.entry(self.ledger, contradicted)["disposition"])
+        # Wired end to end is not the same as proven, so these stay active in the lane whose
+        # exit collects the evidence.
+        for wired in ("FR-RESET-001", "FR-RESET-002"):
+            with self.subTest(requirement=wired):
+                entry = self.entry(self.ledger, wired)
+                self.assertEqual("active", entry["disposition"])
+                self.assertEqual("4A", entry["lane"])
+
+    # --- assignment states are not lanes ---------------------------------------------
+
+    def test_a_lane_assignment_state_can_never_read_as_a_lane(self):
+        states = self.lanes["assignment_states"]
+        self.assertEqual({"pre-lane", "unassigned"}, states)
+        self.assertFalse(states & self.lanes["lane_ids"])
+
+        # It cannot be recorded as a lane in the ledger ...
+        as_a_lane = copy.deepcopy(self.ledger)
+        entry = self.entry(as_a_lane, "FR-PORT-002")
+        entry["lane"] = "pre-lane"
+        entry["lane_authority"] = "queue-realization"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"that is a work-item lane assignment state, not a lane"
+        ):
+            self.check(ledger=as_a_lane)
+
+        # ... and it cannot quietly become one by colliding with a lane id.
+        collided = copy.deepcopy(self.lanes)
+        collided["lane_ids"] = set(collided["lane_ids"])
+        vocabulary = json.loads(
+            (REPO / "docs" / "creator-os-phases.json").read_text(encoding="utf-8")
+        )
+        vocabulary["lanes"][0]["id"] = "unassigned"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"collides with a lane id"
+        ):
+            self.write_and_load_vocabulary(vocabulary)
+
+        # Every assignment state declares the condition for carrying it and says it is not a
+        # lane, so a reader cannot mistake one and a work item cannot opt out through one.
+        for state in vocabulary["work_item_lane_assignment_values"]["assignment_states"]:
+            with self.subTest(state=state["value"]):
+                self.assertTrue(state["rule"].strip())
+                self.assertIn("Not a lane", state["not"])
+
+    def write_and_load_vocabulary(self, vocabulary):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "creator-os-phases.json"
+            path.write_text(json.dumps(vocabulary), encoding="utf-8")
+            return self.renderer.load_lane_vocabulary(path)
+
+    def test_readiness_and_lane_assignment_are_independent(self):
+        # A work item may be technically executable, not selected as next work, and pending a
+        # named ruling all at once. That is information, not a queue defect to normalize away.
+        workbench = self.work_item(self.manifest, "queue.workbench-boundary")
+        self.assertEqual("ready", workbench["state"])
+        self.assertEqual("unassigned", workbench["lane"])
+        self.assertIn("ruling", workbench["lane_note"])
+        # The next task is still unambiguous, because the other `ready` item has a real lane.
+        ready = [item for item in self.manifest["queue"] if item["state"] == "ready"]
+        self.assertEqual(2, len(ready))
+        laned = [item for item in ready if item["lane"] in self.lanes["lane_ids"]]
+        self.assertEqual(["queue.guild-runtime"], [item["id"] for item in laned])
 
     def test_the_invariant_runs_inside_the_ordinary_manifest_gate(self):
         # It has to fire in CI, not only when someone calls it directly.

@@ -1,7 +1,7 @@
 {
   "schema": "comfy-quest-creator-requirements-ledger/v1",
   "adopted_on": "2026-08-24",
-  "authority": "This file is the disposition of record for every FR-/NFR- identifier in docs/creator-portfolio-requirements.md. It answers one question per requirement: who is accountable for it right now. It does not restate the requirement, and it may not define, rename, or schedule a lane -- lane vocabulary is owned by docs/creator-os-phases.json.",
+  "authority": "This file is the disposition of record for every FR-/NFR- identifier in docs/creator-portfolio-requirements.md. It answers one question per requirement: who is accountable for it right now. It does not restate the requirement, and it cannot confer lane authority on one.",
   "invariant": "No executable roadmap item may exist without requirement/decision lineage, and no active requirement may exist without an explicit roadmap disposition. Enforced by validate_manifest in tools/render_quest_mission_control.py, which runs in the Python suite and therefore in CI.",
   "requirements_document": "docs/creator-portfolio-requirements.md",
   "lane_vocabulary": "docs/creator-os-phases.json",
@@ -10,63 +10,107 @@
   "dispositions": {
     "active": {
       "meaning": "Claimed by a work item in a named lane.",
-      "requires": "lane",
-      "check": "The named lane must contain at least one queue item listing this id."
+      "requires": [
+        "lane",
+        "lane_authority"
+      ],
+      "check": "The named lane must contain at least one queue item listing this id, and `lane_authority` must name where the lane came from."
     },
     "parked": {
-      "meaning": "Deliberately unscheduled. No lane owns it and none is being assigned here.",
-      "requires": "reason",
-      "check": "The reason must name why, and where the finding or ruling lives."
+      "meaning": "The requirement remains recognized and relevant, but scheduling or advancement requires an explicit ruling that has not yet been made.",
+      "requires": [
+        "reason",
+        "pending_ruling"
+      ],
+      "check": "`pending_ruling` must name the decision that is missing. A park with no missing decision is not a park -- it is one of the states below wearing a park's clothes.",
+      "not_this": [
+        {
+          "state": "future but already decided work",
+          "use": "deferred, with the lane the phase authority assigned"
+        },
+        {
+          "state": "externally blocked work",
+          "use": "the queue item's `gated` state. A requirement is parked only if the scheduling ruling is genuinely open, not merely because a dependency is late."
+        },
+        {
+          "state": "intentionally abandoned work",
+          "use": "no disposition. Abandoning a requirement means removing it from the requirements document, which the id-set check forces you to do here too."
+        },
+        {
+          "state": "superseded requirements",
+          "use": "the same: supersession edits the requirements document, and the id-set check makes the ledger change part of the same commit."
+        },
+        {
+          "state": "implementation-complete but awaiting evidence",
+          "use": "active, in the lane whose exit collects that evidence. FR-RESET-001 and FR-RESET-002 are the worked example: wired end to end, still active."
+        },
+        {
+          "state": "work merely outside the current lane",
+          "use": "deferred if a lane owns it, or active in that other lane if a work item there claims it. `parked` is not a synonym for `not now`."
+        }
+      ]
     },
     "deferred": {
       "meaning": "Owned by a named lane that is not being worked now.",
-      "requires": "phase",
-      "check": "The phase must be a lane id from the lane vocabulary."
+      "requires": [
+        "phase",
+        "lane_authority"
+      ],
+      "check": "The phase must be a lane id, and `lane_authority` must be `phase-authority`: a future lane can only come from the phase authority."
     },
     "met": {
-      "meaning": "Satisfied by checked-in evidence; no work item is needed.",
-      "requires": "evidence",
-      "check": "Every evidence path must exist inside this repository."
+      "meaning": "Satisfied by evidence that already exists and is gated, at the requirement's own proof standard.",
+      "requires": [
+        "evidence"
+      ],
+      "check": "Every evidence path must exist in this repository. Code existing is not evidence, an end-to-end path appearing wired is not evidence, and a requirement with an unresolved audit finding against it is not met however much of it is built."
     }
   },
   "rules": [
     "A disposition outside the four above is invalid. The set is closed on purpose: 'in progress' and 'partially done' are the states this ledger exists to stop.",
-    "Where docs/creator-os-phases.json names a requirement under a lane, this ledger's lane or phase for that requirement must be the same lane. The vocabulary file wins.",
-    "Where it does not name one, this ledger may record active/parked/deferred/met but may not invent a lane assignment: doing so changes what a lane covers, which needs sign-off.",
-    "`met` is for evidence that exists and is gated, not for work that is believed finished. Where an audit finding contradicts a requirement, the disposition is parked with the finding named, never met."
+    "Where docs/creator-os-phases.json names a requirement under a lane, this ledger must mirror that lane. Disagreeing with it fails validation.",
+    "Where it does not name one, this ledger may record a disposition but may not invent a lane. An active requirement may read its lane off a work item already scheduled there; nothing else may confer one.",
+    "`parked` and `met` carry no lane at all, which is what stops a parked requirement from drifting toward its apparently obvious destination.",
+    "`met` is for evidence that exists and is gated, not for work believed finished. Where an audit finding contradicts a requirement, the disposition is parked with the finding named, never met -- NFR-INTEGRITY-001 stays parked while D6 is unresolved, however much of it is implemented."
   ],
   "requirements": [
     {
       "id": "FR-PORT-001",
       "disposition": "active",
       "lane": "4B",
+      "lane_authority": "phase-authority",
       "note": "The bounded v1 portfolio workspace is implemented; 4B is where it must hold at real authoring density."
     },
     {
       "id": "FR-PORT-002",
       "disposition": "active",
       "lane": "4A",
+      "lane_authority": "queue-realization",
       "note": "Identity, semantic version, and provenance are implemented and tested. Release history remains absent per the baseline table, so the requirement is claimed, not met."
     },
     {
       "id": "FR-PORT-003",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-PORT-004",
       "disposition": "active",
-      "lane": "4B"
+      "lane": "4B",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-PORT-005",
       "disposition": "active",
-      "lane": "4B"
+      "lane": "4B",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-AUTH-001",
       "disposition": "parked",
       "reason": "Audit D5 records an asymmetry against this requirement: NormalizeDocument migrates a v2 document on read while import rejects anything but exact v3, so the same bytes upgrade from disk and are refused on import. No work item claims the repair, and Lane 0's scope fence records implementation gaps rather than fixing them.",
+      "pending_ruling": "Whether the v2-on-read / v3-on-import asymmetry (D5) is repaired, and in which lane.",
       "note": "docs/creator-os-audit-2026-08-24.md, finding D5."
     },
     {
@@ -103,127 +147,151 @@
     {
       "id": "FR-AUTH-005",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-AUTH-006",
       "disposition": "active",
       "lane": "4A",
+      "lane_authority": "queue-realization",
       "note": "Save conflicts, advanced-graph preservation, lineage, and semantic summaries exist; the requirement is that they survive hierarchy growth, which is 4A work."
     },
     {
       "id": "FR-WORLD-001",
       "disposition": "parked",
       "reason": "Named anchors are out of scope for 4A unless the authored slice needs spatial references, and the build strategy places them explicitly off the critical path. queue.anchors carries the conditional work item; nothing schedules it yet.",
+      "pending_ruling": "Whether the authored slice needs spatial references. Until that is answered no lane admits anchors.",
       "note": "docs/creator-os-phases.json, lane 4A out_of_scope."
     },
     {
       "id": "FR-WORLD-002",
       "disposition": "parked",
-      "reason": "Anchor authoring in Studio is conditional on FR-WORLD-001 being triggered by an authored need. Same disposition, same trigger."
+      "reason": "Anchor authoring in Studio is conditional on FR-WORLD-001 being triggered by an authored need. Same disposition, same trigger.",
+      "pending_ruling": "The same ruling as FR-WORLD-001: anchor authoring follows anchor capture."
     },
     {
       "id": "FR-WORLD-003",
       "disposition": "deferred",
-      "phase": "5"
+      "phase": "5",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-WORLD-004",
       "disposition": "deferred",
-      "phase": "5"
+      "phase": "5",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-WORLD-005",
       "disposition": "deferred",
-      "phase": "5"
+      "phase": "5",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-LOOP-001",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "queue-realization"
     },
     {
       "id": "FR-LOOP-002",
       "disposition": "parked",
       "reason": "Audit D4 records that Creator Session's ten verbs cannot drive run control, so reset and rerun are reachable only through Studio HTTP. That sits against this requirement's 'every precondition the next operation needs'. No work item claims the repair.",
+      "pending_ruling": "Whether Creator Session gains run-control verbs (D4), and in which lane.",
       "note": "docs/creator-os-audit-2026-08-24.md, finding D4."
     },
     {
       "id": "FR-LOOP-003",
       "disposition": "parked",
       "reason": "Audit C2: clean-versus-resume is named absent in the baseline table and no lane claims it. Placing it in a lane changes what that lane covers, which is a sign-off matter this ledger may not settle.",
+      "pending_ruling": "Which lane owns clean-versus-resume as a pre-play choice (C2).",
       "note": "docs/creator-os-audit-2026-08-24.md, finding C2."
     },
     {
       "id": "FR-RESET-001",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "queue-realization"
     },
     {
       "id": "FR-RESET-002",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "queue-realization"
     },
     {
       "id": "FR-RESET-003",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-RUN-001",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-RUN-002",
       "disposition": "parked",
       "reason": "Audit C2: the shipping engine supplies one local participant and the peer machine is policy-off for content work, so no lane claims authority and participant scope. Assigning it needs sign-off.",
+      "pending_ruling": "Which lane owns authority and participant scope, given the peer machine is policy-off for content work (C2).",
       "note": "docs/creator-os-audit-2026-08-24.md, finding C2."
     },
     {
       "id": "FR-REL-001",
       "disposition": "deferred",
-      "phase": "5"
+      "phase": "5",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-REL-002",
       "disposition": "deferred",
-      "phase": "5"
+      "phase": "5",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-REL-003",
       "disposition": "deferred",
-      "phase": "5"
+      "phase": "5",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-EVID-001",
       "disposition": "active",
-      "lane": "4B"
+      "lane": "4B",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-EVID-002",
       "disposition": "active",
-      "lane": "4B"
+      "lane": "4B",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-EVID-003",
       "disposition": "deferred",
-      "phase": "4C"
+      "phase": "4C",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-OPT-001",
       "disposition": "deferred",
-      "phase": "4C"
+      "phase": "4C",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "FR-OPT-002",
       "disposition": "deferred",
-      "phase": "4C"
+      "phase": "4C",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "NFR-SEAT-001",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "NFR-SEAT-002",
@@ -238,7 +306,8 @@
     {
       "id": "NFR-SEAT-003",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "NFR-SAFE-001",
@@ -254,12 +323,14 @@
       "id": "NFR-INTEGRITY-001",
       "disposition": "parked",
       "reason": "Audit D6 records a live violation: Comfy.Quest.Contracts.0.6.0-local.nupkg was repacked without a version bump, so a warm NuGet cache resolves stale contracts under the same version string. Punch item 16 owns the repair and is not scheduled into a lane.",
+      "pending_ruling": "Whether punch item 16 is scheduled -- a hash-keyed package cache for build and test, or a version bump on every repack (D6).",
       "note": "docs/creator-os-audit-2026-08-24.md, finding D6."
     },
     {
       "id": "NFR-BOUND-001",
       "disposition": "parked",
       "reason": "Audit C5 records that QuestStudioPortfolioStore.MaxProjects is reported in the portfolio limits block and bounds bundle import, but nothing checks it on project creation, so a declared bound is advisory. Lane 0's scope fence records it rather than fixing it.",
+      "pending_ruling": "Whether declared bounds such as MaxProjects become executable-tested on every path that can breach them (C5), and in which lane.",
       "note": "docs/creator-os-audit-2026-08-24.md, finding C5."
     },
     {
@@ -304,28 +375,42 @@
       "id": "NFR-MCP-001",
       "disposition": "parked",
       "reason": "Audit C4: the standalone Workbench has no place in the 4A/4B/4C/5 vocabulary and no exit gate, while docs/creator-os.md makes it a precondition for the autonomous integration 4A depends on. queue.workbench-boundary carries lane `unassigned` for the same reason. Placing it in a lane is Derek's ruling.",
+      "pending_ruling": "Which lane, if any, owns the standalone Workbench boundary (C4). queue.workbench-boundary names the same ruling in its lane_note.",
       "note": "docs/creator-os-audit-2026-08-24.md, finding C4."
     },
     {
       "id": "NFR-USE-001",
       "disposition": "active",
-      "lane": "4B"
+      "lane": "4B",
+      "lane_authority": "phase-authority"
     },
     {
       "id": "NFR-OBS-001",
       "disposition": "deferred",
       "phase": "4B",
+      "lane_authority": "phase-authority",
       "note": "Audit C3 records both halves violated: run-control receipts prune globally across runs from a flat directory, and RuntimeReceiptStore has no cap at all. The build strategy repairs this in its Lane 2, before Lane 4 collects the 4A evidence, because otherwise the evidence that closes 4A is written to a store that can silently drop members of a correlated proof set."
     },
     {
       "id": "NFR-TEST-001",
       "disposition": "active",
-      "lane": "4A"
+      "lane": "4A",
+      "lane_authority": "queue-realization"
     },
     {
       "id": "NFR-TEST-002",
       "disposition": "parked",
-      "reason": "A standing reporting constraint on completion reports rather than schedulable work. No lane claims it and no executable gate enforces it; a report that substitutes test totals for a named journey is caught by review, not by CI."
+      "reason": "A standing reporting constraint on completion reports rather than schedulable work, and no lane claims it. It stays recognized here because the ruling on whether it earns an executable gate has not been made; without that, 'no gate exists' would quietly become 'no longer required'.",
+      "pending_ruling": "Whether evidence-over-counts earns an executable gate at all, and in which lane if it does."
     }
-  ]
+  ],
+  "authority_chain": {
+    "order": "requirements -> phase authority -> ledger recording -> queue realization -> evidence",
+    "detail": "docs/creator-portfolio-requirements.md states what is required. docs/creator-os-phases.json is the phase and scheduling authority: it alone decides which lane owns a requirement. This ledger records the resulting disposition. docs/quest-mission-control.json realizes it as work items. Evidence closes it.",
+    "one_way": "The ledger is a recorder, never a scheduler. Every lane it names points at where that lane came from, through `lane_authority`, and neither source is this file. A requirement the phase authority has not placed cannot be placed here because its destination looks obvious -- that is exactly how a shadow scheduler starts.",
+    "lane_authority_values": {
+      "phase-authority": "docs/creator-os-phases.json names this requirement under that lane. The ledger mirrors it; disagreeing with it fails validation.",
+      "queue-realization": "The phase authority does not name this requirement, and a work item already scheduled in that lane claims it. The lane is read off that work item, not decided here; if the claim moves or disappears, validation fails. Only `active` may use this. A future lane can only come from the phase authority, so `deferred` may not."
+    }
+  }
 }
