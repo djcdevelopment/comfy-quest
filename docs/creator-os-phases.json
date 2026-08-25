@@ -72,7 +72,71 @@
         "sustained authoring volume — that is 4B",
         "automated launch and world entry — permitted but not required; see human_boundary"
       ],
-      "exit": "Automation drives the real Studio GUI through authoring and publication; selects and runs more than one guild experience; maintains independent run state; resets one completed experience and reruns it under a new run identity; and retains correlated evidence. The one permitted human action is launching the game and entering the pinned world. Everything after entry completes without a repository edit, console command, manual file transfer, log read, retry loop, or machine-fact relay.",
+      "acceptance_journey": {
+        "work_item": "queue.full-width-journey",
+        "precondition": "One operator owns <Valheim>/BepInEx/ for the lap. NFR-SEAT-003 is satisfied before Derek is called: exact artifacts are installed, every applicable machine step has been driven, evidence and recovery are staged, and mechanical failures have been fixed and rerun.",
+        "steps": [
+          {
+            "id": "publish-guild-pack",
+            "detail": "Drive the real Studio GUI to author and publish one guild pack containing experiences A and B, with B locked behind completion of A."
+          },
+          {
+            "id": "locked-b-refusal",
+            "detail": "Attempt B before completing A and retain the fail-closed prerequisite receipt."
+          },
+          {
+            "id": "run-a",
+            "detail": "Select A, run it to completion, and retain A's first run identity and correlated evidence."
+          },
+          {
+            "id": "run-b",
+            "detail": "Confirm A's completion unlocks B, then select and advance B under its own run identity."
+          },
+          {
+            "id": "return-a",
+            "detail": "Select A again and prove the accepted A -> B -> A sequence preserved independent state for both experiences."
+          },
+          {
+            "id": "reset-a",
+            "detail": "Preview and apply a scoped reset to completed experience A only."
+          },
+          {
+            "id": "verify-b-unchanged",
+            "detail": "Prove B's run identity and progress are unchanged by A's reset."
+          },
+          {
+            "id": "rerun-a",
+            "detail": "Rerun A under a new successor run identity linked to the reset and predecessor run."
+          },
+          {
+            "id": "retention-boundary",
+            "detail": "Use bounded automation to cross the configured per-scope receipt-retention bound by one, then prove both experiences' correlated evidence remains retrievable across live and archived storage."
+          }
+        ],
+        "evidence": [
+          {
+            "id": "artifact-identity",
+            "detail": "Guild, pack, immutable revision, activation, installed content hash, machine, and world identity."
+          },
+          {
+            "id": "experience-state",
+            "detail": "Experience A and B selectors, prerequisite refusal and unlock, independent progress, and B-unchanged-after-A-reset proof."
+          },
+          {
+            "id": "run-lineage",
+            "detail": "A's original run, reset, predecessor link, successor run, and B's unaffected run identity."
+          },
+          {
+            "id": "runtime-correlation",
+            "detail": "Accepted and rejected transition/action receipts correlated to activation, experience, run, reset, and world."
+          },
+          {
+            "id": "retention-proof",
+            "detail": "Exact receipt bytes remain retrievable across live and archive stores after the per-scope boundary is crossed; no activity in A breaks B's chain."
+          }
+        ]
+      },
+      "exit": "Automation drives the real Studio GUI through authoring and publication; proves B refuses before A satisfies its prerequisite; runs the accepted A -> B -> A sequence with independent run state; resets only completed experience A; proves B is unchanged; reruns A under a linked successor identity; crosses the configured receipt-retention boundary; and retains the complete correlated evidence set. The one permitted human action is launching the game and entering the pinned world. Everything after entry completes without a repository edit, console command, manual file transfer, log read, retry loop, or machine-fact relay.",
       "failure_mode": "The architecture cannot express or execute a guild.",
       "requirements": ["FR-RUN-001", "FR-PORT-003", "FR-AUTH-005", "FR-RESET-003", "NFR-SEAT-001", "NFR-SEAT-003"]
     },

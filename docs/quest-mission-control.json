@@ -8,6 +8,47 @@
     "program_commit": "a07cb62",
     "program_commit_label": "Build guild portfolio and scoped reruns"
   },
+  "source_intents": {
+    "repository": "djcdevelopment/baseline",
+    "revision": "ed45c98fd5dfe8f92214fd67180937dc10163fee",
+    "documents": [
+      {
+        "id": "01",
+        "title": "Arcane Sight observability",
+        "path": "docs/arch/01_arcane_sight_runtime_observability.md",
+        "bytes": 2771,
+        "sha256": "025eddf14cec353b476938e682e75519629d208fd3040c54da55f7c7c163d610"
+      },
+      {
+        "id": "02",
+        "title": "Quest Lab apprenticeship",
+        "path": "docs/arch/02_quest_lab_apprenticeship_spellbook.md",
+        "bytes": 3089,
+        "sha256": "8a6abcb6aa4e6a1b20aaf622f779773b9d628acf91f574714f42c52321c11ea5"
+      },
+      {
+        "id": "03",
+        "title": "Studio-Live closed loop",
+        "path": "docs/arch/03_studio_live_valheim_creator_loop.md",
+        "bytes": 3176,
+        "sha256": "34ea44ce4009a534ecd212d78af83aed4c18cab96fdd3c39d2fdf358e6c328b4"
+      },
+      {
+        "id": "04",
+        "title": "Community artifact ecosystem",
+        "path": "docs/arch/04_community_artifact_ecosystem.md",
+        "bytes": 3481,
+        "sha256": "84787fa8b99a978d6be0388b929f363c815f5da63047963f4949bc182761f807"
+      },
+      {
+        "id": "05",
+        "title": "Adaptive event semantics",
+        "path": "docs/arch/05_adaptive_event_semantics.md",
+        "bytes": 4015,
+        "sha256": "6fafa4e79fed6af7dcac016c73670e2e580a0cd69cfabf85731ff805f90a7075"
+      }
+    ]
+  },
   "reading_order": [
     {
       "id": "reading.plan",
@@ -29,7 +70,7 @@
       "id": "reading.why",
       "position": 3,
       "role": "Why this exists",
-      "detail": "The ethos the whole program is judged against, and the six rules that govern every lane.",
+      "detail": "The ethos the whole program is judged against: six product guardrails and one communication guardrail.",
       "source": "docs/five-intent-program-plan.md",
       "source_contains": "the machine absorbs the complexity"
     },

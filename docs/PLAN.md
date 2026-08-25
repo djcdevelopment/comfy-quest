@@ -23,8 +23,8 @@ portable artifacts, inspectability, immediate feedback, progressive complexity, 
 with **one inversion: the machine absorbs the complexity WeakAuras historically forced onto the
 human.**
 
-Six rules govern every phase. In full: `five-intent-program-plan.md` §*Program ethos and
-guardrails*. In short:
+Six product guardrails govern every phase. In full: `five-intent-program-plan.md` §*Program
+ethos and guardrails*. In short:
 
 1. **The primitive is small; the composition is powerful.**
 2. **Capability enters the palette only from an observed authored need**, never because a hook
@@ -35,12 +35,26 @@ guardrails*. In short:
 5. **Multiplayer is a separate validation dimension**, not a content concern.
 6. **AI composes against the same contract as humans**, never as its own layer.
 
+One communication guardrail governs how those results are reported: **answer at the reporter's
+altitude.**
+
 **The named danger is not missing capability. It is exposing too much of it too quickly.**
 
 **What this repository does not hold:** the five source design intents live in the *baseline*
-repository at `docs/arch/01..05_*.md` — Arcane Sight observability, Quest Lab apprenticeship,
-Studio↔Live closed loop, community artifact ecosystem, adaptive event semantics. The plan cites
-them and does not restate them. Read the source, or say plainly you did not.
+repository. The plan cites their immutable published revision and does not restate them. Read the
+source, or say plainly you did not.
+
+<!-- source-intents:begin -->
+Pinned source authority: [`djcdevelopment/baseline@ed45c98fd5dfe8f92214fd67180937dc10163fee`](https://github.com/djcdevelopment/baseline/commit/ed45c98fd5dfe8f92214fd67180937dc10163fee).
+
+| Intent | Immutable source | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| 01 | [Arcane Sight observability](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/01_arcane_sight_runtime_observability.md) | 2771 | `025eddf14cec353b476938e682e75519629d208fd3040c54da55f7c7c163d610` |
+| 02 | [Quest Lab apprenticeship](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/02_quest_lab_apprenticeship_spellbook.md) | 3089 | `8a6abcb6aa4e6a1b20aaf622f779773b9d628acf91f574714f42c52321c11ea5` |
+| 03 | [Studio-Live closed loop](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/03_studio_live_valheim_creator_loop.md) | 3176 | `34ea44ce4009a534ecd212d78af83aed4c18cab96fdd3c39d2fdf358e6c328b4` |
+| 04 | [Community artifact ecosystem](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/04_community_artifact_ecosystem.md) | 3481 | `84787fa8b99a978d6be0388b929f363c815f5da63047963f4949bc182761f807` |
+| 05 | [Adaptive event semantics](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/05_adaptive_event_semantics.md) | 4015 | `6fafa4e79fed6af7dcac016c73670e2e580a0cd69cfabf85731ff805f90a7075` |
+<!-- source-intents:end -->
 
 **And the constraint behind the whole shape of this:** Derek runs roughly a dozen efforts in
 parallel. Seat time is a context switch, not minutes. The machine builds, drives, observes,
@@ -96,10 +110,29 @@ worktree (`scanner-slice1`) is fully merged and idle since 2026-08-20.
 
 ### Step 1 — Drive the installed vertical slice `queue.full-width-journey`
 
-The first step that cannot be taken without Valheim installed. Automation drives the real Studio
-GUI through authoring and publication, publishes a multi-experience guild pack, selects one
-experience, plays it, resets it, reruns it under a new run identity, and keeps the correlated
-evidence.
+The first step that cannot be taken without Valheim installed. Its authoritative journey is
+defined under 4A in `creator-os-phases.json` and projected here:
+
+<!-- 4a-journey:begin -->
+**Precondition:** One operator owns <Valheim>/BepInEx/ for the lap. NFR-SEAT-003 is satisfied before Derek is called: exact artifacts are installed, every applicable machine step has been driven, evidence and recovery are staged, and mechanical failures have been fixed and rerun.
+
+1. **publish-guild-pack** — Drive the real Studio GUI to author and publish one guild pack containing experiences A and B, with B locked behind completion of A.
+2. **locked-b-refusal** — Attempt B before completing A and retain the fail-closed prerequisite receipt.
+3. **run-a** — Select A, run it to completion, and retain A's first run identity and correlated evidence.
+4. **run-b** — Confirm A's completion unlocks B, then select and advance B under its own run identity.
+5. **return-a** — Select A again and prove the accepted A -> B -> A sequence preserved independent state for both experiences.
+6. **reset-a** — Preview and apply a scoped reset to completed experience A only.
+7. **verify-b-unchanged** — Prove B's run identity and progress are unchanged by A's reset.
+8. **rerun-a** — Rerun A under a new successor run identity linked to the reset and predecessor run.
+9. **retention-boundary** — Use bounded automation to cross the configured per-scope receipt-retention bound by one, then prove both experiences' correlated evidence remains retrievable across live and archived storage.
+
+**Required correlated evidence:**
+- **artifact-identity** — Guild, pack, immutable revision, activation, installed content hash, machine, and world identity.
+- **experience-state** — Experience A and B selectors, prerequisite refusal and unlock, independent progress, and B-unchanged-after-A-reset proof.
+- **run-lineage** — A's original run, reset, predecessor link, successor run, and B's unaffected run identity.
+- **runtime-correlation** — Accepted and rejected transition/action receipts correlated to activation, experience, run, reset, and world.
+- **retention-proof** — Exact receipt bytes remain retrievable across live and archive stores after the per-scope boundary is crossed; no activity in A breaks B's chain.
+<!-- 4a-journey:end -->
 
 - **Claims:** `FR-LOOP-001`, `NFR-SEAT-001`, `NFR-SEAT-003`, `NFR-TEST-001`
 - **Human cost:** one launch and world entry. Nothing else.
@@ -189,8 +222,18 @@ read a plan that stopped being true nine commits earlier and had no way to notic
 git -C <repo> fetch && git -C <repo> status -sb
 ```
 
-Further reading, in order: `handoff-2026-08-24.md` (session record and environment traps),
-`five-intent-program-plan.md` (the ethos in full), `creator-os-build-strategy.md` (why the lanes
-are ordered this way), `adr/` (decisions, append-only), `working-agreements.md` (how this
-repository expects to be worked on), `creator-os-audit-2026-08-24.md` (what was wrong, with
-receipts).
+Further reading is declared once in `quest-mission-control.json` and projected here:
+
+<!-- reading-order:begin -->
+1. `docs/PLAN.md` — **The plan.** Goal, where we are, what happens next, and what needs Derek. Read this alone and you know the program.
+2. `docs/handoff-2026-08-24.md` — **Session record.** What the 2026-08-24/25 sessions did, the environment traps, and the cold-start checks.
+3. `docs/five-intent-program-plan.md` — **Why this exists.** The ethos the whole program is judged against: six product guardrails and one communication guardrail.
+4. `docs/creator-os-build-strategy.md` — **The plan.** Lane order, the program invariant, and what each lane may not do.
+5. `docs/creator-os-phases.json` — **Lane vocabulary.** The only definition of a lane, and the human boundary.
+6. `docs/creator-requirements-ledger.json` — **Requirement dispositions.** Who is accountable for each of the 47 requirements right now.
+7. `docs/quest-mission-control.json` — **Work queue.** Every work item with its lane and requirement lineage.
+8. `docs/creator-os.md` — **Operating strategy.** Why the loop is shaped this way, and the golden rule.
+9. `docs/creator-portfolio-requirements.md` — **What is required.** The 47 FR-/NFR- requirements themselves.
+10. `docs/adr/README.md` — **Decisions.** Append-only; a reversal needs a superseding record.
+11. `docs/creator-os-audit-2026-08-24.md` — **Findings.** What was wrong on 2026-08-24, with `file:line` receipts.
+<!-- reading-order:end -->

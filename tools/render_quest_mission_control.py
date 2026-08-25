@@ -56,10 +56,51 @@ REQUIREMENT_ID = re.compile(r"\b(?:FR|NFR)-[A-Z]+-\d+\b")
 # The files that advertise the authority reading order, and the fences the block sits in.
 # The previous handoff went stale while the entry path still pointed at it, so the pointers
 # are pinned to the manifest rather than trusted to stay current on their own.
-POINTER_FILES = ("README.md", "docs/creator-os.md")
+POINTER_FILES = (
+    "README.md",
+    "docs/PLAN.md",
+    "docs/handoff-2026-08-24.md",
+    "docs/creator-os.md",
+)
 POINTER_BEGIN = "<!-- reading-order:begin -->"
 POINTER_END = "<!-- reading-order:end -->"
 POINTER_ENTRY = re.compile(r"^>?\s*(\d+)\.\s+`([^`]+)`")
+SOURCE_INTENT_POINTER_FILES = (
+    "docs/PLAN.md",
+    "docs/handoff-2026-08-24.md",
+    "docs/five-intent-program-plan.md",
+)
+SOURCE_INTENT_BEGIN = "<!-- source-intents:begin -->"
+SOURCE_INTENT_END = "<!-- source-intents:end -->"
+JOURNEY_POINTER_FILES = ("docs/PLAN.md",)
+JOURNEY_BEGIN = "<!-- 4a-journey:begin -->"
+JOURNEY_END = "<!-- 4a-journey:end -->"
+BASELINE_REPOSITORY = "djcdevelopment/baseline"
+SOURCE_INTENT_PATHS = {
+    "01": "docs/arch/01_arcane_sight_runtime_observability.md",
+    "02": "docs/arch/02_quest_lab_apprenticeship_spellbook.md",
+    "03": "docs/arch/03_studio_live_valheim_creator_loop.md",
+    "04": "docs/arch/04_community_artifact_ecosystem.md",
+    "05": "docs/arch/05_adaptive_event_semantics.md",
+}
+JOURNEY_STEP_IDS = (
+    "publish-guild-pack",
+    "locked-b-refusal",
+    "run-a",
+    "run-b",
+    "return-a",
+    "reset-a",
+    "verify-b-unchanged",
+    "rerun-a",
+    "retention-boundary",
+)
+JOURNEY_EVIDENCE_IDS = (
+    "artifact-identity",
+    "experience-state",
+    "run-lineage",
+    "runtime-correlation",
+    "retention-proof",
+)
 BOLD_REQUIREMENT_ID = re.compile(r"\*\*((?:FR|NFR)-[A-Z]+-\d+)\b")
 
 
@@ -74,12 +115,12 @@ def read_text(path: Path) -> str:
         raise MissionControlError(f"cannot read {path.relative_to(REPO)}: {exc}") from exc
 
 
-def load_manifest(path: Path = SOURCE) -> dict[str, Any]:
+def load_manifest(path: Path = SOURCE, *, validate_projection_state: bool = True) -> dict[str, Any]:
     try:
         value = json.loads(read_text(path))
     except json.JSONDecodeError as exc:
         raise MissionControlError(f"invalid mission-control JSON: {exc}") from exc
-    validate_manifest(value)
+    validate_manifest(value, validate_projection_state=validate_projection_state)
     return value
 
 
@@ -113,6 +154,238 @@ def validate_source_pin(item: dict[str, Any], where: str) -> None:
         raise MissionControlError(f"{where} source pin is stale: {marker!r} not found in {path.relative_to(REPO)}")
 
 
+def validate_source_intents(value: dict[str, Any]) -> dict[str, Any]:
+    authority = value.get("source_intents")
+    if not isinstance(authority, dict):
+        raise MissionControlError("source_intents must be an object")
+    repository = require_text(authority.get("repository"), "source_intents.repository")
+    if repository != BASELINE_REPOSITORY:
+        raise MissionControlError(
+            f"source_intents.repository must be {BASELINE_REPOSITORY}; got {repository!r}"
+        )
+    revision = require_text(authority.get("revision"), "source_intents.revision")
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise MissionControlError("source_intents.revision must be a lowercase 40-character SHA")
+    documents = require_list(authority.get("documents"), "source_intents.documents")
+    ids: list[str] = []
+    paths: set[str] = set()
+    for index, document in enumerate(documents):
+        where = f"source_intents.documents[{index}]"
+        if not isinstance(document, dict):
+            raise MissionControlError(f"{where} must be an object")
+        intent_id = require_text(document.get("id"), f"{where}.id")
+        ids.append(intent_id)
+        require_text(document.get("title"), f"{where}.title")
+        path = require_text(document.get("path"), f"{where}.path")
+        expected_path = SOURCE_INTENT_PATHS.get(intent_id)
+        if path != expected_path:
+            raise MissionControlError(
+                f"{where}.path must be {expected_path!r} for intent {intent_id}; got {path!r}"
+            )
+        if path in paths:
+            raise MissionControlError(f"duplicate source-intent path: {path}")
+        paths.add(path)
+        byte_count = document.get("bytes")
+        if isinstance(byte_count, bool) or not isinstance(byte_count, int) or byte_count <= 0:
+            raise MissionControlError(f"{where}.bytes must be a positive integer")
+        digest = require_text(document.get("sha256"), f"{where}.sha256")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise MissionControlError(f"{where}.sha256 must be a lowercase SHA-256")
+    if tuple(ids) != tuple(SOURCE_INTENT_PATHS):
+        raise MissionControlError(
+            f"source_intents.documents must contain ordered ids {list(SOURCE_INTENT_PATHS)}; got {ids}"
+        )
+    return authority
+
+
+def fenced_body(path: Path, begin: str, end: str) -> str:
+    text = read_text(path)
+    if text.count(begin) != 1 or text.count(end) != 1:
+        raise MissionControlError(
+            f"{path.relative_to(REPO)} must contain exactly one block fenced by {begin} and {end}"
+        )
+    body = text.split(begin, 1)[1].split(end, 1)[0]
+    lines = []
+    for line in body.splitlines():
+        lines.append(re.sub(r"^>\s?", "", line).rstrip())
+    return "\n".join(lines).strip()
+
+
+def reading_order_projection(value: dict[str, Any]) -> str:
+    return "\n".join(
+        f"{item['position']}. `{item['source']}` — **{item['role']}.** {item['detail']}"
+        for item in value["reading_order"]
+    )
+
+
+def source_intent_projection(value: dict[str, Any]) -> str:
+    authority = value["source_intents"]
+    repository = authority["repository"]
+    revision = authority["revision"]
+    commit_url = f"https://github.com/{repository}/commit/{revision}"
+    lines = [
+        f"Pinned source authority: [`{repository}@{revision}`]({commit_url}).",
+        "",
+        "| Intent | Immutable source | Bytes | SHA-256 |",
+        "| --- | --- | ---: | --- |",
+    ]
+    for document in authority["documents"]:
+        blob_url = f"https://github.com/{repository}/blob/{revision}/{document['path']}"
+        lines.append(
+            f"| {document['id']} | [{document['title']}]({blob_url}) | "
+            f"{document['bytes']} | `{document['sha256']}` |"
+        )
+    return "\n".join(lines)
+
+
+def validate_acceptance_journey(journey: Any) -> dict[str, Any]:
+    if not isinstance(journey, dict):
+        raise MissionControlError("4A.acceptance_journey must be an object")
+    if require_text(journey.get("work_item"), "4A.acceptance_journey.work_item") != "queue.full-width-journey":
+        raise MissionControlError("4A.acceptance_journey.work_item must be queue.full-width-journey")
+    precondition = require_text(journey.get("precondition"), "4A.acceptance_journey.precondition")
+    for marker in ("<Valheim>/BepInEx/", "NFR-SEAT-003"):
+        if marker not in precondition:
+            raise MissionControlError(f"4A.acceptance_journey.precondition must name {marker}")
+    steps = require_list(journey.get("steps"), "4A.acceptance_journey.steps")
+    step_ids: list[str] = []
+    for index, step in enumerate(steps):
+        where = f"4A.acceptance_journey.steps[{index}]"
+        if not isinstance(step, dict):
+            raise MissionControlError(f"{where} must be an object")
+        step_ids.append(require_text(step.get("id"), f"{where}.id"))
+        require_text(step.get("detail"), f"{where}.detail")
+    if tuple(step_ids) != JOURNEY_STEP_IDS:
+        raise MissionControlError(
+            f"4A acceptance journey must be the ordered sequence {list(JOURNEY_STEP_IDS)}; got {step_ids}"
+        )
+    evidence = require_list(journey.get("evidence"), "4A.acceptance_journey.evidence")
+    evidence_ids: list[str] = []
+    for index, item in enumerate(evidence):
+        where = f"4A.acceptance_journey.evidence[{index}]"
+        if not isinstance(item, dict):
+            raise MissionControlError(f"{where} must be an object")
+        evidence_ids.append(require_text(item.get("id"), f"{where}.id"))
+        require_text(item.get("detail"), f"{where}.detail")
+    if tuple(evidence_ids) != JOURNEY_EVIDENCE_IDS:
+        raise MissionControlError(
+            f"4A acceptance evidence must be {list(JOURNEY_EVIDENCE_IDS)}; got {evidence_ids}"
+        )
+    return journey
+
+
+def load_4a_journey(path: Path = PHASES) -> dict[str, Any]:
+    try:
+        value = json.loads(read_text(path))
+    except json.JSONDecodeError as exc:
+        raise MissionControlError(f"invalid lane vocabulary JSON: {exc}") from exc
+    lanes = require_list(value.get("lanes"), "lane vocabulary lanes")
+    lane = next((item for item in lanes if isinstance(item, dict) and item.get("id") == "4A"), None)
+    if lane is None:
+        raise MissionControlError("lane vocabulary has no 4A lane")
+    return validate_acceptance_journey(lane.get("acceptance_journey"))
+
+
+def journey_projection(journey: dict[str, Any]) -> str:
+    lines = [f"**Precondition:** {journey['precondition']}", ""]
+    lines.extend(
+        f"{index}. **{step['id']}** — {step['detail']}"
+        for index, step in enumerate(journey["steps"], start=1)
+    )
+    lines.extend(["", "**Required correlated evidence:**"])
+    lines.extend(f"- **{item['id']}** — {item['detail']}" for item in journey["evidence"])
+    return "\n".join(lines)
+
+
+def projection_specs(value: dict[str, Any]) -> dict[str, list[tuple[str, str, str]]]:
+    projections: dict[str, list[tuple[str, str, str]]] = {}
+    reading = reading_order_projection(value)
+    for relative in POINTER_FILES:
+        projections.setdefault(relative, []).append((POINTER_BEGIN, POINTER_END, reading))
+    source = source_intent_projection(value)
+    for relative in SOURCE_INTENT_POINTER_FILES:
+        projections.setdefault(relative, []).append((SOURCE_INTENT_BEGIN, SOURCE_INTENT_END, source))
+    journey = journey_projection(load_4a_journey())
+    for relative in JOURNEY_POINTER_FILES:
+        projections.setdefault(relative, []).append((JOURNEY_BEGIN, JOURNEY_END, journey))
+    return projections
+
+
+def tracked_markdown_with(marker: str) -> set[str]:
+    result = subprocess.run(
+        ["git", "ls-files", "-z", "--", "*.md"],
+        cwd=REPO,
+        check=True,
+        capture_output=True,
+    )
+    found: set[str] = set()
+    for raw in result.stdout.split(b"\0"):
+        if not raw:
+            continue
+        relative = raw.decode("utf-8")
+        if marker in read_text(REPO / relative):
+            found.add(Path(relative).as_posix())
+    return found
+
+
+def validate_projection_registration() -> None:
+    registrations = (
+        (POINTER_BEGIN, set(POINTER_FILES)),
+        (SOURCE_INTENT_BEGIN, set(SOURCE_INTENT_POINTER_FILES)),
+        (JOURNEY_BEGIN, set(JOURNEY_POINTER_FILES)),
+    )
+    for marker, expected in registrations:
+        actual = tracked_markdown_with(marker)
+        if actual != expected:
+            raise MissionControlError(
+                f"projection marker {marker} is registered for {sorted(expected)} but appears in {sorted(actual)}"
+            )
+
+
+def validate_projections(value: dict[str, Any]) -> None:
+    validate_projection_registration()
+    for relative, specs in projection_specs(value).items():
+        path = source_path(relative)
+        for begin, end, expected in specs:
+            actual = fenced_body(path, begin, end)
+            if actual != expected:
+                raise MissionControlError(
+                    f"{relative} contains a stale projection fenced by {begin}; run {Path(__file__).name}"
+                )
+
+
+def replace_fenced_projection(text: str, begin: str, end: str, body: str) -> str:
+    if text.count(begin) != 1 or text.count(end) != 1:
+        raise MissionControlError(f"projection must contain exactly one {begin} and {end}")
+    begin_at = text.index(begin)
+    end_at = text.index(end, begin_at + len(begin))
+    line_start = text.rfind("\n", 0, begin_at) + 1
+    prefix = text[line_start:begin_at]
+    rendered_body = "\n".join(f"{prefix}{line}" if line else prefix.rstrip() for line in body.splitlines())
+    return (
+        text[: begin_at + len(begin)]
+        + "\n"
+        + rendered_body
+        + "\n"
+        + prefix
+        + text[end_at:]
+    )
+
+
+def write_projections(value: dict[str, Any]) -> None:
+    updates: list[tuple[Path, str]] = []
+    for relative, specs in projection_specs(value).items():
+        path = source_path(relative)
+        updated = read_text(path)
+        for begin, end, body in specs:
+            updated = replace_fenced_projection(updated, begin, end, body)
+        updates.append((path, updated))
+    # Resolve and render every projection before touching the first file. A stale or missing
+    # fence therefore cannot leave a partially rewritten authority chain.
+    for path, updated in updates:
+        path.write_text(updated, encoding="utf-8", newline="\n")
+
+
 def pointer_block(path: Path) -> list[tuple[int, str]]:
     """The ordered (position, source) pairs a pointer file advertises."""
     text = read_text(path)
@@ -130,7 +403,7 @@ def pointer_block(path: Path) -> list[tuple[int, str]]:
     return entries
 
 
-def validate_reading_order(value: dict[str, Any]) -> None:
+def validate_reading_order(value: dict[str, Any], *, validate_pointer_state: bool = True) -> None:
     """One declared authority chain, and every advertisement of it must agree."""
     entries = require_list(value.get("reading_order"), "reading_order")
     declared: list[tuple[int, str]] = []
@@ -147,14 +420,15 @@ def validate_reading_order(value: dict[str, Any]) -> None:
             )
         validate_source_pin(item, where)
         declared.append((index + 1, item["source"]))
-    for relative in POINTER_FILES:
-        advertised = pointer_block(source_path(relative))
-        if advertised != declared:
-            raise MissionControlError(
-                f"{relative} advertises a stale reading order: it lists "
-                f"{[source for _, source in advertised]} but the manifest declares "
-                f"{[source for _, source in declared]}"
-            )
+    if validate_pointer_state:
+        for relative in POINTER_FILES:
+            advertised = pointer_block(source_path(relative))
+            if advertised != declared:
+                raise MissionControlError(
+                    f"{relative} advertises a stale reading order: it lists "
+                    f"{[source for _, source in advertised]} but the manifest declares "
+                    f"{[source for _, source in declared]}"
+                )
 
 
 def requirement_ids(path: Path = REQUIREMENTS) -> set[str]:
@@ -179,6 +453,8 @@ def load_lane_vocabulary(path: Path = PHASES) -> dict[str, Any]:
             raise MissionControlError(f"lanes[{index}] must be an object")
         lane_id = require_text(lane.get("id"), f"lanes[{index}].id")
         require_text(lane.get("slug"), f"lanes[{index}].slug")
+        if lane_id == "4A":
+            validate_acceptance_journey(lane.get("acceptance_journey"))
         lane_ids.append(lane_id)
         for position, requirement in enumerate(lane.get("requirements", [])):
             owned[require_text(requirement, f"lanes[{index}].requirements[{position}]")] = lane_id
@@ -379,7 +655,29 @@ def validate_program_invariant(
             )
 
 
-def validate_manifest(value: Any) -> None:
+def validate_guardrail_taxonomy() -> None:
+    text = read_text(REPO / "docs" / "five-intent-program-plan.md")
+    product_heading = "### Six product guardrails"
+    communication_heading = "### Communication guardrail"
+    if text.count(product_heading) != 1 or text.count(communication_heading) != 1:
+        raise MissionControlError(
+            "five-intent program plan must distinguish six product guardrails from one communication guardrail"
+        )
+    product = text.split(product_heading, 1)[1].split(communication_heading, 1)[0]
+    communication = text.split(communication_heading, 1)[1].split("\n## ", 1)[0]
+    product_numbers = re.findall(r"(?m)^(\d+)\.\s+\*\*", product)
+    communication_numbers = re.findall(r"(?m)^(\d+)\.\s+\*\*", communication)
+    if product_numbers != ["1", "2", "3", "4", "5", "6"]:
+        raise MissionControlError(
+            f"product guardrails must be numbered 1..6; got {product_numbers}"
+        )
+    if communication_numbers != ["7"] or "Answer at the reporter's altitude" not in communication:
+        raise MissionControlError(
+            "communication guardrail must be item 7, Answer at the reporter's altitude"
+        )
+
+
+def validate_manifest(value: Any, *, validate_projection_state: bool = True) -> None:
     if not isinstance(value, dict) or value.get("schema") != SCHEMA:
         raise MissionControlError(f"mission-control schema must be {SCHEMA}")
     page = value.get("page")
@@ -389,6 +687,7 @@ def validate_manifest(value: Any) -> None:
         require_text(page.get(key), f"page.{key}")
     if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,79}", page["id"]):
         raise MissionControlError(f"unsafe page id: {page['id']}")
+    validate_source_intents(value)
 
     ids: set[str] = set()
 
@@ -502,8 +801,11 @@ def validate_manifest(value: Any) -> None:
         require_text(command.get("command"), f"commands[{index}].command")
     require_list(value.get("cautions"), "cautions")
 
-    validate_reading_order(value)
+    validate_guardrail_taxonomy()
+    validate_reading_order(value, validate_pointer_state=validate_projection_state)
     validate_program_invariant(value)
+    if validate_projection_state:
+        validate_projections(value)
 
 
 def markdown_section(path: Path, heading: str) -> list[str]:
@@ -998,15 +1300,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=OUTPUT, help="render to another path")
     args = parser.parse_args(argv)
     try:
-        rendered = render(load_manifest())
         output = args.out.resolve()
         if args.check:
+            rendered = render(load_manifest())
             if not output.is_file() or output.read_text(encoding="utf-8") != rendered:
                 print(f"STALE: {output}; run {Path(__file__).name}", file=sys.stderr)
                 return 1
             print(f"OK: {output.relative_to(REPO) if output.is_relative_to(REPO) else output}")
             return 0
         assert_repo_identity()
+        value = load_manifest(validate_projection_state=False)
+        if output == OUTPUT.resolve():
+            write_projections(value)
+            validate_manifest(value)
+        rendered = render(value)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(rendered, encoding="utf-8", newline="\n")
         print(f"Wrote {output.relative_to(REPO) if output.is_relative_to(REPO) else output}")

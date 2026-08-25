@@ -1,8 +1,19 @@
 # Five-Intent Program Plan — Quest creator ecosystem
 
-Adopted 2026-08-18. Source design intents: `docs/arch/01..05_*.md` in the baseline
-repository (Arcane Sight observability, Quest Lab apprenticeship, Studio↔Live closed
-loop, community artifact ecosystem, adaptive event semantics).
+Adopted 2026-08-18. The source design intents are immutable published authority in the
+Baseline repository:
+
+<!-- source-intents:begin -->
+Pinned source authority: [`djcdevelopment/baseline@ed45c98fd5dfe8f92214fd67180937dc10163fee`](https://github.com/djcdevelopment/baseline/commit/ed45c98fd5dfe8f92214fd67180937dc10163fee).
+
+| Intent | Immutable source | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| 01 | [Arcane Sight observability](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/01_arcane_sight_runtime_observability.md) | 2771 | `025eddf14cec353b476938e682e75519629d208fd3040c54da55f7c7c163d610` |
+| 02 | [Quest Lab apprenticeship](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/02_quest_lab_apprenticeship_spellbook.md) | 3089 | `8a6abcb6aa4e6a1b20aaf622f779773b9d628acf91f574714f42c52321c11ea5` |
+| 03 | [Studio-Live closed loop](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/03_studio_live_valheim_creator_loop.md) | 3176 | `34ea44ce4009a534ecd212d78af83aed4c18cab96fdd3c39d2fdf358e6c328b4` |
+| 04 | [Community artifact ecosystem](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/04_community_artifact_ecosystem.md) | 3481 | `84787fa8b99a978d6be0388b929f363c815f5da63047963f4949bc182761f807` |
+| 05 | [Adaptive event semantics](https://github.com/djcdevelopment/baseline/blob/ed45c98fd5dfe8f92214fd67180937dc10163fee/docs/arch/05_adaptive_event_semantics.md) | 4015 | `6fafa4e79fed6af7dcac016c73670e2e580a0cd69cfabf85731ff805f90a7075` |
+<!-- source-intents:end -->
 
 Exploration confirmed the gold baselines those docs reference already exist
 (RuntimeArcaneSight, F9 drawer with Look→Validate→Load→Confirm, receipts, hot-load,
@@ -18,8 +29,11 @@ Adopted from an external design review (2026-08-18) that scored the program stro
 against the WeakAuras ecosystem ethos — small composable primitives, portable
 artifacts, inspectability, immediate feedback, progressive complexity, community
 reuse — with one modern inversion: the machine absorbs the complexity that WeakAuras
-historically forced onto the human. These constraints govern every phase; the danger
-is not missing capability but exposing too much of it too quickly.
+historically forced onto the human. Six product constraints govern every phase; the
+communication guardrail that follows governs how their results are reported. The danger is not
+missing capability but exposing too much of it too quickly.
+
+### Six product guardrails
 
 1. **The primitive is small; the composition is powerful.** Say, drop, pickup, wait
    are individually unimpressive; `Say → within 10s Drop ×2 → Pickup → Equip →
@@ -56,6 +70,8 @@ is not missing capability but exposing too much of it too quickly.
    validator proves → Studio explains → hot-load → Arcane Sight shows what
    happened"), not merely finished things copied by people who can't operate the
    editor.
+### Communication guardrail
+
 7. **Answer at the reporter's altitude.** When a human reports a technical symptom,
    first determine whether the required output is a maintainer diagnosis, a creator
    explanation, or a player experience — then answer at that altitude. Mechanism-first

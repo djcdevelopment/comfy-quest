@@ -361,6 +361,65 @@ class RoadmapSurfaceTests(unittest.TestCase):
         with self.assertRaisesRegex(self.renderer.MissionControlError, r"source pin is stale"):
             self.renderer.validate_manifest(moved)
 
+    def test_source_intents_are_immutable_and_every_projection_matches(self):
+        authority = self.manifest["source_intents"]
+        self.assertEqual("djcdevelopment/baseline", authority["repository"])
+        self.assertRegex(authority["revision"], r"^[0-9a-f]{40}$")
+        self.assertEqual(["01", "02", "03", "04", "05"], [item["id"] for item in authority["documents"]])
+        self.renderer.validate_source_intents(self.manifest)
+        self.renderer.validate_projections(self.manifest)
+
+        moving = copy.deepcopy(self.manifest)
+        moving["source_intents"]["revision"] = "main"
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "40-character SHA"):
+            self.renderer.validate_manifest(moving)
+
+        wrong_path = copy.deepcopy(self.manifest)
+        wrong_path["source_intents"]["documents"][0]["path"] = "docs/arch/moved.md"
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "path must be"):
+            self.renderer.validate_manifest(wrong_path)
+
+        wrong_hash = copy.deepcopy(self.manifest)
+        wrong_hash["source_intents"]["documents"][0]["sha256"] = "not-a-hash"
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "lowercase SHA-256"):
+            self.renderer.validate_manifest(wrong_hash)
+
+    def test_every_projection_marker_is_registered(self):
+        self.renderer.validate_projection_registration()
+        original = self.renderer.POINTER_FILES
+        try:
+            self.renderer.POINTER_FILES = original + ("docs/working-agreements.md",)
+            with self.assertRaisesRegex(self.renderer.MissionControlError, "projection marker"):
+                self.renderer.validate_projection_registration()
+        finally:
+            self.renderer.POINTER_FILES = original
+
+    def test_4a_journey_is_the_full_a_b_a_contract(self):
+        journey = self.renderer.load_4a_journey()
+        self.assertEqual(list(self.renderer.JOURNEY_STEP_IDS), [item["id"] for item in journey["steps"]])
+        self.assertEqual(
+            list(self.renderer.JOURNEY_EVIDENCE_IDS),
+            [item["id"] for item in journey["evidence"]],
+        )
+        projected = self.renderer.fenced_body(
+            REPO / "docs" / "PLAN.md",
+            self.renderer.JOURNEY_BEGIN,
+            self.renderer.JOURNEY_END,
+        )
+        self.assertEqual(self.renderer.journey_projection(journey), projected)
+        for step_id in self.renderer.JOURNEY_STEP_IDS:
+            with self.subTest(step=step_id):
+                broken = copy.deepcopy(journey)
+                broken["steps"] = [item for item in broken["steps"] if item["id"] != step_id]
+                with self.assertRaisesRegex(self.renderer.MissionControlError, "ordered sequence"):
+                    self.renderer.validate_acceptance_journey(broken)
+
+    def test_guardrails_are_six_product_plus_one_communication(self):
+        self.renderer.validate_guardrail_taxonomy()
+        plan = (REPO / "docs" / "five-intent-program-plan.md").read_text(encoding="utf-8")
+        self.assertIn("### Six product guardrails", plan)
+        self.assertIn("### Communication guardrail", plan)
+
     def test_the_reading_order_answers_why_before_what(self):
         # The chain shipped with nine authorities and not one of them said why any of it
         # exists: a cold reader following it exactly learned the plan, the lanes, the ledger
@@ -401,7 +460,9 @@ class RoadmapSurfaceTests(unittest.TestCase):
         # they are here reconstructs them from the plan, which cites and does not restate them.
         handoff = (REPO / "docs" / "handoff-2026-08-24.md").read_text(encoding="utf-8")
         self.assertIn("What this repository does not hold", handoff)
-        self.assertIn("docs/arch/01..05", handoff)
+        self.assertIn(self.manifest["source_intents"]["revision"], handoff)
+        for document in self.manifest["source_intents"]["documents"]:
+            self.assertIn(document["path"], handoff)
         # And it tells a cold agent to check its checkout before trusting any of it.
         self.assertIn("check your checkout", handoff.lower())
 
