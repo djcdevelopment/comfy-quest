@@ -51,7 +51,8 @@ object is absent.
 ### A2 — The tests that prove the "implemented" foundation never run in CI *(high)*
 
 `.github/workflows/ci.yml:46-60` runs `ComfyQuestLab.Tests`, the Python suite, four drift
-checks, and `dotnet pack`. It does **not** run `src/Quest.Studio.Tests` (72 tests, including
+checks, and `dotnet pack`. It does **not** run `src/Quest.Studio.Tests` (**101 tests**, verified
+passing locally on 2026-08-24 against a clean package cache, including
 `QuestStudioPortfolioTests.cs` and `QuestStudioRunControlTests.cs`, both introduced by
 `a07cb62` — the exact commit the mission-control page cites as proof) or
 `src/Quest.Studio.E2E.Tests`, the repository's only browser-driving suite. `README.md:37-53`
@@ -368,6 +369,35 @@ with FR-LOOP-002 ("one Creator Session owns ... every precondition the next oper
 rejects anything but exact v3 (`:308`). The same bytes upgrade from disk and are refused on
 import.
 
+### D6 — The interim contracts package is version-pinned but content-mutable *(medium-high)*
+
+Found while verifying the A2 fix rather than by reading.
+
+`Comfy.Quest.Contracts.0.6.0-local.nupkg` was repacked by `a07cb62` — 86,347 bytes to 108,102
+bytes — **without a version change**. `Quest.Studio` consumes Contracts as a compiled assembly
+pinned to that version. Any consumer holding a warm NuGet cache therefore resolves the *older*
+package under the same version string and compiles against stale contracts.
+
+Reproduced: a plain `dotnet test src/Quest.Studio.Tests` failed with four `CS0246` /`CS0103`
+errors for `RuntimeRunControlReceipt`, `RuntimeRunStatusEntry`, and `RuntimeRunStatusStore` —
+all types that `a07cb62` added. The global cache held the 86,347-byte package dated 2026-08-19;
+`packages-local/` held the 108,102-byte package dated 2026-08-24, and the packed
+`lib/netstandard2.0/ComfyQuestContracts.dll` contains all three types. Re-running with an
+isolated cache keyed to the nupkg hash passed 101 of 101 tests.
+
+`tools/quest-studio/Start-QuestStudio.ps1` already works around exactly this by pointing
+`NUGET_PACKAGES` at `artifacts/quest-studio/nuget-cache/host-<sha16-of-nupkg>` — which is
+evidence the trap is known and recurring. But `dotnet build`, `dotnet test`, and the local
+verification sequence in `README.md` get no such protection.
+
+This contradicts NFR-INTEGRITY-001 ("canonical serialization, content hashes, versioned
+schemas ... apply to every artifact"). The dangerous case is not the confusing build failure
+above; it is the quieter one where stale contracts still compile and the consumer silently
+builds against the wrong contract.
+
+CI is unaffected — it restores clean — so gating `Quest.Studio.Tests` in CI is safe. The
+exposure is local and developer-facing.
+
 ---
 
 ## E. Hygiene
@@ -405,6 +435,7 @@ requiring sign-off**, not edits. The rest are mechanical.
 | 13 | Validate `machines` / `environment` state enums (A6) | same file | no |
 | 14 | Gitignore or remove `.codex-pdf-profile/`; decide the PDF's status (E1, E4) | `.gitignore` | no |
 | 15 | Remove the empty `Lumberjacks/src/` fossil (E2) | — | no |
+| 16 | Give build/test the hash-keyed package cache `Start-QuestStudio.ps1` already uses, or bump the version on every repack (D6) | `README.md`, build/test entrypoints | no |
 
 Audit recommendations do not silently become adopted architectural decisions. See the sign-off
 boundary in [`creator-os-build-strategy.md`](creator-os-build-strategy.md).

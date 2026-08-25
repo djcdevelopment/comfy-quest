@@ -1,5 +1,10 @@
 # Decision brief — the Studio↔world switch cost (Phase 4 scoping input)
 
+> **HISTORICAL — the F9 question this brief scopes was decided on 2026-08-24.** See
+> `docs/adr/0008-the-overhead-bar-replaces-the-f9-drawer.md`: F9 now expands or minimizes an
+> always-present overhead bar, and the drawer this brief describes no longer exists. The
+> switch-cost finding itself remains valid input.
+
 ## The finding, restated
 
 The lap recorded: "F9 felt like a kernel system-information panel. Its valuable role is

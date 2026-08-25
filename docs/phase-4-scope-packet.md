@@ -1,5 +1,11 @@
 # Phase 4 scope packet — one decision, everything on the table
 
+> **SUPERSEDED 2026-08-24 — do not action the call this document asks for.** The
+> adoption-path pivot in `docs/five-intent-program-plan.md` re-scoped Phase 4 to guild
+> dogfooding, and `docs/creator-portfolio-requirements.md` now owns the gates. The Lab
+> ownership map and the four inputs below remain valid prior art; the three shapes and the
+> request at the end do not.
+
 Strategy workstream W5. This is a decision document, not a work order: it puts the
 four parked inputs, the Lab ownership map, and three shapes of Phase 4 in front of
 one call.

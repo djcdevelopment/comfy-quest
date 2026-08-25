@@ -9,3 +9,10 @@ tools/questlab-package/dist/
 artifacts/*
 !artifacts/questlab-grimoire.json
 .claude/
+
+# Tool artifacts from the mission-control PDF export lane. The profile directory
+# can hold browser state and sits next to a full-history secret-scan gate; the PDF
+# is a third representation of docs/quest-mission-control.html with no drift gate
+# (see docs/creator-os-audit-2026-08-24.md, E1/E4). Both are regenerable.
+.codex-pdf-profile/
+docs/quest-mission-control.pdf

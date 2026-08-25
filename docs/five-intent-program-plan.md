@@ -75,6 +75,10 @@ the eventual repository the community memory.
 
 ## Program overview
 
+> **The post-Phase-3 rows of this table are SUPERSEDED** by the adoption-path pivot below
+> (see "Adoption-path pivot — 2026-08-24"). Phase 4 is no longer the Quest Lab spellbook.
+> `docs/creator-portfolio-requirements.md` owns the detailed gates.
+
 | Phase | Intent | Depends on |
 | --- | --- | --- |
 | 1 | Identity & evidence spine (01 core) | — |
@@ -111,6 +115,15 @@ The post-Phase-3 order is now:
 | 4B | Guild campaign: prerequisites/unlocks, multi-experience Runtime, portfolio readiness, atomic guild/world release | One top-to-bottom guild campaign runs from its released world bundle with rehearsal and required live evidence. |
 | 4C | Refinement through use: capability admission from blocked authored ideas, contextual friction ledger, hundredth-use composition | Multiple complete author-to-rerun cycles require no KVM turn; each tooling change links authored need to rerun proof. |
 | 5 | Community-ready guild artifacts | Export, import-fork, semantic/world diff, install, and lineage preservation work from a clean profile. |
+
+> **Known conflict, unresolved.** The 4A and 4B rows above disagree with
+> `docs/creator-portfolio-requirements.md`: that document makes named anchors conditional,
+> states that saved-world packaging does not gate R&D (see
+> `docs/adr/0010-world-packaging-is-deferred-out-of-rnd.md`), and places multi-experience
+> Runtime in 4A rather than 4B. The requirements document owns the detailed gates and should
+> be treated as authoritative until this table is reconciled. Reconciling it changes the
+> meaning of 4A/4B and therefore requires sign-off. See
+> `docs/creator-os-audit-2026-08-24.md` finding B2.
 
 The Phase 4 notebook design below remains valid prior art, but patterns are now earned
 from structures the dogfood campaign actually repeats. Auto-generation is an optional

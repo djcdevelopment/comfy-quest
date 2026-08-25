@@ -30,6 +30,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The mission-control render resolves page.program_commit with
+          # `git show`. A depth-1 clone cannot see a pinned parent commit.
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
@@ -46,6 +50,9 @@ jobs:
       - name: Game-independent xUnit suite
         shell: pwsh
         run: dotnet test network/mod/ComfyQuestLab.Tests/ComfyQuestLab.Tests.csproj -c Release --no-restore
+      - name: Studio service xUnit suite
+        shell: pwsh
+        run: dotnet test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release
       - name: Python suite and generated drift
         shell: pwsh
         run: |
