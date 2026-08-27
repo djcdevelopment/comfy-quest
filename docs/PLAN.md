@@ -90,43 +90,34 @@ The conclusion the whole plan rests on, and it is good news:
 > **The remaining work is smaller than the roadmap makes it look, because the contract layer is
 > consistently ahead of the runtime layer.**
 
-Four things are **built and unproven.** `implemented` means the code exists and is
-contract-tested, and **no installed game has ever exercised it.** That is not a synonym for done,
-and reporting it as done is the specific failure this program has already paid for.
+The 4A machine gate is complete. Installed session
+`queue-full-width-journey-20260827-r9` exercised the real product and promoted the work that had
+previously been implementation-only.
 
 | What | State | What is actually missing |
 | --- | --- | --- |
-| Portfolio hierarchy | implemented | live evidence |
-| Scoped reset / rerun | implemented | live evidence |
-| Guild-scale runtime selector | implemented | live evidence |
-| Receipt retention | implemented | live evidence |
+| Portfolio hierarchy | complete for the 4A journey | sustained human authorship at real density in 4B |
+| Scoped reset / rerun | installed-proven | human clarity and hundredth-use judgment in 4B |
+| Guild-scale runtime selector | installed-proven | real authored campaign breadth in 4B |
+| Receipt retention | installed-proven across its per-run bound | sustained campaign volume in 4B |
 
 Lanes of the repair program: **0 closed** (the roadmap tells the truth and is machine-checked),
 **1 implemented** (multi-experience selector), **2 implemented** (evidence retention), **3 ruled
-and recorded** (ADR 0012, 0014). **Lane 4 is active on the installed game.** Its autonomous
-launch, exact world entry, nearby reviewed binding fixture, and byte-exact cleanup preflight are
-live-proven. Installed lap `queue-full-width-journey-20260827-r6` then reached the real candidate
-selector and exposed a Studio re-render replacing the chosen sign with the nearest wood pole;
-the rejected Runtime receipt pinned both ZDO and `binding_target_incompatible`. Studio now
-preserves the exact candidate across polling, with a browser regression that re-renders between
-selection and bind. The full corrected guild journey remains the gate.
-Installed lap `queue-full-width-journey-20260827-r7` passed that repaired boundary, proved locked
-B, completed A and B independently, and then exposed the installed evidence helper posting B's
-non-mutating preview to the reset-apply endpoint. The helper now uses `reset-preview`, returns
-the exact API diagnostic on failure, and runs inside the synthetic guild journey. A corrected
-installed rerun is still required.
-Installed lap `queue-full-width-journey-20260827-r8` verified the corrected endpoint and exposed
-the next missing precondition: durable B completion preceded the Runtime status heartbeat that
-makes B eligible for scoped control, so Studio correctly returned `run_scope_not_loaded`. The
-evidence helper now waits for that exact run to be fresh and loaded before requesting its preview;
-the synthetic guild journey covers the wait. The complete installed rerun remains the gate.
+and recorded** (ADR 0012, 0014), and **4 completed** by the installed game journey. Laps r6-r8
+did what integration-first proof is supposed to do: they found candidate-selection drift, a
+preview/apply endpoint error, and a fresh-run status race before Derek entered the seat. Each was
+fixed, regression-covered, and rerun. r9 then passed the full real Studio -> artifact -> Runtime
+-> installed Valheim -> evidence -> recovery chain with no human action.
 
-Nothing is in flight anywhere else: no open PRs, one branch on the remote, and the other agent's
-worktree (`scanner-slice1`) is fully merged and idle since 2026-08-20.
+The authoritative local proof index is
+[`docs/evidence/queue-full-width-journey-20260827-r9.json`](evidence/queue-full-width-journey-20260827-r9.json).
+The full capture bundle remains at
+`C:\work\comfy-quest\captures\queue.full-width-journey\queue-full-width-journey-20260827-r9`.
+There is no remaining mechanical Quest task that should be discovered by putting Derek in-game.
 
 ## 4. What happens next, in order
 
-### Step 1 — Drive the installed vertical slice `queue.full-width-journey`
+### Step 1 — Completed: installed vertical slice `queue.full-width-journey`
 
 The first step that cannot be taken without Valheim installed. Its authoritative journey is
 defined under 4A in `creator-os-phases.json` and projected here:
@@ -155,34 +146,35 @@ defined under 4A in `creator-os-phases.json` and projected here:
 - **Claims:** `FR-LOOP-001`, `NFR-SEAT-001`, `NFR-SEAT-003`, `NFR-TEST-001`
 - **Human cost:** zero by default. `-HumanWorldEntry` retains the one-action ADR fallback while
   the default autonomous path is available.
-- **Current live evidence:** `binding-fixture-smoke-20260827-r5` entered the exact pinned local
-  world, replayed the reviewed 12-piece fixture to a 12/12 `MATCH`, exposed its sign 5.6 metres
-  away through Runtime's bounded candidates, stopped gracefully, and restored the exact world
-  pair, character profile, and empty prior plugin install. Installed lap
-  `queue-full-width-journey-20260827-r6` reached binding, proved that a polling re-render had sent
-  the nearest wood pole instead of the selected sign, and cleaned up byte-exactly. That Studio
-  selection defect is repaired and regression-covered. Installed lap r7 passed locked B and
-  completed A and B before catching an incorrect reset-apply URL in the evidence helper; the
-  helper now drives the non-mutating preview URL under synthetic browser coverage. Lap r8 then
-  proved the B run can become durable just before its status heartbeat; the helper now establishes
-  fresh loaded-run status before previewing. The complete browser-to-A -> B -> A journey still
-  needs its corrected rerun, and no seat is requested before it passes.
-- **Before it starts:** agree who owns `<Valheim>/BepInEx/` for the lap's duration. A worktree
-  isolates the repository, not the game install; another agent has clobbered a live inbox and
-  deployed plugin DLLs mid-lap, twice.
-- **Before Derek is called at all** (`NFR-SEAT-003`): automation has driven every applicable
-  step, collected the screenshots/logs/receipts, and **fixed and rerun the mechanical failures.**
-  What is left must be one bounded batch of human judgments.
-- **Done when:** the four implemented-unproven rows above have live receipts, and the 4A exit in
-  `creator-os-phases.json` is satisfied end to end.
+- **Passing evidence:** r9 authored and production-published A plus prerequisite-locked B through
+  the real Studio GUI; launched Steam into the exact profile/world; replayed the reviewed 12-piece
+  fixture to 12/12 `MATCH`; bound its nearby sign; proved locked-B refusal and A -> B -> A under
+  independent runs; selectively reset and completed a linked successor A; crossed the 32-receipt
+  bound by one without breaking B's chain; restored four bindings LIFO; stopped gracefully; and
+  restored the exact `.db`, `.fwl`, and `.fch` hashes. Studio stderr and game error-signature
+  counts are zero, as are remaining plug-in files and Valheim processes.
+- **Evidence:** the committed index above pins the local proof bundle, identities, run lineage,
+  cleanup verdict, trace, logs, and key artifact hashes.
+- **Result:** 4A / guild-scale-runtime is complete. The technical lap used generated A/B content,
+  so it deliberately does not claim human acceptance of authorship or play feel.
 
 ### Step 2 — Prepare the 4B creative sitting
 
-The 4A lap is technical integration evidence and does not manufacture a reason to put Derek in
-the game. His next contiguous session starts from a prepared guild premise and contains only
-authorship and perception that a machine cannot provide: composition, narrative tone, clarity,
-responsiveness, and play feel. Any launch, navigation, retry, log, or proof request that reaches
-him in that session is a defect with a receipt.
+The 4A lap is technical integration evidence; it does not manufacture Derek's creative answer.
+Before his next contiguous session, automation stages the campaign premise, exact guild draft,
+world/profile, Studio route, capture, evidence, and recovery. Derek's contribution is one bounded
+set of judgments:
+
+1. What player fantasy and narrative tone should the first ERA17 questline carry?
+2. Which in-world compositions and cues read clearly, and which do not?
+3. Does each authored beat respond when expected and explain itself at player altitude?
+4. Which moments feel satisfying, confusing, slow, or dead?
+5. What should be kept, revised, or rejected before the next cycle?
+
+Using Studio to express those choices and playing the resulting content are product use, not KVM
+work. Launch, exact world/profile selection, deployment, navigation performed only for setup,
+retries, screenshots, receipts, logs, reset/rerun plumbing, shutdown, and recovery remain
+machine-owned. Derek is not asked to enter the game until that seat packet is staged.
 
 ### Step 3 — 4B, the sustained campaign `queue.guild-campaign`
 
@@ -217,8 +209,10 @@ the obvious lane — the ledger is built so it cannot.
 | `FR-WORLD-001/002` | Whether the authored slice needs spatial references at all |
 | `NFR-TEST-002` | Whether evidence-over-counts earns an executable gate |
 
-Outside those rulings, Derek is needed for the prepared 4B guild's authorship and play-feel
-judgments. The machine driver owns the game install for each technical lap.
+Outside those rulings, Derek is needed only for the prepared 4B guild's premise, authored
+choices, composition, clarity, narrative tone, responsiveness, and play-feel judgments. He does
+not owe an in-game mechanical step while the seat packet is being staged. The machine driver owns
+the game install, lifecycle, evidence, and recovery.
 
 ## 6. What we are deliberately not doing
 

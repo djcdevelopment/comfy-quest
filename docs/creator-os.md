@@ -139,7 +139,8 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
 - Bounded `Launch` and `Stop` compile against the installed Valheim assemblies and have live
   execution proof. `Launch` pins profile filename, world filename, display name and UID, machine,
   session, and expiry; `Stop` uses graceful-then-forced process recovery and archives the game
-  logs. The complete installed 4A guild journey remains a separate, still-gated claim.
+  logs. Installed session `queue-full-width-journey-20260827-r9` used both inside the complete
+  zero-human 4A guild journey and restored the exact prior game/install state.
 - Quest Lab capture normalization, projection, check-before-build, durable marking, and
   translation-independent diff are executable-test covered. The Godbuild importer is
   exercised through write, clean `--check`, and deliberate-drift rejection.
@@ -179,27 +180,37 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
   candidates including the fixture sign at 5.6 metres; `Stop` closed gracefully; and `Close
   -Restore -RestoreGameState` restored the `.db`, `.fwl`, and `.fch` files to their pre-lap
   SHA256 values while leaving zero plugin files. This proves the launch, deterministic binding
-  fixture, and recovery choreography, not the still-pending full A -> B -> A guild journey.
+  fixture, and recovery choreography; that preflight alone did not yet prove A -> B -> A.
 - Installed journey `queue-full-width-journey-20260827-r6` autonomously continued through guild
   authoring, immutable publication, exact world entry, fixture replay, dev activation, and the
   real 32-candidate binding selector. Its rejected bind receipt proved that a periodic Studio
   render had replaced the selected sign ZDO with the nearest wood-pole ZDO before submission.
   Studio now preserves an existing candidate selection across renders, and the synthetic browser
   journey explicitly selects the non-first sign, forces a re-render, and verifies the exact ZDO
-  remains selected. The installed correction still requires a complete rerun before promotion.
+  remains selected. Promotion correctly waited for the later complete rerun.
 - Installed journey `queue-full-width-journey-20260827-r7` passed the repaired sign selection,
   retained the locked-B prerequisite refusal, and completed A and B under independent run IDs.
   Its next evidence-only B preview exposed the installed helper posting to reset apply instead of
   reset preview. The helper now posts to `runs/reset-preview`, returns the API's exact diagnostic
   rather than an opaque browser exception, and executes in the synthetic guild journey. Cleanup
   again stopped Valheim gracefully, removed all plugins, and restored the world pair and character
-  profile to their pinned hashes. The corrected full installed lap remains pending.
+  profile to their pinned hashes. At that point the corrected full installed lap was still pending.
 - Installed journey `queue-full-width-journey-20260827-r8` confirmed the non-mutating preview URL
   and returned `run_scope_not_loaded`: B's durable completion was visible before Runtime's next
   status heartbeat made that exact run eligible for scoped control. The installed helper now waits
   for fresh connected status containing the exact project/run pair before it requests a preview,
   and that precondition runs in the synthetic guild journey. Cleanup again restored all three
   game-state hashes and left no Valheim process or installed plugin.
+- Installed journey `queue-full-width-journey-20260827-r9` passed the full declared 4A journey
+  with zero human actions. It authored and immutable-published A plus prerequisite-locked B
+  through Studio, entered the pinned local world through Steam, replayed the reviewed 12/12 sign
+  fixture, activated the identical guild content through the dev channel, proved locked-B refusal
+  and independent A -> B -> A completion, reset only A, completed its linked successor, crossed
+  the 32-receipt per-scope bound by one without breaking B's chain, restored four binding changes
+  LIFO, stopped gracefully, and restored the exact `.db`, `.fwl`, and `.fch` hashes. Studio stderr,
+  game error signatures, remaining plugins, and remaining Valheim processes were all zero. The
+  proof index is
+  [`docs/evidence/queue-full-width-journey-20260827-r9.json`](evidence/queue-full-width-journey-20260827-r9.json).
 
 An earlier live launch exposed a success-sentinel defect before Arm dispatch. The
 validator now returns null on success, and both the executable controller round trip and
@@ -208,7 +219,7 @@ the corrected live Arm/Disarm receipts cover that exact branch.
 ## Creator session loop
 
 1. With Valheim closed, run `tools\creator-session\Invoke-CreatorSession.ps1 Prepare`. Prepare takes the install-wide lease, builds and hash-verifies the payload, backs up exact plugin/config/world files, enables the private-world safety gate, and records the machine/world/session pins used by every later request.
-2. The installed driver defaults to `Launch`, which starts Valheim through Steam and requests the exact profile and local world named by the session manifest. Runtime refuses a missing or ambiguous profile, absent or mismatched world UID, wrong machine/session, expired request, server join, console command, or synthetic input. `-HumanWorldEntry` retains the one-action ADR 0014 fallback while the autonomous path is being proven.
+2. The installed driver defaults to `Launch`, which starts Valheim through Steam and requests the exact profile and local world named by the session manifest. Runtime refuses a missing or ambiguous profile, absent or mismatched world UID, wrong machine/session, expired request, server join, console command, or synthetic input. `-HumanWorldEntry` retains the one-action ADR 0014 fallback; the default autonomous path is installed-proven.
 3. Run `tools\creator-session\Invoke-CreatorSession.ps1 Status -SessionId <id>`. Continue only while the session is active, the machine and world pins agree, and every installed plugin hash still matches Prepare.
 4. For a Godbuild lap, run the bounded `BuildOn` operation and require its correlated receipt before the creator begins spatial work. While it is active, the creator uses ordinary hammer/build controls; run one bounded operation from `GalleryRebuild`, `Capture -BlueprintName <name>`, or `Arm` only when the lap calls for it. Every request expires, carries the same three identity pins, is consumed once in game, and has no console-command or synthetic-key field.
 5. Capture automatically imports the fixed receipt artifact and runs the generator-drift check. Review `examples/worldbuild/<name>/preview.svg`, `plan.json`, and `manifest.json`; the manifest names upstream exclusions and the capture/blueprint pair remains replay authority.
@@ -238,20 +249,15 @@ cannot decide.
 
 ## Product roadmap
 
-1. **Integrate the implemented foundation.** Portfolio hierarchy and exact run/reset
-   identity exist. Drive them through the real Studio persistence and publication path,
-   Runtime exchange, process restart, and installed-game receipt path before promoting
-   their proof state.
-2. **Unlock guild-scale execution.** Implement multi-experience guild artifacts,
-   prerequisites and unlocks, Runtime experience selection, independent concurrent run
-   status, and the creator event controls needed to author top-to-bottom guild ideas.
-   Deliver these as full-width Studio-to-Valheim capabilities rather than isolated
-   contract models.
-3. **Make autonomous live integration routine.** Use the standalone Isolate Workbench,
-   existing Valheim lifecycle harnesses, Quest's bounded inbox/outbox, browser driving,
-   direct captures, logs, and receipts to run the installed vertical slice without Derek.
-   Harden the standalone boundary before connecting it; never borrow HEARTH.
-4. **Dogfood real guilds.** Only after the machine loop is ready, Derek authors and runs
+1. **Integrated foundation — complete.** Portfolio hierarchy and exact run/reset identity crossed
+   real Studio persistence/publication, Runtime exchange, installed Valheim, and the receipt path.
+2. **Guild-scale execution — complete for 4A.** Multiple experiences, prerequisites/unlocks,
+   unambiguous Runtime selection, and independent run status passed the installed journey.
+3. **Autonomous live integration — complete for the 4A slice.** The existing lifecycle harness,
+   Quest's bounded inbox/outbox, browser driving, captures, logs, and receipts completed the
+   installed journey without Derek. The separate standalone Isolate boundary remains its own
+   unassigned ruling and may not borrow HEARTH.
+4. **Dogfood real guilds — active 4B.** With the machine loop ready, Derek authors and runs
    quests and repeatable creator events using ordinary building language and the current
    local working world. Add named anchors, event/effect vocabulary, and creator tooling
    when a real authored idea needs them. Feed observed friction directly into the next

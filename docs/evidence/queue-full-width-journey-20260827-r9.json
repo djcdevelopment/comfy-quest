@@ -1,0 +1,74 @@
+{
+  "schema": "comfy-quest-installed-guild-evidence-index/v1",
+  "recorded_on": "2026-08-27",
+  "result": "passed",
+  "lane": "4A",
+  "work_item": "queue.full-width-journey",
+  "session_id": "queue-full-width-journey-20260827-r9",
+  "source_revision": "89c0a71a91e770cdc9fb86d9284c5413c9112819",
+  "driver": "tools/quest-studio/Invoke-QuestStudioGuildJourney.ps1",
+  "local_evidence_root": "C:\\work\\comfy-quest\\captures\\queue.full-width-journey\\queue-full-width-journey-20260827-r9",
+  "local_evidence_is_ignored": true,
+  "identity": {
+    "machine": "OMEN",
+    "world_uid": "-7600395338659582326",
+    "guild_id": "guild-5b6905816836",
+    "content_hash": "6d9a23321dea2fe150a0c9abdafa80235f5080a1836306c16327cca65f533e0e",
+    "binding_zdo": "1784293485:63623",
+    "production_and_dev_pack_sha256": "6058e23bc0f2649332e19c1bdda301d1048242aea5e179510931a53df8db5ab0"
+  },
+  "journey": {
+    "studio_gui_authored_and_published": true,
+    "machine_owned_world_entry": true,
+    "prerequisite_refusal": "experience_prerequisite_incomplete:guild-journey-4664de",
+    "accepted_sequence": "A -> B -> A",
+    "predecessor_run_id": "run-20260827T124531381Z-af2f005e",
+    "other_experience_run_id": "run-20260827T124532891Z-324ec221",
+    "successor_run_id": "run-20260827T124540960Z-ed921bb0",
+    "reset_id": "reset-874960a7624949b0b1439f9440c1aa41",
+    "other_experience_unchanged": true,
+    "receipt_retention_boundary": 32,
+    "receipt_retention_crossed_by": 1,
+    "archived_receipt_bytes_preserved": true,
+    "other_experience_receipt_still_retrievable": true,
+    "binding_changes_restored_lifo": 4
+  },
+  "recovery": {
+    "session_state": "closed",
+    "restored_install": true,
+    "restored_game_state": true,
+    "save_files_pinned": 3,
+    "save_files_sha256_matched": 3,
+    "valheim_processes_after_close": 0,
+    "plugin_files_after_close": 0,
+    "studio_stderr_bytes": 0,
+    "game_error_signatures": 0
+  },
+  "evidence_sha256": {
+    "machine-lap-complete.json": "715c5ab4b387f5c93fed9f632401f666c4952974b2f2d0efeac42689dc82e154",
+    "session.closed.json": "8f1e860d01424a625264542a70818362c0de7f695b63eae3df74062468b179a0",
+    "proof/identity-summary.json": "23261185299e1b3dbfcaea95172b0eb4f1a647b29d95fb420e90ea408bcbf7b3",
+    "proof/prerequisite-refusal.json": "adb052657a2fb261176b535f55c087e5e1b76bb0eeead5258a14b55a49474253",
+    "proof/run-registry.json": "729a45af740bd4b067b9837b99f1526b5fb7d0c2fdcad7b8490d51677e115ba5",
+    "proof/archived-a-reset.json": "d1f28c603cefc14aadc841a2eee17bf2f61dd35aa5410459d3ae3596741584da",
+    "proof/b-correlated-preview.json": "ddacc7dad0f6a55c05fa6192876009de1045a6c6afa2383357f9e533cd60f9ec",
+    "playwright-trace.zip": "d53eefc727dd4f7381394fa84afd1f2229dbc3545cd0696be5f235434c02c239",
+    "20260827T124606Z-stop/Player.log": "9ed47878fdddb77436c60604fdd34377a96eb8686bc0a9a6be835d1be7bfb313",
+    "20260827T124606Z-stop/LogOutput.log": "60632a00df5d3a55b206724c21ed08c5a09f34247b17c967175432ca581b45d8"
+  },
+  "screenshots": {
+    "01-authored-published.png": "b5ebe5f66c3b86e8b9bc51b1bdfedb63e3bd2f30f8c694228502f5ed29719cdd",
+    "02-locked-b.png": "1d38a68d23b35c4a34fd46e840eee4d2d6c29d16b1f7590eefbeb6dc52ac0ff5",
+    "03-a-complete.png": "16c86500b853fc73c26ad48606398be4343e8ac7dcd46b9285b86c02bf8d0bbf",
+    "04-b-complete.png": "7dd34070dddcd70fb45291bcda9809f545d29b91f57833d6bda1110361a11473",
+    "05-return-a.png": "879a4b0ba7537dfe953dfffa2fa3652b95bd6dced31073f08421f9e6b6f54761",
+    "06-a-reset.png": "8d4e5096cc23a68a8ec6ba1b197a8137f6bf15152ce61e3d129810797946398b",
+    "07-a-rerun.png": "9d23cb3ada0f87aae1464593eff700bcc793075a31ac15c72d6a089a1150a85a",
+    "08-retained-proof.png": "57ba8564c8999a2309d889873c44498db19d4378455560ef6bd1a66f48e925ce"
+  },
+  "limitations": [
+    "This was a technical integration lap with generated A/B content, not a human creator-acceptance session.",
+    "The retained capture bundle is local and git-ignored; this committed index pins its location, identities, outcomes, and key artifact hashes.",
+    "The lap proves the declared 4A journey. Sustained authorship, usability at portfolio density, narrative quality, spatial composition, responsiveness, and play feel remain 4B human judgments."
+  ]
+}

@@ -202,9 +202,10 @@ different worlds, server joins, console commands, or synthetic input. The driver
 replay of a reviewed nearby sign fixture, activation, prerequisite refusal, A -> B -> A,
 scoped reset/rerun, exact retention proof, screenshots, LIFO binding recovery, game shutdown,
 log collection, and exact install, world-pair, and character-profile restore.
-`-HumanWorldEntry` retains the ADR 0014 fallback; the default bounded launch/world-entry and
-fixture/recovery preflight have live proof, while the complete installed guild lap remains gated
-until its own evidence set completes.
+`-HumanWorldEntry` retains the ADR 0014 fallback. Installed session
+`queue-full-width-journey-20260827-r9` proved the default bounded launch/world-entry and the
+complete guild lap with zero human actions, including exact retained evidence and recovery; its
+committed index is `docs/evidence/queue-full-width-journey-20260827-r9.json`.
 This is a technical 4A integration lap, not a creator seat; Derek's next session begins with
 a prepared guild premise and questions about authorship, composition, clarity, and play feel.
 

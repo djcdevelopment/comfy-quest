@@ -26,6 +26,7 @@ SCHEMA = "comfy-quest-mission-control/v1"
 LEDGER_SCHEMA = "comfy-quest-creator-requirements-ledger/v1"
 SESSION_SCHEMA = "comfy-quest-mission-control-session/v2"
 ALLOWED_PHASE_STATES = {"complete", "active", "planned"}
+ALLOWED_LANE_STATES = {"complete", "active", "planned"}
 ALLOWED_QUEUE_STATES = {"complete", "implemented", "ready", "human", "gated", "deferred"}
 # badge() and the status-dot stylesheet only style these. An unlisted value renders an
 # unstyled badge or a grey dot and says nothing about it (audit A6).
@@ -453,6 +454,20 @@ def load_lane_vocabulary(path: Path = PHASES) -> dict[str, Any]:
             raise MissionControlError(f"lanes[{index}] must be an object")
         lane_id = require_text(lane.get("id"), f"lanes[{index}].id")
         require_text(lane.get("slug"), f"lanes[{index}].slug")
+        lane_state = require_text(lane.get("state"), f"lanes[{index}].state")
+        if lane_state not in ALLOWED_LANE_STATES:
+            raise MissionControlError(
+                f"invalid lane state at lanes[{index}]: {lane_state!r} is not one of "
+                f"{sorted(ALLOWED_LANE_STATES)}"
+            )
+        if lane_state == "complete":
+            require_text(lane.get("completed_on"), f"lanes[{index}].completed_on")
+            source_path(require_text(
+                lane.get("completion_evidence"), f"lanes[{index}].completion_evidence"))
+        elif "completed_on" in lane or "completion_evidence" in lane:
+            raise MissionControlError(
+                f"lanes[{index}] is {lane_state!r} but carries completion metadata"
+            )
         if lane_id == "4A":
             validate_acceptance_journey(lane.get("acceptance_journey"))
         lane_ids.append(lane_id)

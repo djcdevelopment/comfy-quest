@@ -41,7 +41,7 @@
     "requirement": "NFR-SEAT-001",
     "decision": "docs/adr/0014-one-human-launch-and-entry-is-the-baseline.md",
     "future": "Automating world entry is a reduction of this boundary, not a prerequisite for any lane exit. See docs/adr/0012-creator-session-world-entry-is-not-field-lab-orchestration.md.",
-    "current_implementation": "The installed 4A driver now defaults to a bounded Steam launch and exact local-world entry, so its technical lap is configured to spend zero human actions. ADR 0014 remains the fallback ceiling, not a reason to spend Derek's seat."
+    "current_implementation": "Installed session queue-full-width-journey-20260827-r9 spent zero human actions: the driver launched Steam into the exact pinned local world, completed the full technical 4A journey, closed Valheim, and restored install, world, and character bytes. ADR 0014 remains the fallback ceiling, not a reason to spend Derek's seat."
   },
 
   "not_a_gate_in_any_lane": [
@@ -59,7 +59,9 @@
       "slug": "guild-scale-runtime",
       "title": "Guild-scale runtime",
       "question": "Can Creator OS operate a guild?",
-      "state": "active",
+      "state": "complete",
+      "completed_on": "2026-08-27",
+      "completion_evidence": "docs/evidence/queue-full-width-journey-20260827-r9.json",
       "in_scope": [
         "multi-experience guild artifacts",
         "Runtime experience selection without ambiguity",
@@ -146,7 +148,7 @@
       "slug": "sustained-creator-campaign",
       "title": "Sustained creator campaign",
       "question": "Can I actually use Creator OS to build a guild over time?",
-      "state": "planned",
+      "state": "active",
       "in_scope": [
         "repeated author, validate, play, observe, rerun cycles",
         "accumulated evidence across many runs",

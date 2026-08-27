@@ -5,8 +5,8 @@
     "title": "Quest Creator OS",
     "subtitle": "Drive the whole vertical slice. Automate the evidence. Spend the seat on creation.",
     "observed_on": "2026-08-27",
-    "program_commit": "a07cb62",
-    "program_commit_label": "Build guild portfolio and scoped reruns"
+    "program_commit": "89c0a71",
+    "program_commit_label": "Wait for fresh run scope before preview"
   },
   "source_intents": {
     "repository": "djcdevelopment/baseline",
@@ -170,8 +170,8 @@
       "id": "env.repo",
       "label": "Repository baseline",
       "state": "confirmed",
-      "detail": "The bounded portfolio/guild hierarchy and exact run reset/rerun foundation are committed in a07cb62. Their proof is automated and the live adapter acceptance remains deliberately unclaimed.",
-      "fact_kind": "git-observed"
+      "detail": "Installed session queue-full-width-journey-20260827-r9 ran from committed revision 89c0a71 and passed the declared 4A journey through real Studio, serialized guild packs, Runtime, installed Valheim, retained evidence, and byte-exact recovery.",
+      "fact_kind": "git-and-live-observed"
     },
     {
       "id": "env.session",
@@ -196,10 +196,10 @@
     },
     {
       "id": "env.portfolio-run",
-      "label": "Guild and rerun implementation",
-      "state": "implemented",
-      "detail": "Portfolio hierarchy, exact run/reset, bounded Steam lifecycle, and exact local-world entry code exist. Automated coverage shows internal and browser behavior, but the feature is not promoted to integrated until the real Studio persistence/publication, Runtime exchange, process restart, and installed-Valheim journey complete.",
-      "fact_kind": "implementation-observed"
+      "label": "Installed guild journey",
+      "state": "confirmed",
+      "detail": "Session queue-full-width-journey-20260827-r9 autonomously authored and published A plus prerequisite-locked B, entered the pinned world, proved B refusal and A -> B -> A, selectively reset and reran A, crossed retention, restored four bindings, stopped cleanly, and restored all three save/profile hashes with zero remaining plugins or Valheim processes.",
+      "fact_kind": "live-installed-evidence"
     }
   ],
   "strategy": {
@@ -278,7 +278,7 @@
       "number": 4,
       "title": "Dogfood creator portfolio",
       "state": "active",
-      "summary": "Portfolio hierarchy and scoped rerun are implemented. The active work is a full-width guild slice: real Studio publication, multi-experience Runtime selection, prerequisites/unlocks, autonomous installed-Valheim integration, then prepared guild dogfooding. World packaging is deferred.",
+      "summary": "The autonomous installed guild slice passed end to end, closing 4A / guild-scale-runtime. The active work is now a prepared 4B guild campaign in which Derek supplies authorship and play-feel judgments while automation retains lifecycle, evidence, and recovery ownership. World packaging is deferred.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "The adoption gate is not another generated tutorial"
     },
@@ -367,7 +367,7 @@
     },
     {
       "id": "queue.portfolio",
-      "state": "implemented",
+      "state": "complete",
       "lane": "4A",
       "requirements": [
         "FR-PORT-002",
@@ -375,13 +375,13 @@
         "FR-AUTH-006"
       ],
       "title": "Build the portfolio foundation",
-      "detail": "Studio presents versioned guilds, questlines, standalone quests, repeatable events, progression bands, search/archive, transactional placement, and deep-fork import/export. Promote it only after the real persisted and published journey runs.",
+      "detail": "Studio presents versioned guilds, questlines, standalone quests, repeatable events, progression bands, search/archive, transactional placement, and deep-fork import/export. Installed session queue-full-width-journey-20260827-r9 drove the actual GUI through persisted guild creation, A-before-B prerequisite authoring, certification, immutable production publication, and dev activation with the same content hash.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### Portfolio and progression"
     },
     {
       "id": "queue.reset",
-      "state": "implemented",
+      "state": "complete",
       "lane": "4A",
       "requirements": [
         "FR-RESET-001",
@@ -389,7 +389,7 @@
         "FR-RESET-003"
       ],
       "title": "Make clean reruns a product operation",
-      "detail": "Studio and Runtime implement exact scoped preview, resumable cleanup, retained prior state, and a linked successor run. Promote it only after an installed game run proves the exchange, reset, restart, and rerun path.",
+      "detail": "Installed session queue-full-width-journey-20260827-r9 previewed and applied an exact scoped reset to completed A, preserved completed B unchanged, created a distinct successor A run linked to its predecessor and reset, and completed the successor under the same world, binding, and content hash.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "FR-RESET-001"
     },
@@ -408,32 +408,32 @@
     },
     {
       "id": "queue.guild-runtime",
-      "state": "implemented",
+      "state": "complete",
       "lane": "4A",
       "requirements": [
         "FR-RUN-001",
         "FR-AUTH-005"
       ],
       "title": "Unlock guild-scale Runtime",
-      "detail": "Runtime experience selection is implemented: an additive `experience_id` on the active set, a bounded `select_experience` operation on the run-control allowlist, and one resolver behind both former refusal sites. Prerequisites/unlocks, independent run status, and creator-event controls build on top of it. Promote it only after an installed game run selects and plays more than one guild experience.",
+      "detail": "Installed session queue-full-width-journey-20260827-r9 selected and played two experiences from one guild release through the real bounded sign binding. B failed closed before A, unlocked after A completed, and retained its own completed run while A was selected again, reset, and rerun.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4A — Dogfood foundation"
     },
     {
       "id": "queue.receipt-retention",
-      "state": "implemented",
+      "state": "complete",
       "lane": "4B",
       "requirements": [
         "NFR-OBS-001"
       ],
       "title": "Make the evidence loop trustworthy",
-      "detail": "Retention is implemented: run-control receipts are partitioned by run so a burst on one run cannot reach another's chain, both stores archive by moving the exact bytes rather than deleting, and the only place evidence is destroyed writes a receipt naming what went. Promote it only after an installed game run proves a correlated proof set survives a reset burst.",
+      "detail": "Installed session queue-full-width-journey-20260827-r9 crossed A's 32-receipt per-scope bound by one, retrieved the exact archived receipt bytes through Studio, and proved B's independently correlated preview receipt and run identity remained readable and unchanged.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "NFR-OBS-001"
     },
     {
       "id": "queue.full-width-journey",
-      "state": "gated",
+      "state": "complete",
       "lane": "4A",
       "requirements": [
         "FR-LOOP-001",
@@ -442,7 +442,7 @@
         "NFR-TEST-001"
       ],
       "title": "Drive the installed vertical slice",
-      "detail": "The machine driver authors and production-publishes A and prerequisite-locked B through the actual Studio GUI, launches Steam into the exact pinned profile/local world through a single-use expiring request, replays a reviewed nearby sign fixture, activates the same guild through the armed dev channel, drives B refusal and A -> B -> A, selectively resets and reruns A, crosses receipt retention by exactly one, captures correlated proof, restores bindings LIFO, closes the game, archives logs, and restores prior install, world-pair, and character-profile bytes. The live zero-human preflight proves exact world entry, a 12/12 fixture MATCH, its sign inside the Runtime binding radius, graceful stop, and byte-exact cleanup. Installed laps repaired candidate selection across polling, corrected the evidence-only preview endpoint, and exposed durable run creation preceding the fresh status required by scoped controls. The driver now waits for the exact run to be fresh and loaded before preview, with synthetic browser coverage. This item remains gated until the corrected complete autonomous browser/game guild lap produces its evidence set; Derek has nothing mechanical to supply.",
+      "detail": "Installed session queue-full-width-journey-20260827-r9 completed the entire declared journey with zero human actions: real Studio GUI authoring and immutable publication; bounded Steam launch and exact local-world entry; reviewed 12/12 sign fixture; identical production/dev content; locked-B refusal; accepted A -> B -> A with independent run identities; selective A reset and linked successor rerun; exact receipt retention across live/archive stores; four LIFO binding restores; graceful game stop; archived logs; and exact prior install, world-pair, and character-profile restoration. The committed evidence index is docs/evidence/queue-full-width-journey-20260827-r9.json. 4A / guild-scale-runtime is complete.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "NFR-TEST-001"
     },
@@ -472,7 +472,7 @@
         "NFR-USE-001"
       ],
       "title": "Dogfood the first top-to-bottom guild",
-      "detail": "After autonomous readiness, Derek uses the Creator OS for real questlines and repeatable events. His sitting supplies creative and perceptual judgments; observed blocks drive the next full-width tooling change.",
+      "detail": "Autonomous readiness is proven. The next sitting is one contiguous 4B creator session: Derek uses the prepared Creator OS to shape real questlines and repeatable events and supplies only premise, composition, narrative tone, clarity, responsiveness, and play-feel judgments. Automation owns launch, exact world/profile selection, deployment, retries, captures, receipts, logs, reset/rerun plumbing, shutdown, and recovery; any mechanical request reaching Derek is a defect.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4B — Guild campaign"
     },
@@ -677,7 +677,7 @@
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
     "Close -Restore restores prior install bytes and retains authored world state. After Stop, a disposable technical lap may add -RestoreGameState to restore the exact pinned world pair and character profile; this bounded rollback is not saved-world packaging.",
-    "Portfolio and reset/rerun are wired end to end — endpoints, service, store, browser UI, file mailbox, and Runtime poller. What is missing is live-Valheim evidence, not wiring: they stay unpromoted until the real Studio persistence/publication, Runtime exchange, process restart, and installed-Valheim journey complete. Do not spend a seat turn discovering their mechanical defects.",
+    "The installed 4A journey is proven and its mechanical defects were fixed and rerun before the seat. Do not reopen deployment, lifecycle, binding, reset, retention, or recovery as human steps; a 4B seat turn is for authored choices and perception only.",
     "Receipts are authority, not logs. Retention archives rather than deletes, and the archive bound writes a `receipt_archive_evicted` receipt when it destroys anything — so a gap in a correlated proof set is a fact you can read, never something to infer from absence."
   ]
 }

@@ -455,6 +455,28 @@ class RoadmapSurfaceTests(unittest.TestCase):
                 self.assertIn(lane["question"], self.committed)
                 self.assertIn(lane["failure_mode"], self.committed)
 
+    def test_a_complete_lane_pins_repository_evidence(self):
+        vocabulary = json.loads(
+            (REPO / "docs" / "creator-os-phases.json").read_text(encoding="utf-8")
+        )
+        complete = [lane for lane in vocabulary["lanes"] if lane["state"] == "complete"]
+        self.assertTrue(complete)
+        for lane in complete:
+            with self.subTest(lane=lane["id"]):
+                self.assertTrue(lane["completed_on"])
+                self.assertTrue((REPO / lane["completion_evidence"]).is_file())
+
+        stale = copy.deepcopy(vocabulary)
+        completed = next(lane for lane in stale["lanes"] if lane["state"] == "complete")
+        completed["completion_evidence"] = "docs/evidence/there-is-no-such-lap.json"
+        with self.assertRaisesRegex(
+            self.renderer.MissionControlError, r"source does not exist"
+        ):
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "creator-os-phases.json"
+                path.write_text(json.dumps(stale), encoding="utf-8")
+                self.renderer.load_lane_vocabulary(path)
+
     def test_the_handoff_names_what_this_repository_does_not_hold(self):
         # The five source design intents live in the baseline repository. A reader who assumes
         # they are here reconstructs them from the plan, which cites and does not restate them.
@@ -488,17 +510,18 @@ class RoadmapSurfaceTests(unittest.TestCase):
                 with self.subTest(item=item["id"]):
                     self.assertIn(item["id"], handoff)
 
-    def test_the_caution_says_what_the_environment_entry_says(self):
-        # Audit B8: the caution sent a reader hunting for wiring that exists.
+    def test_the_installed_evidence_caution_matches_the_environment_entry(self):
+        # The caution may not send a reader back into machine work after the installed gate passed.
         caution = self.manifest["cautions"][7]
         environment = self.manifest["environment"][4]
-        self.assertEqual("implemented", environment["state"])
-        self.assertNotIn("not yet integrated", caution)
-        self.assertIn("wired end to end", caution)
-        self.assertIn("live-Valheim evidence", caution)
-        for stage in ("persistence/publication", "Runtime exchange", "process restart"):
-            self.assertIn(stage, caution)
-            self.assertIn(stage, environment["detail"])
+        self.assertEqual("confirmed", environment["state"])
+        self.assertIn("queue-full-width-journey-20260827-r9", environment["detail"])
+        self.assertIn("installed 4A journey is proven", caution)
+        self.assertIn("mechanical defects were fixed and rerun", caution)
+        self.assertNotIn("What is missing", caution)
+        self.assertNotIn("stay unpromoted", caution)
+        for operation in ("deployment", "lifecycle", "binding", "reset", "retention", "recovery"):
+            self.assertIn(operation, caution)
 
     def test_the_command_reference_lists_every_creator_session_verb(self):
         # Audit B9: Arm, Disarm, and GalleryRebuild were missing from the reference while the
@@ -700,7 +723,7 @@ class ProgramInvariantTests(unittest.TestCase):
 
         # `pre-lane` is for finished or blocked pre-vocabulary work, not schedulable work.
         backdated = copy.deepcopy(self.manifest)
-        self.work_item(backdated, "queue.guild-runtime")["lane"] = "pre-lane"
+        self.work_item(backdated, "queue.guild-campaign")["lane"] = "pre-lane"
         with self.assertRaisesRegex(self.renderer.MissionControlError, r"is `pre-lane` but"):
             self.check(manifest=backdated)
 

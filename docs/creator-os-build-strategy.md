@@ -16,8 +16,9 @@ Three verified examples:
 - `QuestPackStore.InspectLane` already validates, hashes, and compiles *N* experience
   documents. Only `RuntimeCharmBinding.TryActive` refuses them (audit D1). Multi-experience
   guilds are one selector away, not a rebuild.
-- Reset and rerun are wired end to end — endpoints, service, store, browser UI, file mailbox,
-  Runtime poller (audit B8). Only live evidence is missing.
+- Reset and rerun were already wired end to end — endpoints, service, store, browser UI, file
+  mailbox, Runtime poller (audit B8) — and installed session
+  `queue-full-width-journey-20260827-r9` later supplied the missing live evidence.
 - The bounded request/receipt mailbox pattern already exists in three tested flavours
   (`creator-request.json`, `questlab-batch-request.json`, `run-control.json`) with identity
   pins, expiry, allowlists, and correlated receipts. New machine-owned operations are cheap to
@@ -339,26 +340,24 @@ only if a second consumer needs the server-join harness.
 
 ## Lane 4 — Drive the real `4A / guild-scale-runtime` exit and call the seat
 
-**Status: active 2026-08-27.** Lanes 0-3 are done — 1 and 2 implemented, 3 ruled and recorded —
-and `queue.full-width-journey` is running against the installed game. The zero-human launch,
-exact-world entry, reviewed nearby binding fixture, and byte-exact install/world/profile cleanup
-preflight have live proof. The first full lap reached Runtime binding and exposed Studio replacing
-the selected sign with the first candidate during a polling render; the content-correlated
-rejection named that wood-pole ZDO and `binding_target_incompatible`. Candidate selection now
-survives re-render and a browser regression drives that exact boundary. The full guild journey is
-still gated. The next installed lap passed locked B plus independent A and B completion, then
-found the installed evidence helper sending a non-mutating B preview to reset apply. That helper
-now addresses `reset-preview`, surfaces the exact response on failure, and is exercised by the
-synthetic guild journey. The following lap confirmed that endpoint and exposed durable run
-completion arriving before the Runtime status heartbeat required by scoped controls; the helper
-now waits for the exact run to be fresh and loaded before preview. A corrected installed A -> B
--> A, reset, retention, browser, and recovery lap remains required.
+**Status: complete 2026-08-27.** Lanes 0-3 were complete before this gate. Installed laps r6-r8
+then found three machine-observable defects in sequence: candidate selection lost during a Studio
+polling render, a non-mutating preview sent to reset apply, and durable run completion preceding
+the fresh status heartbeat required by scoped control. Each defect was fixed, regression-covered,
+and rerun.
 
-Only after Lanes 1-3, and only with the evidence the readiness gate names. Four work items are
-`implemented` and unproven going in — portfolio, reset, guild runtime, receipt retention — and
-this lane is what converts that state into evidence. `NFR-SEAT-003` governs when the seat may be
-called at all: after automation has driven every applicable step, collected the evidence, and
-fixed and rerun the mechanical failures.
+Installed session `queue-full-width-journey-20260827-r9` passed the complete real journey with
+zero human actions: GUI authoring/publication, exact Steam world entry, reviewed nearby sign
+fixture, locked-B refusal, independent A -> B -> A runs, selective A reset, linked successor rerun,
+receipt retention across the 32-item per-scope bound, LIFO binding recovery, graceful shutdown,
+and exact install/world/profile restoration. The committed proof index is
+[`evidence/queue-full-width-journey-20260827-r9.json`](evidence/queue-full-width-journey-20260827-r9.json).
+
+The four work items that entered this lane as `implemented` and unproven — portfolio, reset,
+guild runtime, and receipt retention — now carry their installed promotion evidence.
+`NFR-SEAT-003` is satisfied for the technical slice. The next lane is 4B, and the remaining seat
+request is limited to a prepared batch of authorship, composition, clarity, narrative,
+responsiveness, and play-feel judgments.
 
 ---
 
@@ -418,6 +417,7 @@ python tools/assert_no_reach_in.py
   and every requirement id it cites must exist in the requirements document. Prose that
   *redefines* a lane rather than referencing it should eventually fail a check.
 
-Lanes 1-4 are not verified by this pass, by design. Their verification is the integration-first
-ladder the roadmap already specifies, and it starts with the real Studio-to-Valheim journey
-rather than with new unit tests.
+Lanes 1-3 are not verified by this documentation pass, by design. Lane 4's verification is the
+integration-first ladder the roadmap specifies; its real Studio-to-Valheim journey passed in
+installed session `queue-full-width-journey-20260827-r9` rather than being inferred from unit
+tests.
