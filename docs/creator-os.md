@@ -187,6 +187,13 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
   Studio now preserves an existing candidate selection across renders, and the synthetic browser
   journey explicitly selects the non-first sign, forces a re-render, and verifies the exact ZDO
   remains selected. The installed correction still requires a complete rerun before promotion.
+- Installed journey `queue-full-width-journey-20260827-r7` passed the repaired sign selection,
+  retained the locked-B prerequisite refusal, and completed A and B under independent run IDs.
+  Its next evidence-only B preview exposed the installed helper posting to reset apply instead of
+  reset preview. The helper now posts to `runs/reset-preview`, returns the API's exact diagnostic
+  rather than an opaque browser exception, and executes in the synthetic guild journey. Cleanup
+  again stopped Valheim gracefully, removed all plugins, and restored the world pair and character
+  profile to their pinned hashes. The corrected full installed lap remains pending.
 
 An earlier live launch exposed a success-sentinel defect before Arm dispatch. The
 validator now returns null on success, and both the executable controller round trip and

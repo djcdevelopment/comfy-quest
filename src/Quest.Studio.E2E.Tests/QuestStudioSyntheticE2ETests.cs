@@ -627,6 +627,8 @@ public sealed class QuestStudioSyntheticE2ETests
             Assert.Equal(firstB.RunId, Assert.Single(runtime.RunsFor(b.ExperienceId)).RunId);
             var browserBRun = await page.EvaluateAsync<string>("() => runState.runs[0].run_id");
             Assert.Equal(firstB.RunId, browserBRun);
+            var bPreviewRequest = await RequestPreviewAsync(page, b.ProjectId, firstB.RunId);
+            Assert.False(string.IsNullOrWhiteSpace(bPreviewRequest));
 
             await OpenProjectAsync(page, a.ProjectId);
             await page.Locator("#bind-experience").ClickAsync();
@@ -1162,7 +1164,7 @@ public sealed class QuestStudioSyntheticE2ETests
     static async Task<string> RequestPreviewAsync(IPage page, string projectId, string runId)
     {
         var response = await page.EvaluateAsync<JsonElement>(
-            "async x => await api(`/api/v2/quest-studio/projects/${x.projectId}/runs/reset`,{method:'POST',body:JSON.stringify({run_id:x.runId})})",
+            "async x => {try{return await api(`/api/v2/quest-studio/projects/${x.projectId}/runs/reset-preview`,{method:'POST',body:JSON.stringify({run_id:x.runId})})}catch(e){return {ok:false,error:e?.error||JSON.stringify(e)}}}",
             new { projectId, runId });
         Assert.True(response.GetProperty("ok").GetBoolean(), response.TryGetProperty("error", out var error) ? error.GetString() : "preview rejected");
         var requestId = response.GetProperty("request_id").GetString();

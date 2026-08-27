@@ -110,6 +110,11 @@ selector and exposed a Studio re-render replacing the chosen sign with the neare
 the rejected Runtime receipt pinned both ZDO and `binding_target_incompatible`. Studio now
 preserves the exact candidate across polling, with a browser regression that re-renders between
 selection and bind. The full corrected guild journey remains the gate.
+Installed lap `queue-full-width-journey-20260827-r7` passed that repaired boundary, proved locked
+B, completed A and B independently, and then exposed the installed evidence helper posting B's
+non-mutating preview to the reset-apply endpoint. The helper now uses `reset-preview`, returns
+the exact API diagnostic on failure, and runs inside the synthetic guild journey. A corrected
+installed rerun is still required.
 
 Nothing is in flight anywhere else: no open PRs, one branch on the remote, and the other agent's
 worktree (`scanner-slice1`) is fully merged and idle since 2026-08-20.
@@ -151,8 +156,11 @@ defined under 4A in `creator-os-phases.json` and projected here:
   pair, character profile, and empty prior plugin install. Installed lap
   `queue-full-width-journey-20260827-r6` reached binding, proved that a polling re-render had sent
   the nearest wood pole instead of the selected sign, and cleaned up byte-exactly. That Studio
-  selection defect is repaired and regression-covered; the complete browser-to-A -> B -> A
-  journey still needs its corrected rerun, and no seat is requested before it passes.
+  selection defect is repaired and regression-covered. Installed lap r7 passed locked B and
+  completed A and B before catching an incorrect reset-apply URL in the evidence helper; the
+  helper now drives the non-mutating preview URL under synthetic browser coverage. The complete
+  browser-to-A -> B -> A journey still needs its corrected rerun, and no seat is requested before
+  it passes.
 - **Before it starts:** agree who owns `<Valheim>/BepInEx/` for the lap's duration. A worktree
   isolates the repository, not the game install; another agent has clobbered a live inbox and
   deployed plugin DLLs mid-lap, twice.
