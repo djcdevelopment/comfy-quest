@@ -184,8 +184,14 @@ bounded launch budget, and normal Close was leaving the current world-entry diag
 instead of restoring the quarantined prior status. The latter check was observed failing, fixed,
 and rerun in the fixture lifecycle; the live world pair, character, install, and prior diagnostic
 state were then restored to their exact preflight hashes. The 58-image drone run and a rendered
-12-frame decision sheet are staged locally. Derek's next input is therefore one premise/tone
-choice, not an in-game setup action.
+12-frame decision sheet are staged locally. Derek selected premise C, **Pilgrimage of Ash and
+Ice** -- mythic, uncanny, and reverent. Automation reframed the eight-experience guild around
+the burning skull shrine, sky temple, and snowy ascent, certified it, activated content hash
+`6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e`, and bound its opening
+chapter **The Name in Ash** to the retained nearby sign in Creator Session
+`era17-broken-way-20260827-r6`. Derek's next input is the prepared creative verdict: name that
+sign naturally, then judge composition, clarity, response, narrative tone, and play feel. It is
+not an in-game setup action.
 
 ### Step 3 — 4B, the sustained campaign `queue.guild-campaign`
 

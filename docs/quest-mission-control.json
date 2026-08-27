@@ -205,7 +205,7 @@
       "id": "env.era17-preflight",
       "label": "ERA17 creator seat",
       "state": "confirmed",
-      "detail": "Machine preflight era17-machine-preflight-20260827-r1 entered the exact ComfyEra17 / tugcorp local pair, found a nearby portal and multiple bounded sign candidates without human navigation, and restored the world pair, character, install, and prior world-entry status to their preflight hashes. The 58-image drone survey and a rendered 12-frame premise brief are staged; Derek's next input is creative rather than mechanical.",
+      "detail": "Machine preflight era17-machine-preflight-20260827-r1 entered the exact ComfyEra17 / tugcorp local pair, found a nearby portal and multiple bounded sign candidates without human navigation, and restored the world pair, character, install, and prior world-entry status to their preflight hashes. The 58-image drone survey and rendered 12-frame premise brief produced Derek's choice C: Pilgrimage of Ash and Ice, with a mythic, uncanny, reverent tone. Automation staged all eight experiences, activated exact content hash 6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e, and bound the opening chapter The Name in Ash to the retained nearby sign. His next input is creative judgment rather than mechanical setup; docs/evidence/era17-premise-c-20260827-r1.json pins the installed receipt.",
       "fact_kind": "live-installed-evidence"
     }
   ],
@@ -479,7 +479,7 @@
         "NFR-USE-001"
       ],
       "title": "Dogfood the first top-to-bottom guild",
-      "detail": "Autonomous readiness is proven against the exact ComfyEra17 / tugcorp pair, including nearby portal/sign discovery, Creator-Session-pinned Isolate and Studio control, and byte-exact recovery. Retained session era17-broken-way-20260827-r6 is entered, armed, bound to The Broken Sign 0.1.1, and reports 32 nearby candidates with fresh run status. The remaining sitting asks only for authorship, composition, clarity, responsiveness, and play-feel judgments. Automation owns draft staging, launch, exact world/profile selection, deployment, retries, captures, receipts, logs, reset/rerun plumbing, shutdown, and recovery; any mechanical request reaching Derek is a defect.",
+      "detail": "Autonomous readiness is proven against the exact ComfyEra17 / tugcorp pair, including nearby portal/sign discovery, Creator-Session-pinned Isolate and Studio control, and byte-exact recovery. Derek selected premise C, Pilgrimage of Ash and Ice. Retained session era17-broken-way-20260827-r6 is entered, armed, and bound/current on opening chapter The Name in Ash 0.1.1 at content hash 6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e; it reports one fresh start-stage run on the retained sign after a 32-candidate scan. The remaining sitting asks only for authorship, composition, clarity, responsiveness, narrative tone, and play-feel judgments. Automation owns draft staging, launch, exact world/profile selection, deployment, retries, captures, receipts, logs, reset/rerun plumbing, shutdown, and recovery; any mechanical request reaching Derek is a defect.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4B — Guild campaign"
     },

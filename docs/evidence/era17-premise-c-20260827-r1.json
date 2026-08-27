@@ -1,0 +1,154 @@
+{
+  "schema": "comfy-quest-era17-creative-seat-evidence/v1",
+  "recorded_on": "2026-08-27",
+  "result": "premise_c_staged_activated_bound_and_ready_for_human_judgment",
+  "source_revision": "78bc8cc2b5b91859655d3197d34e801db0b010e1",
+  "decision": {
+    "choice": "C",
+    "title": "Pilgrimage of Ash and Ice",
+    "player_fantasy": "Follow an abandoned ritual path from the burning skull shrine through the sky temple to the snowy ascent, discovering why it was abandoned and whether it should be completed.",
+    "tone": [
+      "mythic",
+      "uncanny",
+      "reverent"
+    ],
+    "correction": null
+  },
+  "installed_identity": {
+    "machine": "OMEN",
+    "world_uid": "-523956327",
+    "world_name": "ComfyEra17",
+    "character_profile": "tugcorp",
+    "creator_session_id": "era17-broken-way-20260827-r6",
+    "world_entry_state": "entered",
+    "isolate_provider_release_sha256": "933e4b801fcf6d2c4ada9f43fddb6e731b920d6520e747babb38d0d32b4a1893",
+    "guild_id": "guild-2de197289aea",
+    "guild_revision": 27,
+    "version": "0.1.1",
+    "content_hash": "6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e",
+    "package_sha256": "42690c075c6bcb380be6b3487ddb878fa05ca54e913bd3447a11181ea363979c",
+    "activation_id": "act-20260827T162128100Z-c8f94aae",
+    "activation_correlation_id": "dev-20260827T162128065Z-19750468"
+  },
+  "guild": {
+    "title": "Pilgrimage of Ash and Ice",
+    "progression": [
+      "Read the Ash",
+      "Cross the Veil",
+      "Climb into Ice"
+    ],
+    "experiences": [
+      {
+        "project_id": "project-b1b79f0d3372",
+        "experience_id": "quest-0d3372",
+        "title": "The Name in Ash",
+        "event": "sign_written",
+        "target": "sign"
+      },
+      {
+        "project_id": "project-ce63ecea92f6",
+        "experience_id": "quest-ea92f6",
+        "title": "Take Up the Pilgrim's Staff",
+        "event": "item_picked_up",
+        "target": "Wood"
+      },
+      {
+        "project_id": "project-3bdafe59d264",
+        "experience_id": "quest-59d264",
+        "title": "Raise the Ashen Marker",
+        "event": "piece_placed",
+        "target": "woodwall"
+      },
+      {
+        "project_id": "project-01855d1e0dc9",
+        "experience_id": "quest-1e0dc9",
+        "title": "Kindle the Skull Flame",
+        "event": "station_fuel_added",
+        "target": "Coal"
+      },
+      {
+        "project_id": "project-9db2a17a4cbb",
+        "experience_id": "quest-7a4cbb",
+        "title": "Cross the Sky Temple",
+        "event": "player_teleported",
+        "target": null
+      },
+      {
+        "project_id": "project-4cd02c1a6cae",
+        "experience_id": "quest-1a6cae",
+        "title": "The Snowbound Vigil",
+        "event": "kill",
+        "target": "$enemy_greyling"
+      },
+      {
+        "project_id": "project-fc6c28b267c1",
+        "experience_id": "quest-b267c1",
+        "title": "Gather the Pilgrim's Red",
+        "event": "resource_picked",
+        "target": "RaspberryBush"
+      },
+      {
+        "project_id": "project-8b9a05b716d2",
+        "experience_id": "quest-b716d2",
+        "title": "Mend a Forgotten Shrine",
+        "event": "piece_repaired",
+        "target": "woodwall"
+      }
+    ]
+  },
+  "binding": {
+    "candidate_request_id": "studio-list-binding-candidates-20260827T162252536Z-ae55c13b",
+    "candidate_count": 32,
+    "binding_zdo": "1:3177525",
+    "target_kind": "sign",
+    "distance_metres": 4.9,
+    "bind_request_id": "studio-bind-selected-experience-20260827T162417902Z-49cf694c",
+    "binding_change_id": "binding-20260827T162426217Z-7e16fd7f",
+    "previous_content_hash": "7f4be295d741b7d366b7f45a22400b286dde07ea65c9ba84957c0326f9283c26",
+    "applied_content_hash": "6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e"
+  },
+  "run": {
+    "run_id": "run-20260827T162426244Z-9dc80dc7",
+    "scope_id": "scope-9c3635e7ef76807efe6a596c341fe207",
+    "experience_id": "quest-0d3372",
+    "binding_zdo": "1:3177525",
+    "stage_id": "start",
+    "participant_count": 1
+  },
+  "studio": {
+    "phase": "bound",
+    "active_relation": "current",
+    "active_title": "The Name in Ash",
+    "dev_connected": true,
+    "dev_armed": true,
+    "dev_state": "watching",
+    "pending_creator_request": false,
+    "pending_run_control": false,
+    "pass_lines": [
+      "Validation:PASS",
+      "Transfer:PASS",
+      "Activation:PASS",
+      "Rebind:PASS"
+    ]
+  },
+  "choreography_observation": {
+    "transient_diagnostic": "runtime_run_status_stale",
+    "cause": "The first bind was submitted after the candidate receipt but before Runtime's next same-frame run heartbeat became visible to Studio.",
+    "resolution": "Automation waited for a fresh connected run heartbeat and resubmitted the exact Creator-Session-pinned binding request. No safety gate was weakened and no human retry was requested."
+  },
+  "next_human_input": {
+    "action": "Write a natural name on the already-bound nearby sign.",
+    "judgments": [
+      "composition and cue clarity",
+      "response timing and explanation",
+      "narrative tone",
+      "satisfying, confusing, slow, or dead moments",
+      "keep, revise, or reject"
+    ]
+  },
+  "limitations": [
+    "This proves premise staging, certification, installed activation, exact binding, and seat readiness; it does not manufacture Derek's creative acceptance verdict.",
+    "The retained r6 game, Studio host, Isolate gateway, and saved world remain running for the creative sitting.",
+    "Clean volunteer-machine Isolate setup and teardown remain outside this installed creative-seat receipt and are tracked separately."
+  ]
+}
