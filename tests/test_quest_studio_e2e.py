@@ -144,6 +144,24 @@ class QuestStudioE2ETests(unittest.TestCase):
         self.assertIn("@testParameters", source)
         self.assertNotIn("@arguments", source)
 
+    def test_installed_driver_owns_world_entry_and_failure_recovery_by_default(self) -> None:
+        driver = INSTALLED_DRIVER.read_text(encoding="utf-8")
+        journey = TEST.read_text(encoding="utf-8")
+        for expected in (
+            "COMFY_QUEST_E2E_AUTOMATE_WORLD_ENTRY",
+            "Invoke-CreatorAction 'Stop'",
+            "Invoke-CreatorAction 'Close' -Extra @('-Restore')",
+            "@('BuildOff', 'Disarm')",
+            "none_technical_lap",
+            "not_applicable_to_technical_lap",
+            "prepared_guild_campaign_with_authorship_and_play_feel_questions",
+        ):
+            self.assertIn(expected, driver)
+        self.assertIn("if ($HumanWorldEntry) { '0' } else { '1' }", driver)
+        self.assertIn('InvokeCreatorSessionAsync(repoRoot, "Launch"', journey)
+        self.assertIn('world_entry = automatedWorldEntry ? "machine_owned"', journey)
+        self.assertIn("stderrText.Trim()", journey)
+
     def test_synthetic_e2e_stays_local_only_and_documented_as_non_live_proof(self) -> None:
         readme = README.read_text(encoding="utf-8")
         workflow = CI.read_text(encoding="utf-8")

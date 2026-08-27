@@ -40,7 +40,8 @@
     ],
     "requirement": "NFR-SEAT-001",
     "decision": "docs/adr/0014-one-human-launch-and-entry-is-the-baseline.md",
-    "future": "Automating world entry is a later reduction of this boundary, not a prerequisite for any lane exit. See docs/adr/0012-creator-session-world-entry-is-not-field-lab-orchestration.md."
+    "future": "Automating world entry is a reduction of this boundary, not a prerequisite for any lane exit. See docs/adr/0012-creator-session-world-entry-is-not-field-lab-orchestration.md.",
+    "current_implementation": "The installed 4A driver now defaults to a bounded Steam launch and exact local-world entry, so its technical lap is configured to spend zero human actions. ADR 0014 remains the fallback ceiling, not a reason to spend Derek's seat."
   },
 
   "not_a_gate_in_any_lane": [
@@ -70,7 +71,7 @@
         "saved-world packaging",
         "named anchors, unless the authored slice needs spatial references",
         "sustained authoring volume — that is 4B",
-        "automated launch and world entry — permitted but not required; see human_boundary"
+        "general client or server orchestration — bounded exact local-world entry may reduce the human boundary but does not define the 4A exit"
       ],
       "acceptance_journey": {
         "work_item": "queue.full-width-journey",
@@ -136,7 +137,7 @@
           }
         ]
       },
-      "exit": "Automation drives the real Studio GUI through authoring and publication; proves B refuses before A satisfies its prerequisite; runs the accepted A -> B -> A sequence with independent run state; resets only completed experience A; proves B is unchanged; reruns A under a linked successor identity; crosses the configured receipt-retention boundary; and retains the complete correlated evidence set. The one permitted human action is launching the game and entering the pinned world. Everything after entry completes without a repository edit, console command, manual file transfer, log read, retry loop, or machine-fact relay.",
+      "exit": "Automation drives the real Studio GUI through authoring and publication; proves B refuses before A satisfies its prerequisite; runs the accepted A -> B -> A sequence with independent run state; resets only completed experience A; proves B is unchanged; reruns A under a linked successor identity; crosses the configured receipt-retention boundary; and retains the complete correlated evidence set. The baseline permits at most one human action: launching the game and entering the pinned world. The installed driver defaults to spending zero through bounded exact-world entry. Everything after entry completes without a repository edit, console command, manual file transfer, log read, retry loop, or machine-fact relay.",
       "failure_mode": "The architecture cannot express or execute a guild.",
       "requirements": ["FR-RUN-001", "FR-PORT-003", "FR-AUTH-005", "FR-RESET-003", "NFR-SEAT-001", "NFR-SEAT-003"]
     },

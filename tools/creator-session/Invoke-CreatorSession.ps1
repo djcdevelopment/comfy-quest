@@ -16,7 +16,7 @@ claim a different session through this entrypoint.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('Prepare', 'Status', 'GalleryRebuild', 'Capture', 'Replay', 'Arm', 'Disarm', 'BuildOn', 'BuildOff', 'Close')]
+    [ValidateSet('Prepare', 'Status', 'Launch', 'Stop', 'GalleryRebuild', 'Capture', 'Replay', 'Arm', 'Disarm', 'BuildOn', 'BuildOff', 'Close')]
     [string]$Action,
 
     [ValidatePattern('^[A-Za-z0-9._-]{1,80}$')]
@@ -36,6 +36,11 @@ param(
     [ValidatePattern('^[A-Za-z0-9._ -]{1,80}$')]
     [string]$WorldName = 'ComfyQuestDemo',
 
+    [ValidatePattern('^[A-Za-z0-9._-]{1,80}$')]
+    [string]$CharacterProfile = 'questyfour',
+
+    [string]$SteamExe = 'C:\Program Files (x86)\Steam\steam.exe',
+
     [ValidateSet('classic', 'marble-wide', 'marble-grand')]
     [string]$Profile = 'marble-grand',
 
@@ -51,7 +56,7 @@ param(
     [ValidateSet('ground', 'sky')]
     [string]$BuildMode = 'ground',
 
-    [ValidateRange(1, 60)]
+    [ValidateRange(1, 900)]
     [int]$WaitSeconds = 60,
 
     [string]$EvidenceRoot,
@@ -142,6 +147,194 @@ function Write-JsonAtomic([string]$Path, $Value) {
 function Test-ValheimRunning {
     if ($FixtureMode) { return $false }
     return $null -ne (Get-Process -Name 'valheim' -ErrorAction SilentlyContinue)
+}
+
+function Get-CharacterProfileFiles {
+    $files = @()
+    $localCharacters = Join-Path $env:USERPROFILE 'AppData\LocalLow\IronGate\Valheim\characters'
+    if (Test-Path -LiteralPath $localCharacters -PathType Container) {
+        $files += Get-ChildItem -LiteralPath $localCharacters -Filter '*.fch' -File -ErrorAction SilentlyContinue
+        $files += Get-ChildItem -LiteralPath $localCharacters -Filter '*.fch.new' -File -ErrorAction SilentlyContinue
+    }
+    $steamUserdata = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($SteamExe))) 'userdata'
+    if (Test-Path -LiteralPath $steamUserdata -PathType Container) {
+        $files += Get-ChildItem -LiteralPath $steamUserdata -Recurse -Filter '*.fch' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\892970\\remote\\characters\\' }
+        $files += Get-ChildItem -LiteralPath $steamUserdata -Recurse -Filter '*.fch.new' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\892970\\remote\\characters\\' }
+    }
+    return @($files | Where-Object { $_.Name -notmatch '(?i)backup' })
+}
+
+function Get-CharacterProfiles {
+    return @(Get-CharacterProfileFiles |
+        ForEach-Object { $_.Name -replace '(?i)\.fch(?:\.new)?$', '' } |
+        Sort-Object -Unique)
+}
+
+function Get-CharacterProfileMetadata([string]$Path, [string]$ExpectedWorldUid) {
+    $stream = [IO.File]::Open(
+        $Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $reader = [IO.BinaryReader]::new($stream)
+    try {
+        if ($stream.Length -lt 8) { throw 'character_metadata_too_short' }
+        $count = $reader.ReadInt32()
+        if ($count -le 0 -or $count -gt 16MB -or $count -gt ($stream.Length - $stream.Position)) {
+            throw 'character_metadata_payload_invalid'
+        }
+        $payload = $reader.ReadBytes($count)
+        if ($payload.Length -ne $count) { throw 'character_metadata_payload_truncated' }
+        $memory = [IO.MemoryStream]::new($payload, $false)
+        $package = [IO.BinaryReader]::new($memory)
+        try {
+            $version = $package.ReadInt32()
+            if ($version -lt 40) { throw "character_metadata_version_unsupported:$version" }
+            $statCount = $package.ReadInt32()
+            if ($statCount -lt 0 -or $statCount -gt 512) { throw 'character_metadata_stats_invalid' }
+            for ($index = 0; $index -lt $statCount; $index++) { [void]$package.ReadSingle() }
+            $firstSpawn = $package.ReadBoolean()
+            $worldCount = $package.ReadInt32()
+            if ($worldCount -lt 0 -or $worldCount -gt 128) { throw 'character_metadata_worlds_invalid' }
+            $matchingWorlds = @()
+            for ($index = 0; $index -lt $worldCount; $index++) {
+                $uid = $package.ReadInt64().ToString([Globalization.CultureInfo]::InvariantCulture)
+                $customSpawn = $package.ReadBoolean()
+                $spawnPoint = @($package.ReadSingle(), $package.ReadSingle(), $package.ReadSingle())
+                $logout = $package.ReadBoolean()
+                $logoutPoint = @($package.ReadSingle(), $package.ReadSingle(), $package.ReadSingle())
+                $death = $package.ReadBoolean()
+                $deathPoint = @($package.ReadSingle(), $package.ReadSingle(), $package.ReadSingle())
+                $homePoint = @($package.ReadSingle(), $package.ReadSingle(), $package.ReadSingle())
+                $hasMap = $package.ReadBoolean()
+                if ($hasMap) {
+                    $mapBytes = $package.ReadInt32()
+                    if ($mapBytes -lt 0 -or $mapBytes -gt ($memory.Length - $memory.Position)) {
+                        throw 'character_metadata_map_invalid'
+                    }
+                    [void]$package.ReadBytes($mapBytes)
+                }
+                if ($uid -eq $ExpectedWorldUid) {
+                    $matchingWorlds += [ordered]@{
+                        uid = $uid
+                        custom_spawn = $customSpawn
+                        spawn_point = $spawnPoint
+                        logout = $logout
+                        logout_point = $logoutPoint
+                        death = $death
+                        death_point = $deathPoint
+                        home_point = $homePoint
+                    }
+                }
+            }
+            $characterName = $package.ReadString()
+            return [ordered]@{
+                version = $version
+                first_spawn = $firstSpawn
+                character_name = $characterName
+                matching_worlds = @($matchingWorlds)
+            }
+        } finally {
+            $package.Dispose()
+            $memory.Dispose()
+        }
+    } catch {
+        throw "Could not read pinned Valheim character metadata from $Path`: $($_.Exception.Message)"
+    } finally {
+        $reader.Dispose()
+        $stream.Dispose()
+    }
+}
+
+function Get-WorldMetadata([string]$Path) {
+    $stream = [IO.File]::Open(
+        $Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $reader = [IO.BinaryReader]::new($stream)
+    try {
+        if ($stream.Length -lt 8) { throw 'world_metadata_too_short' }
+        $count = $reader.ReadInt32()
+        if ($count -le 0 -or $count -gt 1MB -or $count -gt ($stream.Length - $stream.Position)) {
+            throw 'world_metadata_payload_invalid'
+        }
+        $payload = $reader.ReadBytes($count)
+        if ($payload.Length -ne $count) { throw 'world_metadata_payload_truncated' }
+        $memory = [IO.MemoryStream]::new($payload, $false)
+        $package = [IO.BinaryReader]::new($memory)
+        try {
+            $version = $package.ReadInt32()
+            $displayName = $package.ReadString()
+            $seedName = $package.ReadString()
+            $seed = $package.ReadInt32()
+            $uid = $package.ReadInt64()
+            if ([string]::IsNullOrWhiteSpace($displayName) -or $uid -eq 0) {
+                throw 'world_metadata_identity_invalid'
+            }
+            return [ordered]@{
+                version = $version
+                display_name = $displayName
+                seed_name = $seedName
+                seed = $seed
+                uid = $uid.ToString([Globalization.CultureInfo]::InvariantCulture)
+            }
+        } finally {
+            $package.Dispose()
+            $memory.Dispose()
+        }
+    } catch {
+        throw "Could not read pinned Valheim world metadata from $Path`: $($_.Exception.Message)"
+    } finally {
+        $reader.Dispose()
+        $stream.Dispose()
+    }
+}
+
+function Get-InteractiveSessionFacts {
+    $current = [Diagnostics.Process]::GetCurrentProcess().SessionId
+    $explorer = @(Get-Process explorer -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty SessionId -Unique)
+    $steam = @(Get-Process steam -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty SessionId -Unique)
+    return [ordered]@{
+        current = $current
+        explorer = $explorer
+        steam = $steam
+        current_is_interactive = $current -in $explorer -and $current -in $steam
+    }
+}
+
+function Stop-ValheimProcess {
+    if ($FixtureMode) {
+        return [ordered]@{ state = 'fixture'; graceful = $true; forced_process_ids = @() }
+    }
+    $processes = @(Get-Process -Name valheim,UnityCrashHandler64 -ErrorAction SilentlyContinue)
+    if ($processes.Count -eq 0) {
+        return [ordered]@{ state = 'already_stopped'; graceful = $true; forced_process_ids = @() }
+    }
+    foreach ($process in $processes) {
+        if ($process.MainWindowHandle -ne 0) { [void]$process.CloseMainWindow() }
+    }
+    $deadline = (Get-Date).AddSeconds(20)
+    while ((Get-Date) -lt $deadline -and
+        (Get-Process -Name valheim,UnityCrashHandler64 -ErrorAction SilentlyContinue)) {
+        Start-Sleep -Milliseconds 250
+    }
+    $forced = @(Get-Process -Name valheim,UnityCrashHandler64 -ErrorAction SilentlyContinue)
+    if ($forced.Count -gt 0) {
+        $forced | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+    $forcedDeadline = (Get-Date).AddSeconds(10)
+    while ((Get-Date) -lt $forcedDeadline -and
+        (Get-Process -Name valheim,UnityCrashHandler64 -ErrorAction SilentlyContinue)) {
+        Start-Sleep -Milliseconds 250
+    }
+    $remaining = @(Get-Process -Name valheim,UnityCrashHandler64 -ErrorAction SilentlyContinue)
+    if ($remaining.Count -gt 0) {
+        throw "Valheim did not stop; remaining process ids: $(@($remaining.Id) -join ',')"
+    }
+    return [ordered]@{
+        state = if ($forced.Count -eq 0) { 'stopped_gracefully' } else { 'stopped_forcibly' }
+        graceful = $forced.Count -eq 0
+        forced_process_ids = @($forced.Id)
+    }
 }
 
 function Set-PrivateWorldConfirmation([string]$Path, [bool]$Enabled) {
@@ -270,6 +463,9 @@ try {
             valheim_root = $ValheimRoot
             expected_machine = $ExpectedMachine
             world_uid = $WorldUid
+            world_name = $WorldName
+            character_profile = $CharacterProfile
+            steam_exe = $SteamExe
             session_id = $SessionId
             blueprint_name = $BlueprintName
             radius_metres = $RadiusMetres
@@ -300,14 +496,76 @@ try {
         New-Item -ItemType Directory -Force -Path $EvidenceRoot | Out-Null
         $backupRoot = Join-Path $EvidenceRoot 'backup'
         New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
+        $worldMetadata = [ordered]@{
+            version = $null
+            display_name = $WorldName
+            seed_name = $null
+            seed = $null
+            uid = $WorldUid
+        }
+        $characterMetadata = [ordered]@{
+            version = $null
+            first_spawn = $null
+            character_name = $CharacterProfile
+            matching_worlds = @([ordered]@{ uid = $WorldUid })
+        }
+        $worldEntryQuarantine = @()
+        $runtimeRoot = Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime'
+        $deploymentRollback = @()
+        $configPrepared = $false
+        $activeContextWritten = $false
+        $runtimeConfig = $null
+        $configBackup = $null
+        $configExisted = $false
+        try {
 
         if (-not $FixtureMode) {
+            $SteamExe = [IO.Path]::GetFullPath($SteamExe)
+            if (-not (Test-Path -LiteralPath $SteamExe -PathType Leaf)) {
+                throw "Steam executable not found: $SteamExe"
+            }
+            if ($CharacterProfile -notin @(Get-CharacterProfiles)) {
+                throw "Pinned Valheim character profile was not found: $CharacterProfile"
+            }
+            $characterFiles = @(Get-CharacterProfileFiles | Where-Object {
+                    ($_.Name -replace '(?i)\.fch(?:\.new)?$', '') -eq $CharacterProfile
+                })
+            if ($characterFiles.Count -ne 1) {
+                throw "Pinned Valheim character profile is ambiguous across save sources: $CharacterProfile"
+            }
+            $characterMetadata = Get-CharacterProfileMetadata $characterFiles[0].FullName $WorldUid
+            if (@($characterMetadata.matching_worlds).Count -ne 1) {
+                throw "Pinned character profile $CharacterProfile has no unique saved state for world UID $WorldUid."
+            }
             $worldRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\IronGate\Valheim\worlds_local'
             $missingWorldFiles = @('.db', '.fwl') | ForEach-Object {
                 Join-Path $worldRoot ($WorldName + $_)
             } | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }
             if (@($missingWorldFiles).Count -ne 0) {
                 throw "Canonical world pair was not found for $WorldName."
+            }
+            $worldMetadata = Get-WorldMetadata (Join-Path $worldRoot ($WorldName + '.fwl'))
+            if ([string]$worldMetadata.uid -ne $WorldUid) {
+                throw "Pinned world UID $WorldUid differs from $WorldName.fwl UID $($worldMetadata.uid)."
+            }
+            if ([string]$worldMetadata.display_name -notmatch '^[A-Za-z0-9._ -]{1,80}$') {
+                throw "Pinned world display name is outside the bounded world-entry contract: $($worldMetadata.display_name)"
+            }
+        }
+        foreach ($relative in @('requests\world-entry.json', 'status\world-entry.json')) {
+            $source = Join-Path $runtimeRoot $relative
+            if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
+            if (-not (Test-ChildPath $ValheimRoot $source)) {
+                throw "World-entry state escaped ValheimRoot: $source"
+            }
+            $backup = Join-Path $backupRoot ('world-entry-state\' + $relative)
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
+            Copy-Item -LiteralPath $source -Destination $backup -Force
+            Remove-Item -LiteralPath $source -Force
+            $worldEntryQuarantine += [ordered]@{
+                source = $source
+                backup = $backup
+                sha256 = Get-Sha256 $backup
             }
         }
 
@@ -346,6 +604,12 @@ try {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
             $existed = Test-Path -LiteralPath $target -PathType Leaf
             if ($existed) { Copy-Item -LiteralPath $target -Destination $backup -Force }
+            $deploymentRollback += [ordered]@{
+                name = $name
+                target = $target
+                backup = $backup
+                existed = $existed
+            }
             Copy-Item -LiteralPath $source -Destination $target -Force
             if ((Get-Sha256 $source) -ne (Get-Sha256 $target)) {
                 throw "Plugin deployment hash mismatch: $name"
@@ -364,6 +628,7 @@ try {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $configBackup) | Out-Null
         $configExisted = Test-Path -LiteralPath $runtimeConfig -PathType Leaf
         if ($configExisted) { Copy-Item -LiteralPath $runtimeConfig -Destination $configBackup -Force }
+        $configPrepared = $true
         Set-PrivateWorldConfirmation $runtimeConfig $true
 
         $worldFiles = @()
@@ -395,6 +660,11 @@ try {
             expected_machine = $ExpectedMachine
             world_uid = $WorldUid
             world_name = $WorldName
+            world_display_name = [string]$worldMetadata.display_name
+            world_metadata = $worldMetadata
+            character_profile = $CharacterProfile
+            character_metadata = $characterMetadata
+            steam_exe = $SteamExe
             prepared_utc = [DateTimeOffset]::UtcNow.ToString('o')
             repo_root = $repoRoot
             repo_commit = (& git -C $repoRoot rev-parse HEAD).Trim()
@@ -408,13 +678,65 @@ try {
                 armed_sha256 = Get-Sha256 $runtimeConfig
             }
             world_backup = $worldFiles
+            world_entry_quarantine = $worldEntryQuarantine
             inbox_pins = Get-InboxPins $ValheimRoot
             rollback = "tools\creator-session\Invoke-CreatorSession.ps1 Close -SessionId $SessionId -Restore"
         }
-        Write-JsonAtomic $contextPath $context
         Write-JsonAtomic (Join-Path $EvidenceRoot 'session.json') $context
+        Write-JsonAtomic $contextPath $context
+        $activeContextWritten = $true
         $context | ConvertTo-Json -Depth 12
         exit 0
+        } catch {
+            $prepareError = $_.Exception.Message
+            $rollbackErrors = @()
+            for ($index = $deploymentRollback.Count - 1; $index -ge 0; $index--) {
+                $entry = $deploymentRollback[$index]
+                try {
+                    if ($entry.existed) {
+                        Copy-Item -LiteralPath ([string]$entry.backup) `
+                            -Destination ([string]$entry.target) -Force
+                    } elseif (Test-Path -LiteralPath ([string]$entry.target) -PathType Leaf) {
+                        Remove-Item -LiteralPath ([string]$entry.target) -Force
+                    }
+                } catch { $rollbackErrors += "plugin:$([string]$entry.name):$($_.Exception.Message)" }
+            }
+            if ($configPrepared) {
+                try {
+                    if ($configExisted) {
+                        Copy-Item -LiteralPath $configBackup -Destination $runtimeConfig -Force
+                    } elseif (Test-Path -LiteralPath $runtimeConfig -PathType Leaf) {
+                        Remove-Item -LiteralPath $runtimeConfig -Force
+                    }
+                } catch { $rollbackErrors += "config:$($_.Exception.Message)" }
+            }
+            foreach ($entry in $worldEntryQuarantine) {
+                try {
+                    New-Item -ItemType Directory -Force -Path `
+                        (Split-Path -Parent ([string]$entry.source)) | Out-Null
+                    Copy-Item -LiteralPath ([string]$entry.backup) `
+                        -Destination ([string]$entry.source) -Force
+                } catch { $rollbackErrors += "world-entry-state:$($_.Exception.Message)" }
+            }
+            if ($activeContextWritten) {
+                try { Remove-Item -LiteralPath $contextPath -Force }
+                catch { $rollbackErrors += "session-manifest:$($_.Exception.Message)" }
+            }
+            try {
+                Write-JsonAtomic (Join-Path $EvidenceRoot 'preparation-failure.json') ([ordered]@{
+                        schema = 'comfy-quest-creator-session-preparation-failure/v1'
+                        session_id = $SessionId
+                        failed_utc = [DateTimeOffset]::UtcNow.ToString('o')
+                        error = $prepareError
+                        rollback_errors = $rollbackErrors
+                        state = if ($rollbackErrors.Count -eq 0) { 'rolled_back' } else { 'rollback_incomplete' }
+                    })
+            } catch { $rollbackErrors += "failure-receipt:$($_.Exception.Message)" }
+            if ($rollbackErrors.Count -ne 0) {
+                throw "Creator Session Prepare failed: $prepareError; rollback incomplete: $($rollbackErrors -join '; ')"
+            }
+            throw "Creator Session Prepare failed and rolled back: $prepareError"
+        }
     }
 
     if (-not $context -or $context.state -ne 'active') {
@@ -429,10 +751,11 @@ try {
         [IO.Path]::GetFullPath([string]$context.valheim_root) -ne $ValheimRoot) {
         throw 'Creator Session identity differs from the active install manifest.'
     }
-    foreach ($plugin in $context.plugins) {
-        if ((Get-Sha256 ([string]$plugin.target)) -ne [string]$plugin.installed_sha256) {
-            throw "Installed bytes changed during Creator Session: $($plugin.name)"
-        }
+    $pluginHashMismatches = @($context.plugins | Where-Object {
+            (Get-Sha256 ([string]$_.target)) -ne [string]$_.installed_sha256
+        } | ForEach-Object { [string]$_.name })
+    if ($pluginHashMismatches.Count -ne 0 -and $Action -ne 'Stop') {
+        throw "Installed bytes changed during Creator Session: $($pluginHashMismatches -join ', ')"
     }
     if ($Action -eq 'Close' -and $Restore -and (Test-ValheimRunning)) {
         throw 'Restore requires Valheim to be closed.'
@@ -448,11 +771,18 @@ try {
             state = $context.state
             machine = $context.expected_machine
             world_uid = $context.world_uid
+            world_name = $context.world_name
+            world_display_name = $context.world_display_name
+            character_profile = $context.character_profile
             plugin_hashes_match = $true
+            valheim_running = Test-ValheimRunning
             prepared_inbox = $context.inbox_pins
             current_inbox = Get-InboxPins $ValheimRoot
             runtime_status = if (Test-Path -LiteralPath (Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime\status\dev-channel.json')) {
                 [IO.File]::ReadAllText((Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime\status\dev-channel.json')) | ConvertFrom-Json
+            } else { $null }
+            world_entry_status = if (Test-Path -LiteralPath (Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime\status\world-entry.json')) {
+                [IO.File]::ReadAllText((Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime\status\world-entry.json')) | ConvertFrom-Json
             } else { $null }
         } | ConvertTo-Json -Depth 12
         exit 0
@@ -469,8 +799,126 @@ try {
         '-WaitSeconds', [string]$WaitSeconds,
         '-OutputDirectory', $operationRoot)
     $godbuildDirectory = $null
+    $worldEntryReceipt = $null
+    $processLifecycle = $null
 
-    if ($Action -eq 'GalleryRebuild') {
+    if ($Action -eq 'Launch') {
+        if ($FixtureMode) { throw 'Launch is unavailable in FixtureMode.' }
+        if (Test-ValheimRunning) { throw 'Launch requires Valheim to be closed.' }
+        $steamPath = [IO.Path]::GetFullPath([string]$context.steam_exe)
+        if (-not (Test-Path -LiteralPath $steamPath -PathType Leaf)) {
+            throw "Steam executable not found: $steamPath"
+        }
+        $sessions = Get-InteractiveSessionFacts
+        if (-not $sessions.current_is_interactive) {
+            throw 'Launch requires this process, Explorer, and the running Steam client in the same interactive session.'
+        }
+        $runtimeRoot = Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime'
+        $requestPath = Join-Path $runtimeRoot 'requests\world-entry.json'
+        if (Test-Path -LiteralPath $requestPath) {
+            throw "A world-entry request is already armed: $requestPath"
+        }
+        $requestId = 'world-entry-' + [Guid]::NewGuid().ToString('N')
+        $now = [DateTimeOffset]::UtcNow
+        $request = [ordered]@{
+            schema = 'comfy-quest-world-entry-request/v1'
+            request_id = $requestId
+            created_utc = $now.ToString('o')
+            expires_utc = $now.AddMinutes(15).ToString('o')
+            expected_machine = [string]$context.expected_machine
+            expected_world_uid = [string]$context.world_uid
+            world_name = [string]$context.world_name
+            world_display_name = [string]$context.world_display_name
+            character_profile = [string]$context.character_profile
+            creator_session_id = $SessionId
+        }
+        Write-JsonAtomic $requestPath $request
+        Write-JsonAtomic (Join-Path $operationRoot 'world-entry-request.json') $request
+        Start-Process -FilePath $steamPath `
+            -ArgumentList @('-applaunch', '892970', '-console') -WindowStyle Hidden
+
+        $processDeadline = (Get-Date).AddSeconds(90)
+        $game = $null
+        while (-not $game -and (Get-Date) -lt $processDeadline) {
+            Start-Sleep -Milliseconds 500
+            $game = Get-Process valheim -ErrorAction SilentlyContinue | Select-Object -First 1
+        }
+        if (-not $game) { throw 'Valheim did not start within 90 seconds.' }
+        if ($game.SessionId -ne [Diagnostics.Process]::GetCurrentProcess().SessionId) {
+            throw "Valheim started in session $($game.SessionId), expected current interactive session $([Diagnostics.Process]::GetCurrentProcess().SessionId)."
+        }
+        $receiptPath = Join-Path $runtimeRoot "receipts\world-entry\$requestId.json"
+        $statusPath = Join-Path $runtimeRoot 'status\world-entry.json'
+        $deadline = (Get-Date).AddSeconds($WaitSeconds)
+        while ((Get-Date) -lt $deadline) {
+            if (-not (Get-Process -Id $game.Id -ErrorAction SilentlyContinue)) {
+                throw 'Valheim exited before the pinned world-entry receipt arrived.'
+            }
+            if (Test-Path -LiteralPath $receiptPath -PathType Leaf) {
+                try {
+                    $candidate = [IO.File]::ReadAllText($receiptPath) | ConvertFrom-Json
+                    if ([string]$candidate.request_id -eq $requestId -and
+                        [string]$candidate.creator_session_id -eq $SessionId) {
+                        if ([string]$candidate.state -eq 'rejected') {
+                            throw "World entry rejected: $([string]$candidate.detail)"
+                        }
+                        if ([string]$candidate.state -eq 'entered') {
+                            $worldEntryReceipt = $candidate
+                            break
+                        }
+                    }
+                } catch {
+                    if ($_.Exception.Message -like 'World entry rejected:*') { throw }
+                }
+            }
+            if (Test-Path -LiteralPath $statusPath -PathType Leaf) {
+                try {
+                    $status = [IO.File]::ReadAllText($statusPath) | ConvertFrom-Json
+                    if ([string]$status.request_id -eq $requestId -and
+                        [string]$status.creator_session_id -eq $SessionId -and
+                        [string]$status.state -eq 'rejected') {
+                        throw "World entry rejected: $([string]$status.detail)"
+                    }
+                } catch {
+                    if ($_.Exception.Message -like 'World entry rejected:*') { throw }
+                }
+            }
+            Start-Sleep -Milliseconds 250
+        }
+        if (-not $worldEntryReceipt) {
+            throw "Pinned world entry did not complete within $WaitSeconds seconds."
+        }
+        if ([string]$worldEntryReceipt.machine -ne [string]$context.expected_machine -or
+            [string]$worldEntryReceipt.world_uid -ne [string]$context.world_uid -or
+            [string]$worldEntryReceipt.world_name -ne [string]$context.world_name -or
+            [string]$worldEntryReceipt.world_display_name -ne [string]$context.world_display_name -or
+            [string]$worldEntryReceipt.character_profile -ne [string]$context.character_profile) {
+            throw 'World-entry receipt identity differs from the active Creator Session.'
+        }
+        Write-JsonAtomic (Join-Path $operationRoot 'world-entry-receipt.json') $worldEntryReceipt
+        $processLifecycle = [ordered]@{
+            state = 'world_entered'
+            process_id = $game.Id
+            process_session_id = $game.SessionId
+            steam_exe = $steamPath
+            launch_arguments = @('-applaunch', '892970', '-console')
+        }
+    } elseif ($Action -eq 'Stop') {
+        $processLifecycle = Stop-ValheimProcess
+        $pending = Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime\requests\world-entry.json'
+        if (Test-Path -LiteralPath $pending -PathType Leaf) {
+            Copy-Item -LiteralPath $pending -Destination (Join-Path $operationRoot 'unconsumed-world-entry-request.json') -Force
+            Remove-Item -LiteralPath $pending -Force
+        }
+        foreach ($source in @(
+                (Join-Path $ValheimRoot 'BepInEx\LogOutput.log'),
+                (Join-Path $env:USERPROFILE 'AppData\LocalLow\IronGate\Valheim\Player.log'),
+                (Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime\status\world-entry.json'))) {
+            if (Test-Path -LiteralPath $source -PathType Leaf) {
+                Copy-Item -LiteralPath $source -Destination (Join-Path $operationRoot (Split-Path $source -Leaf)) -Force
+            }
+        }
+    } elseif ($Action -eq 'GalleryRebuild') {
         Invoke-ChildScript $batchScript (@('gallery_identify') + $identityArgs)
         Invoke-ChildScript $batchScript (@('gallery_rebuild', '-Profile', $Profile) + $identityArgs)
         Invoke-ChildScript $batchScript (@('gallery_evidence', '-Selector', $Profile) + $identityArgs)
@@ -558,6 +1006,9 @@ try {
         inbox_pins = Get-InboxPins $ValheimRoot
         godbuild_directory = $godbuildDirectory
         evidence_directory = $operationRoot
+        world_entry_receipt = $worldEntryReceipt
+        process_lifecycle = $processLifecycle
+        plugin_hash_mismatches = $pluginHashMismatches
     }
     Write-JsonAtomic (Join-Path $operationRoot 'operation.json') $operation
     $operation | ConvertTo-Json -Depth 10

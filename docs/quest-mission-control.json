@@ -4,7 +4,7 @@
     "id": "comfy-quest-program",
     "title": "Quest Creator OS",
     "subtitle": "Drive the whole vertical slice. Automate the evidence. Spend the seat on creation.",
-    "observed_on": "2026-08-24",
+    "observed_on": "2026-08-27",
     "program_commit": "a07cb62",
     "program_commit_label": "Build guild portfolio and scoped reruns"
   },
@@ -198,7 +198,7 @@
       "id": "env.portfolio-run",
       "label": "Guild and rerun implementation",
       "state": "implemented",
-      "detail": "Portfolio hierarchy and exact run/reset code exist. Automated coverage shows internal and browser behavior, but the feature is not promoted to integrated until the real Studio persistence/publication, Runtime exchange, process restart, and installed-Valheim journey complete.",
+      "detail": "Portfolio hierarchy, exact run/reset, bounded Steam lifecycle, and exact local-world entry code exist. Automated coverage shows internal and browser behavior, but the feature is not promoted to integrated until the real Studio persistence/publication, Runtime exchange, process restart, and installed-Valheim journey complete.",
       "fact_kind": "implementation-observed"
     }
   ],
@@ -442,7 +442,7 @@
         "NFR-TEST-001"
       ],
       "title": "Drive the installed vertical slice",
-      "detail": "The machine driver now authors and production-publishes A and prerequisite-locked B through the actual Studio GUI, waits at the one launch/world-entry boundary, activates the same guild through the armed dev channel, drives B refusal and A -> B -> A, selectively resets and reruns A, crosses receipt retention by exactly one, captures correlated proof, and restores binding changes LIFO. Synthetic browser proof is green; this item remains gated until the installed lap and human seat gate produce live evidence.",
+      "detail": "The machine driver authors and production-publishes A and prerequisite-locked B through the actual Studio GUI, launches Steam into the exact pinned profile/local world through a single-use expiring request, activates the same guild through the armed dev channel, drives B refusal and A -> B -> A, selectively resets and reruns A, crosses receipt retention by exactly one, captures correlated proof, restores bindings LIFO, closes the game, archives logs, and restores prior install bytes. Build, xUnit, fixture, and synthetic browser proof are green; this item remains gated until that autonomous installed lap produces live evidence. The technical lap has no human seat gate.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "NFR-TEST-001"
     },
@@ -597,6 +597,12 @@
       "detail": "Read-only validation of the lease, machine, world, session, and installed payload hashes."
     },
     {
+      "id": "command.launch",
+      "label": "Enter the pinned local world",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Launch -SessionId <id>",
+      "detail": "Launch Valheim through Steam and require a correlated receipt for the exact profile filename, local-world filename, display name and UID, machine, session, and expiry."
+    },
+    {
       "id": "command.gallery-rebuild",
       "label": "Rebuild the Lab gallery",
       "detail": "Identify, rebuild, and re-evidence the gallery profile before a capture beat.",
@@ -643,6 +649,12 @@
       "label": "Disarm the private world",
       "detail": "Return the Runtime safety config to its unarmed state after the authored beat.",
       "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Disarm -SessionId <id>"
+    },
+    {
+      "id": "command.stop",
+      "label": "Stop Valheim and retain diagnostics",
+      "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Stop -SessionId <id>",
+      "detail": "Request a normal window close, force only after a bounded wait, and archive BepInEx, Player, and world-entry status logs. Process recovery remains available when an installed hash has drifted; mutation and restore still refuse that drift."
     },
     {
       "id": "command.close",

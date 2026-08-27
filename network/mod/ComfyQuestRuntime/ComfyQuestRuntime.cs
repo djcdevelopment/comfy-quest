@@ -17,6 +17,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   RuntimeCreatorRequestController creatorRequests;
   RuntimeRunControlController runControl;
   RuntimeRunStatusStore runStatus;
+  RuntimeWorldEntryController worldEntry;
   RuntimeArcaneSight arcaneSight;
   RuntimeExperienceEngine engine;
   ConfigEntry<KeyboardShortcut> checkHotkey;
@@ -53,6 +54,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     arcaneSight=new RuntimeArcaneSight(runtimeRoot);
     creatorRequests=new RuntimeCreatorRequestController(runtimeRoot,devChannel,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,message=>Logger.LogInfo(message),SetCreatorBuildMode,CreatorBuildModeEnabled);
     runControl=new RuntimeRunControlController(runtimeRoot,engine,receipts,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,message=>Logger.LogInfo(message));
+    worldEntry=new RuntimeWorldEntryController(runtimeRoot,message=>Logger.LogInfo(message));
     studioUrl=Config.Bind("Studio","Url","http://127.0.0.1:8085/quest-studio","Loopback URL opened by the Runtime creator bar. Only an http:// localhost address is accepted.");
     var legacyAnchor=Config.Bind("Presentation","DeadlineAnchor",.16f,"Legacy vertical alert position; migrated into AlertAnchorY.");
     alertAnchorX=Config.Bind("Presentation","AlertAnchorX",.5f,"Horizontal center of the single alert anchor as a screen fraction (0.05-0.95).");
@@ -72,6 +74,7 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     RuntimeWorldStatePatches.Apply(harmony); RuntimeCoreActionPatches.Apply(harmony);
     RuntimeHarvestPatches.Apply(harmony);
     foreach(var patch in RuntimePatching.Outcomes) Logger.LogInfo($"Runtime patch {patch.SignatureId}: {(patch.Applied?"ok":patch.Detail)}");
+    worldEntry.TryStart(this);
     Logger.LogInfo($"Runtime ready. CreatorBar={barHotkey.Value}, charm={castHotkey.Value}, check={checkHotkey.Value}, load={loadHotkey.Value}, inbox={Path.Combine(runtimeRoot,"inbox")}");
   }
   void Update(){engine?.Tick();PollDevChannel();creatorRequests?.Poll(UnityEngine.Time.realtimeSinceStartup,engine?.CurrentStageId());runControl?.Poll(UnityEngine.Time.realtimeSinceStartup);PublishRunStatus();arcaneSight?.Tick();WelcomeOnce();if(barExpanded)RuntimeInputPatches.Maintain();if(TypingInGame())return;if(barHotkey.Value.IsDown())SetBarExpanded(!barExpanded);if(barExpanded&&UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Escape))SetBarExpanded(false);if(barExpanded&&castHotkey.Value.IsDown())HandleCharmGesture();if(checkHotkey.Value.IsDown()){status=CheckForNew();Report(status,statusIdle);}if(loadHotkey.Value.IsDown()){status=LoadLatest();Report(status,statusIdle);}}

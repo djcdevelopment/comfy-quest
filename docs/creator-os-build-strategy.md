@@ -185,8 +185,8 @@ where a second is listed it agrees mechanically rather than by reading.
 | 5 | What is explicitly deferred? | 10 `deferred` and 10 `parked` requirements, each with an owning lane or a reason | [`creator-requirements-ledger.json`](creator-requirements-ledger.json) |
 | 6 | What evidence proves the preceding capability exists? | The live Creator Session proof chain, plus 9 `met` requirements whose evidence paths are checked to exist | `creator-os-expected.json`; ledger `met` entries |
 | 7 | What exact evidence will close the current lane? | Lane 4A's `exit` | [`creator-os-phases.json`](creator-os-phases.json); the requirements-document 4A exit now agrees |
-| 8 | Which actions require Derek? | One launch and world entry per session, and nothing else | `human_boundary` in the vocabulary; [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md) |
-| 9 | Which operations are machine-owned? | All ten Creator Session verbs, checked against the script's own `ValidateSet` | `commands` in the manifest; `not_permitted_under_this_allowance` |
+| 8 | Which actions require Derek? | At most one launch and world entry per session; the installed 4A driver is configured to spend zero by default | `human_boundary` in the vocabulary; [ADR 0014](adr/0014-one-human-launch-and-entry-is-the-baseline.md) |
+| 9 | Which operations are machine-owned? | All twelve Creator Session verbs, checked against the script's own `ValidateSet` | `commands` in the manifest; `not_permitted_under_this_allowance` |
 | 10 | What is the next executable task? | `queue.guild-runtime` | the manifest queue |
 
 Question 10 is the one that would have been ambiguous. Two items sit in state `ready`:
@@ -221,7 +221,7 @@ the program invariant is executable, with a tracked ledger of all 47 requirement
 and `requirements` on every queue item, five checks in `validate_manifest`, and a negative test
 per check; the Phase-3 lap is stale in the manifest and in its runbook, and the renderer emits
 no sequence for a stale lap; `cautions[7]` says what `environment[4]` says; the command
-reference lists all ten verbs; the post-render replacement table pins its match counts and has
+reference lists all twelve verbs; the post-render replacement table pins its match counts and has
 lost six dead groups; `machines[].state` and `environment[].state` are validated.
 
 Not applied, on purpose: audit D2 (duplicated allowlist with different comparers), D4 (Creator

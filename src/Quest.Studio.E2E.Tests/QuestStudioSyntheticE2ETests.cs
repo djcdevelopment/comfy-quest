@@ -750,22 +750,46 @@ public sealed class QuestStudioSyntheticE2ETests
             var production = WaitForPack(run.RuntimeRoot, QuestPackLane.Production, guildId, TimeSpan.FromSeconds(30));
             await EvidenceShotAsync(page, run, "01-authored-published");
 
-            WriteJson(Path.Combine(run.Root, "human-action-required.json"), new
+            var automatedWorldEntry = Environment.GetEnvironmentVariable(
+                "COMFY_QUEST_E2E_AUTOMATE_WORLD_ENTRY") == "1";
+            if (automatedWorldEntry)
             {
-                schema = "comfy-quest-human-action/v1",
-                action = "Launch Valheim and enter the pinned ComfyQuestDemo authoring world.",
-                count = 1,
-                session_id = sessionId,
-                expected_machine = expectedMachine,
-                expected_world_uid = expectedWorld,
-                ready_utc = DateTimeOffset.UtcNow,
-                guild_id = guildId,
-                experience_a = a.ExperienceId,
-                experience_b = b.ExperienceId,
-            });
-            _output.WriteLine("HUMAN ACTION READY: launch Valheim and enter ComfyQuestDemo. Everything after world entry is automatic.");
+                WriteJson(Path.Combine(run.Root, "machine-world-entry-requested.json"), new
+                {
+                    schema = "comfy-quest-machine-world-entry/v1",
+                    state = "requested",
+                    session_id = sessionId,
+                    expected_machine = expectedMachine,
+                    expected_world_uid = expectedWorld,
+                    ready_utc = DateTimeOffset.UtcNow,
+                    guild_id = guildId,
+                    experience_a = a.ExperienceId,
+                    experience_b = b.ExperienceId,
+                });
+                _output.WriteLine("MACHINE WORLD ENTRY: launching Valheim into the pinned Creator Session world.");
+                await InvokeCreatorSessionAsync(repoRoot, "Launch", sessionId, run.ValheimRoot,
+                    expectedMachine, expectedWorld, run.Root);
+            }
+            else
+            {
+                WriteJson(Path.Combine(run.Root, "human-action-required.json"), new
+                {
+                    schema = "comfy-quest-human-action/v1",
+                    action = "Launch Valheim and enter the pinned ComfyQuestDemo authoring world.",
+                    count = 1,
+                    session_id = sessionId,
+                    expected_machine = expectedMachine,
+                    expected_world_uid = expectedWorld,
+                    ready_utc = DateTimeOffset.UtcNow,
+                    guild_id = guildId,
+                    experience_a = a.ExperienceId,
+                    experience_b = b.ExperienceId,
+                });
+                _output.WriteLine("HUMAN ACTION READY: launch Valheim and enter ComfyQuestDemo. Everything after world entry is automatic.");
+            }
 
-            await WaitForInstalledWorldAsync(run.RuntimeRoot, expectedMachine, expectedWorld, TimeSpan.FromMinutes(120));
+            await WaitForInstalledWorldAsync(run.RuntimeRoot, expectedMachine, expectedWorld,
+                automatedWorldEntry ? TimeSpan.FromSeconds(30) : TimeSpan.FromMinutes(120));
             await InvokeCreatorSessionAsync(repoRoot, "Arm", sessionId, run.ValheimRoot, expectedMachine, expectedWorld, run.Root);
             await WaitUntilAsync(() => Task.FromResult(FreshArmed(run.RuntimeRoot, expectedMachine)), "armed installed dev channel", 30_000);
 
@@ -905,6 +929,7 @@ public sealed class QuestStudioSyntheticE2ETests
                 other_experience_run_id = firstB.RunId,
                 retained_receipt = Path.GetRelativePath(run.Root, Path.Combine(run.Root, "proof", "archived-a-reset.json")),
                 binding_changes_restored = bindingChangeIds.Length,
+                world_entry = automatedWorldEntry ? "machine_owned" : "human_boundary",
             });
             _output.WriteLine($"INSTALLED GUILD E2E proof preserved: {run.Root}");
         }
@@ -1062,16 +1087,18 @@ public sealed class QuestStudioSyntheticE2ETests
             Path.Combine(repoRoot, "tools", "creator-session", "Invoke-CreatorSession.ps1"),
             action, "-SessionId", sessionId, "-ValheimRoot", valheimRoot,
             "-ExpectedMachine", expectedMachine, "-WorldUid", expectedWorld,
-            "-WaitSeconds", "60"
+            "-WaitSeconds", action == "Launch" ? "780" : "60"
         }) start.ArgumentList.Add(value);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start Creator Session arm request.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
-        await File.WriteAllTextAsync(Path.Combine(evidenceRoot, "creator-session-" + action.ToLowerInvariant() + ".stdout.log"), await stdout);
-        await File.WriteAllTextAsync(Path.Combine(evidenceRoot, "creator-session-" + action.ToLowerInvariant() + ".stderr.log"), await stderr);
+        var stdoutText = await stdout;
+        var stderrText = await stderr;
+        await File.WriteAllTextAsync(Path.Combine(evidenceRoot, "creator-session-" + action.ToLowerInvariant() + ".stdout.log"), stdoutText);
+        await File.WriteAllTextAsync(Path.Combine(evidenceRoot, "creator-session-" + action.ToLowerInvariant() + ".stderr.log"), stderrText);
         if (process.ExitCode != 0)
-            throw new XunitException($"Creator Session {action} failed with exit code {process.ExitCode}.");
+            throw new XunitException($"Creator Session {action} failed with exit code {process.ExitCode}: {stderrText.Trim()}");
     }
 
     static IReadOnlyList<RuntimeRunRecord> RunsFor(string runtimeRoot, string experienceId) =>

@@ -192,10 +192,16 @@ The installed 4A journey has its own clean-checkout driver:
     tools/quest-studio/Invoke-QuestStudioGuildJourney.ps1
 
 It claims the install through Creator Session, drives guild authoring and immutable
-publication before asking for the one launch/world-entry action, then owns activation,
-prerequisite refusal, A -> B -> A, scoped reset/rerun, exact retention proof, screenshots,
-and LIFO binding recovery. The Creator Session deliberately remains owned after the
-machine lap so the contiguous human seat gate can happen before `Close`.
+publication, verifies the world metadata and that the pinned character has saved state in that
+world, writes one expiring request for the exact profile, world filename, display name, world
+UID, machine, and session, and launches Valheim through Steam. Runtime consumes that
+request once through Valheim's own profile/world APIs and refuses fallback characters,
+different worlds, server joins, console commands, or synthetic input. The driver then owns
+activation, prerequisite refusal, A -> B -> A, scoped reset/rerun, exact retention proof,
+screenshots, LIFO binding recovery, game shutdown, log collection, and exact install restore.
+`-HumanWorldEntry` retains the ADR 0014 fallback while autonomous entry is being proven.
+This is a technical 4A integration lap, not a creator seat; Derek's next session begins with
+a prepared guild premise and questions about authorship, composition, clarity, and play feel.
 
 The interim packages-local feed exists only until the first public 0.4.0 NuGet
 publication and exact consumer repin.

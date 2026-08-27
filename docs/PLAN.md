@@ -77,9 +77,11 @@ If a piece of work does not move one of those questions, it is not on the path �
 its gates are. Definitions are in `creator-os-phases.json`, which is the only place a lane may be
 defined.
 
-**The human boundary, for all of it:** exactly one human action per creator session — launching
-the game and entering the pinned authoring world. Everything after entry is machine-owned. Not a
-generic "one intervention" budget (ADR 0014).
+**The human boundary, for all of it:** at most one human action per creator session — launching
+the game and entering the pinned authoring world. Everything after entry is machine-owned. The
+installed 4A driver now defaults to spending zero actions through bounded exact-world entry; the
+ADR 0014 allowance remains a fallback ceiling, not a quota to consume and not a generic "one
+intervention" budget.
 
 ## 3. Where we are
 
@@ -135,7 +137,8 @@ defined under 4A in `creator-os-phases.json` and projected here:
 <!-- 4a-journey:end -->
 
 - **Claims:** `FR-LOOP-001`, `NFR-SEAT-001`, `NFR-SEAT-003`, `NFR-TEST-001`
-- **Human cost:** one launch and world entry. Nothing else.
+- **Human cost:** zero by default. `-HumanWorldEntry` retains the one-action ADR fallback while
+  autonomous entry is being proven.
 - **Before it starts:** agree who owns `<Valheim>/BepInEx/` for the lap's duration. A worktree
   isolates the repository, not the game install; another agent has clobbered a live inbox and
   deployed plugin DLLs mid-lap, twice.
@@ -145,10 +148,13 @@ defined under 4A in `creator-os-phases.json` and projected here:
 - **Done when:** the four implemented-unproven rows above have live receipts, and the 4A exit in
   `creator-os-phases.json` is satisfied end to end.
 
-### Step 2 — Call the 4A seat gate
+### Step 2 — Prepare the 4B creative sitting
 
-One contiguous session. Derek's script contains only judgments a machine cannot make. Any
-mechanical question that reaches him in that session is a defect with a receipt.
+The 4A lap is technical integration evidence and does not manufacture a reason to put Derek in
+the game. His next contiguous session starts from a prepared guild premise and contains only
+authorship and perception that a machine cannot provide: composition, narrative tone, clarity,
+responsiveness, and play feel. Any launch, navigation, retry, log, or proof request that reaches
+him in that session is a defect with a receipt.
 
 ### Step 3 — 4B, the sustained campaign `queue.guild-campaign`
 
@@ -183,8 +189,8 @@ the obvious lane — the ledger is built so it cannot.
 | `FR-WORLD-001/002` | Whether the authored slice needs spatial references at all |
 | `NFR-TEST-002` | Whether evidence-over-counts earns an executable gate |
 
-Plus the two that are not requirements: **the seat lap in step 2**, and **who owns the game
-install** for its duration.
+Outside those rulings, Derek is needed for the prepared 4B guild's authorship and play-feel
+judgments. The machine driver owns the game install for each technical lap.
 
 ## 6. What we are deliberately not doing
 
@@ -198,7 +204,7 @@ Recorded so nobody re-derives them as new ideas, and so nobody quietly fixes the
 | Audit D2, D4, D5, C5 | Real, small, tempting. Each has a ledger entry; none gets fixed as collateral |
 | Punch items 16 and 18 | The interim package and ~20 `Get-FileHash` sites CI never runs |
 | Playwright E2E in CI | Still ungated |
-| Automating world entry | A later reduction of the human boundary, never a gate (ADR 0014) |
+| General client/server orchestration | Outside Quest. Its local-world contract accepts no server address, console command, input, or arbitrary launch argument (ADR 0012) |
 
 The rule that makes this list worth keeping: **fixing one of these while doing something else is
 the problem, not fixing it at all.**

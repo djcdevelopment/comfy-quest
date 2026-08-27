@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SESSION = ROOT / "tools" / "creator-session" / "Invoke-CreatorSession.ps1"
 RUNTIME = ROOT / "tools" / "creator-session" / "Invoke-RuntimeCreatorRequest.ps1"
 PLUGIN = ROOT / "network" / "mod" / "ComfyQuestRuntime" / "ComfyQuestRuntime.cs"
+WORLD_ENTRY = (
+    ROOT / "network" / "mod" / "ComfyQuestRuntime" / "RuntimeWorldEntryController.cs"
+)
 
 
 class CreatorSessionTests(unittest.TestCase):
@@ -22,6 +25,7 @@ class CreatorSessionTests(unittest.TestCase):
         cls.session = SESSION.read_text(encoding="utf-8")
         cls.runtime = RUNTIME.read_text(encoding="utf-8")
         cls.plugin = PLUGIN.read_text(encoding="utf-8")
+        cls.world_entry = WORLD_ENTRY.read_text(encoding="utf-8")
 
     def test_creator_session_actions_are_closed(self) -> None:
         match = re.search(
@@ -35,6 +39,8 @@ class CreatorSessionTests(unittest.TestCase):
             {
                 "Prepare",
                 "Status",
+                "Launch",
+                "Stop",
                 "GalleryRebuild",
                 "Capture",
                 "Replay",
@@ -51,6 +57,8 @@ class CreatorSessionTests(unittest.TestCase):
         self.assertIn("Installed bytes changed during Creator Session", self.session)
         self.assertIn("Get-InboxPins", self.session)
         self.assertIn("world_backup", self.session)
+        self.assertIn("character_profile", self.session)
+        self.assertIn("world_entry_quarantine", self.session)
         self.assertIn("runtime_config", self.session)
         self.assertIn("rollback", self.session)
         self.assertIn("Prepare requires Valheim to be closed", self.session)
@@ -104,6 +112,7 @@ class CreatorSessionTests(unittest.TestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, self.runtime)
                 self.assertNotIn(forbidden, self.session)
+                self.assertNotIn(forbidden, self.world_entry)
         close = self.session[self.session.index("} elseif ($Action -eq 'Close')") :]
         self.assertLess(close.index("@('build_off')"), close.index("@('disarm')"))
 
@@ -114,6 +123,47 @@ class CreatorSessionTests(unittest.TestCase):
         self.assertIn("player.NoCostCheat()&&player.InGodMode()", self.plugin)
         self.assertNotIn("Console.instance", self.plugin)
         self.assertNotIn("ZInput.Simulate", self.plugin)
+
+    def test_world_entry_is_exact_bounded_and_machine_owned(self) -> None:
+        for expected in (
+            "comfy-quest-world-entry-request/v1",
+            "'-applaunch', '892970', '-console'",
+            "Get-InteractiveSessionFacts",
+            "Get-WorldMetadata",
+            "Pinned world UID",
+            "Get-CharacterProfileMetadata",
+            "has no unique saved state for world UID",
+            "Valheim exited before the pinned world-entry receipt arrived",
+            "World entry rejected:",
+            "Stop-ValheimProcess",
+            "CloseMainWindow",
+            "stopped_forcibly",
+        ):
+            self.assertIn(expected, self.session)
+        for expected in (
+            "RuntimeWorldEntryRequestPolicy.Validate",
+            "DuplicatePropertyNameHandling.Error",
+            "world_entry_unknown_field",
+            "profile.GetFilename()",
+            "matches.Count == 0",
+            "matches.Count != 1",
+            "world.m_fileName",
+            "request.WorldDisplayName",
+            "world.m_uid.ToString",
+            "exact.Length != 1",
+            "ZNet.SetServer(server: true, openServer: false, publicServer: false",
+            "world_entry_loaded_world_mismatch",
+            'Write("entered", "world_entry_complete"',
+        ):
+            self.assertIn(expected, self.world_entry)
+        for forbidden in (
+            "SendKeys",
+            "keybd_event",
+            "ZInput.Simulate",
+            "+connect",
+            "server_address",
+        ):
+            self.assertNotIn(forbidden, self.world_entry)
 
     def test_dry_run_reports_the_pinned_plan_without_deploying(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -148,6 +198,7 @@ class CreatorSessionTests(unittest.TestCase):
             self.assertEqual(plan["action"], "GalleryRebuild")
             self.assertEqual(plan["expected_machine"], "OMEN")
             self.assertEqual(plan["world_uid"], "-7600395338659582326")
+            self.assertEqual(plan["character_profile"], "questyfour")
             self.assertFalse((root / "BepInEx" / "plugins").exists())
 
     def test_fixture_lifecycle_deploys_verifies_closes_and_restores(self) -> None:
@@ -175,7 +226,19 @@ class CreatorSessionTests(unittest.TestCase):
             prior_lab = b"prior-lab-install\n"
             (plugins / "ComfyQuestLab.dll").write_bytes(prior_lab)
             prior_config = b"[Safety]\r\nPrivateWorldConfirmed = false\r\n[Display]\r\nScale = 1.0\r\n"
-            config.write_bytes(prior_config)
+            stale_request = (
+                root
+                / "BepInEx"
+                / "config"
+                / "comfy-quest-runtime"
+                / "requests"
+                / "world-entry.json"
+            )
+            stale_status = stale_request.parents[1] / "status" / "world-entry.json"
+            stale_request.parent.mkdir(parents=True)
+            stale_status.parent.mkdir(parents=True)
+            stale_request.write_bytes(b"stale-request\n")
+            stale_status.write_bytes(b"stale-status\n")
 
             common = [
                 "-ValheimRoot",
@@ -208,6 +271,26 @@ class CreatorSessionTests(unittest.TestCase):
                     check=False,
                 )
 
+            # A late preparation failure restores every byte already touched, including
+            # quarantined one-shot state, and never leaves an active install manifest.
+            config.mkdir()
+            failed_prepare = invoke("Prepare", "-NoBuild", "-EvidenceRoot", str(evidence))
+            self.assertNotEqual(0, failed_prepare.returncode)
+            self.assertIn("Prepare failed and rolled back", failed_prepare.stderr)
+            self.assertEqual(prior_lab, (plugins / "ComfyQuestLab.dll").read_bytes())
+            for name in payloads:
+                if name != "ComfyQuestLab.dll":
+                    self.assertFalse((plugins / name).exists())
+            self.assertEqual(b"stale-request\n", stale_request.read_bytes())
+            self.assertEqual(b"stale-status\n", stale_status.read_bytes())
+            self.assertFalse(
+                (root / "BepInEx" / "config" / "comfy-quest-creator" / "session.json").exists()
+            )
+            failure = json.loads((evidence / "preparation-failure.json").read_text())
+            self.assertEqual("rolled_back", failure["state"])
+            config.rmdir()
+            config.write_bytes(prior_config)
+
             prepared = invoke("Prepare", "-NoBuild", "-EvidenceRoot", str(evidence))
             self.assertEqual(0, prepared.returncode, prepared.stdout + prepared.stderr)
             manifest = json.loads((root / "BepInEx" / "config" / "comfy-quest-creator" / "session.json").read_text())
@@ -223,6 +306,15 @@ class CreatorSessionTests(unittest.TestCase):
             status_receipt = json.loads(status.stdout[status.stdout.index("{") :])
             self.assertEqual("active", status_receipt["state"])
             self.assertTrue(status_receipt["plugin_hashes_match"])
+
+            # Process recovery remains available if another writer changes installed bytes;
+            # mutation/restore actions still refuse that drift.
+            (plugins / "ComfyQuestRuntime.dll").write_bytes(b"unexpected-runtime-drift\n")
+            stopped = invoke("Stop")
+            self.assertEqual(0, stopped.returncode, stopped.stdout + stopped.stderr)
+            stopped_receipt = json.loads(stopped.stdout[stopped.stdout.index("{") :])
+            self.assertEqual(["ComfyQuestRuntime.dll"], stopped_receipt["plugin_hash_mismatches"])
+            (plugins / "ComfyQuestRuntime.dll").write_bytes(payloads["ComfyQuestRuntime.dll"])
 
             closed = invoke("Close", "-Restore")
             self.assertEqual(0, closed.returncode, closed.stdout + closed.stderr)

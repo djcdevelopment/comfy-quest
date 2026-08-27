@@ -508,7 +508,7 @@ class RoadmapSurfaceTests(unittest.TestCase):
         )
         declared = re.search(r"\[ValidateSet\(([^)]*)\)\]", script).group(1)
         verbs = set(re.findall(r"'([A-Za-z]+)'", declared))
-        self.assertEqual(10, len(verbs))
+        self.assertEqual(12, len(verbs))
         listed = {
             verb
             for verb in verbs
@@ -516,7 +516,7 @@ class RoadmapSurfaceTests(unittest.TestCase):
             if f"Invoke-CreatorSession.ps1 {verb}" in command["command"]
         }
         self.assertEqual(verbs, listed)
-        for verb in ("Arm", "Disarm", "GalleryRebuild"):
+        for verb in ("Arm", "Disarm", "GalleryRebuild", "Launch", "Stop"):
             self.assertIn(verb, listed)
 
     def test_the_post_render_replacement_table_must_match(self):
