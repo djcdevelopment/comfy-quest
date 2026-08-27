@@ -342,8 +342,12 @@ only if a second consumer needs the server-join harness.
 **Status: active 2026-08-27.** Lanes 0-3 are done — 1 and 2 implemented, 3 ruled and recorded —
 and `queue.full-width-journey` is running against the installed game. The zero-human launch,
 exact-world entry, reviewed nearby binding fixture, and byte-exact install/world/profile cleanup
-preflight have live proof. The full guild journey is still gated until its A -> B -> A, reset,
-retention, browser, and recovery evidence completes.
+preflight have live proof. The first full lap reached Runtime binding and exposed Studio replacing
+the selected sign with the first candidate during a polling render; the content-correlated
+rejection named that wood-pole ZDO and `binding_target_incompatible`. Candidate selection now
+survives re-render and a browser regression drives that exact boundary. The full guild journey is
+still gated until its corrected A -> B -> A, reset, retention, browser, and recovery evidence
+completes.
 
 Only after Lanes 1-3, and only with the evidence the readiness gate names. Four work items are
 `implemented` and unproven going in — portfolio, reset, guild runtime, receipt retention — and

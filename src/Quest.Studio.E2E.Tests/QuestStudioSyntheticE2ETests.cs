@@ -573,8 +573,16 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitUntilAsync(async () => !await page.Locator("#find-bindings").IsDisabledAsync(), "fresh synthetic world binding control");
             await page.Locator("#find-bindings").ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Binding candidates ready", "bounded candidate scan");
-            Assert.Equal(1, await page.Locator("#binding-candidate option:not([value=''])").CountAsync());
-            Assert.Equal("sign", await page.Locator("#binding-candidate option:not([value=''])").GetAttributeAsync("data-target-kind"));
+            Assert.Equal(2, await page.Locator("#binding-candidate option:not([value=''])").CountAsync());
+            var signCandidate = page.Locator("#binding-candidate option[data-target-kind='sign']");
+            Assert.Equal("sign", await signCandidate.GetAttributeAsync("data-target-kind"));
+            var selectedBindingZdo = Assert.IsType<string>(await signCandidate.GetAttributeAsync("value"));
+            await page.Locator("#binding-candidate").SelectOptionAsync(selectedBindingZdo);
+
+            // Runtime polling re-renders this control every three seconds. Preserve the creator's
+            // exact world-object choice across that render instead of silently binding option one.
+            await page.EvaluateAsync("() => renderRunControl()");
+            Assert.Equal(selectedBindingZdo, await page.Locator("#binding-candidate").InputValueAsync());
 
             // B is still the selected project. The same control that will later accept it must
             // first expose Runtime's fail-closed prerequisite receipt.
@@ -1880,6 +1888,7 @@ public sealed class QuestStudioSyntheticE2ETests
 
             public IReadOnlyList<RuntimeBindingCandidate> ListCandidates() => new[]
             {
+                new RuntimeBindingCandidate { BindingZdo = "42:6", TargetKind = "player_built_piece", Label = "Synthetic nearby pole", DistanceMetres = 1.5 },
                 new RuntimeBindingCandidate { BindingZdo = BindingZdo, TargetKind = "sign", Label = "Synthetic authoring sign", DistanceMetres = 2.5 },
             };
 

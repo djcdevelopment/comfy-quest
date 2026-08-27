@@ -180,6 +180,13 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
   -Restore -RestoreGameState` restored the `.db`, `.fwl`, and `.fch` files to their pre-lap
   SHA256 values while leaving zero plugin files. This proves the launch, deterministic binding
   fixture, and recovery choreography, not the still-pending full A -> B -> A guild journey.
+- Installed journey `queue-full-width-journey-20260827-r6` autonomously continued through guild
+  authoring, immutable publication, exact world entry, fixture replay, dev activation, and the
+  real 32-candidate binding selector. Its rejected bind receipt proved that a periodic Studio
+  render had replaced the selected sign ZDO with the nearest wood-pole ZDO before submission.
+  Studio now preserves an existing candidate selection across renders, and the synthetic browser
+  journey explicitly selects the non-first sign, forces a re-render, and verifies the exact ZDO
+  remains selected. The installed correction still requires a complete rerun before promotion.
 
 An earlier live launch exposed a success-sentinel defect before Arm dispatch. The
 validator now returns null on success, and both the executable controller round trip and

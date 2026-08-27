@@ -105,7 +105,11 @@ Lanes of the repair program: **0 closed** (the roadmap tells the truth and is ma
 **1 implemented** (multi-experience selector), **2 implemented** (evidence retention), **3 ruled
 and recorded** (ADR 0012, 0014). **Lane 4 is active on the installed game.** Its autonomous
 launch, exact world entry, nearby reviewed binding fixture, and byte-exact cleanup preflight are
-live-proven; the full guild journey remains the gate.
+live-proven. Installed lap `queue-full-width-journey-20260827-r6` then reached the real candidate
+selector and exposed a Studio re-render replacing the chosen sign with the nearest wood pole;
+the rejected Runtime receipt pinned both ZDO and `binding_target_incompatible`. Studio now
+preserves the exact candidate across polling, with a browser regression that re-renders between
+selection and bind. The full corrected guild journey remains the gate.
 
 Nothing is in flight anywhere else: no open PRs, one branch on the remote, and the other agent's
 worktree (`scanner-slice1`) is fully merged and idle since 2026-08-20.
@@ -144,8 +148,11 @@ defined under 4A in `creator-os-phases.json` and projected here:
 - **Current live evidence:** `binding-fixture-smoke-20260827-r5` entered the exact pinned local
   world, replayed the reviewed 12-piece fixture to a 12/12 `MATCH`, exposed its sign 5.6 metres
   away through Runtime's bounded candidates, stopped gracefully, and restored the exact world
-  pair, character profile, and empty prior plugin install. The complete browser-to-A -> B -> A
-  journey is still pending and no seat is requested before it passes.
+  pair, character profile, and empty prior plugin install. Installed lap
+  `queue-full-width-journey-20260827-r6` reached binding, proved that a polling re-render had sent
+  the nearest wood pole instead of the selected sign, and cleaned up byte-exactly. That Studio
+  selection defect is repaired and regression-covered; the complete browser-to-A -> B -> A
+  journey still needs its corrected rerun, and no seat is requested before it passes.
 - **Before it starts:** agree who owns `<Valheim>/BepInEx/` for the lap's duration. A worktree
   isolates the repository, not the game install; another agent has clobbered a live inbox and
   deployed plugin DLLs mid-lap, twice.
