@@ -194,6 +194,12 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
   rather than an opaque browser exception, and executes in the synthetic guild journey. Cleanup
   again stopped Valheim gracefully, removed all plugins, and restored the world pair and character
   profile to their pinned hashes. The corrected full installed lap remains pending.
+- Installed journey `queue-full-width-journey-20260827-r8` confirmed the non-mutating preview URL
+  and returned `run_scope_not_loaded`: B's durable completion was visible before Runtime's next
+  status heartbeat made that exact run eligible for scoped control. The installed helper now waits
+  for fresh connected status containing the exact project/run pair before it requests a preview,
+  and that precondition runs in the synthetic guild journey. Cleanup again restored all three
+  game-state hashes and left no Valheim process or installed plugin.
 
 An earlier live launch exposed a success-sentinel defect before Arm dispatch. The
 validator now returns null on success, and both the executable controller round trip and

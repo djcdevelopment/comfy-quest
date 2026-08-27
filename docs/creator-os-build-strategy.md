@@ -349,8 +349,10 @@ survives re-render and a browser regression drives that exact boundary. The full
 still gated. The next installed lap passed locked B plus independent A and B completion, then
 found the installed evidence helper sending a non-mutating B preview to reset apply. That helper
 now addresses `reset-preview`, surfaces the exact response on failure, and is exercised by the
-synthetic guild journey. A corrected installed A -> B -> A, reset, retention, browser, and
-recovery lap remains required.
+synthetic guild journey. The following lap confirmed that endpoint and exposed durable run
+completion arriving before the Runtime status heartbeat required by scoped controls; the helper
+now waits for the exact run to be fresh and loaded before preview. A corrected installed A -> B
+-> A, reset, retention, browser, and recovery lap remains required.
 
 Only after Lanes 1-3, and only with the evidence the readiness gate names. Four work items are
 `implemented` and unproven going in — portfolio, reset, guild runtime, receipt retention — and

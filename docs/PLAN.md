@@ -115,6 +115,11 @@ B, completed A and B independently, and then exposed the installed evidence help
 non-mutating preview to the reset-apply endpoint. The helper now uses `reset-preview`, returns
 the exact API diagnostic on failure, and runs inside the synthetic guild journey. A corrected
 installed rerun is still required.
+Installed lap `queue-full-width-journey-20260827-r8` verified the corrected endpoint and exposed
+the next missing precondition: durable B completion preceded the Runtime status heartbeat that
+makes B eligible for scoped control, so Studio correctly returned `run_scope_not_loaded`. The
+evidence helper now waits for that exact run to be fresh and loaded before requesting its preview;
+the synthetic guild journey covers the wait. The complete installed rerun remains the gate.
 
 Nothing is in flight anywhere else: no open PRs, one branch on the remote, and the other agent's
 worktree (`scanner-slice1`) is fully merged and idle since 2026-08-20.
@@ -158,9 +163,10 @@ defined under 4A in `creator-os-phases.json` and projected here:
   the nearest wood pole instead of the selected sign, and cleaned up byte-exactly. That Studio
   selection defect is repaired and regression-covered. Installed lap r7 passed locked B and
   completed A and B before catching an incorrect reset-apply URL in the evidence helper; the
-  helper now drives the non-mutating preview URL under synthetic browser coverage. The complete
-  browser-to-A -> B -> A journey still needs its corrected rerun, and no seat is requested before
-  it passes.
+  helper now drives the non-mutating preview URL under synthetic browser coverage. Lap r8 then
+  proved the B run can become durable just before its status heartbeat; the helper now establishes
+  fresh loaded-run status before previewing. The complete browser-to-A -> B -> A journey still
+  needs its corrected rerun, and no seat is requested before it passes.
 - **Before it starts:** agree who owns `<Valheim>/BepInEx/` for the lap's duration. A worktree
   isolates the repository, not the game install; another agent has clobbered a live inbox and
   deployed plugin DLLs mid-lap, twice.

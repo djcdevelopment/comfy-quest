@@ -1163,6 +1163,11 @@ public sealed class QuestStudioSyntheticE2ETests
 
     static async Task<string> RequestPreviewAsync(IPage page, string projectId, string runId)
     {
+        await WaitUntilAsync(
+            () => page.EvaluateAsync<bool>(
+                "async x => {try{let d=await api(`/api/v2/quest-studio/projects/${x.projectId}/runs`);return !!d.connected&&(d.runs||[]).some(r=>r.run_id===x.runId)}catch{return false}}",
+                new { projectId, runId }),
+            "fresh loaded run before reset preview", 30_000);
         var response = await page.EvaluateAsync<JsonElement>(
             "async x => {try{return await api(`/api/v2/quest-studio/projects/${x.projectId}/runs/reset-preview`,{method:'POST',body:JSON.stringify({run_id:x.runId})})}catch(e){return {ok:false,error:e?.error||JSON.stringify(e)}}}",
             new { projectId, runId });
