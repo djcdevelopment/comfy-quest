@@ -55,6 +55,20 @@ public sealed class QuestStudioRunControlTests : IDisposable
     }
 
     [Fact]
+    public async Task MissingCompletedCreatorSessionCannotReachRunControlMailbox()
+    {
+        var (service, runtimeRoot, project) = CreateService();
+        WriteStatus(runtimeRoot, project.ExperienceId, includeWorldEntry: false);
+
+        var result = await service.BindingCandidatesAsync(project.ProjectId, CancellationToken.None);
+
+        Assert.False(result.Ok);
+        Assert.False(result.Queued);
+        Assert.Equal("creator_session_unavailable", result.Error);
+        Assert.False(File.Exists(Path.Combine(runtimeRoot, "requests", "run-control.json")));
+    }
+
+    [Fact]
     public async Task PreviewMailboxPinsMachineWorldAndRunThenReturnsTheExactSnapshot()
     {
         var (service, runtimeRoot, project) = CreateService();
@@ -76,6 +90,7 @@ public sealed class QuestStudioRunControlTests : IDisposable
             State = "previewed",
             Machine = "OMEN",
             WorldUid = "123",
+            CreatorSessionId = "creator-session-test",
             CompletedUtc = DateTimeOffset.UtcNow,
             Preview = preview,
         });
@@ -89,8 +104,37 @@ public sealed class QuestStudioRunControlTests : IDisposable
         Assert.Equal("preview_reset", request.Operation);
         Assert.Equal("OMEN", request.ExpectedMachine);
         Assert.Equal("123", request.ExpectedWorldUid);
+        Assert.Equal("creator-session-test", request.CreatorSessionId);
         Assert.Equal("run-exact", request.RunId);
         Assert.False(request.ConfirmReset);
+    }
+
+    [Fact]
+    public async Task ReceiptFromAnotherCreatorSessionIsNotAcceptedAsProof()
+    {
+        var (service, runtimeRoot, project) = CreateService();
+        WriteStatus(runtimeRoot, project.ExperienceId);
+        var watcher = AnswerOnce(runtimeRoot, request => new RuntimeRunControlReceipt
+        {
+            RequestId = request.RequestId, Operation = request.Operation, State = "previewed",
+            Machine = "OMEN", WorldUid = "123", CreatorSessionId = "different-session",
+            CompletedUtc = DateTimeOffset.UtcNow,
+            Preview = new RuntimeResetPreview
+            {
+                PreviewToken = "rstp-forged", RunId = "run-exact", ScopeId = "scope-exact",
+                CreatedUtc = DateTimeOffset.UtcNow, ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5),
+                SnapshotHash = "snapshot-hash", Snapshot = new RuntimeResetSnapshot(),
+            },
+        });
+
+        var result = await service.PreviewResetAsync(project.ProjectId,
+            new StudioRunResetRequest("run-exact"), CancellationToken.None);
+        await watcher;
+
+        Assert.False(result.Ok);
+        Assert.False(result.Queued);
+        Assert.Equal("run_control_receipt_identity_mismatch", result.Error);
+        Assert.Null(result.Receipt);
     }
 
     [Fact]
@@ -109,6 +153,7 @@ public sealed class QuestStudioRunControlTests : IDisposable
             State = "completed",
             Machine = "OMEN",
             WorldUid = "123",
+            CreatorSessionId = "creator-session-test",
             CompletedUtc = DateTimeOffset.UtcNow,
             Result = new RuntimeResetResult { ResetId = "reset-one", PreviewToken = "rstp-proof", State = "completed", PriorRunId = "run-exact", NewRunId = "run-successor" },
         });
@@ -130,6 +175,7 @@ public sealed class QuestStudioRunControlTests : IDisposable
         {
             RequestId = request.RequestId, Operation = request.Operation, State = "completed",
             Machine = "OMEN", WorldUid = "123", CompletedUtc = DateTimeOffset.UtcNow,
+            CreatorSessionId = "creator-session-test",
             BindingCandidates = new[] { new RuntimeBindingCandidate { BindingZdo = "10:20", TargetKind = "sign", Label = "Runestone", DistanceMetres = 3 } },
         });
         var candidates = await service.BindingCandidatesAsync(project.ProjectId, CancellationToken.None);
@@ -153,6 +199,7 @@ public sealed class QuestStudioRunControlTests : IDisposable
         {
             RequestId = request.RequestId, Operation = request.Operation, State = "completed",
             Machine = "OMEN", WorldUid = "123", CompletedUtc = DateTimeOffset.UtcNow, BindingChange = change,
+            CreatorSessionId = "creator-session-test",
         });
         var bound = await service.BindExperienceAsync(project.ProjectId,
             new StudioBindExperienceRequest(project.ExperienceId, "10:20"), CancellationToken.None);
@@ -169,6 +216,7 @@ public sealed class QuestStudioRunControlTests : IDisposable
         {
             RequestId = request.RequestId, Operation = request.Operation, State = "completed",
             Machine = "OMEN", WorldUid = "123", CompletedUtc = DateTimeOffset.UtcNow, BindingChange = change,
+            CreatorSessionId = "creator-session-test",
         });
         var restored = await service.RestoreBindingAsync(project.ProjectId,
             new StudioRestoreBindingRequest("10:20", change.ChangeId), CancellationToken.None);
@@ -277,7 +325,8 @@ public sealed class QuestStudioRunControlTests : IDisposable
         return (service, Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime"), project);
     }
 
-    static void WriteStatus(string runtimeRoot, string experienceId, bool includeOther = false, DateTimeOffset? observedUtc = null, string worldUid = "123")
+    static void WriteStatus(string runtimeRoot, string experienceId, bool includeOther = false,
+        DateTimeOffset? observedUtc = null, string worldUid = "123", bool includeWorldEntry = true)
     {
         var runs = new List<RuntimeRunStatusEntry>
         {
@@ -291,6 +340,20 @@ public sealed class QuestStudioRunControlTests : IDisposable
             WorldUid = worldUid,
             Runs = runs,
         });
+        if (includeWorldEntry)
+        {
+            var path = Path.Combine(runtimeRoot, "status", "world-entry.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, JsonSerializer.Serialize(new RuntimeWorldEntryReceipt
+            {
+                RequestId = "world-entry-test", CreatorSessionId = "creator-session-test",
+                State = "entered", Detail = "world_entry_complete", Machine = "OMEN",
+                ExpectedWorldUid = worldUid, WorldUid = worldUid,
+                WorldName = "TestWorld", WorldDisplayName = "TestWorld",
+                CharacterProfile = "tester", CharacterName = "Tester",
+                CompletedUtc = DateTimeOffset.UtcNow,
+            }, HostJson()));
+        }
     }
 
     static async Task<RuntimeRunControlRequest> AnswerOnce(string runtimeRoot, Func<RuntimeRunControlRequest, RuntimeRunControlReceipt> answer)

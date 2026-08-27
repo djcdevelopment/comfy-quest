@@ -129,6 +129,7 @@ public sealed class RuntimeRunControlRequest {
   [JsonProperty("expires_utc")] public string ExpiresUtc {get;set;}
   [JsonProperty("expected_machine")] public string ExpectedMachine {get;set;}
   [JsonProperty("expected_world_uid")] public string ExpectedWorldUid {get;set;}
+  [JsonProperty("creator_session_id")] public string CreatorSessionId {get;set;}
   [JsonProperty("run_id")] public string RunId {get;set;}
   [JsonProperty("preview_token",NullValueHandling=NullValueHandling.Ignore)] public string PreviewToken {get;set;}
   /// <summary>Which experience of the activated pack to bind. Additive and nullable: the two reset
@@ -150,7 +151,7 @@ public static class RuntimeRunControlRequestPolicy {
     var select=request.Operation=="select_experience";
     var bind=request.Operation=="bind_selected_experience";
     var restore=request.Operation=="restore_binding";
-    if(!Safe(request.RequestId,80)||!Safe(request.ExpectedMachine,80)
+    if(!Safe(request.RequestId,80)||!Safe(request.ExpectedMachine,80)||!Safe(request.CreatorSessionId,80)
         ||reset&&!Safe(request.RunId,96)||!reset&&!string.IsNullOrWhiteSpace(request.RunId)
         ||!long.TryParse(request.ExpectedWorldUid,NumberStyles.Integer,CultureInfo.InvariantCulture,out var world)||world==0){error="request_identity_invalid";return false;}
     if((select||bind)&&!Safe(request.ExperienceId,80)){error="experience_selection_required";return false;}
@@ -204,6 +205,7 @@ public sealed class RuntimeRunControlReceipt {
   [JsonProperty("detail",NullValueHandling=NullValueHandling.Ignore)] public string Detail {get;set;}
   [JsonProperty("machine")] public string Machine {get;set;}
   [JsonProperty("world_uid")] public string WorldUid {get;set;}
+  [JsonProperty("creator_session_id")] public string CreatorSessionId {get;set;}
   [JsonProperty("completed_utc")] public DateTimeOffset CompletedUtc {get;set;}
   [JsonProperty("preview",NullValueHandling=NullValueHandling.Ignore)] public RuntimeResetPreview Preview {get;set;}
   [JsonProperty("result",NullValueHandling=NullValueHandling.Ignore)] public RuntimeResetResult Result {get;set;}

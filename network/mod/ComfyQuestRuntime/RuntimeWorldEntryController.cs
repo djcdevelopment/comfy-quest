@@ -33,7 +33,12 @@ sealed class RuntimeWorldEntryController {
   readonly string receiptRoot;
   readonly string statusPath;
   readonly Action<string> log;
+  readonly RuntimeCreatorSessionAuthority creatorSession = new();
   RuntimeWorldEntryRequest request;
+
+  /// <summary>The Creator Session that completed entry into the currently loaded world.
+  /// Merely accepting or rejecting a request must not grant creator authority.</summary>
+  public string CreatorSessionId => creatorSession.Current;
 
   public RuntimeWorldEntryController(string runtimeRoot, Action<string> logger = null) {
     root = Path.GetFullPath(runtimeRoot ?? throw new ArgumentNullException(nameof(runtimeRoot)));
@@ -74,6 +79,7 @@ sealed class RuntimeWorldEntryController {
       Write("rejected", "world_entry_machine_mismatch", null, null);
       return false;
     }
+    creatorSession.BeginEntry();
     Application.runInBackground = true;
     Write("accepted", "world_entry_request_accepted", null, null);
     host.StartCoroutine(Drive());
@@ -242,6 +248,7 @@ sealed class RuntimeWorldEntryController {
           SafePlayerName(Player.m_localPlayer));
       yield break;
     }
+    creatorSession.ConfirmEntered(request.CreatorSessionId);
     Write("entered", "world_entry_complete", actualWorld, SafePlayerName(Player.m_localPlayer));
   }
 

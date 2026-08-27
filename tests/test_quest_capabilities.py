@@ -427,6 +427,28 @@ class QuestCapabilityManifestTests(unittest.TestCase):
             finally:
                 CAPABILITY_GENERATOR.AUTHORING = original
 
+    def test_invalid_piece_prefab_example_turns_the_guard_red(self) -> None:
+        authoring = json.loads(AUTHORING.read_text(encoding="utf-8"))
+        piece_placed = next(
+            row for row in authoring["Events"] if row["Name"] == "piece_placed"
+        )
+        piece_placed["ExampleTarget"] = "wood_wall"
+        with tempfile.TemporaryDirectory() as temporary:
+            mutated = Path(temporary) / "quest-event-authoring.json"
+            mutated.write_text(json.dumps(authoring), encoding="utf-8")
+            original = CAPABILITY_GENERATOR.AUTHORING
+            try:
+                CAPABILITY_GENERATOR.AUTHORING = mutated
+                atlas, rules, _, signatures = CAPABILITY_GENERATOR.build_model()
+                with self.assertRaisesRegex(
+                    CAPABILITY_GENERATOR.CapabilityError,
+                    "piece_placed: ExampleTarget 'wood_wall' is not an exact "
+                    "buildable piece name",
+                ):
+                    CAPABILITY_GENERATOR.build_manifest(atlas, rules, signatures)
+            finally:
+                CAPABILITY_GENERATOR.AUTHORING = original
+
 
 if __name__ == "__main__":
     unittest.main()

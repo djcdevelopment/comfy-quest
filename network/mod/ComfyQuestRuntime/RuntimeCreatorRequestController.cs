@@ -20,6 +20,7 @@ public sealed class RuntimeCreatorRequestController {
   readonly Func<bool> privateConfirmed;
   readonly Func<bool> worldLoaded;
   readonly Func<string> worldUid;
+  readonly Func<string> creatorSessionId;
   readonly Action<string> log;
   readonly Action<bool> setCreatorBuildMode;
   readonly Func<bool> creatorBuildMode;
@@ -31,6 +32,7 @@ public sealed class RuntimeCreatorRequestController {
       Func<bool> privateWorldConfirmed,
       Func<bool> isWorldLoaded,
       Func<string> currentWorldUid,
+      Func<string> currentCreatorSessionId,
       Action<string> logger = null,
       Action<bool> setBuildMode = null,
       Func<bool> isBuildModeEnabled = null) {
@@ -39,6 +41,8 @@ public sealed class RuntimeCreatorRequestController {
     privateConfirmed = privateWorldConfirmed ?? (() => false);
     worldLoaded = isWorldLoaded ?? (() => false);
     worldUid = currentWorldUid ?? (() => string.Empty);
+    creatorSessionId = currentCreatorSessionId
+        ?? throw new ArgumentNullException(nameof(currentCreatorSessionId));
     log = logger ?? (_ => { });
     setCreatorBuildMode = setBuildMode;
     creatorBuildMode = isBuildModeEnabled;
@@ -93,6 +97,20 @@ public sealed class RuntimeCreatorRequestController {
       return;
     }
     string operation = request.Operation.ToLowerInvariant();
+    // Fail-safe disable operations remain reachable if world-entry evidence is damaged. Every
+    // operation that observes or enables creator authority must match the session that actually
+    // entered this world; carrying and echoing an unchecked request value is not an identity pin.
+    if (operation != "disarm" && operation != "build_off") {
+      string activeSession = creatorSessionId();
+      if (string.IsNullOrWhiteSpace(activeSession)) {
+        Write(request, "rejected", "creator_session_unavailable", currentStageId);
+        return;
+      }
+      if (!string.Equals(request.CreatorSessionId, activeSession, StringComparison.Ordinal)) {
+        Write(request, "rejected", "creator_session_mismatch", currentStageId);
+        return;
+      }
+    }
     if (operation == "arm") {
       if (!privateConfirmed()) {
         Write(request, "rejected", "private_world_confirmation_required", currentStageId);

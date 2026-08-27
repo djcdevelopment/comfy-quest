@@ -143,7 +143,9 @@ class CreatorSessionTests(unittest.TestCase):
             "World entry rejected:",
             "Stop-ValheimProcess",
             "CloseMainWindow",
+            "[Math]::Max(120, $WaitSeconds)",
             "stopped_forcibly",
+            "quarantined_partial_saves",
             "forced_process_ids = @($forced | ForEach-Object { $_.Id })",
         ):
             self.assertIn(expected, self.session)

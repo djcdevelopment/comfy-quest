@@ -26,6 +26,7 @@ internal sealed class QuestStudioRunControl
 {
     const int MaxStatusBytes = RuntimeRunStatusStore.MaxStatusBytes;
     const int MaxReceiptBytes = 1024 * 1024;
+    const int MaxWorldEntryBytes = 16 * 1024;
     readonly IQuestStudioHost _host;
     readonly QuestStudioWorkspace _workspace;
 
@@ -95,8 +96,12 @@ internal sealed class QuestStudioRunControl
         var status = Status(projectId);
         if (!status.Available || !status.Connected)
             return Task.FromResult(new StudioRunControlResult(false, false, status.Error ?? "runtime_disconnected", null));
+        var root = RuntimeRoot()!;
+        var creatorSessionId = ReadCreatorSessionId(root, status.Machine!, status.WorldUid!);
+        if (creatorSessionId is null)
+            return Task.FromResult(new StudioRunControlResult(false, false, "creator_session_unavailable", null));
         var now = DateTimeOffset.UtcNow;
-        return DispatchAsync(RuntimeRoot()!, new RuntimeRunControlRequest
+        return DispatchAsync(root, new RuntimeRunControlRequest
         {
             RequestId = RequestId("select_experience", now),
             Operation = "select_experience",
@@ -104,6 +109,7 @@ internal sealed class QuestStudioRunControl
             ExpiresUtc = now.AddMinutes(2).ToString("O"),
             ExpectedMachine = status.Machine!,
             ExpectedWorldUid = status.WorldUid!,
+            CreatorSessionId = creatorSessionId,
             ExperienceId = request.ExperienceId,
         }, cancellationToken);
     }
@@ -136,12 +142,17 @@ internal sealed class QuestStudioRunControl
         var status = Status(projectId);
         if (!status.Available || !status.Connected)
             return Task.FromResult(new StudioRunControlResult(false, false, status.Error ?? "runtime_disconnected", null));
+        var root = RuntimeRoot()!;
+        var creatorSessionId = ReadCreatorSessionId(root, status.Machine!, status.WorldUid!);
+        if (creatorSessionId is null)
+            return Task.FromResult(new StudioRunControlResult(false, false, "creator_session_unavailable", null));
         var now = DateTimeOffset.UtcNow;
-        return DispatchAsync(RuntimeRoot()!, new RuntimeRunControlRequest
+        return DispatchAsync(root, new RuntimeRunControlRequest
         {
             RequestId = RequestId(operation, now), Operation = operation,
             CreatedUtc = now.ToString("O"), ExpiresUtc = now.AddMinutes(2).ToString("O"),
             ExpectedMachine = status.Machine!, ExpectedWorldUid = status.WorldUid!,
+            CreatorSessionId = creatorSessionId,
             ExperienceId = experienceId, BindingZdo = bindingZdo, BindingChangeId = bindingChangeId,
         }, cancellationToken);
     }
@@ -171,6 +182,8 @@ internal sealed class QuestStudioRunControl
         var run = status.Runs.SingleOrDefault(value => value.RunId == request.RunId);
         if (run is null) return new(false, false, "run_scope_not_loaded", null);
         var root = RuntimeRoot()!;
+        var creatorSessionId = ReadCreatorSessionId(root, status.Machine!, status.WorldUid!);
+        if (creatorSessionId is null) return new(false, false, "creator_session_unavailable", null);
         var now = DateTimeOffset.UtcNow;
         return await DispatchAsync(root, new RuntimeRunControlRequest
         {
@@ -180,6 +193,7 @@ internal sealed class QuestStudioRunControl
             ExpiresUtc = now.AddMinutes(2).ToString("O"),
             ExpectedMachine = status.Machine!,
             ExpectedWorldUid = status.WorldUid!,
+            CreatorSessionId = creatorSessionId,
             RunId = request.RunId,
             PreviewToken = request.PreviewToken,
             ConfirmReset = request.ConfirmReset,
@@ -216,9 +230,15 @@ internal sealed class QuestStudioRunControl
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (TryReadScopedReceipt(root, body.RunId, requestId, out var receipt))
+            {
+                if (!string.Equals(receipt!.Machine, body.ExpectedMachine, StringComparison.OrdinalIgnoreCase)
+                    || receipt.WorldUid != body.ExpectedWorldUid
+                    || receipt.CreatorSessionId != body.CreatorSessionId)
+                    return new(false, false, "run_control_receipt_identity_mismatch", null, requestId);
                 return new(receipt!.State is "previewed" or "completed", false,
                     receipt.State is "previewed" or "completed" ? null : receipt.Detail ?? receipt.State,
                     receipt, requestId);
+            }
             await Task.Delay(100, cancellationToken);
         }
         return new(true, true, null, null, requestId);
@@ -243,6 +263,30 @@ internal sealed class QuestStudioRunControl
             return receipt?.Schema == "comfy-quest-runtime-run-control-receipt/v1" && receipt.RequestId == requestId;
         }
         catch { return false; }
+    }
+
+    static string? ReadCreatorSessionId(string root, string machine, string worldUid)
+    {
+        try
+        {
+            var path = Path.Combine(root, "status", "world-entry.json");
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length is <= 0 or > MaxWorldEntryBytes) return null;
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            var receipt = JsonConvert.DeserializeObject<RuntimeWorldEntryReceipt>(reader.ReadToEnd());
+            var session = receipt?.CreatorSessionId;
+            return receipt?.Schema == "comfy-quest-world-entry-receipt/v1"
+                && receipt.State == "entered"
+                && string.Equals(receipt.Machine, machine, StringComparison.OrdinalIgnoreCase)
+                && receipt.WorldUid == worldUid
+                && !string.IsNullOrWhiteSpace(session)
+                && session.Length <= 80
+                && session.All(value => char.IsLetterOrDigit(value) || value is '-' or '_' or '.')
+                    ? session : null;
+        }
+        catch { return null; }
     }
 
     string? RuntimeRoot()

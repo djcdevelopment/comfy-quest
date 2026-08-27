@@ -1,0 +1,183 @@
+{
+  "schema": "comfy-quest-isolate-workbench-evidence-index/v1",
+  "recorded_on": "2026-08-27",
+  "result": "installed_session_pin_and_shutdown_passed_with_portability_limitations",
+  "lane": "unassigned",
+  "work_item": "queue.workbench-boundary",
+  "session_id": "isolate-runtime-20260827-r2",
+  "source_revision": "a172e77437dd7586cbfd8620fab56c373821cc73",
+  "source_dirty": true,
+  "local_evidence_root": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\isolate-runtime-20260827-r2",
+  "local_evidence_is_ignored": true,
+  "gateway": {
+    "project": "isolate",
+    "kernel": "comfy_gateway",
+    "container_id": "c01cf61caeb7eb0451e94b962d484d82e5675dba9a4f23820fef623821848c50",
+    "image": "sha256:bc7059b4ee141e136d331029af5030f1c2466f6aad4e215320ea93bc5163e219",
+    "profile": "Lab+ComfyQuest",
+    "published_endpoint": "127.0.0.1:8722",
+    "providers": [
+      "comfy_gateway.kernel.gateway#builtin",
+      "comfy_gateway.toolsurface.valheim",
+      "comfy_gateway.toolsurface.inference",
+      "comfy_quest_workbench"
+    ],
+    "source_revision_reported": null
+  },
+  "provider_release": {
+    "archive": "comfy-quest-workbench-provider.zip",
+    "archive_sha256": "933e4b801fcf6d2c4ada9f43fddb6e731b920d6520e747babb38d0d32b4a1893",
+    "archive_bytes": 5664,
+    "manifest_sha256": "6ff471a096fa253a31c80a23a78a8dcbe8f5c581b716dac51e354bdf9c68bce9",
+    "provider_sha256": "f52f35acc594670af83f7abe83f4a005c6399e976ad8f1e3f55207f0211c7c53",
+    "source_revision": "a172e77437dd7586cbfd8620fab56c373821cc73",
+    "source_dirty": true,
+    "tools": [
+      "quest_runtime_status",
+      "quest_runtime_receipts",
+      "quest_runtime_creator_request",
+      "quest_runtime_run_control"
+    ]
+  },
+  "authentication_negative_control": {
+    "initialize_http": 200,
+    "transport_session_created": true,
+    "tool_invocation_rejected": true,
+    "detail": "Error executing tool quest_runtime_status: unknown or missing X-Comfy-Key key"
+  },
+  "creator_session_negative_controls": {
+    "loaded_session_id": "era17-broken-way-20260827-r5",
+    "submitted_prior_session_id": "era17-broken-way-20260827-r4",
+    "creator_request": {
+      "request_id": "mcp-creator-status-20260827T153152128008Z-bfe24e02",
+      "state": "rejected",
+      "detail": "creator_session_mismatch"
+    },
+    "run_control_request": {
+      "request_id": "mcp-run-list_binding_candidates-20260827T153157142232Z-b67f3790",
+      "state": "rejected",
+      "detail": "runtime_creator_session_mismatch"
+    }
+  },
+  "installed_r5_journey": {
+    "machine": "OMEN",
+    "world_uid": "-523956327",
+    "world_name": "ComfyEra17",
+    "character_profile": "tugcorp",
+    "creator_session_id": "era17-broken-way-20260827-r5",
+    "world_entry_request_id": "world-entry-bc8d83f812204ce49b5b1fc8a237ddd0",
+    "world_entry_completed_utc": "2026-08-27T15:28:18.9574933+00:00",
+    "provider_release_sha256": "38019566373564504a1d4527c140f59c40c5050783b9300a72f7657c774fda1b",
+    "runtime_dll_sha256": "cae91402d19f98a3537a21107a188e8e911765a8b12f26defa9eb530c307afdd",
+    "contracts_dll_sha256": "bfcb022b19691b29288f6237be23a77d97cd900cb6122410889ff8b5a55433da",
+    "lab_dll_sha256": "4a19455e213549d4f137d4decda632e26a581aba4a9c7be751c0de9762804377",
+    "arm_request_id": "mcp-creator-arm-20260827T153157683253Z-2341c229",
+    "arm_result": "dev_channel_armed",
+    "isolate_binding_candidate_request_id": "mcp-run-list_binding_candidates-20260827T153158221936Z-3f150390",
+    "studio_binding_candidate_request_id": "studio-list-binding-candidates-20260827T153244422Z-94b157ec",
+    "binding_candidate_count": 32,
+    "studio_receipt_creator_session_id": "era17-broken-way-20260827-r5",
+    "guild_id": "guild-2de197289aea",
+    "version": "0.1.1",
+    "experience_id": "quest-0d3372",
+    "content_hash": "7f4be295d741b7d366b7f45a22400b286dde07ea65c9ba84957c0326f9283c26",
+    "production_and_dev_pack_sha256": "d61e4bf1b891a21e6b7433224c4e00168ffdc60203e43811b2116b8ea922818c",
+    "run_id": "run-20260827T151803425Z-9908f727",
+    "binding_zdo": "1:3177523",
+    "stage_id": "start",
+    "participant_count": 1,
+    "studio_phase": "bound",
+    "studio_active_relation": "current",
+    "studio_active_title": "The Broken Sign",
+    "studio_pass_lines": [
+      "Validation:PASS",
+      "Transfer:PASS",
+      "Activation:PASS",
+      "Rebind:PASS"
+    ]
+  },
+  "large_world_shutdown": {
+    "pre_fix_r4": {
+      "state": "stopped_forcibly",
+      "forced_process_ids": [26220, 38612],
+      "world_save_started_utc": "2026-08-27T15:23:21Z",
+      "active_db_matched_prelaunch_backup": true,
+      "active_db_sha256": "38260a3a4bf77f15af7c889bf3efabb59aca9a39f67b663dd39e78b3c09119fc",
+      "quarantined_partial_db_bytes": 496343827,
+      "quarantined_partial_db_sha256": "916058d0ffcd688e2502f9c649c2be073635fccf2d2efd23407be5645030e2ad"
+    },
+    "patched_r5": {
+      "state": "stopped_gracefully",
+      "graceful_wait_seconds": 120,
+      "forced_process_ids": [],
+      "world_save_started_utc": "2026-08-27T15:34:54Z",
+      "world_save_finished_utc": "2026-08-27T15:35:26Z",
+      "world_save_duration_ms": 32459.2619,
+      "saved_db_bytes": 1299575181,
+      "saved_db_sha256": "e7da48fe7deac6b13ba86db1d89e8e650265e9fe2fb533bd0a74203437d31ef6",
+      "remaining_world_new_files": 0,
+      "remaining_character_new_files": 0,
+      "quarantined_partial_saves": []
+    }
+  },
+  "retained_r6_seat": {
+    "machine": "OMEN",
+    "world_uid": "-523956327",
+    "world_name": "ComfyEra17",
+    "character_profile": "tugcorp",
+    "creator_session_id": "era17-broken-way-20260827-r6",
+    "world_entry_request_id": "world-entry-38f3c7eda9044b858d9d88d46406b44e",
+    "world_entry_completed_utc": "2026-08-27T15:39:30.3000262+00:00",
+    "provider_release_sha256": "933e4b801fcf6d2c4ada9f43fddb6e731b920d6520e747babb38d0d32b4a1893",
+    "process_id_at_entry": 40792,
+    "arm_request_id": "mcp-creator-arm-20260827T153948192130Z-860dab3c",
+    "arm_result": "dev_channel_armed",
+    "status_reported_creator_session_id": "era17-broken-way-20260827-r6",
+    "derived_status_request_id": "mcp-creator-status-20260827T154509896432Z-2c11aabb",
+    "derived_status_result": "dev_channel_armed",
+    "studio_binding_candidate_request_id": "studio-list-binding-candidates-20260827T154014909Z-ed91310c",
+    "studio_receipt_creator_session_id": "era17-broken-way-20260827-r6",
+    "binding_candidate_count": 32,
+    "studio_phase": "bound",
+    "studio_active_relation": "current",
+    "active_version": "0.1.1",
+    "active_experience_id": "quest-0d3372",
+    "run_id": "run-20260827T144506134Z-0d367ef0",
+    "binding_zdo": "1:3177525",
+    "participant_count": 1,
+    "game_intentionally_left_running": true
+  },
+  "evidence_sha256": {
+    "missing-caller-negative.json": "9fc4398629b0a715b20acb36aeb16cc950c99a78935f7a2460a6630da336f151",
+    "wrong-creator-session.json": "d2509aa78a44475332329e2e22ff0efafad84c59ccb4acebf69ffc8fab9edbc9",
+    "wrong-run-session.json": "5bfcf9e78a22523609c7c638007d568df85b330780fdcd0539cb1d3307784277",
+    "arm-r5.json": "21fc8e2b67a616f93916f88a704bbf4e3e53298d12d21568b7cabd016d8e7ac4",
+    "binding-candidates-r5.json": "f39b108af35621aa9f8ee297779c3870229ad3ae2b34f0665e4b0fd24d33c56d",
+    "runtime-status-r5.json": "98dd5aef649e05380684ebfcbbd958fbd76df7491282b33fe5c5a218d47c9c42",
+    "gateway-status-r5.json": "163e4da204fcfb9ad2c09366bb798a2ddd991293b2fca352d6ef3174f9ce125e",
+    "studio-binding-candidates-r5.json": "800276f6d112bde9747afe292506a368946029cc887cdfee87db05994cd9e197",
+    "studio-runtime-status-r5.json": "a0a8dd79e9bf79a7261fd39ed42faba751b0c33bc62302a84889417ec2a2af9c",
+    "arm-r6.json": "a4ff2e50f64f268d8fd23f4f19ec4be6a42351579076fa8d06e40e69b04c49a6",
+    "runtime-status-r6.json": "8aa2cde43632259c48300b58a8fe91a5e881e24648bad8050c13e751ba282fa8",
+    "derived-session-status-r6.json": "bd36e2e69896270812914217cd55b7cd8ab7f3550a16d467ff1aad0d1fc7f8aa",
+    "gateway-status-r6.json": "6d41ea31304bfbe4ad6126d0a02d6f15ef4ffd63c15d70dc2c9f844e85a8de28",
+    "studio-binding-candidates-r6.json": "671f570d1421d3f8b2ad9fea6cc2e2ffff6030fc0effd249b4e9eba686440743",
+    "studio-runtime-status-r6.json": "7d7399254b09f5882bca9cd39e2a98bb83c143cf691dad0f2341a37123094b1f",
+    "r4-stop-operation.json": "8ac07ed729721e6dd71e479a996c3a6b2b52223f02b4999a6dac265d8dbcee79",
+    "r4-quarantined-ComfyEra17.db.new": "916058d0ffcd688e2502f9c649c2be073635fccf2d2efd23407be5645030e2ad",
+    "r5-stop-operation.json": "3e14da91096a71612b002ea029a26f1f58af63d8ea5d1419f156971292befc9a",
+    "r5-stop-Player.log": "473bcc6c7c024eac06c736fe7e61080853d6a107f0a72b23ecea22877711be96",
+    "r6-session.json": "dce8e936399b0dc807b1560831173638277154791bd523da6058eeebc9a6f6d3",
+    "r6-launch-operation.json": "d4d7bb7816f9d5cda819f7e9dc9912de166fec98e2f1a1a1853e421ea8945dc1",
+    "r6-world-entry-receipt.json": "a4f2260f1e4300c4c756912c10790696dade8de67a3ade582379d3d81495970a"
+  },
+  "limitations": [
+    "This is an installed technical integration and recovery slice, not Derek's creator-acceptance verdict.",
+    "The Isolate image identity reports a null source revision, and this lap used an already registered operator-specific local caller credential rather than generating one for the session.",
+    "The provider archive was built from a dirty checkout and mounted from an operator-specific local artifact path. This does not prove volunteer-machine portability from released artifacts alone.",
+    "The running container retains Isolate checkout-owned state mounts. A clean-machine setup and correlated teardown/recovery lap remains required before NFR-MCP-001 can be marked met.",
+    "The exact installed Play retry during an already-armed stale heartbeat remains unobserved; source integration covers the bounded 30-second grace and r5 proved that run status fails closed and reconnects after a real main-thread pause.",
+    "The r6 game, Studio host, Isolate gateway, saved world state, and recovered sign binding were intentionally retained for the creative seat, so this lap does not claim final teardown or game-state restoration.",
+    "The retained capture bundles are local and git-ignored; this committed index pins their locations, identities, outcomes, and key artifact hashes."
+  ]
+}

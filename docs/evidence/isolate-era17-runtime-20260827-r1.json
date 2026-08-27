@@ -1,0 +1,107 @@
+{
+  "schema": "comfy-quest-isolate-workbench-evidence-index/v1",
+  "recorded_on": "2026-08-27",
+  "result": "installed_slice_passed_with_portability_limitations",
+  "lane": "unassigned",
+  "work_item": "queue.workbench-boundary",
+  "session_id": "isolate-runtime-20260827-r1",
+  "source_revision": "a172e77437dd7586cbfd8620fab56c373821cc73",
+  "source_dirty": true,
+  "local_evidence_root": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\isolate-runtime-20260827-r1",
+  "local_evidence_is_ignored": true,
+  "gateway": {
+    "project": "isolate",
+    "kernel": "comfy_gateway",
+    "image": "sha256:bc7059b4ee141e136d331029af5030f1c2466f6aad4e215320ea93bc5163e219",
+    "profile": "Lab+ComfyQuest",
+    "published_endpoint": "127.0.0.1:8722",
+    "providers": [
+      "comfy_gateway.kernel.gateway#builtin",
+      "comfy_gateway.toolsurface.valheim",
+      "comfy_gateway.toolsurface.inference",
+      "comfy_quest_workbench"
+    ],
+    "source_revision_reported": null
+  },
+  "provider_release": {
+    "archive": "comfy-quest-workbench-provider.zip",
+    "archive_sha256": "3ad6f2de7ff5752484a6c3606518f40b6f0778b0f33688519cfb946451520c8c",
+    "provider_sha256": "54f5b9b320179848a1630e2e93d7926b752dde478fb0625019ae8410c205a588",
+    "source_revision": "a172e77437dd7586cbfd8620fab56c373821cc73",
+    "source_dirty": true,
+    "tools": [
+      "quest_runtime_status",
+      "quest_runtime_receipts",
+      "quest_runtime_creator_request",
+      "quest_runtime_run_control"
+    ]
+  },
+  "negative_control": {
+    "operation": "status",
+    "submitted_expected_world_uid": "-523956328",
+    "runtime_world_uid": "-523956327",
+    "state": "rejected",
+    "detail": "creator_world_mismatch",
+    "request_id": "mcp-creator-status-20260827T143652905658Z-90215596"
+  },
+  "installed_journey": {
+    "machine": "OMEN",
+    "world_uid": "-523956327",
+    "creator_session_id": "era17-broken-way-20260827-r2",
+    "arm_request_id": "mcp-creator-arm-20260827T143653349522Z-24e16379",
+    "arm_result": "dev_channel_armed",
+    "binding_candidate_count": 32,
+    "selected_binding_zdo": "1:3177525",
+    "selected_binding_kind": "sign",
+    "selected_binding_distance_metres": 4.9,
+    "binding_change_id": "binding-20260827T144506114Z-be3aa94d",
+    "guild_id": "guild-2de197289aea",
+    "version": "0.1.1",
+    "experience_id": "quest-0d3372",
+    "content_hash": "7f4be295d741b7d366b7f45a22400b286dde07ea65c9ba84957c0326f9283c26",
+    "production_and_dev_pack_sha256": "d61e4bf1b891a21e6b7433224c4e00168ffdc60203e43811b2116b8ea922818c",
+    "activation_id": "act-20260827T144444058Z-84bd6411",
+    "run_id": "run-20260827T144506134Z-0d367ef0",
+    "stage_id": "start",
+    "participant_count": 1
+  },
+  "observation": {
+    "isolate_status_matches_release": true,
+    "studio_phase": "bound",
+    "studio_active_relation": "current",
+    "studio_active_title": "The Broken Sign",
+    "studio_pass_lines": [
+      "Validation:PASS",
+      "Transfer:PASS",
+      "Activation:PASS",
+      "Rebind:PASS"
+    ],
+    "piece_prefab_examples": {
+      "piece_damaged": "woodwall",
+      "piece_destroyed": "woodwall",
+      "piece_placed": "woodwall",
+      "piece_repaired": "woodwall"
+    },
+    "invalid_example_guard_observed_red": "wood_wall"
+  },
+  "evidence_sha256": {
+    "gateway-identity.json": "bb609f03e4e15397b2a078c77a4152c0fac9afd256b22c598863daf084262737",
+    "provider-manifest.json": "10001771e8b301ca2a48244df2850817cb2d1d5c852ec007ddf453bcc8def94c",
+    "mcp-creator-status-20260827T143652905658Z-90215596.json": "e9855db33a3826eecad54f373cef095dc6b19923330cd416eb66e5be8ecd4571",
+    "mcp-creator-arm-20260827T143653349522Z-24e16379.json": "c72644b77ffe2c10c338c8395900c8a07d7c41b13fb07b3bce5b2f013a9fc8ca",
+    "mcp-run-list_binding_candidates-20260827T143720427925Z-840a8385.json": "6704ad0b6db730ec82154ab497a462e2a573443174c8ee40dfa2ed9e6c1d7f0e",
+    "mcp-run-bind_selected_experience-20260827T144505687429Z-b7e8abcf.json": "6884a24537c8e380d708d1fc113bf840618970d7aab6afdd1595c35b1b88e9f9",
+    "isolate-runtime-status.json": "5653f87c9e7030a01408a983c8bf6f2112096dc2e4db607c9eb2275058ece149",
+    "studio-runtime-status.json": "672ff7f9dabb3a368740e76fc0b16f435ff0772c726631fb89e80832dfba5dce",
+    "studio-piece-prefab-examples.json": "5d03ab96a7f6de08b9ac69410647a53ec0033dec2caaa7a8db4b865c902a6f94",
+    "production-packs.json": "0abc554ba564dcea2135dbc75ce423c5dfd997895a9f2e5d22c784b433ac0e97"
+  },
+  "limitations": [
+    "This is an installed technical integration slice, not a human creator-acceptance session.",
+    "The Isolate image identity reports a null source revision, and the caller registry is packaged inside the installed image; the image therefore does not yet satisfy the full released identity and generated-credential gate.",
+    "The provider archive was built from a dirty checkout and mounted from an operator-specific local artifact path. This does not prove volunteer-machine portability from released artifacts alone.",
+    "The running container retains Isolate checkout-owned state mounts. A clean-machine setup and correlated teardown/recovery lap remains required before NFR-MCP-001 can be marked met.",
+    "The ERA17 session and recovered sign binding were intentionally retained for the upcoming creative seat, so this lap does not claim teardown or world-state restoration.",
+    "The retained capture bundle is local and git-ignored; this committed index pins its location, identities, outcomes, and key artifact hashes."
+  ]
+}

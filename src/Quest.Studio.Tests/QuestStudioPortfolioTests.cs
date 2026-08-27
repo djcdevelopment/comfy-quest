@@ -259,6 +259,81 @@ public sealed class QuestStudioPortfolioTests : IDisposable
     }
 
     [Fact]
+    public async Task GuildPlayWaitsForAnArmedRuntimeToResumeItsHeartbeat()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var service = CreateService(valheim);
+        var project = service.CreateProject("blank");
+        var guild = service.CreateGuild(new StudioGuildCreateRequest("Paused Guild", "Derek"));
+        var placed = service.PlaceProject(guild.GuildId,
+            new(guild.Revision, project.ProjectId, "quest", "questline", "main", null));
+        Assert.True(placed.Ok, placed.Error);
+        guild = placed.Guild!;
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var coordinator = new RuntimeDevChannelCoordinator(runtimeRoot);
+        coordinator.Arm(DateTimeOffset.UtcNow.AddMinutes(-1));
+
+        var play = service.PlayGuildAsync(guild.GuildId,
+            new StudioPublishRequest(guild.Revision), CancellationToken.None);
+        await Task.Delay(100);
+        coordinator.Heartbeat(DateTimeOffset.UtcNow);
+        var played = await play;
+
+        Assert.True(played.Ok, played.Error);
+        Assert.Equal("dev", played.Receipt!.Channel);
+    }
+
+    [Fact]
+    public async Task RuntimeStatusCorrelatesASelectedProjectThroughItsMultiExperienceGuild()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var service = CreateService(valheim);
+        var selected = service.CreateProject("blank");
+        var sibling = service.CreateProject("blank");
+        var guild = service.CreateGuild(new StudioGuildCreateRequest("Live Guild", "Derek"));
+        var placed = service.PlaceProject(guild.GuildId,
+            new(guild.Revision, selected.ProjectId, "quest", "questline", "main", null));
+        placed = service.PlaceProject(guild.GuildId,
+            new(placed.Guild!.Revision, sibling.ProjectId, "quest", "questline", "main", null));
+        Assert.True(placed.Ok, placed.Error);
+        guild = placed.Guild!;
+
+        var published = await service.PublishGuildAsync(guild.GuildId,
+            new StudioPublishRequest(guild.Revision), CancellationToken.None);
+        Assert.True(published.Ok, published.Error);
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var store = new QuestPackStore(runtimeRoot);
+        store.LoadLatest();
+        var active = store.SelectExperience(selected.ExperienceId);
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Operation = "bind_selected_experience", Status = "completed",
+            PackId = guild.GuildId, Version = guild.Version, ContentHash = published.ContentHash,
+            ActivationId = active.ActivationId, ExperienceId = selected.ExperienceId,
+            BindingZdo = "10:20", Diagnostics = Array.Empty<ContractDiagnostic>()
+        });
+
+        var current = service.RuntimeStatusView(selected.ProjectId);
+        Assert.Equal("current", current.ActiveRelation);
+        Assert.Equal("bound", current.Phase);
+        Assert.Equal(guild.GuildId, current.ActivePackId);
+        Assert.Equal(published.ContentHash, current.ContentHash);
+        Assert.Equal(selected.Title, current.ActiveTitle);
+        Assert.Equal(selected.ExperienceId, Assert.Single(current.Receipts).ExperienceId);
+        Assert.Contains(current.PassLines,
+            line => line.Kind == "Rebind" && line.Status == "PASS");
+
+        var other = service.RuntimeStatusView(sibling.ProjectId);
+        Assert.Equal("other_experience", other.ActiveRelation);
+        Assert.Equal("other_experience", other.Phase);
+        Assert.Contains("Bind this quest", other.NextInstruction);
+        Assert.Empty(other.Receipts);
+        Assert.Null(other.ActiveTitle);
+    }
+
+    [Fact]
     public void InterruptedCrossGuildMoveFinishesForwardFromItsJournal()
     {
         var service = CreateService();

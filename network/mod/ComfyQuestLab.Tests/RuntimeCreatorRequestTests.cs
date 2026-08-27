@@ -11,6 +11,17 @@ using Newtonsoft.Json;
 using Xunit;
 
 public sealed class RuntimeCreatorRequestTests {
+  [Fact]
+  public void CreatorSessionAuthorityExistsOnlyAfterCompletedEntry() {
+    var authority = new RuntimeCreatorSessionAuthority();
+    Assert.Null(authority.Current);
+    authority.ConfirmEntered("creator-session-r3");
+    Assert.Equal("creator-session-r3", authority.Current);
+    authority.BeginEntry();
+    Assert.Null(authority.Current);
+    Assert.Throws<ArgumentException>(() => authority.ConfirmEntered(""));
+  }
+
   static RuntimeCreatorRequest Request(string operation = "status") => new() {
     Schema = RuntimeCreatorRequest.CurrentSchema,
     RequestId = "runtime-status-20260824-abcd1234",
@@ -75,7 +86,7 @@ public sealed class RuntimeCreatorRequestTests {
       bool creatorBuild = false;
       var controller = new RuntimeCreatorRequestController(
           root, coordinator, () => true, () => true,
-          () => "-7600395338659582326", logs.Add,
+          () => "-7600395338659582326", () => "creator-controller-test", logs.Add,
           enabled => creatorBuild = enabled, () => creatorBuild);
 
       RuntimeCreatorRequestReceipt status = Dispatch(
@@ -140,6 +151,14 @@ public sealed class RuntimeCreatorRequestTests {
         privateConfirmed: true, worldLoaded: true, actualWorld: "-7600395338659582326",
         expected: "creator_world_mismatch");
     AssertDispatchRejected(
+        RequestNow("arm", "wrong-session"),
+        privateConfirmed: true, worldLoaded: true, actualWorld: "-7600395338659582326",
+        expected: "creator_session_mismatch", actualSession: "another-session");
+    AssertDispatchRejected(
+        RequestNow("status", "session-unavailable"),
+        privateConfirmed: true, worldLoaded: true, actualWorld: "-7600395338659582326",
+        expected: "creator_session_unavailable", actualSession: null);
+    AssertDispatchRejected(
         RequestNow("arm", "private-required"),
         privateConfirmed: false, worldLoaded: true, actualWorld: "-7600395338659582326",
         expected: "private_world_confirmation_required");
@@ -167,7 +186,7 @@ public sealed class RuntimeCreatorRequestTests {
       bool creatorBuild = true;
       var controller = new RuntimeCreatorRequestController(
           root, new RuntimeDevChannelCoordinator(root), () => false, () => true,
-          () => "-7600395338659582326", null,
+          () => "-7600395338659582326", () => null, null,
           enabled => creatorBuild = enabled, () => creatorBuild);
       RuntimeCreatorRequestReceipt buildOff = Dispatch(
           root, controller, RequestNow("build_off", "build-off-with-gate-closed"), 1d);
@@ -178,7 +197,7 @@ public sealed class RuntimeCreatorRequestTests {
       var transitions = new System.Collections.Generic.List<bool>();
       var mismatchController = new RuntimeCreatorRequestController(
           root, new RuntimeDevChannelCoordinator(root), () => true, () => true,
-          () => "-7600395338659582326", null,
+          () => "-7600395338659582326", () => "creator-controller-test", null,
           enabled => transitions.Add(enabled), () => false);
       RuntimeCreatorRequestReceipt mismatch = Dispatch(
           root, mismatchController, RequestNow("build_on", "build-on-mismatch"), 2d);
@@ -227,7 +246,7 @@ public sealed class RuntimeCreatorRequestTests {
       var controller = new RuntimeCreatorRequestController(
           runtimeRoot, coordinator,
           () => File.ReadAllText(config).Contains("PrivateWorldConfirmed = true"),
-          () => true, () => "-7600395338659582326", null,
+          () => true, () => "-7600395338659582326", () => sessionId, null,
           enabled => creatorBuild = enabled, () => creatorBuild);
 
       ProcessResult buildOn = RunPowerShell(
@@ -304,13 +323,14 @@ public sealed class RuntimeCreatorRequestTests {
 
   static void AssertDispatchRejected(
       RuntimeCreatorRequest request, bool privateConfirmed,
-      bool worldLoaded, string actualWorld, string expected) {
+      bool worldLoaded, string actualWorld, string expected,
+      string actualSession = "creator-controller-test") {
     string root = Path.Combine(Path.GetTempPath(), "comfy-runtime-rejection-" + Guid.NewGuid().ToString("N"));
     try {
       var coordinator = new RuntimeDevChannelCoordinator(root);
       var controller = new RuntimeCreatorRequestController(
           root, coordinator, () => privateConfirmed, () => worldLoaded,
-          () => actualWorld);
+          () => actualWorld, () => actualSession);
       RuntimeCreatorRequestReceipt receipt = Dispatch(root, controller, request, 1d);
       Assert.Equal("rejected", receipt.State);
       Assert.Equal(expected, receipt.Detail);

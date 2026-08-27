@@ -240,7 +240,7 @@
       {
         "id": "strategy.workbench",
         "title": "Keep Workbench standalone",
-        "detail": "Use an identity-attested, released Isolate profile that works on a volunteer machine. It never discovers, imports, falls back to, or shares credentials or state with HEARTH or private fleet topology."
+        "detail": "Isolate owns gateway authentication, caller identity, provider loading, and lifecycle; Quest contributes a bounded released provider instead of rebuilding that tooling. The installed profile rejected a missing caller credential at tool invocation. The final profile must generate a credential for the lap, be identity-attested, work on a volunteer machine, and never discover, import, fall back to, or share credentials or state with HEARTH or private fleet topology."
       }
     ],
     "readiness_title": "Ready before the seat",
@@ -404,12 +404,12 @@
       "id": "queue.workbench-boundary",
       "state": "ready",
       "lane": "unassigned",
-      "lane_note": "Audit C4: the standalone Workbench has no place in the 4A/4B/4C/5 vocabulary and no exit gate, while docs/creator-os.md makes it a precondition for the autonomous integration 4A depends on. Placing it in a lane changes what that lane covers, so it is Derek's ruling, not this manifest's.",
+      "lane_note": "Derek reconfirmed on 2026-08-27 that Isolate owns tooling consolidation. That resolves the architecture but not audit C4's lane or exit-gate ruling: the standalone Workbench still has no place in the 4A/4B/4C/5 vocabulary. Placing it in a lane changes what that lane covers, so it remains Derek's ruling, not this manifest's.",
       "requirements": [
         "NFR-MCP-001"
       ],
       "title": "Prove the standalone Workbench boundary",
-      "detail": "Before connecting MCP, make the released Isolate profile independently portable, identity-attested, neutral to machine and operator, and incapable of discovering or sharing anything with HEARTH. Drive one disposable command/receipt/teardown slice from clean artifacts.",
+      "detail": "The 2026-08-27 installed slices in docs/evidence/isolate-era17-runtime-20260827-r1.json and r2 used the newer Isolate image plus an explicit Quest provider release to reject a missing caller credential and wrong world/session identities, arm ERA17, list bounded targets, bind the selected 0.1.1 experience, and return matching Isolate/Studio/Runtime evidence. Final r6 status supplied its own non-secret Creator Session identity for the successful follow-up control, so a later caller does not need harness-side session context. The r2 recovery lap also let the 1.30 GB world finish its 32.46-second save and exited without force or partial files. Keep this item ready, not complete: the image reports no source revision, the provider came from a dirty checkout-local mount, the credential and state are still operator-specific, and no clean volunteer-machine setup/teardown was run.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "NFR-MCP-001"
     },
@@ -479,7 +479,7 @@
         "NFR-USE-001"
       ],
       "title": "Dogfood the first top-to-bottom guild",
-      "detail": "Autonomous readiness is proven against the exact ComfyEra17 / tugcorp pair, including nearby portal/sign discovery and byte-exact recovery. The 58-image survey and 12-frame decision sheet reduce the next input to one premise/tone choice; the contiguous 4B sitting then asks only for composition, clarity, responsiveness, and play-feel judgments. Automation owns draft staging, launch, exact world/profile selection, deployment, retries, captures, receipts, logs, reset/rerun plumbing, shutdown, and recovery; any mechanical request reaching Derek is a defect.",
+      "detail": "Autonomous readiness is proven against the exact ComfyEra17 / tugcorp pair, including nearby portal/sign discovery, Creator-Session-pinned Isolate and Studio control, and byte-exact recovery. Retained session era17-broken-way-20260827-r6 is entered, armed, bound to The Broken Sign 0.1.1, and reports 32 nearby candidates with fresh run status. The remaining sitting asks only for authorship, composition, clarity, responsiveness, and play-feel judgments. Automation owns draft staging, launch, exact world/profile selection, deployment, retries, captures, receipts, logs, reset/rerun plumbing, shutdown, and recovery; any mechanical request reaching Derek is a defect.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4B — Guild campaign"
     },

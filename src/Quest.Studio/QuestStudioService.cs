@@ -160,12 +160,10 @@ public sealed class QuestStudioService
         var valheim = _host.FindValheim();
         if (valheim is null) return StudioGuildPublishResult.Fail("valheim_not_found");
         var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
-        var devStatus = new RuntimeDevChannelStatusStore(runtimeRoot).Read();
-        var now = DateTimeOffset.UtcNow;
-        var devConnected = devStatus is not null && devStatus.ObservedUtc <= now.AddSeconds(1)
-            && devStatus.ObservedUtc >= now.AddSeconds(-3);
-        if (!devConnected) return StudioGuildPublishResult.Fail("dev_channel_disconnected");
-        if (devStatus!.Armed != true) return StudioGuildPublishResult.Fail("dev_channel_not_armed");
+        var devStatus = await StudioDevChannelConnection.WaitForConnectedAsync(
+            runtimeRoot, cancellationToken);
+        if (devStatus is null) return StudioGuildPublishResult.Fail("dev_channel_disconnected");
+        if (devStatus.Armed != true) return StudioGuildPublishResult.Fail("dev_channel_not_armed");
         var compiled = CompileGuild(guildId);
         if (!compiled.Ok) return StudioGuildPublishResult.Fail(compiled.Error!, compiled.Diagnostics);
         var bytes = StudioGraphCompiler.BuildPack(guild.GuildId, guild.Version, compiled.Experiences!, compiled.ContentHash!);
@@ -339,10 +337,11 @@ public sealed class QuestStudioService
         _usage.RecordCheckpoint("rehearse", UsageOutcome(result.Ok, false, result.Error), result.Ok ? _workspace.ReadProject(projectId) : null);
         return result;
     }
-    public StudioRuntimeStatus RuntimeStatus(string projectId) => _workspace.RuntimeStatus(projectId);
+    public StudioRuntimeStatus RuntimeStatus(string projectId) =>
+        _workspace.RuntimeStatus(projectId, RuntimePackIdentity(projectId));
     public StudioRuntimeStatusView RuntimeStatusView(string projectId)
     {
-        var status = _workspace.RuntimeStatus(projectId);
+        var status = RuntimeStatus(projectId);
         var active = status.ActiveSet;
         return new StudioRuntimeStatusView(status.SchemaVersion, status.Available, status.Phase, status.NextInstruction,
             status.ContentHash, status.PackageSha256,
@@ -373,13 +372,26 @@ public sealed class QuestStudioService
         };
     }
 
+    StudioRuntimePackIdentity? RuntimePackIdentity(string projectId)
+    {
+        var placement = _portfolio.Placements()
+            .SingleOrDefault(value => value.ProjectId == projectId);
+        if (placement is null) return null;
+        var guild = _portfolio.ReadGuild(placement.GuildId);
+        if (guild is null) return null;
+        var compiled = CompileGuild(guild.GuildId);
+        return !compiled.Ok ? null : new StudioRuntimePackIdentity(
+            guild.GuildId, guild.Version, compiled.ContentHash!, compiled.Experiences!.Count > 1);
+    }
+
     static IReadOnlyList<StudioRuntimePassLine> ComposePassLines(IReadOnlyList<RuntimeReceipt> receipts)
     {
         var result = new List<StudioRuntimePassLine>();
-        Add("Validation", "dev_validation", "Revision satisfies the shared contract.");
-        Add("Transfer", "dev_transfer", "Revision reached the game-owned dev inbox.");
-        Add("Activation", "dev_activation", "The game activated this exact revision.");
-        Add("Rebind", "dev_rebind", "Loaded local Charm bindings now use this revision.");
+        Add("Validation", "Revision satisfies the shared contract.", "dev_validation");
+        Add("Transfer", "Revision reached the game-owned dev inbox.", "dev_transfer");
+        Add("Activation", "The game activated this exact revision.", "dev_activation");
+        Add("Rebind", "Loaded local Charm bindings now use this revision.",
+            "dev_rebind", "bind_selected_experience");
         var observed = receipts.Where(value => value.Operation is "event" or "transition"
                 && value.Status is "matched" or "advanced" or "complete" or "fail")
             .OrderByDescending(value => value.AtUtc).FirstOrDefault();
@@ -390,9 +402,9 @@ public sealed class QuestStudioService
                 observed.ActivationId, observed.CorrelationId, observed.AtUtc));
         return result;
 
-        void Add(string kind, string operation, string success)
+        void Add(string kind, string success, params string[] operations)
         {
-            var receipt = receipts.Where(value => value.Operation == operation)
+            var receipt = receipts.Where(value => operations.Contains(value.Operation, StringComparer.Ordinal))
                 .OrderByDescending(value => value.AtUtc).FirstOrDefault();
             if (receipt is null) return;
             var failed = receipt.Status == "rejected";
@@ -426,7 +438,7 @@ public sealed class QuestStudioService
     {
         var project = _workspace.ReadProject(projectId);
         var compiled = project is null ? StudioCertificationResult.Fail("project_missing") : _workspace.Validate(projectId);
-        var live = request?.IncludeLiveEvidence == true && project is not null ? _workspace.RuntimeStatus(projectId) : null;
+        var live = request?.IncludeLiveEvidence == true && project is not null ? RuntimeStatus(projectId) : null;
         var result = _dataExport.BuildBundle(project, compiled, live, request);
         _usage.RecordOutcome("bundle_export", UsageOutcome(result.Ok, false, result.Error));
         return result;

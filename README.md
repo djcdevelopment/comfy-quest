@@ -210,6 +210,23 @@ committed index is `docs/evidence/queue-full-width-journey-20260827-r9.json`.
 This is a technical 4A integration lap, not a creator seat; Derek's next session begins with
 a prepared guild premise and questions about authorship, composition, clarity, and play feel.
 
+Quest's bounded development MCP surface is packaged as a Python-importable provider release,
+not hosted by another Quest gateway:
+
+    tools/workbench-provider/New-QuestWorkbenchProvider.ps1
+
+Mount the resulting verified zip read-only into an explicit Isolate profile. Isolate owns gateway
+authentication, caller identity, provider loading, and lifecycle; Quest owns only four
+fixed-mailbox tools for Runtime status, receipts, and Creator-Session-pinned creator/run controls.
+The bounded status result includes the current non-secret Creator Session identity, so a caller
+can derive the next control request without reading harness state or asking a human to relay it.
+The installed ERA17 slices are indexed in `docs/evidence/isolate-era17-runtime-20260827-r1.json`
+and `docs/evidence/isolate-era17-runtime-20260827-r2.json`. They are not the clean-machine
+NFR-MCP-001 exit: the image reports no source revision, the registered local credential was not
+generated for the lap, and its state still uses checkout-specific mounts. The final Isolate
+release must generate credentials, attest its source identity, start from released artifacts
+alone, and prove correlated teardown.
+
 The interim packages-local feed exists only until the first public 0.4.0 NuGet
 publication and exact consumer repin.
 

@@ -52,9 +52,9 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
       return result;
     });
     arcaneSight=new RuntimeArcaneSight(runtimeRoot);
-    creatorRequests=new RuntimeCreatorRequestController(runtimeRoot,devChannel,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,message=>Logger.LogInfo(message),SetCreatorBuildMode,CreatorBuildModeEnabled);
-    runControl=new RuntimeRunControlController(runtimeRoot,engine,receipts,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,message=>Logger.LogInfo(message));
     worldEntry=new RuntimeWorldEntryController(runtimeRoot,message=>Logger.LogInfo(message));
+    creatorRequests=new RuntimeCreatorRequestController(runtimeRoot,devChannel,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,()=>worldEntry.CreatorSessionId,message=>Logger.LogInfo(message),SetCreatorBuildMode,CreatorBuildModeEnabled);
+    runControl=new RuntimeRunControlController(runtimeRoot,engine,receipts,()=>privateWorldConfirmed.Value,()=>ZNet.instance!=null&&Player.m_localPlayer!=null,CurrentWorldUid,()=>worldEntry.CreatorSessionId,message=>Logger.LogInfo(message));
     studioUrl=Config.Bind("Studio","Url","http://127.0.0.1:8085/quest-studio","Loopback URL opened by the Runtime creator bar. Only an http:// localhost address is accepted.");
     var legacyAnchor=Config.Bind("Presentation","DeadlineAnchor",.16f,"Legacy vertical alert position; migrated into AlertAnchorY.");
     alertAnchorX=Config.Bind("Presentation","AlertAnchorX",.5f,"Horizontal center of the single alert anchor as a screen fraction (0.05-0.95).");

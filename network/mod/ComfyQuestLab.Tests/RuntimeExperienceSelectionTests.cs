@@ -280,6 +280,7 @@ public sealed class RuntimeExperienceSelectionTests {
     ExpiresUtc = now.AddMinutes(2).ToString("O"),
     ExpectedMachine = "OMEN",
     ExpectedWorldUid = "918273645",
+    CreatorSessionId = "creator-session-selection-test",
     RunId = runId,
     ExperienceId = experienceId,
   };

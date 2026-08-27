@@ -371,7 +371,11 @@ function Stop-ValheimProcess {
     foreach ($process in $processes) {
         if ($process.MainWindowHandle -ne 0) { [void]$process.CloseMainWindow() }
     }
-    $deadline = (Get-Date).AddSeconds(20)
+    # Large Valheim worlds continue their atomic .new save after OnApplicationQuit. ERA17 has
+    # repeatedly needed about 45 seconds; killing at the former 20-second deadline interrupted
+    # that write. Keep the caller's longer wait, but never allow less than two minutes.
+    $gracefulWaitSeconds = [Math]::Max(120, $WaitSeconds)
+    $deadline = (Get-Date).AddSeconds($gracefulWaitSeconds)
     while ((Get-Date) -lt $deadline -and
         (Get-Process -Name valheim,UnityCrashHandler64 -ErrorAction SilentlyContinue)) {
         Start-Sleep -Milliseconds 250
@@ -392,6 +396,7 @@ function Stop-ValheimProcess {
     return [ordered]@{
         state = if ($forced.Count -eq 0) { 'stopped_gracefully' } else { 'stopped_forcibly' }
         graceful = $forced.Count -eq 0
+        graceful_wait_seconds = $gracefulWaitSeconds
         forced_process_ids = @($forced | ForEach-Object { $_.Id })
     }
 }
@@ -830,8 +835,10 @@ try {
         throw "Session mismatch: active is $($context.session_id), requested $SessionId."
     }
     $SessionId = [string]$context.session_id
-    if ($ExpectedMachine -ne [string]$context.expected_machine -or
-        $WorldUid -ne [string]$context.world_uid -or
+    if (($PSBoundParameters.ContainsKey('ExpectedMachine') -and
+            $ExpectedMachine -ne [string]$context.expected_machine) -or
+        ($PSBoundParameters.ContainsKey('WorldUid') -and
+            $WorldUid -ne [string]$context.world_uid) -or
         [IO.Path]::GetFullPath([string]$context.valheim_root) -ne $ValheimRoot) {
         throw 'Creator Session identity differs from the active install manifest.'
     }
@@ -995,6 +1002,34 @@ try {
         }
     } elseif ($Action -eq 'Stop') {
         $processLifecycle = Stop-ValheimProcess
+        $processLifecycle.quarantined_partial_saves = @()
+        if (-not $processLifecycle.graceful) {
+            $interruptedRoot = Join-Path $operationRoot 'interrupted-save'
+            $worldRoot = if ($FixtureMode) {
+                Join-Path $ValheimRoot 'worlds_local'
+            } else {
+                Join-Path $env:USERPROFILE 'AppData\LocalLow\IronGate\Valheim\worlds_local'
+            }
+            $partialSources = @(
+                (Join-Path $worldRoot ([string]$context.world_name + '.db.new')),
+                (Join-Path $worldRoot ([string]$context.world_name + '.fwl.new')),
+                ([string]$context.character_backup.source + '.new'))
+            foreach ($source in $partialSources) {
+                if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
+                $target = Join-Path $interruptedRoot (Split-Path $source -Leaf)
+                if (-not (Test-ChildPath $operationRoot $target)) {
+                    throw 'Interrupted-save quarantine escaped the Stop evidence directory.'
+                }
+                New-Item -ItemType Directory -Force -Path $interruptedRoot | Out-Null
+                Move-Item -LiteralPath $source -Destination $target
+                $processLifecycle.quarantined_partial_saves += [ordered]@{
+                    source = [IO.Path]::GetFullPath($source)
+                    quarantine = [IO.Path]::GetFullPath($target)
+                    sha256 = Get-Sha256 $target
+                    bytes = (Get-Item -LiteralPath $target).Length
+                }
+            }
+        }
         $pending = Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime\requests\world-entry.json'
         if (Test-Path -LiteralPath $pending -PathType Leaf) {
             Copy-Item -LiteralPath $pending -Destination (Join-Path $operationRoot 'unconsumed-world-entry-request.json') -Force

@@ -455,12 +455,10 @@ internal sealed class QuestStudioWorkspace
         var valheim = _host.FindValheim();
         if (valheim is null) return StudioPublishResult.Fail("valheim_not_found");
         var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
-        var devStatus = new RuntimeDevChannelStatusStore(runtimeRoot).Read();
-        var now = DateTimeOffset.UtcNow;
-        var devConnected = devStatus is not null && devStatus.ObservedUtc <= now.AddSeconds(1)
-            && devStatus.ObservedUtc >= now.AddSeconds(-3);
-        if (!devConnected) return StudioPublishResult.Fail("dev_channel_disconnected");
-        if (devStatus!.Armed != true) return StudioPublishResult.Fail("dev_channel_not_armed");
+        var devStatus = await StudioDevChannelConnection.WaitForConnectedAsync(
+            runtimeRoot, cancellationToken);
+        if (devStatus is null) return StudioPublishResult.Fail("dev_channel_disconnected");
+        if (devStatus.Armed != true) return StudioPublishResult.Fail("dev_channel_not_armed");
         var compiled = StudioGraphCompiler.Compile(project);
         if (!compiled.Ok) return StudioPublishResult.Fail(compiled.Error!, compiled.Diagnostics);
         var bytes = StudioGraphCompiler.BuildPack(project, compiled.ExperienceJson!, compiled.ContentHash!);
@@ -496,7 +494,8 @@ internal sealed class QuestStudioWorkspace
         return StudioRehearsal.Run(project, compiled.Document!, request ?? new());
     }
 
-    public StudioRuntimeStatus RuntimeStatus(string projectId)
+    public StudioRuntimeStatus RuntimeStatus(
+        string projectId, StudioRuntimePackIdentity? releaseIdentity = null)
     {
         var project = ReadProject(projectId);
         if (project is null) return StudioRuntimeStatus.Unavailable("project_missing");
@@ -506,15 +505,17 @@ internal sealed class QuestStudioWorkspace
         if (valheim is null) return StudioRuntimeStatus.Unavailable("valheim_not_found");
         var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
         var store = new QuestPackStore(runtimeRoot);
+        var releasePackId = releaseIdentity?.PackId ?? project.PackId;
+        var releaseVersion = releaseIdentity?.Version ?? project.Version;
+        var releaseContentHash = releaseIdentity?.ContentHash ?? compiled.ContentHash!;
         var published = store.CheckInbox(RuntimeProductionEventCatalog.CreateSet()).FirstOrDefault(candidate => candidate.IsValid
-            && candidate.Manifest.PackId == project.PackId && candidate.Manifest.Version == project.Version
-            && string.Equals(candidate.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase));
+            && candidate.Manifest.PackId == releasePackId && candidate.Manifest.Version == releaseVersion
+            && string.Equals(candidate.ContentHash, releaseContentHash, StringComparison.OrdinalIgnoreCase));
         var devPublished = store.CheckDevInbox(RuntimeProductionEventCatalog.CreateSet()).FirstOrDefault(candidate => candidate.IsValid
-            && candidate.Manifest.PackId == project.PackId && candidate.Manifest.Version == project.Version
-            && string.Equals(candidate.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase));
+            && candidate.Manifest.PackId == releasePackId && candidate.Manifest.Version == releaseVersion
+            && string.Equals(candidate.ContentHash, releaseContentHash, StringComparison.OrdinalIgnoreCase));
         var devStatus = new RuntimeDevChannelStatusStore(runtimeRoot).Read();
-        var devConnected = devStatus is not null && devStatus.ObservedUtc <= DateTimeOffset.UtcNow.AddSeconds(1)
-            && devStatus.ObservedUtc >= DateTimeOffset.UtcNow.AddSeconds(-3);
+        var devConnected = StudioDevChannelConnection.IsConnected(devStatus, DateTimeOffset.UtcNow);
         ComfyQuestContracts.ActiveSet? active = null;
         try
         {
@@ -532,9 +533,12 @@ internal sealed class QuestStudioWorkspace
                 var receiptInfo = new FileInfo(path);
                 if (!receiptInfo.Exists || receiptInfo.Length is < 0 or > 128 * 1024) continue;
                 var receipt = JsonConvert.DeserializeObject<RuntimeReceipt>(File.ReadAllText(path));
-                var matchesProject = receipt is not null && receipt.PackId == project.PackId && receipt.Version == project.Version
+                var matchesProject = receipt is not null && receipt.PackId == releasePackId && receipt.Version == releaseVersion
                     && !string.IsNullOrWhiteSpace(receipt.ContentHash)
-                    && string.Equals(receipt.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase);
+                    && string.Equals(receipt.ContentHash, releaseContentHash, StringComparison.OrdinalIgnoreCase)
+                    && (releaseIdentity?.MultipleExperiences != true
+                        || string.IsNullOrWhiteSpace(receipt.ExperienceId)
+                        || string.Equals(receipt.ExperienceId, project.ExperienceId, StringComparison.Ordinal));
                 if (matchesProject)
                     receipts.Add(receipt!);
             }
@@ -544,15 +548,23 @@ internal sealed class QuestStudioWorkspace
             .OrderByDescending(value => value.AtUtc)
             .ThenByDescending(value => value.Operation == "transition")
             .ToArray();
-        var isActive = active?.PackId == project.PackId && active.Version == project.Version
-            && string.Equals(active.ContentHash, compiled.ContentHash, StringComparison.OrdinalIgnoreCase);
-        var activeRelation = active is null ? "none" : isActive ? "current" : "other_version";
+        var isActiveRelease = active?.PackId == releasePackId && active.Version == releaseVersion
+            && string.Equals(active.ContentHash, releaseContentHash, StringComparison.OrdinalIgnoreCase);
+        var selectedForProject = releaseIdentity?.MultipleExperiences != true
+            || string.Equals(active?.ExperienceId, project.ExperienceId, StringComparison.Ordinal);
+        var isActive = isActiveRelease && selectedForProject;
+        var activeRelation = active is null ? "none" : isActive ? "current"
+            : isActiveRelease ? "other_experience" : "other_version";
         var activeReceipts = !isActive ? Array.Empty<RuntimeReceipt>()
             : string.IsNullOrWhiteSpace(active?.ActivationId) ? orderedReceipts
             : orderedReceipts.Where(value => value.ActivationId == active.ActivationId).ToArray();
         var checkedOk = orderedReceipts.Any(value => value.Operation == "check" && value.Status == "accepted");
-        var bound = activeReceipts.Any(value => (value.Operation == "bind" && value.Status is "inscribed" or "accepted")
-            || (value.Operation == "dev_rebind" && (value.Status == "rebound" || value.Error == "already_current")));
+        var bound = activeReceipts.Any(value =>
+            (releaseIdentity?.MultipleExperiences != true
+                || string.Equals(value.ExperienceId, project.ExperienceId, StringComparison.Ordinal))
+            && ((value.Operation == "bind" && value.Status is "inscribed" or "accepted")
+                || (value.Operation == "dev_rebind" && (value.Status == "rebound" || value.Error == "already_current"))
+                || (value.Operation == "bind_selected_experience" && value.Status == "completed")));
         var completed = activeReceipts.FirstOrDefault(value => value.Operation == "transition" && value.Status is "complete" or "fail");
         var liveReceipt = activeReceipts.FirstOrDefault(value =>
             (value.Operation == "transition" && value.Status == "advanced")
@@ -565,6 +577,7 @@ internal sealed class QuestStudioWorkspace
         var currentCount = liveReceipt?.Operation == "event" ? liveReceipt.CurrentCount : null;
         var requiredCount = liveReceipt?.Operation == "event" ? liveReceipt.RequiredCount : null;
         var phase = completed is not null ? completed.Status : bound ? "bound" : isActive ? "active"
+            : activeRelation == "other_experience" ? "other_experience"
             : devPublished is not null && active is not null ? "other_active"
             : devPublished is not null ? !devConnected ? "dev_disconnected" : devStatus!.Armed ? "dev_queued" : "dev_waiting_for_arm"
             : checkedOk ? "checked" : published is not null ? "published" : "certified";
@@ -586,6 +599,7 @@ internal sealed class QuestStudioWorkspace
             "dev_disconnected" => "Start the local Runtime; Studio is waiting for its read-only heartbeat.",
             "dev_waiting_for_arm" => "Open F9 once and arm the dev channel for this game session.",
             "dev_queued" => "Revision transferred; the armed Runtime is validating and activating it.",
+            "other_experience" => "This guild release is active. Bind this quest to its nearby target to select it.",
             "other_active" => "A different revision is active. Play this revision to return to the current draft.",
             "published" => "In Valheim, press F10 to check the published update.",
             "checked" => "In Valheim, press F11 to load the validated update.",
@@ -595,16 +609,18 @@ internal sealed class QuestStudioWorkspace
             "fail" => "The live Runtime reports the fail outcome.",
             _ => "Inspect the latest Runtime receipt."
         };
-        return new(2, true, phase, instruction, compiled.ContentHash, devPublished?.Sha256 ?? published?.Sha256, active,
+        return new(2, true, phase, instruction, releaseContentHash, devPublished?.Sha256 ?? published?.Sha256, active,
             currentStageId, currentCount, requiredCount, orderedReceipts.Take(20).ToArray(), compiled.Diagnostics)
         {
             ActiveRelation = activeRelation,
             // The one shared title fact: whatever revision is actually running, by content
             // hash. The compiled draft's title is an equally honest fallback only when the
             // active content IS this draft; an other_version revision has no provable title.
-            ActiveTitle = CreatorLoopNotice.ActiveTitle(
-                new[] { devPublished, published }.Where(value => value is not null).ToArray()!, active)
-                ?? (isActive ? compiled.Document!.Title : null),
+            ActiveTitle = !isActive ? null : releaseIdentity?.MultipleExperiences == true
+                ? compiled.Document!.Title
+                : CreatorLoopNotice.ActiveTitle(
+                    new[] { devPublished, published }.Where(value => value is not null).ToArray()!, active)
+                    ?? compiled.Document!.Title,
             RouteLabels = RuntimeRouteLabels(compiled.Document!),
             EffectLabels = RuntimeEffectLabels(compiled.Document!),
             DevConnected = devConnected,
@@ -2001,6 +2017,9 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
             phase == "draft_invalid" ? "Resolve the graph diagnostics before publishing." : "Runtime state is unavailable on this machine.",
             null, null, null, null, null, null, Array.Empty<RuntimeReceipt>(), diagnostics ?? Array.Empty<ContractDiagnostic>());
 }
+
+internal sealed record StudioRuntimePackIdentity(
+    string PackId, string Version, string ContentHash, bool MultipleExperiences);
 
 public sealed record StudioRuntimeReceiptSummary(
     string? Operation, string? Status, string? StageId, string? EventName,

@@ -217,8 +217,12 @@ public sealed class RuntimeRunTests : IDisposable
   [Fact]
   public void RunControlPolicyRequiresExactIdentityFreshnessAndConfirmation()
   {
-    var valid=new RuntimeRunControlRequest{RequestId="request-1",Operation="apply_reset",CreatedUtc=now.ToString("O"),ExpiresUtc=now.AddMinutes(2).ToString("O"),ExpectedMachine="OMEN",ExpectedWorldUid="123",RunId="run-one",PreviewToken="rstp-one",ConfirmReset=true};
+    var valid=new RuntimeRunControlRequest{RequestId="request-1",Operation="apply_reset",CreatedUtc=now.ToString("O"),ExpiresUtc=now.AddMinutes(2).ToString("O"),ExpectedMachine="OMEN",ExpectedWorldUid="123",CreatorSessionId="creator-session-one",RunId="run-one",PreviewToken="rstp-one",ConfirmReset=true};
     Assert.True(RuntimeRunControlRequestPolicy.Validate(valid,now,out var accepted),accepted);
+    valid.CreatorSessionId=null;
+    Assert.False(RuntimeRunControlRequestPolicy.Validate(valid,now,out var session));
+    Assert.Equal("request_identity_invalid",session);
+    valid.CreatorSessionId="creator-session-one";
     valid.ConfirmReset=false;
     Assert.False(RuntimeRunControlRequestPolicy.Validate(valid,now,out var confirmation));
     Assert.Equal("reset_confirmation_required",confirmation);

@@ -11,6 +11,7 @@ signature record, and duplicate atlas rows remain visible through AtlasRowCount.
 
 Reads:
   tools/component-packets/samples/valheim-event-atlas.json
+  tools/component-packets/samples/prefab-dump.json
   tools/component-packets/quest-capability-rules.json
   tools/component-packets/quest-event-authoring.json
 Writes:
@@ -36,6 +37,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 ATLAS = HERE / "samples" / "valheim-event-atlas.json"
+PREFABS = HERE / "samples" / "prefab-dump.json"
 RULES = HERE / "quest-capability-rules.json"
 AUTHORING = HERE / "quest-event-authoring.json"
 MANIFEST = HERE / "samples" / "quest-capability-manifest.json"
@@ -464,6 +466,22 @@ def build_authoring(safe_events: list[str]) -> list[dict]:
     an event the evaluator will reject.
     """
     document = read_json(AUTHORING)
+    prefab_document = read_json(PREFABS)
+    if prefab_document.get("schema") != "comfy-prefab-dump/v1":
+        raise CapabilityError("prefab-dump.json schema is not v1")
+    prefab_rows = prefab_document.get("prefabs")
+    if not isinstance(prefab_rows, list):
+        raise CapabilityError("prefab-dump.json prefabs must be an array")
+    piece_prefabs = {
+        row["name"]
+        for row in prefab_rows
+        if isinstance(row, dict)
+        and row.get("piece") is True
+        and isinstance(row.get("name"), str)
+        and row["name"].strip()
+    }
+    if not piece_prefabs:
+        raise CapabilityError("prefab-dump.json contains no buildable piece prefabs")
     if document.get("Schema") != "comfy-quest-event-authoring/v1":
         raise CapabilityError("quest-event-authoring.json schema is not v1")
     rows = document.get("Events")
@@ -493,6 +511,14 @@ def build_authoring(safe_events: list[str]) -> list[dict]:
         for field in ("TargetKind", "TargetDescription", "ExampleTarget"):
             if not isinstance(row[field], str) or not row[field].strip():
                 raise CapabilityError(f"{name}: {field} must be a non-empty string")
+        if (
+            row["TargetKind"] == "piece-prefab"
+            and row["ExampleTarget"] not in piece_prefabs
+        ):
+            raise CapabilityError(
+                f"{name}: ExampleTarget {row['ExampleTarget']!r} is not an exact "
+                "buildable piece name in prefab-dump.json"
+            )
         for field in ("SupportsWeaponSkill", "SupportsProjectile"):
             if not isinstance(row[field], bool):
                 raise CapabilityError(f"{name}: {field} must be boolean")

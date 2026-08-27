@@ -374,9 +374,9 @@
     {
       "id": "NFR-MCP-001",
       "disposition": "parked",
-      "reason": "Audit C4: the standalone Workbench has no place in the 4A/4B/4C/5 vocabulary and no exit gate, while docs/creator-os.md makes it a precondition for the autonomous integration 4A depends on. queue.workbench-boundary carries lane `unassigned` for the same reason. Placing it in a lane is Derek's ruling.",
+      "reason": "Derek reconfirmed that Isolate owns tooling consolidation, and the 2026-08-27 installed slices proved a bounded Quest provider plus rejection of a missing caller credential through that gateway. Audit C4 remains unresolved because the standalone Workbench still has no place in the 4A/4B/4C/5 vocabulary or exit gate, while released-image identity, per-lap generated credentials, clean volunteer-machine setup, and teardown remain unproved. queue.workbench-boundary stays `unassigned`; placing it in a lane is Derek's ruling.",
       "pending_ruling": "Which lane, if any, owns the standalone Workbench boundary (C4). queue.workbench-boundary names the same ruling in its lane_note.",
-      "note": "docs/creator-os-audit-2026-08-24.md, finding C4."
+      "note": "docs/creator-os-audit-2026-08-24.md, finding C4; docs/evidence/isolate-era17-runtime-20260827-r1.json; docs/evidence/isolate-era17-runtime-20260827-r2.json."
     },
     {
       "id": "NFR-USE-001",

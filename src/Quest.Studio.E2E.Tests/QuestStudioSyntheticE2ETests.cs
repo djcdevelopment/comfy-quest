@@ -1593,6 +1593,7 @@ public sealed class QuestStudioSyntheticE2ETests
     {
         const string WorldUid = "424242";
         const string BindingZdo = "42:7";
+        const string CreatorSessionId = "synthetic-guild-session";
         readonly SyntheticRun _run;
         readonly ActiveSet _active;
         readonly IReadOnlyDictionary<string, ExperienceDocument> _documents;
@@ -1621,6 +1622,7 @@ public sealed class QuestStudioSyntheticE2ETests
             _bindings = new RuntimeBindingCoordinator(run.RuntimeRoot, _adapter, _runs.Registry);
             _status = new RuntimeRunStatusStore(run.RuntimeRoot);
             _receipts = new RuntimeReceiptStore(run.RuntimeRoot);
+            WriteWorldEntryStatus();
             WriteStatus();
             _pump = Task.Run(PumpAsync);
         }
@@ -1683,6 +1685,8 @@ public sealed class QuestStudioSyntheticE2ETests
                 if (!string.Equals(request!.ExpectedMachine, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("runtime_machine_mismatch");
                 if (request.ExpectedWorldUid != WorldUid) throw new InvalidOperationException("runtime_world_mismatch");
+                if (request.CreatorSessionId != CreatorSessionId)
+                    throw new InvalidOperationException("runtime_creator_session_mismatch");
 
                 switch (request.Operation)
                 {
@@ -1757,6 +1761,27 @@ public sealed class QuestStudioSyntheticE2ETests
             });
         }
 
+        void WriteWorldEntryStatus()
+        {
+            var path = Path.Combine(_run.RuntimeRoot, "status", "world-entry.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, JsonConvert.SerializeObject(new RuntimeWorldEntryReceipt
+            {
+                RequestId = "synthetic-guild-world-entry",
+                CreatorSessionId = CreatorSessionId,
+                State = "entered",
+                Detail = "world_entry_complete",
+                Machine = Environment.MachineName,
+                ExpectedWorldUid = WorldUid,
+                WorldUid = WorldUid,
+                WorldName = "SyntheticGuild",
+                WorldDisplayName = "SyntheticGuild",
+                CharacterProfile = "synthetic-player",
+                CharacterName = "Synthetic Player",
+                CompletedUtc = DateTimeOffset.UtcNow,
+            }, Formatting.Indented));
+        }
+
         void WriteReceipt(RuntimeRunControlRequest request, string state, string detail,
             RuntimeResetPreview? preview = null, RuntimeResetResult? result = null,
             IReadOnlyList<RuntimeBindingCandidate>? candidates = null, RuntimeBindingChange? change = null)
@@ -1769,6 +1794,7 @@ public sealed class QuestStudioSyntheticE2ETests
                 Detail = detail,
                 Machine = Environment.MachineName,
                 WorldUid = WorldUid,
+                CreatorSessionId = request.CreatorSessionId,
                 CompletedUtc = DateTimeOffset.UtcNow,
                 Preview = preview,
                 Result = result,
