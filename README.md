@@ -201,7 +201,8 @@ request once through Valheim's own profile/world APIs and refuses fallback chara
 different worlds, server joins, console commands, or synthetic input. The driver then owns
 replay of a reviewed nearby sign fixture, activation, prerequisite refusal, A -> B -> A,
 scoped reset/rerun, exact retention proof, screenshots, LIFO binding recovery, game shutdown,
-log collection, and exact install, world-pair, and character-profile restore.
+log collection, and exact install, one-shot world-entry state, world-pair, and character-profile
+restore.
 `-HumanWorldEntry` retains the ADR 0014 fallback. Installed session
 `queue-full-width-journey-20260827-r9` proved the default bounded launch/world-entry and the
 complete guild lap with zero human actions, including exact retained evidence and recovery; its

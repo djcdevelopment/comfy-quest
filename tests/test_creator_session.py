@@ -295,6 +295,7 @@ class CreatorSessionTests(unittest.TestCase):
             )
             failure = json.loads((evidence / "preparation-failure.json").read_text())
             self.assertEqual("rolled_back", failure["state"])
+            stale_request.unlink()
             config.rmdir()
             config.write_bytes(prior_config)
 
@@ -307,6 +308,8 @@ class CreatorSessionTests(unittest.TestCase):
             for name, payload in payloads.items():
                 self.assertEqual(payload, (plugins / name).read_bytes())
             self.assertIn(b"PrivateWorldConfirmed = true", config.read_bytes())
+            self.assertFalse(stale_request.exists())
+            self.assertFalse(stale_status.exists())
 
             game_state = root / "fixture-game-state"
             game_state.mkdir()
@@ -350,9 +353,27 @@ class CreatorSessionTests(unittest.TestCase):
             stopped_receipt = json.loads(stopped.stdout[stopped.stdout.index("{") :])
             self.assertEqual(["ComfyQuestRuntime.dll"], stopped_receipt["plugin_hash_mismatches"])
             (plugins / "ComfyQuestRuntime.dll").write_bytes(payloads["ComfyQuestRuntime.dll"])
+            stale_request.write_bytes(b"current-session-request\n")
+            stale_status.write_bytes(b"current-session-status\n")
 
             for source_path in original_state:
                 source_path.write_bytes(b"mutated-by-technical-lap\n")
+
+            # Quarantined one-shot state is validated before any install or game mutation.
+            # A corrupt prior status cannot be reported as restored or leave a partial close.
+            world_entry_backup = Path(manifest["world_entry_quarantine"][0]["backup"])
+            world_entry_backup.write_bytes(b"corrupt-world-entry-snapshot\n")
+            refused_world_entry_close = invoke("Close", "-Restore", "-RestoreGameState")
+            self.assertNotEqual(0, refused_world_entry_close.returncode)
+            self.assertIn("world-entry status snapshot hash mismatch", refused_world_entry_close.stderr)
+            for source_path in original_state:
+                self.assertEqual(b"mutated-by-technical-lap\n", source_path.read_bytes())
+            for name, payload in payloads.items():
+                self.assertEqual(payload, (plugins / name).read_bytes())
+            self.assertIn(b"PrivateWorldConfirmed = true", config.read_bytes())
+            self.assertEqual(b"current-session-request\n", stale_request.read_bytes())
+            self.assertEqual(b"current-session-status\n", stale_status.read_bytes())
+            world_entry_backup.write_bytes(b"stale-status\n")
 
             # All three snapshots are validated before Close mutates either install or game
             # state, so a corrupt late snapshot cannot leave a half-restored world pair.
@@ -366,6 +387,8 @@ class CreatorSessionTests(unittest.TestCase):
             for name, payload in payloads.items():
                 self.assertEqual(payload, (plugins / name).read_bytes())
             self.assertIn(b"PrivateWorldConfirmed = true", config.read_bytes())
+            self.assertEqual(b"current-session-request\n", stale_request.read_bytes())
+            self.assertEqual(b"current-session-status\n", stale_status.read_bytes())
             world_fwl_backup.write_bytes(original_state[world_fwl])
 
             closed = invoke("Close", "-Restore", "-RestoreGameState")
@@ -377,9 +400,12 @@ class CreatorSessionTests(unittest.TestCase):
             self.assertEqual(prior_config, config.read_bytes())
             for source_path, payload in original_state.items():
                 self.assertEqual(payload, source_path.read_bytes())
+            self.assertFalse(stale_request.exists())
+            self.assertEqual(b"stale-status\n", stale_status.read_bytes())
             closed_manifest = json.loads((evidence / "session.closed.json").read_text())
             self.assertEqual("closed", closed_manifest["state"])
             self.assertTrue(closed_manifest["restored"])
+            self.assertTrue(closed_manifest["restored_world_entry_state"])
             self.assertTrue(closed_manifest["restored_game_state"])
 
     def test_powershell_parsers_accept_both_entrypoints(self) -> None:

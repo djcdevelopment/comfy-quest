@@ -125,9 +125,12 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
 ## Proof level
 
 - `Invoke-CreatorSession.ps1` has an executed fixture-mode lifecycle covering Prepare,
-  Status, Close, exact plugin/config/world-pair/character restoration, its closed action vocabulary,
-  exclusive lease, install hash pins, backups, and rollback manifest. A forced late Prepare
-  failure also proves partial plugin deployment and quarantined one-shot state roll back, and
+  Status, Close, exact plugin/config/quarantined-world-entry/world-pair/character restoration,
+  its closed action vocabulary, exclusive lease, install hash pins, backups, and rollback
+  manifest. The check was observed failing when normal Close left the current session's
+  world-entry request/status behind; the fixed lifecycle now proves a previously absent request
+  is removed and a prior status is restored exactly. A forced late Prepare failure also proves
+  partial plugin deployment and quarantined one-shot state roll back, and
   `Stop` remains available as a process-recovery fail-safe when an installed hash drifts. A second executable
   path drives Creator Session through the PowerShell sender, real Runtime request file,
   shipping controller, correlated receipt, BuildOn, BuildOff, Arm, Disarm, and Restore.
@@ -171,9 +174,9 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
   `creator_build_enabled: false`. The closed session manifest records the exact prior
   plugin/config restoration and a released session; the authored world was deliberately
   retained. Its pre-session `.db`/`.fwl` pair remains in the session backup. Ordinary
-  `Close -Restore` still retains authored world state; a technical lap may explicitly use
-  `Close -Restore -RestoreGameState` after `Stop` to restore the exact pinned world pair and
-  character profile.
+  `Close -Restore` restores the prior install plus quarantined one-shot world-entry state while
+  retaining authored world state; a technical lap may explicitly use `Close -Restore
+  -RestoreGameState` after `Stop` to restore the exact pinned world pair and character profile.
 - Creator Session `binding-fixture-smoke-20260827-r5` executed the autonomous installed-game
   preflight without a human relay. Steam entered `questyfour` / `ComfyQuestDemo` with the exact
   UID; reviewed replay produced `MATCH` for 12/12 pieces; Runtime returned 32 bounded binding
@@ -223,7 +226,7 @@ the corrected live Arm/Disarm receipts cover that exact branch.
 3. Run `tools\creator-session\Invoke-CreatorSession.ps1 Status -SessionId <id>`. Continue only while the session is active, the machine and world pins agree, and every installed plugin hash still matches Prepare.
 4. For a Godbuild lap, run the bounded `BuildOn` operation and require its correlated receipt before the creator begins spatial work. While it is active, the creator uses ordinary hammer/build controls; run one bounded operation from `GalleryRebuild`, `Capture -BlueprintName <name>`, or `Arm` only when the lap calls for it. Every request expires, carries the same three identity pins, is consumed once in game, and has no console-command or synthetic-key field.
 5. Capture automatically imports the fixed receipt artifact and runs the generator-drift check. Review `examples/worldbuild/<name>/preview.svg`, `plan.json`, and `manifest.json`; the manifest names upstream exclusions and the capture/blueprint pair remains replay authority.
-6. Run `Replay -BlueprintName <name>` only after review. Replay hash-verifies and stages that exact reviewed pair, then performs check, build, and a mark-scoped translation-independent diff and fails unless the receipt says `MATCH`. Run `BuildOff` and require its receipt before leaving the loaded world; then use `Stop` to close the game and archive logs. Finish with `Close -Restore` to restore prior install bytes. A disposable technical lap adds `-RestoreGameState` to restore the exact pinned world pair and character profile; an authoring lap omits it and retains the authored world.
+6. Run `Replay -BlueprintName <name>` only after review. Replay hash-verifies and stages that exact reviewed pair, then performs check, build, and a mark-scoped translation-independent diff and fails unless the receipt says `MATCH`. Run `BuildOff` and require its receipt before leaving the loaded world; then use `Stop` to close the game and archive logs. Finish with `Close -Restore` to restore prior install bytes and the quarantined one-shot world-entry request/status pair. A disposable technical lap adds `-RestoreGameState` to restore the exact pinned world pair and character profile; an authoring lap omits it and retains the authored world.
 
 ## Studio creator loop
 

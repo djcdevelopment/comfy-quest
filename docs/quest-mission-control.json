@@ -200,6 +200,13 @@
       "state": "confirmed",
       "detail": "Session queue-full-width-journey-20260827-r9 autonomously authored and published A plus prerequisite-locked B, entered the pinned world, proved B refusal and A -> B -> A, selectively reset and reran A, crossed retention, restored four bindings, stopped cleanly, and restored all three save/profile hashes with zero remaining plugins or Valheim processes.",
       "fact_kind": "live-installed-evidence"
+    },
+    {
+      "id": "env.era17-preflight",
+      "label": "ERA17 creator seat",
+      "state": "confirmed",
+      "detail": "Machine preflight era17-machine-preflight-20260827-r1 entered the exact ComfyEra17 / tugcorp local pair, found a nearby portal and multiple bounded sign candidates without human navigation, and restored the world pair, character, install, and prior world-entry status to their preflight hashes. The 58-image drone survey and a rendered 12-frame premise brief are staged; Derek's next input is creative rather than mechanical.",
+      "fact_kind": "live-installed-evidence"
     }
   ],
   "strategy": {
@@ -278,7 +285,7 @@
       "number": 4,
       "title": "Dogfood creator portfolio",
       "state": "active",
-      "summary": "The autonomous installed guild slice passed end to end, closing 4A / guild-scale-runtime. The active work is now a prepared 4B guild campaign in which Derek supplies authorship and play-feel judgments while automation retains lifecycle, evidence, and recovery ownership. World packaging is deferred.",
+      "summary": "The autonomous installed guild slice passed end to end, closing 4A / guild-scale-runtime. ERA17 machine entry, nearby binding discovery, exact recovery, and the drone-grounded premise brief are now preflighted for 4B; Derek supplies authorship and play-feel judgments while automation retains lifecycle, evidence, and recovery ownership. World packaging is deferred.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "The adoption gate is not another generated tutorial"
     },
@@ -472,7 +479,7 @@
         "NFR-USE-001"
       ],
       "title": "Dogfood the first top-to-bottom guild",
-      "detail": "Autonomous readiness is proven. The next sitting is one contiguous 4B creator session: Derek uses the prepared Creator OS to shape real questlines and repeatable events and supplies only premise, composition, narrative tone, clarity, responsiveness, and play-feel judgments. Automation owns launch, exact world/profile selection, deployment, retries, captures, receipts, logs, reset/rerun plumbing, shutdown, and recovery; any mechanical request reaching Derek is a defect.",
+      "detail": "Autonomous readiness is proven against the exact ComfyEra17 / tugcorp pair, including nearby portal/sign discovery and byte-exact recovery. The 58-image survey and 12-frame decision sheet reduce the next input to one premise/tone choice; the contiguous 4B sitting then asks only for composition, clarity, responsiveness, and play-feel judgments. Automation owns draft staging, launch, exact world/profile selection, deployment, retries, captures, receipts, logs, reset/rerun plumbing, shutdown, and recovery; any mechanical request reaching Derek is a defect.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4B — Guild campaign"
     },
@@ -660,7 +667,7 @@
       "id": "command.close",
       "label": "Close Creator Session",
       "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Close -SessionId <id> -Restore [-RestoreGameState]",
-      "detail": "After BuildOff and Stop: clear private confirmation, restore exact prior install bytes, and release the lease. Disposable technical laps add RestoreGameState to hash-verify and restore the pinned world pair and character profile; authoring laps omit it and retain authored state."
+      "detail": "After BuildOff and Stop: clear private confirmation, restore exact prior install bytes plus the quarantined one-shot world-entry request/status pair, and release the lease. The operation reports restored_world_entry_state. Disposable technical laps add RestoreGameState to hash-verify and restore the pinned world pair and character profile; authoring laps omit it and retain authored state."
     },
     {
       "id": "command.studio",
@@ -676,7 +683,7 @@
     "The Creator Session lease owns the shared Valheim installation. Do not run another deployment or Lab mutation beside it.",
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
-    "Close -Restore restores prior install bytes and retains authored world state. After Stop, a disposable technical lap may add -RestoreGameState to restore the exact pinned world pair and character profile; this bounded rollback is not saved-world packaging.",
+    "Close -Restore restores prior install bytes plus quarantined one-shot world-entry request/status state and retains authored world state. After Stop, a disposable technical lap may add -RestoreGameState to restore the exact pinned world pair and character profile; this bounded rollback is not saved-world packaging.",
     "The installed 4A journey is proven and its mechanical defects were fixed and rerun before the seat. Do not reopen deployment, lifecycle, binding, reset, retention, or recovery as human steps; a 4B seat turn is for authored choices and perception only.",
     "Receipts are authority, not logs. Retention archives rather than deletes, and the archive bound writes a `receipt_archive_evicted` receipt when it destroys anything — so a gap in a correlated proof set is a fact you can read, never something to infer from absence."
   ]

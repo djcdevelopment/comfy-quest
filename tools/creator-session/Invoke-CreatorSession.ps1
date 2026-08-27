@@ -1054,9 +1054,50 @@ try {
         }
         Invoke-ChildScript $runtimeScript (@($runtimeOperation) + $identityArgs)
     } elseif ($Action -eq 'Close') {
+        $snapshotRoot = Join-Path $EvidenceRoot 'backup'
+        $worldEntryRestorePlan = @()
+        if ($Restore) {
+            $runtimeRoot = Join-Path $ValheimRoot 'BepInEx\config\comfy-quest-runtime'
+            $worldEntryTargets = @(
+                [pscustomobject]@{
+                    Source = Join-Path $runtimeRoot 'requests\world-entry.json'
+                    Label = 'world-entry request'
+                },
+                [pscustomobject]@{
+                    Source = Join-Path $runtimeRoot 'status\world-entry.json'
+                    Label = 'world-entry status'
+                })
+            $worldEntryRecords = @($context.world_entry_quarantine)
+            $expectedWorldEntrySources = @($worldEntryTargets | ForEach-Object {
+                    [IO.Path]::GetFullPath([string]$_.Source)
+                })
+            foreach ($record in $worldEntryRecords) {
+                if ($null -eq $record -or [string]::IsNullOrWhiteSpace([string]$record.source) -or
+                    $expectedWorldEntrySources -notcontains [IO.Path]::GetFullPath([string]$record.source)) {
+                    throw 'World-entry snapshot restore target is outside the bounded request/status pair.'
+                }
+            }
+            foreach ($target in $worldEntryTargets) {
+                $expectedSource = [IO.Path]::GetFullPath([string]$target.Source)
+                $records = @($worldEntryRecords | Where-Object {
+                        [IO.Path]::GetFullPath([string]$_.source) -eq $expectedSource
+                    })
+                if ($records.Count -gt 1) {
+                    throw "$([string]$target.Label) snapshot is ambiguous."
+                }
+                $record = if ($records.Count -eq 1) { $records[0] } else { $null }
+                if ($null -ne $record) {
+                    Assert-SnapshotFile $record $expectedSource $snapshotRoot ([string]$target.Label)
+                }
+                $worldEntryRestorePlan += [pscustomobject]@{
+                    Record = $record
+                    ExpectedSource = $expectedSource
+                    Label = [string]$target.Label
+                }
+            }
+        }
         $gameStateRestorePlan = @()
         if ($RestoreGameState) {
-            $snapshotRoot = Join-Path $EvidenceRoot 'backup'
             $worldRecords = @($context.world_backup)
             if ($worldRecords.Count -ne 2) {
                 throw 'RestoreGameState requires the exact pinned world pair.'
@@ -1145,7 +1186,15 @@ try {
             } elseif (Test-Path -LiteralPath ([string]$config.path)) {
                 Remove-Item -LiteralPath ([string]$config.path) -Force
             }
+            foreach ($item in $worldEntryRestorePlan) {
+                if ($null -ne $item.Record) {
+                    Restore-SnapshotFile $item.Record $item.ExpectedSource $snapshotRoot $item.Label
+                } elseif (Test-Path -LiteralPath $item.ExpectedSource -PathType Leaf) {
+                    Remove-Item -LiteralPath $item.ExpectedSource -Force
+                }
+            }
             $context | Add-Member -NotePropertyName restored -NotePropertyValue $true -Force
+            $context | Add-Member -NotePropertyName restored_world_entry_state -NotePropertyValue $true -Force
         }
         if ($RestoreGameState) {
             foreach ($item in $gameStateRestorePlan) {
@@ -1172,6 +1221,7 @@ try {
         evidence_directory = $operationRoot
         world_entry_receipt = $worldEntryReceipt
         process_lifecycle = $processLifecycle
+        restored_world_entry_state = [bool]$context.restored_world_entry_state
         restored_game_state = [bool]$context.restored_game_state
         plugin_hash_mismatches = $pluginHashMismatches
     }

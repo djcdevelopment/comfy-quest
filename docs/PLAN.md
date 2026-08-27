@@ -176,6 +176,17 @@ work. Launch, exact world/profile selection, deployment, navigation performed on
 retries, screenshots, receipts, logs, reset/rerun plumbing, shutdown, and recovery remain
 machine-owned. Derek is not asked to enter the game until that seat packet is staged.
 
+Machine preflight `era17-machine-preflight-20260827-r1` entered the exact local
+`ComfyEra17` / `tugcorp` pair and found a portal plus multiple bounded sign candidates at the
+saved spawn without human navigation. It also caught two setup hazards before the seat: this
+1.3 GB world took about 190 seconds to enter, so the installed driver retains its 780-second
+bounded launch budget, and normal Close was leaving the current world-entry diagnostic in place
+instead of restoring the quarantined prior status. The latter check was observed failing, fixed,
+and rerun in the fixture lifecycle; the live world pair, character, install, and prior diagnostic
+state were then restored to their exact preflight hashes. The 58-image drone run and a rendered
+12-frame decision sheet are staged locally. Derek's next input is therefore one premise/tone
+choice, not an in-game setup action.
+
 ### Step 3 — 4B, the sustained campaign `queue.guild-campaign`
 
 Author a top-to-bottom guild for real. This is where the portfolio is tested at density and where
