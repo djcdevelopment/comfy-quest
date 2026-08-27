@@ -155,8 +155,10 @@ private-world no-cost/all-pieces and god-mode states, verifies both, and exposes
 console commands nor synthetic keys; `BuildOff` reverses both before the world is left.
 Capture automatically produces a reviewable Godbuild under `examples/worldbuild/<name>`
 and verifies generator drift. Replay stages the exact reviewed capture/blueprint pair,
-runs check before build, and fails unless the translation-independent diff receipt says
-`MATCH`. Captures are modular source and diff authority for the fields their manifest
+runs check before build, scopes the live comparison to that blueprint's durable mark, and
+fails unless the translation-independent diff receipt says `MATCH`. Ground replay also
+refuses to treat an overhead Lab deck as the operator's ground elevation. Captures are
+modular source and diff authority for the fields their manifest
 supports; the saved `.db`/`.fwl` world remains authoritative for terrain, vegetation,
 portal topology, and other excluded world-native state. The executable,
 precondition-ordered choreography and its current proof level live in `docs/creator-os.md`.
@@ -197,9 +199,12 @@ world, writes one expiring request for the exact profile, world filename, displa
 UID, machine, and session, and launches Valheim through Steam. Runtime consumes that
 request once through Valheim's own profile/world APIs and refuses fallback characters,
 different worlds, server joins, console commands, or synthetic input. The driver then owns
-activation, prerequisite refusal, A -> B -> A, scoped reset/rerun, exact retention proof,
-screenshots, LIFO binding recovery, game shutdown, log collection, and exact install restore.
-`-HumanWorldEntry` retains the ADR 0014 fallback while autonomous entry is being proven.
+replay of a reviewed nearby sign fixture, activation, prerequisite refusal, A -> B -> A,
+scoped reset/rerun, exact retention proof, screenshots, LIFO binding recovery, game shutdown,
+log collection, and exact install, world-pair, and character-profile restore.
+`-HumanWorldEntry` retains the ADR 0014 fallback; the default bounded launch/world-entry and
+fixture/recovery preflight have live proof, while the complete installed guild lap remains gated
+until its own evidence set completes.
 This is a technical 4A integration lap, not a creator seat; Derek's next session begins with
 a prepared guild premise and questions about authorship, composition, clarity, and play feel.
 

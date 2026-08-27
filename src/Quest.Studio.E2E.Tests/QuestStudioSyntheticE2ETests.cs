@@ -27,6 +27,7 @@ public sealed class QuestStudioSyntheticE2ETests
 {
     const string SentinelName = ".quest-studio-synthetic-e2e";
     const string SentinelContents = "comfy-quest synthetic e2e owned root\n";
+    const string InstalledBindingFixture = "first-portal-progression-shelter";
     readonly ITestOutputHelper _output;
 
     public QuestStudioSyntheticE2ETests(ITestOutputHelper output) => _output = output;
@@ -572,7 +573,8 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitUntilAsync(async () => !await page.Locator("#find-bindings").IsDisabledAsync(), "fresh synthetic world binding control");
             await page.Locator("#find-bindings").ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Binding candidates ready", "bounded candidate scan");
-            Assert.Equal(1, await page.Locator("#binding-candidate option").CountAsync());
+            Assert.Equal(1, await page.Locator("#binding-candidate option:not([value=''])").CountAsync());
+            Assert.Equal("sign", await page.Locator("#binding-candidate option:not([value=''])").GetAttributeAsync("data-target-kind"));
 
             // B is still the selected project. The same control that will later accept it must
             // first expose Runtime's fail-closed prerequisite receipt.
@@ -790,6 +792,9 @@ public sealed class QuestStudioSyntheticE2ETests
 
             await WaitForInstalledWorldAsync(run.RuntimeRoot, expectedMachine, expectedWorld,
                 automatedWorldEntry ? TimeSpan.FromSeconds(30) : TimeSpan.FromMinutes(120));
+            await InvokeCreatorSessionAsync(repoRoot, "Replay", sessionId, run.ValheimRoot,
+                expectedMachine, expectedWorld, run.Root,
+                "-BlueprintName", InstalledBindingFixture, "-RadiusMetres", "12");
             await InvokeCreatorSessionAsync(repoRoot, "Arm", sessionId, run.ValheimRoot, expectedMachine, expectedWorld, run.Root);
             await WaitUntilAsync(() => Task.FromResult(FreshArmed(run.RuntimeRoot, expectedMachine)), "armed installed dev channel", 30_000);
 
@@ -808,8 +813,15 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitUntilAsync(async () => !await page.Locator("#find-bindings").IsDisabledAsync(), "installed binding controls", 30_000);
             await page.Locator("#find-bindings").ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Binding candidates ready", "installed bounded candidate scan", 30_000);
-            Assert.InRange(await page.Locator("#binding-candidate option").CountAsync(), 1, RuntimeBindingCoordinator.MaxCandidates);
-            var bindingZdo = await page.Locator("#binding-candidate").InputValueAsync();
+            var candidates = page.Locator("#binding-candidate option:not([value=''])");
+            Assert.InRange(await candidates.CountAsync(), 1, RuntimeBindingCoordinator.MaxCandidates);
+            var signCandidates = page.Locator("#binding-candidate option[data-target-kind='sign']:not([value=''])");
+            Assert.InRange(await signCandidates.CountAsync(), 1, RuntimeBindingCoordinator.MaxCandidates);
+            var bindingZdo = Assert.IsType<string>(await signCandidates.First.GetAttributeAsync("value"));
+            Assert.False(string.IsNullOrWhiteSpace(bindingZdo));
+            await page.Locator("#binding-candidate").SelectOptionAsync(bindingZdo);
+            await WaitUntilAsync(async () => !await page.Locator("#bind-experience").IsDisabledAsync(),
+                "installed sign binding selection");
 
             await page.Locator("#bind-experience").ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Binding rejected", "installed locked B refusal", 30_000);
@@ -1070,7 +1082,8 @@ public sealed class QuestStudioSyntheticE2ETests
     }
 
     static async Task InvokeCreatorSessionAsync(string repoRoot, string action, string sessionId,
-        string valheimRoot, string expectedMachine, string expectedWorld, string evidenceRoot)
+        string valheimRoot, string expectedMachine, string expectedWorld, string evidenceRoot,
+        params string[] extraArguments)
     {
         var start = new ProcessStartInfo
         {
@@ -1089,7 +1102,8 @@ public sealed class QuestStudioSyntheticE2ETests
             "-ExpectedMachine", expectedMachine, "-WorldUid", expectedWorld,
             "-WaitSeconds", action == "Launch" ? "780" : "60"
         }) start.ArgumentList.Add(value);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start Creator Session arm request.");
+        foreach (var value in extraArguments) start.ArgumentList.Add(value);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start Creator Session {action} request.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();

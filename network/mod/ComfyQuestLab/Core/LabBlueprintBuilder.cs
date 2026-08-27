@@ -224,7 +224,12 @@ public sealed class LabBlueprintBuilder {
         ? artifact.Selection : selectionArg.Trim().ToLowerInvariant();
     if (selection != "mine" && selection != "lab") return "diff selection must be mine or lab.";
     List<LabCapturePiece> actual;
-    if (!TrySelect(player, radius, selection, out actual, out error)) return error;
+    // A named blueprint diff must compare against that blueprint's durable mark, not
+    // every Lab-owned gallery and blueprint piece that happens to share the radius.
+    // Capture's broad "lab" selection remains available for deliberately capturing a
+    // mixed Lab scene; replay proof is scoped by the canonical artifact being proved.
+    string blueprintMark = selection == "lab" ? canonical : null;
+    if (!TrySelect(player, radius, selection, out actual, out error, blueprintMark)) return error;
     LabCaptureDiff diff = LabCaptureContract.Diff(artifact.Pieces, actual);
     var sb = new StringBuilder();
     sb.Append("capture diff ").Append(canonical).Append(": ")
@@ -380,6 +385,14 @@ public sealed class LabBlueprintBuilder {
     // edges, and the answer to that is picking flat ground, not per-piece sampling.
     float ground;
     if (!TryGroundHeight(anchor, out ground)) {
+      ground = anchor.y;
+    }
+    // GetSolidHeight reports the highest solid at this X/Z. Under the raised gallery that
+    // can be a deck tens of metres above the player, which made a nominal ground build
+    // unreachable to every 20 m creator/runtime surface. Ground mode stays at the
+    // operator's elevation when the sample is clearly overhead; sky mode deliberately
+    // retains the highest-solid behavior before adding SkyLift.
+    if (!sky && ground > anchor.y + 1f) {
       ground = anchor.y;
     }
     Vector3 origin = new Vector3(anchor.x, 0f, anchor.z);
@@ -721,7 +734,8 @@ public sealed class LabBlueprintBuilder {
   }
 
   bool TrySelect(Player player, float radius, string selection,
-                 out List<LabCapturePiece> records, out string error) {
+                 out List<LabCapturePiece> records, out string error,
+                 string blueprintMark = null) {
     records = new List<LabCapturePiece>();
     error = null;
     Vector3 center = player.transform.position;
@@ -732,7 +746,10 @@ public sealed class LabBlueprintBuilder {
         Vector3 at = zdo.GetPosition();
         if ((at - center).sqrMagnitude > radiusSquared) continue;
         bool selected = selection == "lab"
-            ? LabMarks.IsLabBuilt(zdo)
+            ? (string.IsNullOrEmpty(blueprintMark)
+                ? LabMarks.IsLabBuilt(zdo)
+                : string.Equals(
+                    LabMarks.BlueprintName(zdo), blueprintMark, StringComparison.Ordinal))
             : zdo.GetLong("creator", 0L) == playerId && !LabMarks.IsLabBuilt(zdo);
         if (!selected) continue;
         GameObject prefab = ZNetScene.instance.GetPrefab(zdo.GetPrefab());

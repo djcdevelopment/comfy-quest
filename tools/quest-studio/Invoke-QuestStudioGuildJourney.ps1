@@ -126,7 +126,7 @@ if ($sessionPrepared) {
     try { Invoke-CreatorAction 'Stop' }
     catch { $cleanupErrors += "Stop: $($_.Exception.Message)" }
     if ($lapComplete -or -not $KeepSessionOnFailure) {
-        try { Invoke-CreatorAction 'Close' -Extra @('-Restore') }
+        try { Invoke-CreatorAction 'Close' -Extra @('-Restore', '-RestoreGameState') }
         catch { $cleanupErrors += "Close/Restore: $($_.Exception.Message)" }
     }
 }
@@ -145,7 +145,7 @@ if ($cleanupErrors.Count -ne 0) {
     session_id = $SessionId
     evidence_root = $EvidenceRoot
     world_entry = if ($HumanWorldEntry) { 'human_boundary' } else { 'machine_owned' }
-    session_state = if ($KeepSessionOnFailure -and -not $lapComplete) { 'active' } else { 'closed_restored' }
+    session_state = if ($KeepSessionOnFailure -and -not $lapComplete) { 'active' } else { 'closed_install_and_game_state_restored' }
     human_contribution = if ($HumanWorldEntry) { 'launch_and_world_entry_only' } else { 'none_technical_lap' }
     seat_gate = 'not_applicable_to_technical_lap'
     next_lane = 'prepared_guild_campaign_with_authorship_and_play_feel_questions'

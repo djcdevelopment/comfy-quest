@@ -125,7 +125,7 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
 ## Proof level
 
 - `Invoke-CreatorSession.ps1` has an executed fixture-mode lifecycle covering Prepare,
-  Status, Close, exact plugin/config restoration, its closed action vocabulary,
+  Status, Close, exact plugin/config/world-pair/character restoration, its closed action vocabulary,
   exclusive lease, install hash pins, backups, and rollback manifest. A forced late Prepare
   failure also proves partial plugin deployment and quarantined one-shot state roll back, and
   `Stop` remains available as a process-recovery fail-safe when an installed hash drifts. A second executable
@@ -136,11 +136,10 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
   cannot carry a console command or synthetic key. The Lab
   sender has a corresponding correlated local round trip and fails on receipt identity
   drift.
-- Bounded `Launch` and `Stop` are implemented and compile against the installed Valheim
-  assemblies. `Launch` pins profile filename, world filename, display name and UID, machine,
-  session, and expiry;
-  `Stop` uses graceful-then-forced process recovery and archives the game logs. The installed
-  4A lap is still required before this paragraph may claim live proof of that new choreography.
+- Bounded `Launch` and `Stop` compile against the installed Valheim assemblies and have live
+  execution proof. `Launch` pins profile filename, world filename, display name and UID, machine,
+  session, and expiry; `Stop` uses graceful-then-forced process recovery and archives the game
+  logs. The complete installed 4A guild journey remains a separate, still-gated claim.
 - Quest Lab capture normalization, projection, check-before-build, durable marking, and
   translation-independent diff are executable-test covered. The Godbuild importer is
   exercised through write, clean `--check`, and deliberate-drift rejection.
@@ -170,8 +169,17 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
   `runtime-build_off-20260824T133209Z-187c0af5` reported
   `creator_build_enabled: false`. The closed session manifest records the exact prior
   plugin/config restoration and a released session; the authored world was deliberately
-  retained. Its pre-session `.db`/`.fwl` pair remains in the session backup, but Creator
-  Session does not claim that `Close -Restore` restores world state.
+  retained. Its pre-session `.db`/`.fwl` pair remains in the session backup. Ordinary
+  `Close -Restore` still retains authored world state; a technical lap may explicitly use
+  `Close -Restore -RestoreGameState` after `Stop` to restore the exact pinned world pair and
+  character profile.
+- Creator Session `binding-fixture-smoke-20260827-r5` executed the autonomous installed-game
+  preflight without a human relay. Steam entered `questyfour` / `ComfyQuestDemo` with the exact
+  UID; reviewed replay produced `MATCH` for 12/12 pieces; Runtime returned 32 bounded binding
+  candidates including the fixture sign at 5.6 metres; `Stop` closed gracefully; and `Close
+  -Restore -RestoreGameState` restored the `.db`, `.fwl`, and `.fch` files to their pre-lap
+  SHA256 values while leaving zero plugin files. This proves the launch, deterministic binding
+  fixture, and recovery choreography, not the still-pending full A -> B -> A guild journey.
 
 An earlier live launch exposed a success-sentinel defect before Arm dispatch. The
 validator now returns null on success, and both the executable controller round trip and
@@ -184,7 +192,7 @@ the corrected live Arm/Disarm receipts cover that exact branch.
 3. Run `tools\creator-session\Invoke-CreatorSession.ps1 Status -SessionId <id>`. Continue only while the session is active, the machine and world pins agree, and every installed plugin hash still matches Prepare.
 4. For a Godbuild lap, run the bounded `BuildOn` operation and require its correlated receipt before the creator begins spatial work. While it is active, the creator uses ordinary hammer/build controls; run one bounded operation from `GalleryRebuild`, `Capture -BlueprintName <name>`, or `Arm` only when the lap calls for it. Every request expires, carries the same three identity pins, is consumed once in game, and has no console-command or synthetic-key field.
 5. Capture automatically imports the fixed receipt artifact and runs the generator-drift check. Review `examples/worldbuild/<name>/preview.svg`, `plan.json`, and `manifest.json`; the manifest names upstream exclusions and the capture/blueprint pair remains replay authority.
-6. Run `Replay -BlueprintName <name>` only after review. Replay hash-verifies and stages that exact reviewed pair, then performs check, build, and translation-independent diff and fails unless the receipt says `MATCH`. Run `BuildOff` and require its receipt before leaving the loaded world; then use `Stop` to close the game and archive logs, followed by `Close -Restore` for the exact prior install bytes.
+6. Run `Replay -BlueprintName <name>` only after review. Replay hash-verifies and stages that exact reviewed pair, then performs check, build, and a mark-scoped translation-independent diff and fails unless the receipt says `MATCH`. Run `BuildOff` and require its receipt before leaving the loaded world; then use `Stop` to close the game and archive logs. Finish with `Close -Restore` to restore prior install bytes. A disposable technical lap adds `-RestoreGameState` to restore the exact pinned world pair and character profile; an authoring lap omits it and retains the authored world.
 
 ## Studio creator loop
 

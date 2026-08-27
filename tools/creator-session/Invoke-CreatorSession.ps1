@@ -63,6 +63,7 @@ param(
 
     [switch]$Replace,
     [switch]$Restore,
+    [switch]$RestoreGameState,
     [switch]$NoBuild,
     [switch]$DryRun,
     [switch]$FixtureMode
@@ -111,6 +112,64 @@ function Get-Sha256([string]$Path) {
             return [System.BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
         } finally { $stream.Dispose() }
     } finally { $sha.Dispose() }
+}
+
+function Assert-SnapshotFile(
+    $Record,
+    [string]$ExpectedSource,
+    [string]$SnapshotRoot,
+    [string]$Label) {
+    if ($null -eq $Record) { throw "$Label snapshot is missing." }
+    $source = [IO.Path]::GetFullPath([string]$Record.source)
+    $backup = [IO.Path]::GetFullPath([string]$Record.backup)
+    $expected = [IO.Path]::GetFullPath($ExpectedSource)
+    if ($source -ne $expected) { throw "$Label restore target differs from the pinned snapshot." }
+    if (-not (Test-ChildPath $SnapshotRoot $backup)) {
+        throw "$Label snapshot escaped the Creator Session evidence root."
+    }
+    if (-not (Test-Path -LiteralPath $backup -PathType Leaf) -or
+        (Get-Sha256 $backup) -ne [string]$Record.sha256) {
+        throw "$Label snapshot hash mismatch."
+    }
+}
+
+function Restore-SnapshotFile(
+    $Record,
+    [string]$ExpectedSource,
+    [string]$SnapshotRoot,
+    [string]$Label) {
+    Assert-SnapshotFile $Record $ExpectedSource $SnapshotRoot $Label
+    $source = [IO.Path]::GetFullPath([string]$Record.source)
+    $backup = [IO.Path]::GetFullPath([string]$Record.backup)
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $source) | Out-Null
+    $temporary = $source + '.creator-restore'
+    $previous = $source + '.creator-prior'
+    $replaced = $false
+    try {
+        Copy-Item -LiteralPath $backup -Destination $temporary -Force
+        if ((Get-Sha256 $temporary) -ne [string]$Record.sha256) {
+            throw "$Label staged restore hash mismatch."
+        }
+        if (Test-Path -LiteralPath $source -PathType Leaf) {
+            if (Test-Path -LiteralPath $previous -PathType Leaf) {
+                throw "$Label prior-byte recovery file already exists."
+            }
+            [IO.File]::Replace($temporary, $source, $previous)
+            $replaced = $true
+        } else {
+            [IO.File]::Move($temporary, $source)
+        }
+        if ((Get-Sha256 $source) -ne [string]$Record.sha256) {
+            throw "$Label restored bytes do not match the pinned snapshot."
+        }
+        if ($replaced -and (Test-Path -LiteralPath $previous -PathType Leaf)) {
+            Remove-Item -LiteralPath $previous -Force
+        }
+    } finally {
+        if (Test-Path -LiteralPath $temporary -PathType Leaf) {
+            Remove-Item -LiteralPath $temporary -Force
+        }
+    }
 }
 
 function Get-InboxPins([string]$Root) {
@@ -333,7 +392,7 @@ function Stop-ValheimProcess {
     return [ordered]@{
         state = if ($forced.Count -eq 0) { 'stopped_gracefully' } else { 'stopped_forcibly' }
         graceful = $forced.Count -eq 0
-        forced_process_ids = @($forced.Id)
+        forced_process_ids = @($forced | ForEach-Object { $_.Id })
     }
 }
 
@@ -409,20 +468,32 @@ function Stage-ReviewedGodbuild([string]$Name, [string]$Root) {
             $leaf = Split-Path $source -Leaf
             $target = Join-Path $targetRoot $leaf
             $temporary = $target + '.creator-staging'
+            $previous = $target + '.creator-prior'
+            if (Test-Path -LiteralPath $previous -PathType Leaf) {
+                throw "Godbuild recovery file already exists: $previous"
+            }
             Copy-Item -LiteralPath $source -Destination $temporary -Force
             if ((Get-Sha256 $source) -ne (Get-Sha256 $temporary)) {
                 throw "Godbuild staging hash mismatch: $leaf"
             }
-            $staged += [pscustomobject]@{ Source = $source; Target = $target; Temporary = $temporary }
+            $staged += [pscustomobject]@{
+                Source = $source
+                Target = $target
+                Temporary = $temporary
+                Previous = $previous
+            }
         }
         foreach ($item in $staged) {
             if (Test-Path -LiteralPath $item.Target -PathType Leaf) {
-                [IO.File]::Replace($item.Temporary, $item.Target, $null)
+                [IO.File]::Replace($item.Temporary, $item.Target, $item.Previous)
             } else {
                 [IO.File]::Move($item.Temporary, $item.Target)
             }
             if ((Get-Sha256 $item.Source) -ne (Get-Sha256 $item.Target)) {
                 throw "Godbuild deployment hash mismatch: $(Split-Path $item.Target -Leaf)"
+            }
+            if (Test-Path -LiteralPath $item.Previous -PathType Leaf) {
+                Remove-Item -LiteralPath $item.Previous -Force
             }
         }
     } finally {
@@ -471,6 +542,7 @@ try {
             radius_metres = $RadiusMetres
             selection = $Selection
             build_mode = $BuildMode
+            restore_game_state = [bool]$RestoreGameState
         } | ConvertTo-Json -Depth 5
         exit 0
     }
@@ -517,6 +589,7 @@ try {
         $runtimeConfig = $null
         $configBackup = $null
         $configExisted = $false
+        $characterBackup = $null
         try {
 
         if (-not $FixtureMode) {
@@ -650,6 +723,16 @@ try {
             if ($worldFiles.Count -ne 2) {
                 throw "Canonical world pair was not found for $WorldName."
             }
+
+            $sourceCharacter = [IO.Path]::GetFullPath($characterFiles[0].FullName)
+            $backupCharacter = Join-Path $backupRoot ('character\' + $characterFiles[0].Name)
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backupCharacter) | Out-Null
+            Copy-Item -LiteralPath $sourceCharacter -Destination $backupCharacter -Force
+            $characterBackup = [ordered]@{
+                source = $sourceCharacter
+                backup = $backupCharacter
+                sha256 = Get-Sha256 $backupCharacter
+            }
         }
 
         $context = [ordered]@{
@@ -678,6 +761,7 @@ try {
                 armed_sha256 = Get-Sha256 $runtimeConfig
             }
             world_backup = $worldFiles
+            character_backup = $characterBackup
             world_entry_quarantine = $worldEntryQuarantine
             inbox_pins = Get-InboxPins $ValheimRoot
             rollback = "tools\creator-session\Invoke-CreatorSession.ps1 Close -SessionId $SessionId -Restore"
@@ -757,7 +841,13 @@ try {
     if ($pluginHashMismatches.Count -ne 0 -and $Action -ne 'Stop') {
         throw "Installed bytes changed during Creator Session: $($pluginHashMismatches -join ', ')"
     }
-    if ($Action -eq 'Close' -and $Restore -and (Test-ValheimRunning)) {
+    if ($RestoreGameState -and $Action -ne 'Close') {
+        throw 'RestoreGameState is available only with Close.'
+    }
+    if ($RestoreGameState -and -not $Restore) {
+        throw 'RestoreGameState requires Close -Restore so game and install bytes roll back together.'
+    }
+    if ($Action -eq 'Close' -and ($Restore -or $RestoreGameState) -and (Test-ValheimRunning)) {
         throw 'Restore requires Valheim to be closed.'
     }
     $EvidenceRoot = [string]$context.evidence_root
@@ -796,7 +886,7 @@ try {
         '-ExpectedWorldUid', [string]$context.world_uid,
         '-CreatorSessionId', $SessionId,
         '-OmenValheimRoot', [string]$context.valheim_root,
-        '-WaitSeconds', [string]$WaitSeconds,
+        '-WaitSeconds', [string][Math]::Min($WaitSeconds, 60),
         '-OutputDirectory', $operationRoot)
     $godbuildDirectory = $null
     $worldEntryReceipt = $null
@@ -964,6 +1054,74 @@ try {
         }
         Invoke-ChildScript $runtimeScript (@($runtimeOperation) + $identityArgs)
     } elseif ($Action -eq 'Close') {
+        $gameStateRestorePlan = @()
+        if ($RestoreGameState) {
+            $snapshotRoot = Join-Path $EvidenceRoot 'backup'
+            $worldRecords = @($context.world_backup)
+            if ($worldRecords.Count -ne 2) {
+                throw 'RestoreGameState requires the exact pinned world pair.'
+            }
+            if ($FixtureMode) {
+                foreach ($extension in @('.db', '.fwl')) {
+                    $record = @($worldRecords | Where-Object {
+                            [IO.Path]::GetExtension([string]$_.source) -eq $extension
+                        })
+                    if ($record.Count -ne 1 -or
+                        -not (Test-ChildPath $ValheimRoot ([string]$record[0].source))) {
+                        throw "Fixture $extension world restore target is not uniquely bounded."
+                    }
+                    $gameStateRestorePlan += [pscustomobject]@{
+                        Record = $record[0]
+                        ExpectedSource = [string]$record[0].source
+                        Label = "world $extension"
+                    }
+                }
+            } else {
+                $worldRoot = Join-Path $env:USERPROFILE 'AppData\LocalLow\IronGate\Valheim\worlds_local'
+                foreach ($extension in @('.db', '.fwl')) {
+                    $expectedWorld = Join-Path $worldRoot ([string]$context.world_name + $extension)
+                    $record = @($worldRecords | Where-Object {
+                            [IO.Path]::GetFullPath([string]$_.source) -eq [IO.Path]::GetFullPath($expectedWorld)
+                        })
+                    if ($record.Count -ne 1) {
+                        throw "Pinned world $extension snapshot is missing or ambiguous."
+                    }
+                    $gameStateRestorePlan += [pscustomobject]@{
+                        Record = $record[0]
+                        ExpectedSource = $expectedWorld
+                        Label = "world $extension"
+                    }
+                }
+            }
+
+            $characterRecord = $context.character_backup
+            if ($null -eq $characterRecord) { throw 'RestoreGameState requires the pinned character snapshot.' }
+            $characterSource = [IO.Path]::GetFullPath([string]$characterRecord.source)
+            if ($FixtureMode) {
+                if (-not (Test-ChildPath $ValheimRoot $characterSource)) {
+                    throw 'Fixture character restore target escaped ValheimRoot.'
+                }
+            } else {
+                $profileLeaf = [regex]::Escape([string]$context.character_profile)
+                $localCharacters = Join-Path $env:USERPROFILE 'AppData\LocalLow\IronGate\Valheim\characters'
+                $steamUserdata = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath([string]$context.steam_exe))) 'userdata'
+                $validLeaf = (Split-Path $characterSource -Leaf) -match "(?i)^$profileLeaf\.fch(?:\.new)?$"
+                $validLocal = Test-ChildPath $localCharacters $characterSource
+                $validSteam = (Test-ChildPath $steamUserdata $characterSource) -and
+                    $characterSource -match '(?i)\\892970\\remote\\characters\\'
+                if (-not $validLeaf -or (-not $validLocal -and -not $validSteam)) {
+                    throw 'Pinned character restore target is outside the supported Valheim save roots.'
+                }
+            }
+            $gameStateRestorePlan += [pscustomobject]@{
+                Record = $characterRecord
+                ExpectedSource = $characterSource
+                Label = 'character profile'
+            }
+            foreach ($item in $gameStateRestorePlan) {
+                Assert-SnapshotFile $item.Record $item.ExpectedSource $snapshotRoot $item.Label
+            }
+        }
         if (Test-ValheimRunning) {
             Invoke-ChildScript $runtimeScript (@('build_off') + $identityArgs)
             Invoke-ChildScript $runtimeScript (@('disarm') + $identityArgs)
@@ -989,6 +1147,12 @@ try {
             }
             $context | Add-Member -NotePropertyName restored -NotePropertyValue $true -Force
         }
+        if ($RestoreGameState) {
+            foreach ($item in $gameStateRestorePlan) {
+                Restore-SnapshotFile $item.Record $item.ExpectedSource $snapshotRoot $item.Label
+            }
+            $context | Add-Member -NotePropertyName restored_game_state -NotePropertyValue $true -Force
+        }
         Write-JsonAtomic $contextPath $context
         Write-JsonAtomic (Join-Path $EvidenceRoot 'session.closed.json') $context
     }
@@ -1008,6 +1172,7 @@ try {
         evidence_directory = $operationRoot
         world_entry_receipt = $worldEntryReceipt
         process_lifecycle = $processLifecycle
+        restored_game_state = [bool]$context.restored_game_state
         plugin_hash_mismatches = $pluginHashMismatches
     }
     Write-JsonAtomic (Join-Path $operationRoot 'operation.json') $operation

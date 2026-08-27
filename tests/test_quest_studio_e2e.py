@@ -150,7 +150,7 @@ class QuestStudioE2ETests(unittest.TestCase):
         for expected in (
             "COMFY_QUEST_E2E_AUTOMATE_WORLD_ENTRY",
             "Invoke-CreatorAction 'Stop'",
-            "Invoke-CreatorAction 'Close' -Extra @('-Restore')",
+            "Invoke-CreatorAction 'Close' -Extra @('-Restore', '-RestoreGameState')",
             "@('BuildOff', 'Disarm')",
             "none_technical_lap",
             "not_applicable_to_technical_lap",
@@ -159,6 +159,9 @@ class QuestStudioE2ETests(unittest.TestCase):
             self.assertIn(expected, driver)
         self.assertIn("if ($HumanWorldEntry) { '0' } else { '1' }", driver)
         self.assertIn('InvokeCreatorSessionAsync(repoRoot, "Launch"', journey)
+        self.assertIn('InvokeCreatorSessionAsync(repoRoot, "Replay"', journey)
+        self.assertIn('InstalledBindingFixture = "first-portal-progression-shelter"', journey)
+        self.assertIn("option[data-target-kind='sign']:not([value=''])", journey)
         self.assertIn('world_entry = automatedWorldEntry ? "machine_owned"', journey)
         self.assertIn("stderrText.Trim()", journey)
 

@@ -1,6 +1,6 @@
 # The plan
 
-Quest Creator OS. Updated 2026-08-25.
+Quest Creator OS. Updated 2026-08-27.
 
 **This is the plan of record.** Read it alone and you know the goal, where we are, and what
 happens next. Everything else in `docs/` is detail this document points at; if this document and
@@ -103,7 +103,9 @@ and reporting it as done is the specific failure this program has already paid f
 
 Lanes of the repair program: **0 closed** (the roadmap tells the truth and is machine-checked),
 **1 implemented** (multi-experience selector), **2 implemented** (evidence retention), **3 ruled
-and recorded** (ADR 0012, 0014). **Lane 4 is next and needs the installed game.**
+and recorded** (ADR 0012, 0014). **Lane 4 is active on the installed game.** Its autonomous
+launch, exact world entry, nearby reviewed binding fixture, and byte-exact cleanup preflight are
+live-proven; the full guild journey remains the gate.
 
 Nothing is in flight anywhere else: no open PRs, one branch on the remote, and the other agent's
 worktree (`scanner-slice1`) is fully merged and idle since 2026-08-20.
@@ -138,7 +140,12 @@ defined under 4A in `creator-os-phases.json` and projected here:
 
 - **Claims:** `FR-LOOP-001`, `NFR-SEAT-001`, `NFR-SEAT-003`, `NFR-TEST-001`
 - **Human cost:** zero by default. `-HumanWorldEntry` retains the one-action ADR fallback while
-  autonomous entry is being proven.
+  the default autonomous path is available.
+- **Current live evidence:** `binding-fixture-smoke-20260827-r5` entered the exact pinned local
+  world, replayed the reviewed 12-piece fixture to a 12/12 `MATCH`, exposed its sign 5.6 metres
+  away through Runtime's bounded candidates, stopped gracefully, and restored the exact world
+  pair, character profile, and empty prior plugin install. The complete browser-to-A -> B -> A
+  journey is still pending and no seat is requested before it passes.
 - **Before it starts:** agree who owns `<Valheim>/BepInEx/` for the lap's duration. A worktree
   isolates the repository, not the game install; another agent has clobbered a live inbox and
   deployed plugin DLLs mid-lap, twice.

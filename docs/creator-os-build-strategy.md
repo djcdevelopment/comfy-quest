@@ -339,9 +339,11 @@ only if a second consumer needs the server-join harness.
 
 ## Lane 4 — Drive the real `4A / guild-scale-runtime` exit and call the seat
 
-**Status: unblocked 2026-08-25.** Lanes 0-3 are done — 1 and 2 implemented, 3 ruled and recorded —
-so this is the next lane, and the first that cannot proceed without the installed game.
-`queue.full-width-journey` is the work item.
+**Status: active 2026-08-27.** Lanes 0-3 are done — 1 and 2 implemented, 3 ruled and recorded —
+and `queue.full-width-journey` is running against the installed game. The zero-human launch,
+exact-world entry, reviewed nearby binding fixture, and byte-exact install/world/profile cleanup
+preflight have live proof. The full guild journey is still gated until its A -> B -> A, reset,
+retention, browser, and recovery evidence completes.
 
 Only after Lanes 1-3, and only with the evidence the readiness gate names. Four work items are
 `implemented` and unproven going in — portfolio, reset, guild runtime, receipt retention — and

@@ -88,6 +88,9 @@ class QuestStudioVNextTests(unittest.TestCase):
         self.assertIn("spawn_not_locally_owned", runtime_controller)
         self.assertIn("private_world_confirmation_required", runtime_controller)
         self.assertIn("runtime_world_mismatch", runtime_controller)
+        self.assertIn('data-target-kind="${esc(x.target_kind)}"', script)
+        self.assertIn("No binding targets nearby", script)
+        self.assertIn("Approach an eligible sign, item stand, or player-built piece", script)
 
     def test_page_guides_creators_through_four_soft_stages(self) -> None:
         html = raw_constant("Html")

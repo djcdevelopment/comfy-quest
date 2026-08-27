@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import subprocess
 import tempfile
@@ -57,6 +58,9 @@ class CreatorSessionTests(unittest.TestCase):
         self.assertIn("Installed bytes changed during Creator Session", self.session)
         self.assertIn("Get-InboxPins", self.session)
         self.assertIn("world_backup", self.session)
+        self.assertIn("character_backup", self.session)
+        self.assertIn("RestoreGameState requires the exact pinned world pair", self.session)
+        self.assertIn("restored_game_state", self.session)
         self.assertIn("character_profile", self.session)
         self.assertIn("world_entry_quarantine", self.session)
         self.assertIn("runtime_config", self.session)
@@ -89,6 +93,8 @@ class CreatorSessionTests(unittest.TestCase):
         self.assertLess(stage, check)
         self.assertIn("Reviewed Godbuild hash mismatch", self.session)
         self.assertIn("[IO.File]::Replace", self.session)
+        self.assertIn("Godbuild recovery file already exists", self.session)
+        self.assertIn("$item.Previous", self.session)
 
     def test_runtime_request_is_closed_to_session_and_private_build_control(self) -> None:
         match = re.search(
@@ -138,6 +144,7 @@ class CreatorSessionTests(unittest.TestCase):
             "Stop-ValheimProcess",
             "CloseMainWindow",
             "stopped_forcibly",
+            "forced_process_ids = @($forced | ForEach-Object { $_.Id })",
         ):
             self.assertIn(expected, self.session)
         for expected in (
@@ -301,6 +308,34 @@ class CreatorSessionTests(unittest.TestCase):
                 self.assertEqual(payload, (plugins / name).read_bytes())
             self.assertIn(b"PrivateWorldConfirmed = true", config.read_bytes())
 
+            game_state = root / "fixture-game-state"
+            game_state.mkdir()
+            world_db = game_state / "ComfyQuestDemo.db"
+            world_fwl = game_state / "ComfyQuestDemo.fwl"
+            character = game_state / "questyfour.fch"
+            original_state = {
+                world_db: b"original-world-db\n",
+                world_fwl: b"original-world-fwl\n",
+                character: b"original-character\n",
+            }
+            snapshot_root = evidence / "backup"
+            snapshot_records = {}
+            for source_path, payload in original_state.items():
+                source_path.write_bytes(payload)
+                kind = "character" if source_path == character else "world"
+                backup_path = snapshot_root / kind / source_path.name
+                backup_path.parent.mkdir(parents=True, exist_ok=True)
+                backup_path.write_bytes(payload)
+                snapshot_records[source_path] = {
+                    "source": str(source_path),
+                    "backup": str(backup_path),
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                }
+            manifest["world_backup"] = [snapshot_records[world_db], snapshot_records[world_fwl]]
+            manifest["character_backup"] = snapshot_records[character]
+            context_path = root / "BepInEx" / "config" / "comfy-quest-creator" / "session.json"
+            context_path.write_text(json.dumps(manifest), encoding="utf-8")
+
             status = invoke("Status")
             self.assertEqual(0, status.returncode, status.stdout + status.stderr)
             status_receipt = json.loads(status.stdout[status.stdout.index("{") :])
@@ -316,16 +351,36 @@ class CreatorSessionTests(unittest.TestCase):
             self.assertEqual(["ComfyQuestRuntime.dll"], stopped_receipt["plugin_hash_mismatches"])
             (plugins / "ComfyQuestRuntime.dll").write_bytes(payloads["ComfyQuestRuntime.dll"])
 
-            closed = invoke("Close", "-Restore")
+            for source_path in original_state:
+                source_path.write_bytes(b"mutated-by-technical-lap\n")
+
+            # All three snapshots are validated before Close mutates either install or game
+            # state, so a corrupt late snapshot cannot leave a half-restored world pair.
+            world_fwl_backup = Path(snapshot_records[world_fwl]["backup"])
+            world_fwl_backup.write_bytes(b"corrupt-snapshot\n")
+            refused_close = invoke("Close", "-Restore", "-RestoreGameState")
+            self.assertNotEqual(0, refused_close.returncode)
+            self.assertIn("world .fwl snapshot hash mismatch", refused_close.stderr)
+            for source_path in original_state:
+                self.assertEqual(b"mutated-by-technical-lap\n", source_path.read_bytes())
+            for name, payload in payloads.items():
+                self.assertEqual(payload, (plugins / name).read_bytes())
+            self.assertIn(b"PrivateWorldConfirmed = true", config.read_bytes())
+            world_fwl_backup.write_bytes(original_state[world_fwl])
+
+            closed = invoke("Close", "-Restore", "-RestoreGameState")
             self.assertEqual(0, closed.returncode, closed.stdout + closed.stderr)
             self.assertEqual(prior_lab, (plugins / "ComfyQuestLab.dll").read_bytes())
             for name in payloads:
                 if name != "ComfyQuestLab.dll":
                     self.assertFalse((plugins / name).exists())
             self.assertEqual(prior_config, config.read_bytes())
+            for source_path, payload in original_state.items():
+                self.assertEqual(payload, source_path.read_bytes())
             closed_manifest = json.loads((evidence / "session.closed.json").read_text())
             self.assertEqual("closed", closed_manifest["state"])
             self.assertTrue(closed_manifest["restored"])
+            self.assertTrue(closed_manifest["restored_game_state"])
 
     def test_powershell_parsers_accept_both_entrypoints(self) -> None:
         for script in (SESSION, RUNTIME):

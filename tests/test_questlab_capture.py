@@ -39,6 +39,9 @@ class QuestLabCaptureBoundaryTests(unittest.TestCase):
         self.assertIn("view.GetZDO().Set(LabMarks.BlueprintMark, mark);", self.builder)
         self.assertIn("LabCaptureContract.BlueprintMatches", self.builder)
         self.assertIn("refusing to build capture pair", self.builder)
+        self.assertIn('string blueprintMark = selection == "lab" ? canonical : null;', self.builder)
+        self.assertIn("LabMarks.BlueprintName(zdo), blueprintMark", self.builder)
+        self.assertIn("!sky && ground > anchor.y + 1f", self.builder)
 
     def test_command_surface_is_fixed_not_remote_console(self) -> None:
         for verb in ("capture", "inspect", "diff", "check", "build", "count", "clear"):
