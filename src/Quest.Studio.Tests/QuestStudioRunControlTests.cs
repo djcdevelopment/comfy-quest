@@ -26,6 +26,95 @@ public sealed class QuestStudioRunControlTests : IDisposable
     }
 
     [Fact]
+    public void StatusReadRetriesAnAtomicReplacementWindowThenReturnsTheExactSnapshot()
+    {
+        const string expected = "{\"schema\":\"comfy-quest-runtime-run-status/v1\"}";
+        var attempts = 0;
+
+        var read = QuestStudioRunControl.ReadStatusJsonWithRetry(() =>
+        {
+            attempts++;
+            return attempts < 5
+                ? (null, "runtime_run_status_unreadable", true)
+                : (expected, null, false);
+        }, retryDelayMilliseconds: 0);
+
+        Assert.Equal(5, attempts);
+        Assert.Equal(expected, read.Json);
+        Assert.Null(read.Error);
+    }
+
+    [Fact]
+    public void StatusReadFailsClosedAfterTheBoundedRetryBudget()
+    {
+        var attempts = 0;
+
+        var read = QuestStudioRunControl.ReadStatusJsonWithRetry(() =>
+        {
+            attempts++;
+            return (null, "runtime_run_status_unreadable", true);
+        }, retryDelayMilliseconds: 0);
+
+        Assert.Equal(5, attempts);
+        Assert.Null(read.Json);
+        Assert.Equal("runtime_run_status_unreadable", read.Error);
+    }
+
+    [Fact]
+    public async Task StatusReadRecoversAfterABoundedWindowsReplacementWindow()
+    {
+        var (service, runtimeRoot, project) = CreateService();
+        WriteStatus(runtimeRoot, project.ExperienceId);
+        var path = Path.Combine(runtimeRoot, "status", "runs.json");
+        using var replacementWindow = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reading = Task.Run(() =>
+        {
+            started.SetResult(true);
+            return service.RunStatus(project.ProjectId);
+        });
+
+        await started.Task;
+        await Task.Delay(15);
+        replacementWindow.Dispose();
+        var status = await reading;
+
+        Assert.True(status.Connected, status.Error);
+        Assert.Equal("run-exact", Assert.Single(status.Runs).RunId);
+    }
+
+    [Fact]
+    public async Task ExhaustedWindowsReplacementWindowFailsClosedWithoutAMailboxWrite()
+    {
+        var (service, runtimeRoot, project) = CreateService();
+        WriteStatus(runtimeRoot, project.ExperienceId);
+        var path = Path.Combine(runtimeRoot, "status", "runs.json");
+        using var replacementWindow = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        var result = await service.PreviewResetAsync(project.ProjectId,
+            new StudioRunResetRequest("run-exact"), CancellationToken.None);
+
+        Assert.False(result.Ok);
+        Assert.False(result.Queued);
+        Assert.Equal("runtime_run_status_unreadable", result.Error);
+        Assert.False(File.Exists(Path.Combine(runtimeRoot, "requests", "run-control.json")));
+    }
+
+    [Fact]
+    public async Task MissingStatusExhaustsTheBoundedReadAndCannotReachTheMailbox()
+    {
+        var (service, runtimeRoot, project) = CreateService();
+
+        var result = await service.PreviewResetAsync(project.ProjectId,
+            new StudioRunResetRequest("run-exact"), CancellationToken.None);
+
+        Assert.False(result.Ok);
+        Assert.False(result.Queued);
+        Assert.Equal("runtime_run_status_missing", result.Error);
+        Assert.False(File.Exists(Path.Combine(runtimeRoot, "requests", "run-control.json")));
+    }
+
+    [Fact]
     public async Task StaleStatusCannotQueueAStateChangingRequest()
     {
         var (service, runtimeRoot, project) = CreateService();

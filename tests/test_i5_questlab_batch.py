@@ -14,6 +14,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "tools" / "questlab-batch" / "Invoke-I5QuestLabBatch.ps1"
+CONTROLLER = REPO / "network" / "mod" / "ComfyQuestLab" / "Core" / "LabBatchController.cs"
 CAPABILITIES = (
     REPO / "tools" / "component-packets" / "samples" / "quest-capability-manifest.json"
 )
@@ -43,6 +44,7 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.source = SCRIPT.read_text(encoding="utf-8")
+        cls.controller = CONTROLLER.read_text(encoding="utf-8")
 
     def test_operation_surface_is_exactly_allowlisted(self) -> None:
         match = re.search(
@@ -53,6 +55,18 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
         self.assertIsNotNone(match)
         values = set(re.findall(r"'([a-z_]+)'", match.group(1)))
         self.assertEqual(values, EXPECTED_OPERATIONS)
+
+    def test_blueprint_clear_waits_for_valheim_to_retire_destroyed_zdos(self) -> None:
+        dispatch = self.controller[
+            self.controller.index('if (operation == "blueprint_clear")') :
+            self.controller.index('if (operation == "blueprint_build")')
+        ]
+        self.assertIn("host.StartCoroutine(RequestRoutine(", dispatch)
+        self.assertIn("ClearBlueprintAndAwaitRemoval", dispatch)
+        self.assertNotIn("WriteRequestReceipt(request", dispatch)
+        self.assertIn("const int maxRetirementFrames = 120", self.controller)
+        self.assertIn("StandingPieceCount(blueprintName) > 0", self.controller)
+        self.assertIn("BlueprintClearAccepted(detail)", dispatch)
 
     def test_uses_verified_config_lane_and_batchmode_reads(self) -> None:
         self.assertIn("Deploy-ToI5.ps1", self.source)

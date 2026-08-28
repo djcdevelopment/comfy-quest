@@ -350,16 +350,9 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForTextAsync(page.Locator("#rehearsal-result"), "1/2", "Woodbound partial offering");
             await ShotAsync(page, "05-rehearse-the-rite");
 
-            var devChannel = new RuntimeDevChannelCoordinator(run.RuntimeRoot, (active, correlation) => new[]
-            {
-                new RuntimeReceipt
-                {
-                    Operation = "dev_rebind", Status = "rebound", PackId = active.PackId,
-                    Version = active.Version, ContentHash = active.ContentHash, ActivationId = active.ActivationId,
-                    CorrelationId = correlation, BindingZdo = "synthetic:dev:1",
-                    Diagnostics = Array.Empty<ContractDiagnostic>()
-                }
-            });
+            var woodboundExperienceId = await page.EvaluateAsync<string>("() => project.experience_id");
+            var devRuntime = new SyntheticDevRuntimeFixture(run, woodboundExperienceId);
+            var devChannel = new RuntimeDevChannelCoordinator(run.RuntimeRoot, devRuntime.Rebind);
             devChannel.Arm(DateTimeOffset.UtcNow);
             await page.Locator("[data-stage='play']").ClickAsync();
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Play this revision", Exact = true }).ClickAsync();
@@ -367,13 +360,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await WaitForFileCountAsync(Path.Combine(run.RuntimeRoot, "inbox-dev"), "*.questpack", 1, "Woodbound r1 dev questpack");
             var r1 = devChannel.Poll(DateTimeOffset.UtcNow, "start");
             Assert.True(r1.Activated, r1.Message);
-            new RuntimeReceiptStore(run.RuntimeRoot).Write(new RuntimeReceipt
-            {
-                Operation = "event", Status = "matched", PackId = r1.ActiveSet.PackId,
-                Version = r1.ActiveSet.Version, ContentHash = r1.ActiveSet.ContentHash,
-                ActivationId = r1.ActiveSet.ActivationId, CorrelationId = "evt-woodbound-r1",
-                CurrentStageId = "start", EventName = "chat_sent", Diagnostics = Array.Empty<ContractDiagnostic>()
-            });
+            devRuntime.WriteEvent(r1.ActiveSet, "evt-woodbound-r1", "start", "chat_sent");
             await RefreshRuntimeAsync(page);
             await WaitForExactTextAsync(page.Locator("#runtime-phase"), "bound", "Woodbound r1 bound through dev channel");
             foreach (var proof in new[] { "Validation", "Transfer", "Activation", "Rebind", "Runtime observed" })
@@ -622,6 +609,14 @@ public sealed class QuestStudioSyntheticE2ETests
             var successorA = Assert.Single(aRuns, value => value.Status == "active");
             Assert.Equal(firstA.RunId, successorA.PredecessorRunId);
             Assert.NotEqual(firstA.RunId, successorA.RunId);
+            Assert.Equal("complete", successorA.Outcome);
+            var successorStarted = await WaitForRuntimeReceiptAsync(run.RuntimeRoot,
+                value => value.Operation == "transition" && value.Status == "complete"
+                    && value.RunId == successorA.RunId && value.ExperienceId == a.ExperienceId
+                    && value.EventName == ExperienceSchema.ExperienceStartedEvent,
+                "successor A experience_started evidence");
+            Assert.Equal(successorA.Scope.WorldId, successorStarted.Receipt.WorldId);
+            Assert.Equal(successorA.Scope.BindingZdo, successorStarted.Receipt.BindingZdo);
 
             await OpenProjectAsync(page, b.ProjectId);
             Assert.Equal(firstB.RunId, Assert.Single(runtime.RunsFor(b.ExperienceId)).RunId);
@@ -631,8 +626,6 @@ public sealed class QuestStudioSyntheticE2ETests
             Assert.False(string.IsNullOrWhiteSpace(bPreviewRequest));
 
             await OpenProjectAsync(page, a.ProjectId);
-            await page.Locator("#bind-experience").ClickAsync();
-            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "successor A rerun");
             successorA = Assert.Single(runtime.RunsFor(a.ExperienceId), value => value.Status == "active");
             Assert.Equal("complete", successorA.Outcome);
 
@@ -876,16 +869,21 @@ public sealed class QuestStudioSyntheticE2ETests
             await page.Locator("#confirm-reset").ClickAsync();
             await WaitForExactTextAsync(page.Locator("#status-title"), "Clean rerun ready", "installed A reset successor", 30_000);
             var successorA = await WaitForRunAsync(run.RuntimeRoot, a.ExperienceId,
-                value => value.Status == "active" && value.PredecessorRunId == firstA.RunId, "installed A successor identity");
+                value => value.Status == "active" && value.PredecessorRunId == firstA.RunId
+                    && value.Outcome == "complete", "installed A started successor identity");
             Assert.NotEqual(firstA.RunId, successorA.RunId);
             Assert.Equal(firstB.RunId, Assert.Single(RunsFor(run.RuntimeRoot, b.ExperienceId)).RunId);
+            var successorStarted = await WaitForRuntimeReceiptAsync(run.RuntimeRoot,
+                value => value.Operation == "transition" && value.Status == "complete"
+                    && value.RunId == successorA.RunId && value.ExperienceId == a.ExperienceId
+                    && value.EventName == ExperienceSchema.ExperienceStartedEvent,
+                "installed successor A experience_started evidence");
+            Assert.Equal(active.ActivationId, successorStarted.Receipt.ActivationId);
+            Assert.Equal(active.ContentHash, successorStarted.Receipt.ContentHash);
+            Assert.Equal(expectedWorld, successorStarted.Receipt.WorldId);
+            Assert.Equal(bindingZdo, successorStarted.Receipt.BindingZdo);
             await EvidenceShotAsync(page, run, "06-a-reset");
-
-            await page.Locator("#bind-experience").ClickAsync();
-            await WaitForExactTextAsync(page.Locator("#status-title"), "Quest bound and started", "installed A successor rerun", 30_000);
-            successorA = await WaitForRunAsync(run.RuntimeRoot, a.ExperienceId,
-                value => value.RunId == successorA.RunId && value.Outcome == "complete", "installed A successor completion");
-            await EvidenceShotAsync(page, run, "07-a-rerun");
+            await EvidenceShotAsync(page, run, "07-successor-started");
 
             var successorScope = RuntimeRunControlReceipts.ScopeDirectory(run.RuntimeRoot, successorA.RunId);
             var initialReceipts = Directory.Exists(successorScope) ? Directory.GetFiles(successorScope, "*.json").Length : 0;
@@ -911,7 +909,7 @@ public sealed class QuestStudioSyntheticE2ETests
             await EvidenceShotAsync(page, run, "08-retained-proof");
 
             var bindingChangeIds = await page.EvaluateAsync<string[]>("() => bindingChanges.map(value => value.change_id)");
-            Assert.Equal(4, bindingChangeIds.Length);
+            Assert.Equal(3, bindingChangeIds.Length);
             while (await page.EvaluateAsync<int>("() => bindingChanges.length") > 0)
             {
                 var before = await page.EvaluateAsync<int>("() => bindingChanges.length");
@@ -924,7 +922,8 @@ public sealed class QuestStudioSyntheticE2ETests
                     Path.Combine(run.RuntimeRoot, "state", "binding-changes", changeId + ".json")))?.State));
 
             CaptureInstalledEvidence(run, production, dev, active, a, b, firstA, firstB, successorA,
-                prerequisiteRefusal, archivedRequest!, archivedPath, bPreviewRequest, bindingChangeIds);
+                prerequisiteRefusal, successorStarted, archivedRequest!, archivedPath, bPreviewRequest,
+                bindingChangeIds);
             Assert.Empty(failedRequests);
             Assert.Contains(httpErrors, value => value.EndsWith("/runs/bind", StringComparison.Ordinal));
             Assert.DoesNotContain(httpErrors, value => !value.EndsWith("/runs/bind", StringComparison.Ordinal));
@@ -1187,8 +1186,9 @@ public sealed class QuestStudioSyntheticE2ETests
     static void CaptureInstalledEvidence(SyntheticRun run, PackCandidate production, PackCandidate dev, ActiveSet active,
         (string ProjectId, string ExperienceId) a, (string ProjectId, string ExperienceId) b,
         RuntimeRunRecord firstA, RuntimeRunRecord firstB, RuntimeRunRecord successorA,
-        RuntimeReceiptEvidence prerequisiteRefusal, string archivedRequest, string archivedPath,
-        string bPreviewRequest, IReadOnlyList<string> bindingChangeIds)
+        RuntimeReceiptEvidence prerequisiteRefusal, RuntimeReceiptEvidence successorStarted,
+        string archivedRequest, string archivedPath, string bPreviewRequest,
+        IReadOnlyList<string> bindingChangeIds)
     {
         var proof = Path.Combine(run.Root, "proof");
         Directory.CreateDirectory(proof);
@@ -1199,6 +1199,7 @@ public sealed class QuestStudioSyntheticE2ETests
         Copy(Path.Combine(run.RuntimeRoot, "status", "runs.json"), "run-status.json");
         Copy(Path.Combine(run.RuntimeRoot, "status", "dev-channel.json"), "dev-channel-status.json");
         Copy(prerequisiteRefusal.Path, "prerequisite-refusal.json");
+        Copy(successorStarted.Path, "successor-experience-started.json");
         Copy(archivedPath, "archived-a-reset.json");
         Copy(RuntimeRunControlReceipts.ReceiptPath(run.RuntimeRoot, firstB.RunId, bPreviewRequest), "b-correlated-preview.json");
         foreach (var changeId in bindingChangeIds)
@@ -1235,6 +1236,7 @@ public sealed class QuestStudioSyntheticE2ETests
             first_b_run = firstB.RunId,
             successor_a_run = successorA.RunId,
             successor_a_predecessor = successorA.PredecessorRunId,
+            successor_a_started_receipt = successorStarted.Receipt.Id,
             archived_a_request = archivedRequest,
             b_correlated_request = bPreviewRequest,
             binding_changes = bindingChangeIds,
@@ -1604,6 +1606,7 @@ public sealed class QuestStudioSyntheticE2ETests
         readonly RuntimeReceiptStore _receipts;
         readonly CancellationTokenSource _stop = new();
         readonly Task _pump;
+        DateTimeOffset _nextStatusAt;
         Exception? _fault;
 
         SyntheticGuildRuntime(SyntheticRun run, string experienceA, string experienceB)
@@ -1658,7 +1661,7 @@ public sealed class QuestStudioSyntheticE2ETests
                 while (!_stop.IsCancellationRequested)
                 {
                     AnswerMailbox();
-                    WriteStatus();
+                    if (DateTimeOffset.UtcNow >= _nextStatusAt) WriteStatus();
                     await Task.Delay(40, _stop.Token);
                 }
             }
@@ -1707,6 +1710,7 @@ public sealed class QuestStudioSyntheticE2ETests
                     case "apply_reset":
                         var result = _runs.Apply(request.RunId, request.PreviewToken, DateTimeOffset.UtcNow,
                             SyntheticSpawnResetAdapter.Instance);
+                        StartResetSuccessor(result);
                         WriteReceipt(request, result.State == "completed" ? "completed" : "failed", result.Detail ?? result.State,
                             result: result);
                         break;
@@ -1732,6 +1736,7 @@ public sealed class QuestStudioSyntheticE2ETests
                 WorldId = WorldUid,
                 ExperienceId = document.Id,
                 BindingZdo = request.BindingZdo,
+                BindingInstanceId = change.Applied.BindingInstanceId,
                 ParticipantIds = new List<string> { "synthetic-player" },
                 ContentHash = _active.ContentHash,
             }, DateTimeOffset.UtcNow);
@@ -1739,11 +1744,65 @@ public sealed class QuestStudioSyntheticE2ETests
             WriteReceipt(request, "completed", "experience_bound:" + document.Id, change: change);
         }
 
+        void StartResetSuccessor(RuntimeResetResult result)
+        {
+            if (result?.State != "completed" || string.IsNullOrWhiteSpace(result.NewRunId)) return;
+            var successor = _runs.Registry.Find(result.NewRunId)
+                ?? throw new InvalidOperationException("reset_successor_missing");
+            if (successor.Status != "active" || string.IsNullOrWhiteSpace(successor.PredecessorRunId))
+                throw new InvalidOperationException("reset_successor_invalid");
+            if (!string.IsNullOrWhiteSpace(successor.Outcome))
+            {
+                if (successor.Outcome != "complete") throw new InvalidOperationException("reset_successor_outcome_invalid");
+                return;
+            }
+            if (!_documents.TryGetValue(successor.Scope.ExperienceId, out var document))
+                throw new InvalidOperationException("reset_successor_experience_missing");
+
+            var at = DateTimeOffset.UtcNow;
+            var started = new RuntimeEvent { Name = ExperienceSchema.ExperienceStartedEvent, At = at };
+            var stage = document.Stages.Single(value => value.Id == document.EntryStage);
+            var transition = stage.Transitions.Single(value =>
+                TriggerEvaluator.Matches(value.When, new[] { started }));
+            if (transition.Outcome != "complete") throw new InvalidOperationException("reset_successor_not_complete");
+            var evidence = TriggerEvaluator.Explain(transition.When, new[] { started });
+            if (!evidence.Satisfied) throw new InvalidOperationException("reset_successor_evidence_invalid");
+
+            _receipts.Write(new RuntimeReceipt
+            {
+                Operation = "transition",
+                Status = transition.Outcome,
+                PackId = _active.PackId,
+                Version = _active.Version,
+                ContentHash = successor.Scope.ContentHash,
+                ExperienceId = successor.Scope.ExperienceId,
+                RunId = successor.RunId,
+                WorldId = successor.Scope.WorldId,
+                ActivationId = _active.ActivationId,
+                CorrelationId = result.ResetId,
+                BindingZdo = successor.Scope.BindingZdo,
+                BindingInstanceId = successor.Scope.BindingInstanceId,
+                StageId = stage.Id,
+                CurrentStageId = stage.Id,
+                NextStageId = transition.NextStage,
+                TransitionId = transition.Id,
+                EventName = ExperienceSchema.ExperienceStartedEvent,
+                CurrentCount = 1,
+                RequiredCount = 1,
+                StageEnteredUtc = at,
+                EvidenceKind = CreatorEvidenceLine.KindName(CreatorEvidenceKind.Story),
+                Evidence = evidence,
+                Diagnostics = Array.Empty<ContractDiagnostic>(),
+            });
+            _runs.Registry.MarkOutcome(successor.RunId, transition.Outcome, at);
+        }
+
         void WriteStatus()
         {
+            var observedUtc = DateTimeOffset.UtcNow;
             _status.Write(new RuntimeRunStatusDocument
             {
-                ObservedUtc = DateTimeOffset.UtcNow,
+                ObservedUtc = observedUtc,
                 Machine = Environment.MachineName,
                 WorldUid = WorldUid,
                 Runs = _runs.Registry.List().Select(value => new RuntimeRunStatusEntry
@@ -1759,6 +1818,10 @@ public sealed class QuestStudioSyntheticE2ETests
                     RewardPolicy = value.RewardPolicy,
                 }).ToArray(),
             });
+            // Match the installed Runtime's one-second heartbeat. The fixture previously
+            // replaced this file every mailbox poll (25 Hz), manufacturing replacement
+            // windows that have no counterpart in the real publication cadence.
+            _nextStatusAt = observedUtc.AddSeconds(1);
         }
 
         void WriteWorldEntryStatus()
@@ -1801,7 +1864,6 @@ public sealed class QuestStudioSyntheticE2ETests
                 BindingCandidates = candidates,
                 BindingChange = change,
             };
-            WriteControlReceipt(RuntimeRunControlReceipts.Scope(request.RunId), receipt, prune: true);
             var addressed = result?.NewRunId ?? request.RunId;
             var run = string.IsNullOrWhiteSpace(addressed) ? null : _runs.Registry.Find(addressed);
             _receipts.Write(new RuntimeReceipt
@@ -1818,7 +1880,10 @@ public sealed class QuestStudioSyntheticE2ETests
                 CandidateCount = candidates?.Count ?? 0,
                 Diagnostics = Array.Empty<ContractDiagnostic>(),
             });
+            // The scoped control receipt is the commit marker Studio waits on. Publish the
+            // matching generic evidence and successor run status before making it visible.
             WriteStatus();
+            WriteControlReceipt(RuntimeRunControlReceipts.Scope(request.RunId), receipt, prune: true);
         }
 
         string WriteControlReceipt(string scope, RuntimeRunControlReceipt receipt, bool prune)
@@ -1917,7 +1982,7 @@ public sealed class QuestStudioSyntheticE2ETests
         sealed class SyntheticBindingAdapter : IRuntimeBindingAdapter
         {
             readonly object _gate = new();
-            RuntimeBindingReference _current = new();
+            readonly Dictionary<string, RuntimeBindingReference> _references = new(StringComparer.Ordinal);
 
             public IReadOnlyList<RuntimeBindingCandidate> ListCandidates() => new[]
             {
@@ -1927,12 +1992,12 @@ public sealed class QuestStudioSyntheticE2ETests
 
             public RuntimeBindingReference Read(string bindingZdo)
             {
-                lock (_gate) return Clone(_current);
+                lock (_gate) return Clone(_references.TryGetValue(bindingZdo, out var value) ? value : null);
             }
 
             public bool TryWrite(string bindingZdo, RuntimeBindingReference reference, out string error)
             {
-                lock (_gate) _current = Clone(reference);
+                lock (_gate) _references[bindingZdo] = Clone(reference);
                 error = string.Empty;
                 return true;
             }
@@ -1944,6 +2009,7 @@ public sealed class QuestStudioSyntheticE2ETests
                 BindingId = value?.BindingId,
                 Version = value?.Version,
                 ContentHash = value?.ContentHash,
+                BindingInstanceId = value?.BindingInstanceId,
             };
         }
 
@@ -1955,15 +2021,147 @@ public sealed class QuestStudioSyntheticE2ETests
         }
     }
 
+    sealed class SyntheticDevRuntimeFixture
+    {
+        const string WorldId = "424242";
+        const string BindingZdo = "synthetic:dev:1";
+        const string BindingInstanceId = "binding-synthetic-dev-0001";
+        const string ParticipantId = "synthetic-player";
+        readonly SyntheticRun _run;
+        readonly string _experienceId;
+        readonly RuntimeReceiptStore _receipts;
+        readonly RuntimeRunStatusStore _runStatus;
+        ActiveSet? _active;
+        RuntimeRunScope? _scope;
+        string? _runId;
+        int _revision;
+
+        public SyntheticDevRuntimeFixture(SyntheticRun run, string experienceId)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(experienceId));
+            _run = run;
+            _experienceId = experienceId;
+            _receipts = new RuntimeReceiptStore(run.RuntimeRoot);
+            _runStatus = new RuntimeRunStatusStore(run.RuntimeRoot);
+        }
+
+        public IReadOnlyList<RuntimeReceipt> Rebind(ActiveSet active, string correlationId)
+        {
+            Assert.NotNull(active);
+            Assert.False(string.IsNullOrWhiteSpace(active.ContentHash));
+            Assert.False(string.IsNullOrWhiteSpace(active.ActivationId));
+            _active = active;
+            _runId = $"run-synthetic-dev-{++_revision:D3}";
+            _scope = new RuntimeRunScope
+            {
+                WorldId = WorldId,
+                ExperienceId = _experienceId,
+                BindingZdo = BindingZdo,
+                BindingInstanceId = BindingInstanceId,
+                ContentHash = active.ContentHash,
+                ParticipantIds = new List<string> { ParticipantId },
+            };
+            WriteRunStatus("start");
+            return new[]
+            {
+                Stamp(active, new RuntimeReceipt
+                {
+                    Operation = "dev_rebind",
+                    Status = "rebound",
+                    CorrelationId = correlationId,
+                })
+            };
+        }
+
+        public void WriteEvent(ActiveSet active, string correlationId, string stageId, string eventName)
+        {
+            AssertCurrent(active);
+            _receipts.Write(Stamp(active, new RuntimeReceipt
+            {
+                Operation = "event",
+                Status = "matched",
+                CorrelationId = correlationId,
+                CurrentStageId = stageId,
+                EventName = eventName,
+            }));
+            WriteRunStatus(stageId);
+        }
+
+        RuntimeReceipt Stamp(ActiveSet active, RuntimeReceipt receipt)
+        {
+            AssertCurrent(active);
+            receipt.PackId = active.PackId;
+            receipt.Version = active.Version;
+            receipt.ContentHash = active.ContentHash;
+            receipt.ActivationId = active.ActivationId;
+            receipt.WorldId = WorldId;
+            receipt.ExperienceId = _experienceId;
+            receipt.BindingZdo = BindingZdo;
+            receipt.BindingInstanceId = BindingInstanceId;
+            receipt.RunId = _runId;
+            receipt.Diagnostics = Array.Empty<ContractDiagnostic>();
+            return receipt;
+        }
+
+        void AssertCurrent(ActiveSet active)
+        {
+            Assert.NotNull(_active);
+            Assert.NotNull(_scope);
+            Assert.False(string.IsNullOrWhiteSpace(_runId));
+            Assert.Equal(_active.PackId, active.PackId);
+            Assert.Equal(_active.Version, active.Version);
+            Assert.Equal(_active.ContentHash, active.ContentHash);
+            Assert.Equal(_active.ActivationId, active.ActivationId);
+        }
+
+        void WriteRunStatus(string stageId)
+        {
+            Assert.NotNull(_active);
+            Assert.NotNull(_scope);
+            Assert.False(string.IsNullOrWhiteSpace(_runId));
+            SyntheticRuntimeFixture.AssertOwnedRoot(_run, SentinelName, SentinelContents);
+            _runStatus.Write(new RuntimeRunStatusDocument
+            {
+                ObservedUtc = DateTimeOffset.UtcNow,
+                Machine = Environment.MachineName,
+                WorldUid = WorldId,
+                Runs = new[]
+                {
+                    new RuntimeRunStatusEntry
+                    {
+                        RunId = _runId,
+                        ScopeId = _scope.ScopeId,
+                        ExperienceId = _experienceId,
+                        BindingZdo = BindingZdo,
+                        BindingInstanceId = BindingInstanceId,
+                        ParticipantIds = new[] { ParticipantId },
+                        ContentHash = _active.ContentHash,
+                        StageId = stageId,
+                    }
+                }
+            });
+        }
+    }
+
     sealed class SyntheticRuntimeFixture
     {
+        const string WorldId = "424242";
+        const string BindingZdo = "synthetic:0:1";
+        const string BindingInstanceId = "binding-synthetic-0001";
+        const string RunId = "run-synthetic-0001";
+        const string ParticipantId = "synthetic-player";
         readonly SyntheticRun _run;
         readonly PackCandidate _candidate;
         readonly ExperienceDocument _document;
         readonly RuntimeReceiptStore _receipts;
+        readonly RuntimeRunStatusStore _runStatus;
+        readonly RuntimeRunScope _runScope;
         DateTimeOffset _nextReceiptAt = DateTimeOffset.UtcNow.AddSeconds(1);
         string? _activationId;
         DateTimeOffset? _stageEnteredUtc;
+        string? _currentStageId;
+        string? _outcome;
+        bool _runStarted;
         int _correlationSequence;
 
         SyntheticRuntimeFixture(SyntheticRun run, PackCandidate candidate)
@@ -1972,6 +2170,17 @@ public sealed class QuestStudioSyntheticE2ETests
             _candidate = candidate;
             _document = ReadExperience(candidate);
             _receipts = new RuntimeReceiptStore(run.RuntimeRoot);
+            _runStatus = new RuntimeRunStatusStore(run.RuntimeRoot);
+            _runScope = new RuntimeRunScope
+            {
+                WorldId = WorldId,
+                ExperienceId = _document.Id,
+                BindingZdo = BindingZdo,
+                BindingInstanceId = BindingInstanceId,
+                ContentHash = _candidate.ContentHash,
+                ParticipantIds = new List<string> { ParticipantId },
+            };
+            _currentStageId = _document.EntryStage;
         }
 
         public string Version => _candidate.Manifest.Version;
@@ -2012,13 +2221,16 @@ public sealed class QuestStudioSyntheticE2ETests
             WriteForPack(new RuntimeReceipt { Operation = "load", Status = "activated", CorrelationId = "corr-synthetic-load" });
         }
 
-        public void WriteBound() => WriteForPack(new RuntimeReceipt
+        public void WriteBound()
         {
-            Operation = "bind",
-            Status = "inscribed",
-            BindingZdo = "synthetic:0:1",
-            CorrelationId = "corr-synthetic-bind"
-        });
+            _runStarted = true;
+            WriteForPack(new RuntimeReceipt
+            {
+                Operation = "bind",
+                Status = "inscribed",
+                CorrelationId = "corr-synthetic-bind"
+            });
+        }
 
         public void WritePartialProgress(string eventName, int current, int required)
         {
@@ -2175,7 +2387,52 @@ public sealed class QuestStudioSyntheticE2ETests
             receipt.ActivationId ??= _activationId;
             receipt.CorrelationId ??= $"corr-synthetic-{++_correlationSequence:D3}";
             receipt.Diagnostics = Array.Empty<ContractDiagnostic>();
+            if (_runStarted)
+            {
+                receipt.WorldId = WorldId;
+                receipt.ExperienceId = _document.Id;
+                receipt.BindingZdo = BindingZdo;
+                receipt.BindingInstanceId = BindingInstanceId;
+                receipt.RunId = RunId;
+            }
             Write(receipt);
+            if (_runStarted) WriteRunStatus(receipt);
+        }
+
+        void WriteRunStatus(RuntimeReceipt receipt)
+        {
+            if (receipt.Operation == "transition" && receipt.Status == "advanced"
+                && !string.IsNullOrWhiteSpace(receipt.NextStageId))
+                _currentStageId = receipt.NextStageId;
+            else if (!string.IsNullOrWhiteSpace(receipt.CurrentStageId))
+                _currentStageId = receipt.CurrentStageId;
+            else if (!string.IsNullOrWhiteSpace(receipt.StageId))
+                _currentStageId = receipt.StageId;
+
+            if (receipt.Operation == "transition" && receipt.Status is "complete" or "fail")
+                _outcome = receipt.Status;
+
+            _runStatus.Write(new RuntimeRunStatusDocument
+            {
+                ObservedUtc = DateTimeOffset.UtcNow,
+                Machine = Environment.MachineName,
+                WorldUid = WorldId,
+                Runs = new[]
+                {
+                    new RuntimeRunStatusEntry
+                    {
+                        RunId = RunId,
+                        ScopeId = _runScope.ScopeId,
+                        ExperienceId = _document.Id,
+                        BindingZdo = BindingZdo,
+                        BindingInstanceId = BindingInstanceId,
+                        ParticipantIds = new[] { ParticipantId },
+                        ContentHash = _candidate.ContentHash,
+                        StageId = _outcome is null ? _currentStageId : null,
+                        Outcome = _outcome,
+                    }
+                }
+            });
         }
 
         void Write(RuntimeReceipt receipt)

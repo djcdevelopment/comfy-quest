@@ -314,8 +314,30 @@ public static class LabBatchRequestPolicy {
       bool replace,
       string buildMode,
       out string error) {
+    return ValidateBlueprint(operation, name, radius, selection, replace, buildMode,
+        null, null, null, null, out error);
+  }
+
+  /// <summary>R&amp;D placement probe. The ordinary overload stays closed over the historical
+  /// mailbox shape; only build_mode=at may carry an explicit finite world transform.</summary>
+  public static bool ValidateBlueprint(
+      string operation,
+      string name,
+      string radius,
+      string selection,
+      bool replace,
+      string buildMode,
+      string worldX,
+      string worldY,
+      string worldZ,
+      string yawDegrees,
+      out string error) {
     error = string.Empty;
     operation = (operation ?? string.Empty).Trim().ToLowerInvariant();
+    bool hasPlacement = !string.IsNullOrWhiteSpace(worldX)
+        || !string.IsNullOrWhiteSpace(worldY)
+        || !string.IsNullOrWhiteSpace(worldZ)
+        || !string.IsNullOrWhiteSpace(yawDegrees);
     string canonical = LabCaptureContract.CanonicalName(name);
     if (canonical.Length == 0 || !string.Equals(canonical, name, StringComparison.Ordinal)) {
       error = "blueprint_name_invalid";
@@ -326,7 +348,7 @@ public static class LabBatchRequestPolicy {
         error = "blueprint_capture_arguments_invalid";
         return false;
       }
-      if (!string.IsNullOrWhiteSpace(buildMode)) {
+      if (!string.IsNullOrWhiteSpace(buildMode) || hasPlacement) {
         error = "request_argument_not_allowed";
         return false;
       }
@@ -339,11 +361,27 @@ public static class LabBatchRequestPolicy {
         error = "blueprint_diff_arguments_invalid";
         return false;
       }
+      if (hasPlacement) {
+        error = "request_argument_not_allowed";
+        return false;
+      }
       return NoBlueprintMutationExtras(replace, buildMode, out error);
     }
     if (operation == "blueprint_build") {
       if (!string.IsNullOrWhiteSpace(radius) || !string.IsNullOrWhiteSpace(selection)
           || replace) {
+        error = "request_argument_not_allowed";
+        return false;
+      }
+      if (buildMode == "at") {
+        if (!(BoundedWorldCoordinate(worldX) && BoundedWorldCoordinate(worldY)
+            && BoundedWorldCoordinate(worldZ) && BoundedYaw(yawDegrees))) {
+          error = "blueprint_build_at_transform_invalid";
+          return false;
+        }
+        return true;
+      }
+      if (hasPlacement) {
         error = "request_argument_not_allowed";
         return false;
       }
@@ -357,6 +395,10 @@ public static class LabBatchRequestPolicy {
     if (operation == "blueprint_inspect" || operation == "blueprint_check"
         || operation == "blueprint_count" || operation == "blueprint_clear") {
       if (!string.IsNullOrWhiteSpace(radius) || !string.IsNullOrWhiteSpace(selection)) {
+        error = "request_argument_not_allowed";
+        return false;
+      }
+      if (hasPlacement) {
         error = "request_argument_not_allowed";
         return false;
       }
@@ -438,6 +480,20 @@ public static class LabBatchRequestPolicy {
         out float radius)
         && radius >= LabCaptureContract.MinRadius
         && radius <= LabCaptureContract.MaxRadius;
+  }
+
+  static bool BoundedWorldCoordinate(string value) {
+    return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture,
+        out double coordinate)
+        && !double.IsNaN(coordinate) && !double.IsInfinity(coordinate)
+        && Math.Abs(coordinate) <= 10500d;
+  }
+
+  static bool BoundedYaw(string value) {
+    return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture,
+        out double yaw)
+        && !double.IsNaN(yaw) && !double.IsInfinity(yaw)
+        && Math.Abs(yaw) <= 3600d;
   }
 
   static bool SafeToken(string value, int maxLength) {

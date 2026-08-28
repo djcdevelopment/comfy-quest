@@ -27,6 +27,8 @@ internal sealed class QuestStudioRunControl
     const int MaxStatusBytes = RuntimeRunStatusStore.MaxStatusBytes;
     const int MaxReceiptBytes = 1024 * 1024;
     const int MaxWorldEntryBytes = 16 * 1024;
+    const int StatusReadAttempts = 5;
+    const int StatusReadRetryDelayMilliseconds = 10;
     readonly IQuestStudioHost _host;
     readonly QuestStudioWorkspace _workspace;
 
@@ -43,19 +45,11 @@ internal sealed class QuestStudioRunControl
         var root = RuntimeRoot();
         if (root is null) return new(1, false, false, "valheim_not_found", null, null, Array.Empty<RuntimeRunStatusEntry>());
         var path = Path.Combine(root, "status", "runs.json");
+        var read = ReadStatusJsonWithRetry(() => ReadStatusJsonOnce(path));
+        if (read.Error is not null)
+            return new(1, true, false, read.Error, null, null, Array.Empty<RuntimeRunStatusEntry>());
         RuntimeRunStatusDocument? status;
-        try
-        {
-            var info = new FileInfo(path);
-            if (!info.Exists || info.Length is <= 0 or > MaxStatusBytes)
-                return new(1, true, false, "runtime_run_status_missing", null, null, Array.Empty<RuntimeRunStatusEntry>());
-            // Runtime replaces this heartbeat atomically while Studio polls it. Read with delete
-            // sharing so a dashboard refresh cannot make Runtime's next File.Replace fail on Windows.
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete);
-            using var reader = new StreamReader(stream);
-            status = JsonConvert.DeserializeObject<RuntimeRunStatusDocument>(reader.ReadToEnd());
-        }
+        try { status = JsonConvert.DeserializeObject<RuntimeRunStatusDocument>(read.Json!); }
         catch { return new(1, true, false, "runtime_run_status_unreadable", null, null, Array.Empty<RuntimeRunStatusEntry>()); }
         if (status?.Schema != "comfy-quest-runtime-run-status/v1")
             return new(1, true, false, "runtime_run_status_schema_invalid", null, null, Array.Empty<RuntimeRunStatusEntry>());
@@ -77,6 +71,39 @@ internal sealed class QuestStudioRunControl
             : !worldLoaded ? "runtime_world_not_loaded"
             : null;
         return new(1, true, connected, error, status.Machine, status.WorldUid, runs);
+    }
+
+    static (string? Json, string? Error, bool Retryable) ReadStatusJsonOnce(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            if (stream.Length is <= 0 or > MaxStatusBytes)
+                return (null, "runtime_run_status_missing", false);
+            using var reader = new StreamReader(stream);
+            return (reader.ReadToEnd(), null, false);
+        }
+        catch (FileNotFoundException) { return (null, "runtime_run_status_missing", true); }
+        catch (DirectoryNotFoundException) { return (null, "runtime_run_status_missing", true); }
+        catch (IOException) { return (null, "runtime_run_status_unreadable", true); }
+        catch { return (null, "runtime_run_status_unreadable", false); }
+    }
+
+    internal static (string? Json, string? Error, bool Retryable) ReadStatusJsonWithRetry(
+        Func<(string? Json, string? Error, bool Retryable)> readOnce,
+        int retryDelayMilliseconds = StatusReadRetryDelayMilliseconds)
+    {
+        ArgumentNullException.ThrowIfNull(readOnce);
+        (string? Json, string? Error, bool Retryable) read = default;
+        for (var attempt = 0; attempt < StatusReadAttempts; attempt++)
+        {
+            read = readOnce();
+            if (read.Error is null || !read.Retryable) return read;
+            if (attempt + 1 < StatusReadAttempts && retryDelayMilliseconds > 0)
+                Thread.Sleep(retryDelayMilliseconds);
+        }
+        return read;
     }
 
     public Task<StudioRunControlResult> PreviewAsync(string projectId, StudioRunResetRequest? request, CancellationToken cancellationToken) =>

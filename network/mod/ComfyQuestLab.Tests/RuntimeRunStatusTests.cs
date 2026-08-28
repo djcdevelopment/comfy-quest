@@ -27,6 +27,24 @@ public sealed class RuntimeRunStatusTests
   }
 
   [Fact]
+  public async Task HeartbeatReaderRetriesAcrossABoundedAtomicReplacementWindow()
+  {
+    var root=Path.Combine(Path.GetTempPath(),"comfy-run-status-read-"+Guid.NewGuid().ToString("N"));
+    try{
+      var store=new RuntimeRunStatusStore(root);
+      store.Write(Status("stable"));
+      var path=Path.Combine(root,"status","runs.json");
+      var writer=new FileStream(path,FileMode.Open,FileAccess.ReadWrite,FileShare.None);
+      var started=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+      var reading=Task.Run(()=>{started.SetResult(true);return store.Read();});
+      await started.Task;
+      await Task.Delay(15);
+      writer.Dispose();
+      Assert.Equal("stable",(await reading).Runs[0].RunId);
+    }finally{try{Directory.Delete(root,true);}catch{}}
+  }
+
+  [Fact]
   public async Task DevChannelHeartbeatRetriesAcrossABoundedWindowsReader()
   {
     var root=Path.Combine(Path.GetTempPath(),"comfy-dev-status-"+Guid.NewGuid().ToString("N"));

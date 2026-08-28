@@ -91,8 +91,8 @@ Use these proof states without promotion by implication:
 Before asking Derek to enter Valheim or operate Studio for acceptance, the implementing
 agent owns all applicable preparation:
 
-- exact build, install, identity, configuration, world/content selection, launch, and
-  clean shutdown;
+- exact build, install, identity, configuration, declared world-support dependencies,
+  world/content selection, launch, and clean shutdown;
 - a driven Studio-to-artifact-to-Runtime journey using the actual GUI and exchange files;
 - bounded in-game requests and correlated receipts for every machine-verifiable claim;
 - automatic collection of logs, screenshots or window captures, persisted state, and
@@ -106,6 +106,35 @@ agent owns all applicable preparation:
 If those conditions are not met, the agent is not ready to call the seat. Derek is never
 the keyboard relay, screenshot courier, log reader, hash checker, process monitor, or
 manual retry loop for the fleet.
+
+Machine selection is part of that boundary. A visible game client needed only for automation
+belongs on an unattended fleet machine when one is available; the immersive OMEN seat stays
+released until the remaining question requires Derek's perception or authored choice. Window
+focus, pop-ups, and accidental tabbing are real seat costs even when no key-by-key instructions
+were written down. A monitor on the automation machine makes the lap observable; it does not
+turn Derek into its driver.
+
+Install cleanup is therefore dependency resolution, not deletion. A world-specific support
+artifact must be declared, provenance- and hash-pinned, included in backup/restore, and proved by
+the running application's own signals. Removing every file outside the product's repository may
+produce a simpler directory while making the selected world unusable. ERA17 r12 paid for that
+distinction when cleanup removed its connection caches and Derek encountered a distracting hard
+freeze during otherwise inspiring play.
+
+## World-lap routing
+
+`ComfyQuestDemo` / UID `-7600395338659582326` is the default installed mechanics world.
+New Runtime actions, binding and reset/retry behavior, Studio correlation, provider projection,
+launch/recovery choreography, and portal-mutation mechanics run there first with `questyfour`.
+The full installed guild journey refuses any other world pair before it prepares or mutates the
+shared game installation.
+
+`ComfyEra17` / UID `-523956327` is an acceptance and scale surface only: retained-world
+compatibility, load/save behavior, its actual topology and spatial pacing, and Derek's batched
+play-feel or choice judgments. Move the same immutable content/package bytes from the green Demo
+journey into a separately pinned ERA17 Creator Session; never migrate or equate run, binding, or
+receipt state across worlds. A change returns to ERA17 only when its remaining question depends
+on ERA17 itself.
 
 ## Standalone Workbench boundary
 
@@ -214,6 +243,47 @@ commands and receipts; it does not clone the MCP kernel or the Valheim lifecycle
   game error signatures, remaining plugins, and remaining Valheim processes were all zero. The
   proof index is
   [`docs/evidence/queue-full-width-journey-20260827-r9.json`](evidence/queue-full-width-journey-20260827-r9.json).
+- Creator Session `era17-pilgrimage-20260827-r13` restored the world-specific NetworkSense
+  connection support that the earlier non-Quest cleanup had removed. The corrected cold Launch
+  entered the exact OMEN/account/profile/world and captured a hash-pinned log showing 5,171 saved
+  portal links plus a cached spawner pass over 92,359 sources and 19,493 targets, with both
+  vanilla connection-scan markers absent. A separate artifact captured three recurring
+  full-world cache cycles one minute apart over 13,875 portal objects with zero dirty work;
+  Runtime remained armed at `pilgrim-choice`. The first attempt also executed the launcher's
+  failure branch: Valheim entered, but `[IO.File]::ReadAllText` requested sharing incompatible
+  with BepInEx's open log and made every support signal appear absent. The corrected
+  shared-handle snapshot produced operation hash
+  `0e0b62854de5f418e66526eeec8102256ec5fbffd6063dfb5185f98692a7cb85` and support-log hash
+  `ec8035c300777c3307b519228d94f64ce7bd4b9cc1e6edd46562d7e793bde615`.
+  This proves the cached load and recurring paths for the current static topology, not portal
+  traversal or authoring. The supporting DLL is an unsigned captured external artifact, still
+  registers its full patch assembly, and has a stale post-load tag index; it is a tactical seat
+  rescue rather than the generalized NetworkSense release boundary.
+- Creator Session `quest-am4-fastlane-20260828-r1` moved machine-only mechanics work to the
+  unattended AM4 Valheim client under Steam persona `Zephar410`, entered the exact
+  `ComfyQuestDemo` / `questyfour` pair, and left OMEN released. The first cold attempt disproved
+  the candidate-cap diagnosis: even with target-kind reservation, the sign was absent because
+  the reviewed 12-piece fixture had not been replayed. The first fixture check then exposed the
+  Linux/Mono `DataContractJsonSerializer` configuration failure. After the capture contracts
+  moved to the already-deployed Newtonsoft.Json dependency, the same reviewed source completed
+  check, built all 12 pieces including one sign, and returned `MATCH` with no missing or extra
+  pieces. Runtime found that sign inside the 32-candidate wire bound, bound **The Name in Ash**,
+  and advanced `experience_started` to `name-in-ash`. A real reset created exactly one successor
+  on the same durable binding and advanced it independently; replaying the same confirmed reset
+  returned the same reset and successor identities without a second event/action/transition
+  chain. The fifth provider tool then executed the reviewed fixture precondition as one bounded
+  operation: its first call built and matched all 12 pieces, its retry omitted the build, and the
+  same pair passed again after a live clear exposed and corrected deferred Valheim object
+  retirement. Every call verified Runtime build authority was disabled afterward. AM4 saved and
+  stopped cleanly and is ready for the next unattended launch. The committed evidence index is
+  [`docs/evidence/quest-am4-fastlane-20260828-r1.json`](evidence/quest-am4-fastlane-20260828-r1.json).
+- The final combined Studio browser gate exposed an order-dependent pre-dispatch
+  `runtime_run_status_unreadable` at reset and restore. Studio now opens the atomically replaced
+  run-status stream first and retries only a bounded 5 x 10 ms filesystem window; corrupt,
+  invalid, stale, or persistently unreadable status still fails closed without a mailbox write.
+  The fixture publishes at Runtime's one-second cadence and makes matching status/evidence a
+  precondition of its control-receipt commit marker. Locked-file recovery, exhausted-window
+  refusal, 114 Studio tests, and both synthetic browser journeys pass together.
 
 An earlier live launch exposed a success-sentinel defect before Arm dispatch. The
 validator now returns null on success, and both the executable controller round trip and
@@ -221,8 +291,8 @@ the corrected live Arm/Disarm receipts cover that exact branch.
 
 ## Creator session loop
 
-1. With Valheim closed, run `tools\creator-session\Invoke-CreatorSession.ps1 Prepare`. Prepare takes the install-wide lease, builds and hash-verifies the payload, backs up exact plugin/config/world files, enables the private-world safety gate, and records the machine/world/session pins used by every later request.
-2. The installed driver defaults to `Launch`, which starts Valheim through Steam and requests the exact profile and local world named by the session manifest. Runtime refuses a missing or ambiguous profile, absent or mismatched world UID, wrong machine/session, expired request, server join, console command, or synthetic input. `-HumanWorldEntry` retains the one-action ADR 0014 fallback; the default autonomous path is installed-proven.
+1. With Valheim closed, sign in to the Steam account that owns the intended character, then run `tools\creator-session\Invoke-CreatorSession.ps1 Prepare`. Prepare resolves the active Steam process/account, limits cloud-profile discovery to that account's userdata root, takes the install-wide lease, builds and hash-verifies the payload, resolves any exact world-support manifest, backs up the owned plugin/config/support/world files, enables the private-world safety gate, and records the Steam account plus machine/world/session pins used by every later request.
+2. The installed driver defaults to `Launch`, which first refuses Steam executable, active-account, installed-byte, or support-config drift, then starts Valheim through that exact Steam executable and requests the profile and local world named by the session manifest. Runtime refuses a missing or ambiguous profile, absent or mismatched world UID, wrong machine/session, expired request, server join, console command, or synthetic input. For a declared world-support release, Launch also requires its current-process log signals, excludes its forbidden fallback/error markers, snapshots the open log through a shared handle, validates that exact evidence copy, and only then hashes it. `-HumanWorldEntry` retains the one-action ADR 0014 fallback; the default autonomous path is installed-proven.
 3. Run `tools\creator-session\Invoke-CreatorSession.ps1 Status -SessionId <id>`. Continue only while the session is active, the machine and world pins agree, and every installed plugin hash still matches Prepare.
 4. For a Godbuild lap, run the bounded `BuildOn` operation and require its correlated receipt before the creator begins spatial work. While it is active, the creator uses ordinary hammer/build controls; run one bounded operation from `GalleryRebuild`, `Capture -BlueprintName <name>`, or `Arm` only when the lap calls for it. Every request expires, carries the same three identity pins, is consumed once in game, and has no console-command or synthetic-key field.
 5. Capture automatically imports the fixed receipt artifact and runs the generator-drift check. Review `examples/worldbuild/<name>/preview.svg`, `plan.json`, and `manifest.json`; the manifest names upstream exclusions and the capture/blueprint pair remains replay authority.

@@ -1,10 +1,11 @@
 namespace ComfyQuestLab;
 
 using System;
+using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Json;
 using System.Text;
+using Newtonsoft.Json;
 
 /// <summary>Unity-free, explicitly named JSON contract for recoverable natural trees.
 ///
@@ -52,22 +53,22 @@ public sealed class LabTreeRecoveryLedger {
 }
 
 public static class LabTreeRecoveryContract {
-  static readonly DataContractJsonSerializer Serializer =
-      new DataContractJsonSerializer(typeof(LabTreeRecoveryLedger));
+  static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings {
+    Culture = CultureInfo.InvariantCulture,
+    DateParseHandling = DateParseHandling.None,
+    MissingMemberHandling = MissingMemberHandling.Error,
+    MaxDepth = 32,
+  };
 
   public static LabTreeRecoveryLedger Deserialize(string json) {
-    using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json ?? string.Empty))) {
-      return Serializer.ReadObject(stream) as LabTreeRecoveryLedger;
-    }
+    return JsonConvert.DeserializeObject<LabTreeRecoveryLedger>(json ?? string.Empty,
+      SerializerSettings);
   }
 
   public static string Serialize(LabTreeRecoveryLedger ledger) {
     if (ledger == null) {
       throw new ArgumentNullException(nameof(ledger));
     }
-    using (var stream = new MemoryStream()) {
-      Serializer.WriteObject(stream, ledger);
-      return Encoding.UTF8.GetString(stream.ToArray());
-    }
+    return JsonConvert.SerializeObject(ledger, Formatting.None, SerializerSettings);
   }
 }

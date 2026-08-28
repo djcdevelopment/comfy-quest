@@ -495,7 +495,8 @@ internal sealed class QuestStudioWorkspace
     }
 
     public StudioRuntimeStatus RuntimeStatus(
-        string projectId, StudioRuntimePackIdentity? releaseIdentity = null)
+        string projectId, StudioRuntimePackIdentity? releaseIdentity = null,
+        StudioRunStatusView? runStatus = null)
     {
         var project = ReadProject(projectId);
         if (project is null) return StudioRuntimeStatus.Unavailable("project_missing");
@@ -558,15 +559,22 @@ internal sealed class QuestStudioWorkspace
         var activeReceipts = !isActive ? Array.Empty<RuntimeReceipt>()
             : string.IsNullOrWhiteSpace(active?.ActivationId) ? orderedReceipts
             : orderedReceipts.Where(value => value.ActivationId == active.ActivationId).ToArray();
+        // A pack-level bind receipt outlives the run it created. It is present-tense evidence only
+        // while Runtime's fresh heartbeat reports the exact world/binding scope from that receipt.
+        // Keep unmatched receipts in orderedReceipts for history, but keep them out of phase and
+        // proof-line computation.
+        var currentEvidenceReceipts = activeReceipts.Where(value =>
+            !RequiresFreshRunEvidence(value)
+            || MatchesFreshRun(value, runStatus, project.ExperienceId, releaseContentHash)).ToArray();
         var checkedOk = orderedReceipts.Any(value => value.Operation == "check" && value.Status == "accepted");
-        var bound = activeReceipts.Any(value =>
+        var bound = currentEvidenceReceipts.Any(value =>
             (releaseIdentity?.MultipleExperiences != true
                 || string.Equals(value.ExperienceId, project.ExperienceId, StringComparison.Ordinal))
             && ((value.Operation == "bind" && value.Status is "inscribed" or "accepted")
                 || (value.Operation == "dev_rebind" && (value.Status == "rebound" || value.Error == "already_current"))
                 || (value.Operation == "bind_selected_experience" && value.Status == "completed")));
-        var completed = activeReceipts.FirstOrDefault(value => value.Operation == "transition" && value.Status is "complete" or "fail");
-        var liveReceipt = activeReceipts.FirstOrDefault(value =>
+        var completed = currentEvidenceReceipts.FirstOrDefault(value => value.Operation == "transition" && value.Status is "complete" or "fail");
+        var liveReceipt = currentEvidenceReceipts.FirstOrDefault(value =>
             (value.Operation == "transition" && value.Status == "advanced")
             || (value.Operation == "event" && value.Status is "matched" or "ignored"));
         var currentStageId = liveReceipt?.Operation == "transition"
@@ -625,9 +633,60 @@ internal sealed class QuestStudioWorkspace
             EffectLabels = RuntimeEffectLabels(compiled.Document!),
             DevConnected = devConnected,
             DevPublished = devPublished is not null,
-            DevStatus = devStatus
+            DevStatus = devStatus,
+            CurrentEvidenceReceipts = currentEvidenceReceipts
         };
     }
+
+    static bool MatchesFreshRun(RuntimeReceipt receipt, StudioRunStatusView? status,
+        string experienceId, string contentHash)
+    {
+        if (status?.Connected != true
+            || string.IsNullOrWhiteSpace(status.WorldUid)
+            || string.IsNullOrWhiteSpace(receipt.WorldId)
+            || string.IsNullOrWhiteSpace(receipt.ExperienceId)
+            || string.IsNullOrWhiteSpace(receipt.ContentHash)
+            || string.IsNullOrWhiteSpace(receipt.BindingZdo)
+            || !string.Equals(receipt.WorldId, status.WorldUid, StringComparison.Ordinal)
+            || !string.Equals(receipt.ExperienceId, experienceId, StringComparison.Ordinal)
+            || !string.Equals(receipt.ContentHash, contentHash, StringComparison.OrdinalIgnoreCase))
+            return false;
+        return status.Runs.Any(run =>
+            string.Equals(run.ExperienceId, receipt.ExperienceId, StringComparison.Ordinal)
+            && string.Equals(run.ContentHash, receipt.ContentHash, StringComparison.OrdinalIgnoreCase)
+            && (string.IsNullOrWhiteSpace(receipt.RunId)
+                || string.Equals(run.RunId, receipt.RunId, StringComparison.Ordinal))
+            && MatchesBindingIdentity(receipt, run));
+    }
+
+    static bool MatchesBindingIdentity(RuntimeReceipt receipt, RuntimeRunStatusEntry run)
+    {
+        // Valheim persists custom ZDO values but assigns a new physical ZDO UID when a v37
+        // world is loaded. Once either side knows the durable marker, physical identity is no
+        // longer admissible evidence: both surfaces must name the same binding instance.
+        if (!string.IsNullOrWhiteSpace(receipt.BindingInstanceId)
+            || !string.IsNullOrWhiteSpace(run.BindingInstanceId))
+            return !string.IsNullOrWhiteSpace(receipt.BindingInstanceId)
+                && !string.IsNullOrWhiteSpace(run.BindingInstanceId)
+                && string.Equals(receipt.BindingInstanceId, run.BindingInstanceId,
+                    StringComparison.Ordinal);
+        return string.Equals(run.BindingZdo, receipt.BindingZdo, StringComparison.Ordinal);
+    }
+
+    static bool IsSuccessfulBindingEvidence(RuntimeReceipt receipt) =>
+        receipt.Operation == "bind" && receipt.Status is "inscribed" or "accepted"
+        || receipt.Operation == "bind_selected_experience" && receipt.Status == "completed"
+        || receipt.Operation == "dev_rebind"
+            && (receipt.Status == "rebound" || receipt.Error == "already_current");
+
+    static bool RequiresFreshRunEvidence(RuntimeReceipt receipt) =>
+        IsSuccessfulBindingEvidence(receipt)
+        || receipt.Operation == "dev_rebind"
+        || !string.IsNullOrWhiteSpace(receipt.RunId)
+        || !string.IsNullOrWhiteSpace(receipt.BindingInstanceId)
+        || !string.IsNullOrWhiteSpace(receipt.StageId)
+        || !string.IsNullOrWhiteSpace(receipt.TransitionId)
+        || !string.IsNullOrWhiteSpace(receipt.ActionId);
 
     static string DescribeLiveTrigger(TriggerExpression? trigger)
     {
@@ -2011,6 +2070,7 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
     public RuntimeDevChannelStatus? DevStatus { get; init; }
     public IReadOnlyDictionary<string, string> RouteLabels { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> EffectLabels { get; init; } = new Dictionary<string, string>();
+    internal IReadOnlyList<RuntimeReceipt> CurrentEvidenceReceipts { get; init; } = Array.Empty<RuntimeReceipt>();
 
     public static StudioRuntimeStatus Unavailable(string phase, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
         new(2, false, phase,

@@ -20,6 +20,10 @@ nuget.config text eol=lf
 *.cfg text eol=lf
 *.txt text eol=lf
 
+# This captured external support configuration is a hash-pinned release payload.
+# Preserve its exact bytes instead of applying the repository's source-text normalization.
+tools/creator-session/world-support/ComfyNetworkSense.PortalSupport.0.5.80/djcdevelopment.valheim.comfynetworksense.cfg binary
+
 *.nupkg binary
 *.questpack binary
 *.zip binary

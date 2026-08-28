@@ -39,13 +39,13 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     Directory.CreateDirectory(Path.Combine(runtimeRoot,"inbox-dev"));
     packs=new QuestPackStore(runtimeRoot);
     receipts=new RuntimeReceiptStore(runtimeRoot);
-    charms=new RuntimeCharmBinding(runtimeRoot,receipts);
     privateWorldConfirmed=Config.Bind("Safety","PrivateWorldConfirmed",false,"Required before Charm inscription or mutation. Enable only for a private solo/listen-host world you control.");
     engine=new RuntimeExperienceEngine(runtimeRoot,receipts,()=>privateWorldConfirmed.Value);
+    charms=new RuntimeCharmBinding(runtimeRoot,receipts,engine);
     runStatus=new RuntimeRunStatusStore(runtimeRoot);
     devChannel=new RuntimeDevChannelCoordinator(runtimeRoot,(active,correlation)=>{
       var result=charms.RebindDevActive(active,correlation);
-      if(result.Any(value=>value.Status=="rebound"||value.Status=="already_current")){
+      if(result.Any(value=>value.Status=="rebound"||value.Error=="already_current")){
         engine?.ResolveAlert("charm_unbound");
         engine?.ResolveAlert("binding_version");
       }

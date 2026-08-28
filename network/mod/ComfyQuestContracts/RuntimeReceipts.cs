@@ -25,6 +25,7 @@ public sealed class RuntimeReceipt {
   [JsonProperty("transition_id")] public string TransitionId { get; set; }
   [JsonProperty("action_id")] public string ActionId { get; set; }
   [JsonProperty("binding_zdo")] public string BindingZdo { get; set; }
+  [JsonProperty("binding_instance_id", NullValueHandling=NullValueHandling.Ignore)] public string BindingInstanceId { get; set; }
   [JsonProperty("experience_id", NullValueHandling=NullValueHandling.Ignore)] public string ExperienceId { get; set; }
   [JsonProperty("run_id", NullValueHandling=NullValueHandling.Ignore)] public string RunId { get; set; }
   [JsonProperty("world_id", NullValueHandling=NullValueHandling.Ignore)] public string WorldId { get; set; }

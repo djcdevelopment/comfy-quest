@@ -114,6 +114,136 @@ function Get-Sha256([string]$Path) {
     } finally { $sha.Dispose() }
 }
 
+function Read-SharedText([string]$Path) {
+    $stream = [IO.FileStream]::new(
+        $Path,
+        [IO.FileMode]::Open,
+        [IO.FileAccess]::Read,
+        ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+    try {
+        $reader = [IO.StreamReader]::new($stream, $true)
+        try {
+            return $reader.ReadToEnd()
+        } finally { $reader.Dispose() }
+    } finally { $stream.Dispose() }
+}
+
+function Copy-SharedFile([string]$Source, [string]$Destination) {
+    $sourceStream = [IO.FileStream]::new(
+        $Source,
+        [IO.FileMode]::Open,
+        [IO.FileAccess]::Read,
+        ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+    try {
+        $destinationStream = [IO.FileStream]::new(
+            $Destination,
+            [IO.FileMode]::Create,
+            [IO.FileAccess]::Write,
+            [IO.FileShare]::None)
+        try {
+            $sourceStream.CopyTo($destinationStream)
+        } finally { $destinationStream.Dispose() }
+    } finally { $sourceStream.Dispose() }
+}
+
+function Get-WorldSupport([string]$ExpectedWorldUid, [string]$ExpectedWorldName) {
+    if ($FixtureMode) { return $null }
+
+    $catalogPath = Join-Path $repoRoot 'tools\creator-session\world-support.json'
+    if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) {
+        throw "Creator world-support catalog is missing: $catalogPath"
+    }
+    $catalog = [IO.File]::ReadAllText($catalogPath) | ConvertFrom-Json
+    if ([string]$catalog.schema -ne 'comfy-quest-creator-world-support/v1') {
+        throw 'Creator world-support catalog schema is unsupported.'
+    }
+    $matches = @($catalog.worlds | Where-Object {
+            [string]$_.world_uid -eq $ExpectedWorldUid
+        })
+    if ($matches.Count -eq 0) { return $null }
+    if ($matches.Count -ne 1) {
+        throw "Creator world-support catalog has ambiguous entries for world UID $ExpectedWorldUid."
+    }
+    $world = $matches[0]
+    if ([string]$world.world_name -ne $ExpectedWorldName) {
+        throw "Creator world-support name mismatch for UID ${ExpectedWorldUid}: expected $ExpectedWorldName, catalog has $([string]$world.world_name)."
+    }
+
+    $manifestPath = [IO.Path]::GetFullPath((Join-Path $repoRoot ([string]$world.package_manifest)))
+    if (-not (Test-ChildPath $repoRoot $manifestPath) -or
+        -not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        throw "World-support package manifest is unavailable inside this repository: $manifestPath"
+    }
+    if ((Get-Sha256 $manifestPath) -ne [string]$world.package_manifest_sha256) {
+        throw 'World-support package manifest hash mismatch.'
+    }
+    $manifest = [IO.File]::ReadAllText($manifestPath) | ConvertFrom-Json
+    if ([string]$manifest.schema -ne 'comfy-quest-external-support-release/v1') {
+        throw 'World-support package manifest schema is unsupported.'
+    }
+    $availableCapabilities = @($manifest.capabilities | ForEach-Object { [string]$_ })
+    foreach ($capability in @($world.required_capabilities)) {
+        if ([string]$capability -notin $availableCapabilities) {
+            throw "World-support package lacks required capability: $capability"
+        }
+    }
+
+    $packageRoot = Split-Path -Parent $manifestPath
+    $pluginFiles = @()
+    foreach ($file in @($manifest.files)) {
+        $name = [string]$file.name
+        if ($name -notmatch '^[A-Za-z0-9._-]+\.dll$') {
+            throw "World-support plugin filename is unsafe: $name"
+        }
+        $source = [IO.Path]::GetFullPath((Join-Path $packageRoot $name))
+        if (-not (Test-ChildPath $packageRoot $source) -or
+            -not (Test-Path -LiteralPath $source -PathType Leaf)) {
+            throw "World-support release file is missing: $source"
+        }
+        if ((Get-Item -LiteralPath $source).Length -ne [long]$file.bytes -or
+            (Get-Sha256 $source) -ne [string]$file.sha256) {
+            throw "World-support release identity mismatch: $name"
+        }
+        $pluginFiles += [pscustomobject]@{
+            name = $name
+            source = $source
+            sha256 = [string]$file.sha256
+        }
+    }
+
+    $configName = [string]$manifest.config.name
+    if ($configName -notmatch '^[A-Za-z0-9._-]+\.cfg$') {
+        throw "World-support config filename is unsafe: $configName"
+    }
+    $configSource = [IO.Path]::GetFullPath((Join-Path $packageRoot $configName))
+    if (-not (Test-ChildPath $packageRoot $configSource) -or
+        -not (Test-Path -LiteralPath $configSource -PathType Leaf) -or
+        (Get-Sha256 $configSource) -ne [string]$manifest.config.sha256) {
+        throw 'World-support configuration identity mismatch.'
+    }
+
+    return [pscustomobject]@{
+        world_uid = [string]$world.world_uid
+        world_name = [string]$world.world_name
+        reason = [string]$world.reason
+        package_id = [string]$manifest.package_id
+        version = [string]$manifest.version
+        release_id = [string]$manifest.release_id
+        upstream_owner = [string]$manifest.upstream_owner
+        manifest = $manifestPath
+        manifest_sha256 = Get-Sha256 $manifestPath
+        required_capabilities = @($world.required_capabilities)
+        plugin_files = $pluginFiles
+        config = [pscustomobject]@{
+            name = $configName
+            source = $configSource
+            sha256 = [string]$manifest.config.sha256
+            profile = [string]$manifest.config.profile
+        }
+        runtime_proof = $manifest.runtime_proof
+    }
+}
+
 function Assert-SnapshotFile(
     $Record,
     [string]$ExpectedSource,
@@ -208,7 +338,89 @@ function Test-ValheimRunning {
     return $null -ne (Get-Process -Name 'valheim' -ErrorAction SilentlyContinue)
 }
 
-function Get-CharacterProfileFiles {
+function Get-SteamAccountContext([string]$SteamExecutable = $SteamExe) {
+    $steamPath = [IO.Path]::GetFullPath($SteamExecutable)
+    $steamRoot = Split-Path -Parent $steamPath
+    $loginUsersPath = Join-Path $steamRoot 'config\loginusers.vdf'
+    if (-not (Test-Path -LiteralPath $loginUsersPath -PathType Leaf)) {
+        throw "Steam login-user inventory was not found: $loginUsersPath"
+    }
+
+    $loginUsers = @()
+    $loginText = [IO.File]::ReadAllText($loginUsersPath)
+    $userBlocks = [regex]::Matches(
+        $loginText,
+        '"(?<steam_id>[0-9]{17})"\s*\{(?<body>.*?)\}',
+        [Text.RegularExpressions.RegexOptions]::Singleline)
+    foreach ($block in $userBlocks) {
+        $body = $block.Groups['body'].Value
+        $accountNameMatch = [regex]::Match($body, '"AccountName"\s*"(?<value>[^"]*)"')
+        $personaNameMatch = [regex]::Match($body, '"PersonaName"\s*"(?<value>[^"]*)"')
+        $steamId = [UInt64]::Parse(
+            $block.Groups['steam_id'].Value,
+            [Globalization.CultureInfo]::InvariantCulture)
+        $accountId = $steamId - [UInt64]76561197960265728
+        $loginUsers += [pscustomobject]@{
+            account_id = $accountId.ToString([Globalization.CultureInfo]::InvariantCulture)
+            account_name = if ($accountNameMatch.Success) { $accountNameMatch.Groups['value'].Value } else { $null }
+            persona_name = if ($personaNameMatch.Success) { $personaNameMatch.Groups['value'].Value } else { $null }
+        }
+    }
+
+    $steamRegistryPath = 'HKCU:\Software\Valve\Steam'
+    $activeProcessPath = Join-Path $steamRegistryPath 'ActiveProcess'
+    $activeAccountId = $null
+    $selection = $null
+    if (Test-Path $activeProcessPath) {
+        $active = Get-ItemProperty -Path $activeProcessPath
+        $activePid = [int]$active.pid
+        $activeProcess = if ($activePid -gt 0) {
+            Get-Process -Id $activePid -ErrorAction SilentlyContinue
+        } else { $null }
+        if ($activeProcess -and [UInt64]$active.ActiveUser -gt 0) {
+            $activeProcessPathValue = $null
+            try { $activeProcessPathValue = [IO.Path]::GetFullPath($activeProcess.Path) } catch { }
+            if (-not $activeProcessPathValue -or
+                -not [string]::Equals($activeProcessPathValue, $steamPath,
+                    [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'The active Steam process does not match the configured Steam executable.'
+            }
+            $activeAccountId = ([UInt64]$active.ActiveUser).ToString(
+                [Globalization.CultureInfo]::InvariantCulture)
+            $selection = 'active_process'
+        }
+    }
+
+    if (-not $activeAccountId) {
+        if (-not (Test-Path $steamRegistryPath)) {
+            throw 'Creator Session could not resolve the Steam account that would launch Valheim.'
+        }
+        $steam = Get-ItemProperty -Path $steamRegistryPath
+        $autoLoginUser = [string]$steam.AutoLoginUser
+        $autoLoginMatches = @($loginUsers | Where-Object {
+                [string]::Equals([string]$_.account_name, $autoLoginUser,
+                    [StringComparison]::OrdinalIgnoreCase)
+            })
+        if ([string]::IsNullOrWhiteSpace($autoLoginUser) -or $autoLoginMatches.Count -ne 1) {
+            throw 'Creator Session requires one unambiguous selected Steam account before Prepare.'
+        }
+        $activeAccountId = [string]$autoLoginMatches[0].account_id
+        $selection = 'auto_login'
+    }
+
+    $matches = @($loginUsers | Where-Object { [string]$_.account_id -eq $activeAccountId })
+    if ($matches.Count -ne 1) {
+        throw "Active Steam account $activeAccountId is absent or ambiguous in loginusers.vdf."
+    }
+    return [pscustomobject]@{
+        account_id = $activeAccountId
+        account_name = [string]$matches[0].account_name
+        persona_name = [string]$matches[0].persona_name
+        selection = $selection
+    }
+}
+
+function Get-CharacterProfileFiles([string]$SteamAccountId) {
     $files = @()
     $localCharacters = Join-Path $env:USERPROFILE 'AppData\LocalLow\IronGate\Valheim\characters'
     if (Test-Path -LiteralPath $localCharacters -PathType Container) {
@@ -216,17 +428,16 @@ function Get-CharacterProfileFiles {
         $files += Get-ChildItem -LiteralPath $localCharacters -Filter '*.fch.new' -File -ErrorAction SilentlyContinue
     }
     $steamUserdata = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($SteamExe))) 'userdata'
-    if (Test-Path -LiteralPath $steamUserdata -PathType Container) {
-        $files += Get-ChildItem -LiteralPath $steamUserdata -Recurse -Filter '*.fch' -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match '\\892970\\remote\\characters\\' }
-        $files += Get-ChildItem -LiteralPath $steamUserdata -Recurse -Filter '*.fch.new' -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match '\\892970\\remote\\characters\\' }
+    $steamCharacters = Join-Path $steamUserdata "$SteamAccountId\892970\remote\characters"
+    if (Test-Path -LiteralPath $steamCharacters -PathType Container) {
+        $files += Get-ChildItem -LiteralPath $steamCharacters -Filter '*.fch' -File -ErrorAction SilentlyContinue
+        $files += Get-ChildItem -LiteralPath $steamCharacters -Filter '*.fch.new' -File -ErrorAction SilentlyContinue
     }
     return @($files | Where-Object { $_.Name -notmatch '(?i)backup' })
 }
 
-function Get-CharacterProfiles {
-    return @(Get-CharacterProfileFiles |
+function Get-CharacterProfiles([string]$SteamAccountId) {
+    return @(Get-CharacterProfileFiles $SteamAccountId |
         ForEach-Object { $_.Name -replace '(?i)\.fch(?:\.new)?$', '' } |
         Sort-Object -Unique)
 }
@@ -595,6 +806,11 @@ try {
         $configBackup = $null
         $configExisted = $false
         $characterBackup = $null
+        $steamAccount = $null
+        $worldSupport = $null
+        $supportConfigRollback = @()
+        $supportConfigRecords = @()
+        $supportRequestQuarantine = @()
         try {
 
         if (-not $FixtureMode) {
@@ -602,14 +818,15 @@ try {
             if (-not (Test-Path -LiteralPath $SteamExe -PathType Leaf)) {
                 throw "Steam executable not found: $SteamExe"
             }
-            if ($CharacterProfile -notin @(Get-CharacterProfiles)) {
-                throw "Pinned Valheim character profile was not found: $CharacterProfile"
+            $steamAccount = Get-SteamAccountContext
+            if ($CharacterProfile -notin @(Get-CharacterProfiles $steamAccount.account_id)) {
+                throw "Pinned Valheim character profile was not found for active Steam account $($steamAccount.account_id): $CharacterProfile"
             }
-            $characterFiles = @(Get-CharacterProfileFiles | Where-Object {
+            $characterFiles = @(Get-CharacterProfileFiles $steamAccount.account_id | Where-Object {
                     ($_.Name -replace '(?i)\.fch(?:\.new)?$', '') -eq $CharacterProfile
                 })
             if ($characterFiles.Count -ne 1) {
-                throw "Pinned Valheim character profile is ambiguous across save sources: $CharacterProfile"
+                throw "Pinned Valheim character profile is ambiguous across active-account save sources: $CharacterProfile"
             }
             $characterMetadata = Get-CharacterProfileMetadata $characterFiles[0].FullName $WorldUid
             if (@($characterMetadata.matching_worlds).Count -ne 1) {
@@ -628,6 +845,24 @@ try {
             }
             if ([string]$worldMetadata.display_name -notmatch '^[A-Za-z0-9._ -]{1,80}$') {
                 throw "Pinned world display name is outside the bounded world-entry contract: $($worldMetadata.display_name)"
+            }
+        }
+        $worldSupport = Get-WorldSupport $WorldUid $WorldName
+        if ($worldSupport) {
+            if (-not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable('COMFY_AUTOJOIN'))) {
+                throw 'World-support preflight refused inherited COMFY_AUTOJOIN automation.'
+            }
+            $supportRequestPath = Join-Path $ValheimRoot 'BepInEx\config\comfy-network-sense\native-autotest-request.json'
+            if (Test-Path -LiteralPath $supportRequestPath -PathType Leaf) {
+                $supportRequestBackup = Join-Path $backupRoot 'world-support-state\native-autotest-request.json'
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $supportRequestBackup) | Out-Null
+                Copy-Item -LiteralPath $supportRequestPath -Destination $supportRequestBackup -Force
+                Remove-Item -LiteralPath $supportRequestPath -Force
+                $supportRequestQuarantine += [ordered]@{
+                    source = $supportRequestPath
+                    backup = $supportRequestBackup
+                    sha256 = Get-Sha256 $supportRequestBackup
+                }
             }
         }
         foreach ($relative in @('requests\world-entry.json', 'status\world-entry.json')) {
@@ -662,6 +897,17 @@ try {
             'ComfyQuestContracts.dll' = Join-Path $repoRoot 'network\mod\ComfyQuestContracts\bin\Release\netstandard2.0\ComfyQuestContracts.dll'
             'Newtonsoft.Json.dll' = Join-Path $repoRoot 'network\mod\ComfyQuestRuntime\bin\Release\net48\Newtonsoft.Json.dll'
         }
+        $supportPluginNames = @()
+        if ($worldSupport) {
+            foreach ($supportPlugin in @($worldSupport.plugin_files)) {
+                $supportName = [string]$supportPlugin.name
+                if ($sources.Contains($supportName)) {
+                    throw "World-support plugin collides with a Quest deployment file: $supportName"
+                }
+                $sources[$supportName] = [string]$supportPlugin.source
+                $supportPluginNames += $supportName
+            }
+        }
         if ($FixtureMode) {
             foreach ($name in @($sources.Keys)) {
                 $sources[$name] = Join-Path $ValheimRoot "fixture-source\$name"
@@ -694,10 +940,13 @@ try {
             }
             $plugins += [ordered]@{
                 name = $name
+                source = $source
+                source_sha256 = Get-Sha256 $source
                 target = $target
                 installed_sha256 = Get-Sha256 $target
                 backup = $backup
                 existed = $existed
+                external_support = $name -in $supportPluginNames
             }
         }
 
@@ -708,6 +957,39 @@ try {
         if ($configExisted) { Copy-Item -LiteralPath $runtimeConfig -Destination $configBackup -Force }
         $configPrepared = $true
         Set-PrivateWorldConfirmation $runtimeConfig $true
+
+        if ($worldSupport) {
+            $supportConfigSource = [string]$worldSupport.config.source
+            $supportConfigTarget = Join-Path $ValheimRoot ('BepInEx\config\' + [string]$worldSupport.config.name)
+            if (-not (Test-ChildPath $ValheimRoot $supportConfigTarget)) {
+                throw 'World-support config target escaped ValheimRoot.'
+            }
+            $supportConfigBackup = Join-Path $backupRoot ('config\' + [string]$worldSupport.config.name)
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $supportConfigBackup) | Out-Null
+            $supportConfigExisted = Test-Path -LiteralPath $supportConfigTarget -PathType Leaf
+            if ($supportConfigExisted) {
+                Copy-Item -LiteralPath $supportConfigTarget -Destination $supportConfigBackup -Force
+            }
+            $supportConfigRollback += [ordered]@{
+                target = $supportConfigTarget
+                backup = $supportConfigBackup
+                existed = $supportConfigExisted
+            }
+            Copy-Item -LiteralPath $supportConfigSource -Destination $supportConfigTarget -Force
+            if ((Get-Sha256 $supportConfigTarget) -ne [string]$worldSupport.config.sha256) {
+                throw 'World-support config deployment hash mismatch.'
+            }
+            $supportConfigRecords += [ordered]@{
+                name = [string]$worldSupport.config.name
+                source = $supportConfigSource
+                source_sha256 = [string]$worldSupport.config.sha256
+                target = $supportConfigTarget
+                installed_sha256 = Get-Sha256 $supportConfigTarget
+                backup = $supportConfigBackup
+                existed = $supportConfigExisted
+                profile = [string]$worldSupport.config.profile
+            }
+        }
 
         $worldFiles = @()
         if (-not $FixtureMode) {
@@ -740,6 +1022,22 @@ try {
             }
         }
 
+        $worldSupportRecord = if ($worldSupport) {
+            [ordered]@{
+                package_id = [string]$worldSupport.package_id
+                version = [string]$worldSupport.version
+                release_id = [string]$worldSupport.release_id
+                upstream_owner = [string]$worldSupport.upstream_owner
+                reason = [string]$worldSupport.reason
+                manifest = [string]$worldSupport.manifest
+                manifest_sha256 = [string]$worldSupport.manifest_sha256
+                required_capabilities = @($worldSupport.required_capabilities)
+                configs = @($supportConfigRecords)
+                quarantined_requests = @($supportRequestQuarantine)
+                runtime_proof = $worldSupport.runtime_proof
+            }
+        } else { $null }
+
         $context = [ordered]@{
             schema = 'comfy-quest-creator-session/v1'
             state = 'active'
@@ -753,6 +1051,7 @@ try {
             character_profile = $CharacterProfile
             character_metadata = $characterMetadata
             steam_exe = $SteamExe
+            steam_account = $steamAccount
             prepared_utc = [DateTimeOffset]::UtcNow.ToString('o')
             repo_root = $repoRoot
             repo_commit = (& git -C $repoRoot rev-parse HEAD).Trim()
@@ -767,6 +1066,7 @@ try {
             }
             world_backup = $worldFiles
             character_backup = $characterBackup
+            world_support = $worldSupportRecord
             world_entry_quarantine = $worldEntryQuarantine
             inbox_pins = Get-InboxPins $ValheimRoot
             rollback = "tools\creator-session\Invoke-CreatorSession.ps1 Close -SessionId $SessionId -Restore"
@@ -790,6 +1090,17 @@ try {
                     }
                 } catch { $rollbackErrors += "plugin:$([string]$entry.name):$($_.Exception.Message)" }
             }
+            for ($index = $supportConfigRollback.Count - 1; $index -ge 0; $index--) {
+                $entry = $supportConfigRollback[$index]
+                try {
+                    if ($entry.existed) {
+                        Copy-Item -LiteralPath ([string]$entry.backup) `
+                            -Destination ([string]$entry.target) -Force
+                    } elseif (Test-Path -LiteralPath ([string]$entry.target) -PathType Leaf) {
+                        Remove-Item -LiteralPath ([string]$entry.target) -Force
+                    }
+                } catch { $rollbackErrors += "support_config:$($_.Exception.Message)" }
+            }
             if ($configPrepared) {
                 try {
                     if ($configExisted) {
@@ -798,6 +1109,14 @@ try {
                         Remove-Item -LiteralPath $runtimeConfig -Force
                     }
                 } catch { $rollbackErrors += "config:$($_.Exception.Message)" }
+            }
+            foreach ($entry in $supportRequestQuarantine) {
+                try {
+                    New-Item -ItemType Directory -Force -Path `
+                        (Split-Path -Parent ([string]$entry.source)) | Out-Null
+                    Copy-Item -LiteralPath ([string]$entry.backup) `
+                        -Destination ([string]$entry.source) -Force
+                } catch { $rollbackErrors += "support_request:$($_.Exception.Message)" }
             }
             foreach ($entry in $worldEntryQuarantine) {
                 try {
@@ -848,6 +1167,18 @@ try {
     if ($pluginHashMismatches.Count -ne 0 -and $Action -ne 'Stop') {
         throw "Installed bytes changed during Creator Session: $($pluginHashMismatches -join ', ')"
     }
+    $supportConfigs = @()
+    $supportRequests = @()
+    if ($null -ne $context.world_support) {
+        $supportConfigs = @($context.world_support.configs)
+        $supportRequests = @($context.world_support.quarantined_requests)
+    }
+    $supportConfigHashMismatches = @($supportConfigs | Where-Object {
+            (Get-Sha256 ([string]$_.target)) -ne [string]$_.installed_sha256
+        } | ForEach-Object { [string]$_.name })
+    if ($supportConfigHashMismatches.Count -ne 0 -and $Action -ne 'Stop') {
+        throw "World-support configuration changed during Creator Session: $($supportConfigHashMismatches -join ', ')"
+    }
     if ($RestoreGameState -and $Action -ne 'Close') {
         throw 'RestoreGameState is available only with Close.'
     }
@@ -872,6 +1203,8 @@ try {
             world_display_name = $context.world_display_name
             character_profile = $context.character_profile
             plugin_hashes_match = $true
+            support_config_hashes_match = $true
+            world_support = $context.world_support
             valheim_running = Test-ValheimRunning
             prepared_inbox = $context.inbox_pins
             current_inbox = Get-InboxPins $ValheimRoot
@@ -898,13 +1231,38 @@ try {
     $godbuildDirectory = $null
     $worldEntryReceipt = $null
     $processLifecycle = $null
+    $supportRuntimeProof = $null
 
     if ($Action -eq 'Launch') {
         if ($FixtureMode) { throw 'Launch is unavailable in FixtureMode.' }
         if (Test-ValheimRunning) { throw 'Launch requires Valheim to be closed.' }
+        # The ordinary request timeout is deliberately short, but world entry is not an
+        # ordinary mailbox operation. ERA17 has repeatedly needed about 190 seconds to load
+        # its 8.9 million ZDOs. Keep an explicit caller override, and otherwise retain the
+        # installed driver's proven thirteen-minute bound so a cold resume does not report
+        # failure while the pinned world is still making healthy progress.
+        $launchWaitSeconds = if ($PSBoundParameters.ContainsKey('WaitSeconds')) {
+            $WaitSeconds
+        } else {
+            780
+        }
         $steamPath = [IO.Path]::GetFullPath([string]$context.steam_exe)
         if (-not (Test-Path -LiteralPath $steamPath -PathType Leaf)) {
             throw "Steam executable not found: $steamPath"
+        }
+        $currentSteamAccount = Get-SteamAccountContext -SteamExecutable $steamPath
+        if (-not $context.steam_account -or
+            [string]$currentSteamAccount.account_id -ne [string]$context.steam_account.account_id) {
+            throw "Steam account changed since Prepare: expected $([string]$context.steam_account.account_id), active $([string]$currentSteamAccount.account_id)."
+        }
+        if ($context.world_support) {
+            if (-not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable('COMFY_AUTOJOIN'))) {
+                throw 'Launch refused inherited COMFY_AUTOJOIN automation.'
+            }
+            $nativeAutotestRequest = Join-Path $ValheimRoot 'BepInEx\config\comfy-network-sense\native-autotest-request.json'
+            if (Test-Path -LiteralPath $nativeAutotestRequest -PathType Leaf) {
+                throw "Launch refused an unpinned NetworkSense native-autotest request: $nativeAutotestRequest"
+            }
         }
         $sessions = Get-InteractiveSessionFacts
         if (-not $sessions.current_is_interactive) {
@@ -931,6 +1289,11 @@ try {
         }
         Write-JsonAtomic $requestPath $request
         Write-JsonAtomic (Join-Path $operationRoot 'world-entry-request.json') $request
+        $supportLogPath = Join-Path $ValheimRoot 'BepInEx\LogOutput.log'
+        if ($context.world_support -and (Test-Path -LiteralPath $supportLogPath -PathType Leaf)) {
+            Move-Item -LiteralPath $supportLogPath `
+                -Destination (Join-Path $operationRoot 'pre-launch-LogOutput.log') -Force
+        }
         Start-Process -FilePath $steamPath `
             -ArgumentList @('-applaunch', '892970', '-console') -WindowStyle Hidden
 
@@ -946,7 +1309,7 @@ try {
         }
         $receiptPath = Join-Path $runtimeRoot "receipts\world-entry\$requestId.json"
         $statusPath = Join-Path $runtimeRoot 'status\world-entry.json'
-        $deadline = (Get-Date).AddSeconds($WaitSeconds)
+        $deadline = (Get-Date).AddSeconds($launchWaitSeconds)
         while ((Get-Date) -lt $deadline) {
             if (-not (Get-Process -Id $game.Id -ErrorAction SilentlyContinue)) {
                 throw 'Valheim exited before the pinned world-entry receipt arrived.'
@@ -983,7 +1346,7 @@ try {
             Start-Sleep -Milliseconds 250
         }
         if (-not $worldEntryReceipt) {
-            throw "Pinned world entry did not complete within $WaitSeconds seconds."
+            throw "Pinned world entry did not complete within $launchWaitSeconds seconds."
         }
         if ([string]$worldEntryReceipt.machine -ne [string]$context.expected_machine -or
             [string]$worldEntryReceipt.world_uid -ne [string]$context.world_uid -or
@@ -992,6 +1355,53 @@ try {
             [string]$worldEntryReceipt.character_profile -ne [string]$context.character_profile) {
             throw 'World-entry receipt identity differs from the active Creator Session.'
         }
+        if ($context.world_support) {
+            $requiredSignals = @($context.world_support.runtime_proof.required_log_contains | ForEach-Object { [string]$_ })
+            $forbiddenSignals = @($context.world_support.runtime_proof.forbidden_log_contains | ForEach-Object { [string]$_ })
+            $supportDeadline = (Get-Date).AddSeconds(15)
+            $supportLogText = ''
+            $missingSignals = @($requiredSignals)
+            while ((Get-Date) -lt $supportDeadline) {
+                if (Test-Path -LiteralPath $supportLogPath -PathType Leaf) {
+                    try { $supportLogText = Read-SharedText $supportLogPath } catch { $supportLogText = '' }
+                }
+                $missingSignals = @($requiredSignals | Where-Object { -not $supportLogText.Contains($_) })
+                if ($missingSignals.Count -eq 0) { break }
+                Start-Sleep -Milliseconds 250
+            }
+            if ($missingSignals.Count -ne 0) {
+                throw "Pinned world-support plugin did not emit required current-launch proof: $($missingSignals -join '; ')"
+            }
+            $forbiddenFound = @($forbiddenSignals | Where-Object { $supportLogText.Contains($_) })
+            if ($forbiddenFound.Count -ne 0) {
+                throw "Pinned world-support plugin emitted a forbidden vanilla/error signal: $($forbiddenFound -join '; ')"
+            }
+            $rewrittenSupportConfigs = @($supportConfigs | Where-Object {
+                    (Get-Sha256 ([string]$_.target)) -ne [string]$_.installed_sha256
+                } | ForEach-Object { [string]$_.name })
+            if ($rewrittenSupportConfigs.Count -ne 0) {
+                throw "World-support configuration was rewritten during launch: $($rewrittenSupportConfigs -join ', ')"
+            }
+            $supportLogEvidence = Join-Path $operationRoot 'world-support-LogOutput.log'
+            Copy-SharedFile $supportLogPath $supportLogEvidence
+            $supportEvidenceText = [IO.File]::ReadAllText($supportLogEvidence)
+            $evidenceMissingSignals = @($requiredSignals | Where-Object { -not $supportEvidenceText.Contains($_) })
+            if ($evidenceMissingSignals.Count -ne 0) {
+                throw "Captured world-support evidence omitted required proof: $($evidenceMissingSignals -join '; ')"
+            }
+            $evidenceForbiddenFound = @($forbiddenSignals | Where-Object { $supportEvidenceText.Contains($_) })
+            if ($evidenceForbiddenFound.Count -ne 0) {
+                throw "Captured world-support evidence contains a forbidden vanilla/error signal: $($evidenceForbiddenFound -join '; ')"
+            }
+            $supportRuntimeProof = [ordered]@{
+                package_id = [string]$context.world_support.package_id
+                release_id = [string]$context.world_support.release_id
+                required_signals = $requiredSignals
+                forbidden_signals_absent = $forbiddenSignals
+                log = $supportLogEvidence
+                log_sha256 = Get-Sha256 $supportLogEvidence
+            }
+        }
         Write-JsonAtomic (Join-Path $operationRoot 'world-entry-receipt.json') $worldEntryReceipt
         $processLifecycle = [ordered]@{
             state = 'world_entered'
@@ -999,6 +1409,8 @@ try {
             process_session_id = $game.SessionId
             steam_exe = $steamPath
             launch_arguments = @('-applaunch', '892970', '-console')
+            world_entry_wait_seconds = $launchWaitSeconds
+            world_support_proof = $supportRuntimeProof
         }
     } elseif ($Action -eq 'Stop') {
         $processLifecycle = Stop-ValheimProcess
@@ -1221,6 +1633,18 @@ try {
             } elseif (Test-Path -LiteralPath ([string]$config.path)) {
                 Remove-Item -LiteralPath ([string]$config.path) -Force
             }
+            foreach ($supportConfig in $supportConfigs) {
+                $target = [string]$supportConfig.target
+                if ($supportConfig.existed) {
+                    Copy-Item -LiteralPath ([string]$supportConfig.backup) -Destination $target -Force
+                } elseif (Test-Path -LiteralPath $target) {
+                    Remove-Item -LiteralPath $target -Force
+                }
+            }
+            foreach ($supportRequest in $supportRequests) {
+                Restore-SnapshotFile $supportRequest ([string]$supportRequest.source) `
+                    $snapshotRoot 'world-support request'
+            }
             foreach ($item in $worldEntryRestorePlan) {
                 if ($null -ne $item.Record) {
                     Restore-SnapshotFile $item.Record $item.ExpectedSource $snapshotRoot $item.Label
@@ -1251,6 +1675,7 @@ try {
         installed_plugins = @($context.plugins | ForEach-Object {
             [ordered]@{ name = $_.name; sha256 = Get-Sha256 ([string]$_.target) }
         })
+        world_support = $context.world_support
         inbox_pins = Get-InboxPins $ValheimRoot
         godbuild_directory = $godbuildDirectory
         evidence_directory = $operationRoot
@@ -1259,6 +1684,7 @@ try {
         restored_world_entry_state = [bool]$context.restored_world_entry_state
         restored_game_state = [bool]$context.restored_game_state
         plugin_hash_mismatches = $pluginHashMismatches
+        support_config_hash_mismatches = $supportConfigHashMismatches
     }
     Write-JsonAtomic (Join-Path $operationRoot 'operation.json') $operation
     $operation | ConvertTo-Json -Depth 10

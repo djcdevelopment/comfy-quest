@@ -70,7 +70,14 @@ try {
         source_revision = $revision
         source_dirty = [bool]($dirty.Count -gt 0)
         runtime_root_env = 'COMFY_QUEST_RUNTIME_ROOT'
-        tools = @('quest_runtime_status', 'quest_runtime_receipts', 'quest_runtime_creator_request', 'quest_runtime_run_control')
+        lab_root_env = 'COMFY_QUEST_LAB_ROOT'
+        reviewed_godbuild_root_env = 'COMFY_QUEST_REVIEWED_GODBUILD_ROOT'
+        tools = @(
+            'quest_runtime_status',
+            'quest_runtime_receipts',
+            'quest_runtime_creator_request',
+            'quest_runtime_run_control',
+            'quest_lab_replay')
     }
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $staging 'provider-manifest.json') -Encoding UTF8
     if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }

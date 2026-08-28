@@ -27,6 +27,12 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 & (Join-Path $repoRoot 'tools\Assert-RepoIdentity.ps1') | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Repository identity check failed.' }
 
+$mechanicsWorldUid = '-7600395338659582326'
+$mechanicsWorldName = 'ComfyQuestDemo'
+if ($WorldUid -ne $mechanicsWorldUid -or $WorldName -ne $mechanicsWorldName) {
+    throw "The installed guild mechanics journey is restricted to $mechanicsWorldName / $mechanicsWorldUid. Use Invoke-CreatorSession.ps1 directly for an acceptance or scale world."
+}
+
 $ValheimRoot = [IO.Path]::GetFullPath($ValheimRoot).TrimEnd('\', '/')
 if (-not (Test-Path -LiteralPath (Join-Path $ValheimRoot 'valheim.exe') -PathType Leaf)) {
     throw "Valheim executable not found under: $ValheimRoot"

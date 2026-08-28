@@ -658,10 +658,13 @@ public sealed class LabBatchController {
       return;
     }
     if (operation == "blueprint_clear") {
-      string detail = _blueprints.Clear(request.blueprint_name);
-      WriteRequestReceipt(request,
-          _blueprints.StandingPieceCount(request.blueprint_name) == 0 ? "completed" : "failed",
-          detail);
+      string detail = null;
+      host.StartCoroutine(RequestRoutine(
+          request,
+          ClearBlueprintAndAwaitRemoval(request.blueprint_name, value => detail = value),
+          () => detail,
+          () => BlueprintClearAccepted(detail)
+              && _blueprints.StandingPieceCount(request.blueprint_name) == 0));
       return;
     }
     if (operation == "blueprint_build") {
@@ -673,15 +676,42 @@ public sealed class LabBatchController {
         return;
       }
       int before = _blueprints.StandingPieceCount(request.blueprint_name);
+      bool buildAt = string.Equals(request.build_mode, "at", StringComparison.Ordinal);
+      IEnumerator work = buildAt
+          ? _blueprints.BuildAt(host, request.blueprint_name,
+              ParseInvariantFloat(request.world_x), ParseInvariantFloat(request.world_y),
+              ParseInvariantFloat(request.world_z), ParseInvariantFloat(request.yaw_degrees))
+          : _blueprints.Build(host, request.blueprint_name,
+              string.Equals(request.build_mode, "sky", StringComparison.Ordinal));
       host.StartCoroutine(RequestRoutine(
           request,
-          _blueprints.Build(host, request.blueprint_name,
-              string.Equals(request.build_mode, "sky", StringComparison.Ordinal)),
-          () => _blueprints.Count(request.blueprint_name),
+          work,
+          () => buildAt ? _blueprints.LastBuildResult : _blueprints.Count(request.blueprint_name),
           () => _blueprints.StandingPieceCount(request.blueprint_name) > before));
       return;
     }
     WriteRequestReceipt(request, "rejected", "operation_not_allowlisted");
+  }
+
+  IEnumerator ClearBlueprintAndAwaitRemoval(string blueprintName, Action<string> detail) {
+    detail(_blueprints.Clear(blueprintName));
+    // ZNetScene.Destroy removes the object immediately but Valheim can retire its ZDO on a
+    // later frame. The installed AM4 lap observed all twelve pieces removed while the
+    // same-frame count still read non-zero and emitted a false failed receipt. Wait only for
+    // the bounded authoritative predicate; RequestRoutine still fails closed after the cap.
+    const int maxRetirementFrames = 120;
+    for (int frame = 0;
+         frame < maxRetirementFrames
+             && _blueprints.StandingPieceCount(blueprintName) > 0;
+         frame++) {
+      yield return null;
+    }
+  }
+
+  static bool BlueprintClearAccepted(string detail) {
+    return !string.IsNullOrWhiteSpace(detail)
+        && (detail.StartsWith("cleared ", StringComparison.Ordinal)
+            || detail.StartsWith("no pieces of \"", StringComparison.Ordinal));
   }
 
   static string CreatorIdentityError(LabBatchRequest request) {
@@ -799,13 +829,19 @@ public sealed class LabBatchController {
       }
       return LabBatchRequestPolicy.ValidateBlueprint(
           request.operation, request.blueprint_name, request.radius_metres,
-          request.selection, request.replace, request.build_mode, out error);
+          request.selection, request.replace, request.build_mode,
+          request.world_x, request.world_y, request.world_z, request.yaw_degrees,
+          out error);
     }
     if (!string.IsNullOrWhiteSpace(request.blueprint_name)
         || !string.IsNullOrWhiteSpace(request.radius_metres)
         || !string.IsNullOrWhiteSpace(request.selection)
         || request.replace
-        || !string.IsNullOrWhiteSpace(request.build_mode)) {
+        || !string.IsNullOrWhiteSpace(request.build_mode)
+        || !string.IsNullOrWhiteSpace(request.world_x)
+        || !string.IsNullOrWhiteSpace(request.world_y)
+        || !string.IsNullOrWhiteSpace(request.world_z)
+        || !string.IsNullOrWhiteSpace(request.yaw_degrees)) {
       error = "request_argument_not_allowed";
       return false;
     }
@@ -828,6 +864,10 @@ public sealed class LabBatchController {
       }
     }
     return true;
+  }
+
+  static float ParseInvariantFloat(string value) {
+    return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
   }
 
   static void ConsumeRequest() {
@@ -864,6 +904,19 @@ public sealed class LabBatchController {
           + LabBatchContract.Json(artifactPath ?? string.Empty) + "\",");
       sb.AppendLine("  \"blueprint_path\": \""
           + LabBatchContract.Json(blueprintPath ?? string.Empty) + "\",");
+      if (string.Equals(request.operation, "blueprint_build", StringComparison.Ordinal)
+          && string.Equals(request.build_mode, "at", StringComparison.Ordinal)
+          && TryCanonicalNumber(request.world_x, out string canonicalX)
+          && TryCanonicalNumber(request.world_y, out string canonicalY)
+          && TryCanonicalNumber(request.world_z, out string canonicalZ)
+          && TryCanonicalNumber(request.yaw_degrees, out string canonicalYaw)) {
+        sb.AppendLine("  \"placement\": {");
+        sb.AppendLine("    \"x\": " + canonicalX + ",");
+        sb.AppendLine("    \"y\": " + canonicalY + ",");
+        sb.AppendLine("    \"z\": " + canonicalZ + ",");
+        sb.AppendLine("    \"yaw_degrees\": " + canonicalYaw);
+        sb.AppendLine("  },");
+      }
       string suiteReceiptPath = RequestExposesSuiteReceipt(request.operation)
           ? _lastExportPath
           : string.Empty;
@@ -881,6 +934,16 @@ public sealed class LabBatchController {
   static bool RequestExposesSuiteReceipt(string operation) {
     return operation == "run" || operation == "report" || operation == "export"
         || operation == "reset";
+  }
+
+  static bool TryCanonicalNumber(string value, out string canonical) {
+    canonical = string.Empty;
+    if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture,
+        out float number) || float.IsNaN(number) || float.IsInfinity(number)) {
+      return false;
+    }
+    canonical = number.ToString("0.######", CultureInfo.InvariantCulture);
+    return true;
   }
 
   static string CurrentWorldUid() {
@@ -907,6 +970,10 @@ public sealed class LabBatchRequest {
   public string selection;
   public bool replace;
   public string build_mode;
+  public string world_x;
+  public string world_y;
+  public string world_z;
+  public string yaw_degrees;
   public string expected_machine;
   public string expected_world_uid;
   public string creator_session_id;

@@ -1,6 +1,6 @@
 # The plan
 
-Quest Creator OS. Updated 2026-08-27.
+Quest Creator OS. Updated 2026-08-28.
 
 **This is the plan of record.** Read it alone and you know the goal, where we are, and what
 happens next. Everything else in `docs/` is detail this document points at; if this document and
@@ -94,10 +94,27 @@ The 4A machine gate is complete. Installed session
 `queue-full-width-journey-20260827-r9` exercised the real product and promoted the work that had
 previously been implementation-only.
 
+The first 4B opening is no longer merely staged. Derek played **The Name in Ash** through its
+sign, Resin offering, and Greyling trial to `pilgrim-choice`. His product signal was "pretty
+inspiring"; his machine signal was a distracting hard freeze about every three seconds. ERA17
+session r13 restored and proved the world-specific NetworkSense connection caches that the
+earlier Quest-only cleanup had removed, then parked the 1.30 GB world for batched acceptance and
+scale questions. Routine mechanics now run first on the 3.1 MB `ComfyQuestDemo` world. The
+retained AM4 lap replayed the reviewed sign fixture, bound the same guild 0.1.3 opening, and
+proved reset-successor startup plus exact retry without using Derek's OMEN seat. The fifth
+provider tool then executed the entire reviewed Lab precondition as one bounded call: first run
+built and matched 12 pieces, immediate retry was a no-op exact match, a live clear exposed and
+corrected deferred Valheim object retirement, and the provider repeated the build/no-op pair.
+Runtime finished with build authority disabled, and AM4 saved and stopped cleanly; the session is
+ready on demand rather than consuming a foreground seat. The final combined Studio browser gate
+also exposed an order-dependent atomic heartbeat read at reset/restore. Studio now retries only a
+bounded filesystem replacement window while stale, invalid, corrupt, or exhausted status still
+fails before mailbox dispatch; both journeys pass together.
+
 | What | State | What is actually missing |
 | --- | --- | --- |
 | Portfolio hierarchy | complete for the 4A journey | sustained human authorship at real density in 4B |
-| Scoped reset / rerun | installed-proven | human clarity and hundredth-use judgment in 4B |
+| Scoped reset / rerun | installed-proven, including successor start and idempotent confirmation retry | human clarity and hundredth-use judgment in 4B |
 | Guild-scale runtime selector | installed-proven | real authored campaign breadth in 4B |
 | Receipt retention | installed-proven across its per-run bound | sustained campaign volume in 4B |
 
@@ -109,11 +126,14 @@ preview/apply endpoint error, and a fresh-run status race before Derek entered t
 fixed, regression-covered, and rerun. r9 then passed the full real Studio -> artifact -> Runtime
 -> installed Valheim -> evidence -> recovery chain with no human action.
 
-The authoritative local proof index is
+The authoritative 4A proof index is
 [`docs/evidence/queue-full-width-journey-20260827-r9.json`](evidence/queue-full-width-journey-20260827-r9.json).
 The full capture bundle remains at
 `C:\work\comfy-quest\captures\queue.full-width-journey\queue-full-width-journey-20260827-r9`.
-There is no remaining mechanical Quest task that should be discovered by putting Derek in-game.
+The current AM4 mechanics proof is indexed at
+[`docs/evidence/quest-am4-fastlane-20260828-r1.json`](evidence/quest-am4-fastlane-20260828-r1.json).
+There is no remaining mechanical Quest task that should be discovered by putting Derek in-game;
+visible machine-only client work belongs on AM4 while OMEN remains released.
 
 ## 4. What happens next, in order
 
@@ -158,40 +178,44 @@ defined under 4A in `creator-os-phases.json` and projected here:
 - **Result:** 4A / guild-scale-runtime is complete. The technical lap used generated A/B content,
   so it deliberately does not claim human acceptance of authorship or play feel.
 
-### Step 2 — Prepare the 4B creative sitting
+### Step 2 — In progress: machine-lock the first 4B campaign before the next sitting
 
 The 4A lap is technical integration evidence; it does not manufacture Derek's creative answer.
-Before his next contiguous session, automation stages the campaign premise, exact guild draft,
-world/profile, Studio route, capture, evidence, and recovery. Derek's contribution is one bounded
-set of judgments:
+The first 4B sitting has already supplied more than the old plan recorded: Derek selected premise
+C, **Pilgrimage of Ash and Ice**, then played its five-stage opening through `pilgrim-choice`.
+That sitting produced one creative verdict and one mechanical defect. The experience was otherwise
+"pretty inspiring"; the recurring stall was distracting.
 
-1. What player fantasy and narrative tone should the first ERA17 questline carry?
-2. Which in-world compositions and cues read clearly, and which do not?
-3. Does each authored beat respond when expected and explain itself at player altitude?
-4. Which moments feel satisfying, confusing, slow, or dead?
-5. What should be kept, revised, or rejected before the next cycle?
+The machine-owned sequence before another sitting is now:
+
+1. keep ordinary mechanics, reset/retry, provider, and Studio correlation work on
+   `ComfyQuestDemo` / `questyfour` using the unattended AM4 client;
+2. require reviewed fixture `MATCH`, exact binding/run identity, an automatically started reset
+   successor, and idempotent retry evidence before promoting immutable content bytes;
+3. keep ERA17 parked until the remaining question actually depends on its topology, scale,
+   spatial pacing, or human perception; and
+4. when that question is ready, stage one pinned ERA17 batch with world support, evidence, and
+   rollback before asking Derek to enter OMEN.
+
+Derek's remaining contribution is one bounded set of judgments:
+
+1. choose what the pilgrim carries at `pilgrim-choice`: Resin for memory or Stone for oath;
+2. say whether the recurring distraction is gone on the supported ERA17 build;
+3. judge which in-world compositions and cues read clearly and which do not;
+4. judge whether each authored beat responds and explains itself at player altitude; and
+5. say what should be kept, revised, or rejected before the next cycle.
 
 Using Studio to express those choices and playing the resulting content are product use, not KVM
 work. Launch, exact world/profile selection, deployment, navigation performed only for setup,
 retries, screenshots, receipts, logs, reset/rerun plumbing, shutdown, and recovery remain
 machine-owned. Derek is not asked to enter the game until that seat packet is staged.
 
-Machine preflight `era17-machine-preflight-20260827-r1` entered the exact local
-`ComfyEra17` / `tugcorp` pair and found a portal plus multiple bounded sign candidates at the
-saved spawn without human navigation. It also caught two setup hazards before the seat: this
-1.3 GB world took about 190 seconds to enter, so the installed driver retains its 780-second
-bounded launch budget, and normal Close was leaving the current world-entry diagnostic in place
-instead of restoring the quarantined prior status. The latter check was observed failing, fixed,
-and rerun in the fixture lifecycle; the live world pair, character, install, and prior diagnostic
-state were then restored to their exact preflight hashes. The 58-image drone run and a rendered
-12-frame decision sheet are staged locally. Derek selected premise C, **Pilgrimage of Ash and
-Ice** -- mythic, uncanny, and reverent. Automation reframed the eight-experience guild around
-the burning skull shrine, sky temple, and snowy ascent, certified it, activated content hash
-`6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e`, and bound its opening
-chapter **The Name in Ash** to the retained nearby sign in Creator Session
-`era17-broken-way-20260827-r6`. Derek's next input is the prepared creative verdict: name that
-sign naturally, then judge composition, clarity, response, narrative tone, and play feel. It is
-not an in-game setup action.
+The exact progression and its remaining uncertainty are recorded in
+[`docs/evidence/era17-pilgrimage-20260827-r12.json`](evidence/era17-pilgrimage-20260827-r12.json)
+and the world-support correction in
+[`docs/evidence/era17-pilgrimage-20260827-r13.json`](evidence/era17-pilgrimage-20260827-r13.json).
+The AM4 mechanics lock is recorded separately because immutable content may move between worlds,
+but binding, run, receipt, and saved-world state may not be equated across them.
 
 ### Step 3 — 4B, the sustained campaign `queue.guild-campaign`
 

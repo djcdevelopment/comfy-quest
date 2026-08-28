@@ -52,7 +52,7 @@ sealed class RuntimeBindingWorldAdapter : IRuntimeBindingAdapter {
     for(var index=0;index<count;index++){
       var wear=colliders[index]?.GetComponentInParent<WearNTear>();
       var view=wear?.GetComponent<ZNetView>();var zdo=view?.GetZDO();
-      if(zdo==null||!seen.Add(zdo.m_uid.ToString())||!LocallyOwned(view))continue;
+      if(zdo==null||!zdo.Persistent||!seen.Add(zdo.m_uid.ToString())||!LocallyOwned(view))continue;
       var piece=wear.GetComponent<Piece>();
       if(piece==null||piece.GetCreator()==0L)continue;
       var distance=UnityEngine.Vector3.Distance(player.transform.position,wear.transform.position);
@@ -61,26 +61,36 @@ sealed class RuntimeBindingWorldAdapter : IRuntimeBindingAdapter {
       values.Add(new RuntimeBindingCandidate{BindingZdo=zdo.m_uid.ToString(),TargetKind=kind,
         Label=Name(piece,kind),DistanceMetres=Math.Round(distance,1,MidpointRounding.AwayFromZero)});
     }
-    return values.OrderBy(value=>value.DistanceMetres).ThenBy(value=>value.TargetKind,StringComparer.Ordinal)
-      .ThenBy(value=>value.BindingZdo,StringComparer.Ordinal).Take(RuntimeBindingCoordinator.MaxCandidates).ToArray();
+    return RuntimeBindingCandidateSelector.Select(values,RuntimeBindingCoordinator.MaxCandidates);
   }
   public RuntimeBindingReference Read(string bindingZdo){
     var view=Find(bindingZdo,out var zdo);
+    if(!zdo.Persistent)throw new InvalidOperationException("binding_not_persistent");
     if(!LocallyOwned(view))throw new InvalidOperationException("binding_not_locally_owned");
     return new RuntimeBindingReference{PackId=Null(zdo.GetString(Prefix+"packId","")),
       ExperienceId=Null(zdo.GetString(Prefix+"experienceId","")),BindingId=Null(zdo.GetString(Prefix+"bindingId","")),
-      Version=Null(zdo.GetString(Prefix+"version","")),ContentHash=Null(zdo.GetString(Prefix+"contentHash",""))};
+      Version=Null(zdo.GetString(Prefix+"version","")),ContentHash=Null(zdo.GetString(Prefix+"contentHash","")),
+      BindingInstanceId=Null(zdo.GetString(Prefix+"bindingInstanceId",""))};
   }
   public bool TryWrite(string bindingZdo,RuntimeBindingReference reference,out string error){
     error=null;
     try{
       var view=Find(bindingZdo,out var zdo);
+      if(!zdo.Persistent){error="binding_not_persistent";return false;}
       if(!LocallyOwned(view)){error="binding_not_locally_owned";return false;}
+      var currentInstance=zdo.GetString(Prefix+"bindingInstanceId","");
+      var nextInstance=reference?.BindingInstanceId??"";
+      // A new anchor marker is the cold-recovery locator, so establish it before any
+      // partial apply. When restoring to empty/different identity, retain the current
+      // locator until the other fields are complete and replace it last.
+      if(string.IsNullOrWhiteSpace(currentInstance)&&!string.IsNullOrWhiteSpace(nextInstance))
+        zdo.Set(Prefix+"bindingInstanceId",nextInstance);
       zdo.Set(Prefix+"packId",reference?.PackId??"");
       zdo.Set(Prefix+"experienceId",reference?.ExperienceId??"");
       zdo.Set(Prefix+"bindingId",reference?.BindingId??"");
       zdo.Set(Prefix+"version",reference?.Version??"");
       zdo.Set(Prefix+"contentHash",reference?.ContentHash??"");
+      zdo.Set(Prefix+"bindingInstanceId",nextInstance);
       return true;
     }catch(Exception e){error="binding_write_failed:"+e.GetType().Name;return false;}
   }
@@ -125,14 +135,17 @@ sealed class RuntimeRunControlController {
     try{
       if(request.Operation=="preview_reset"){var preview=engine.RunCoordinator().Preview(request.RunId,DateTimeOffset.UtcNow,adapter);Write(request,"previewed","reset_preview_ready",preview,null);return;}
       if(!privateConfirmed()){Write(request,"rejected","private_world_confirmation_required",null,null);return;}
-      var result=engine.RunCoordinator().Apply(request.RunId,request.PreviewToken,DateTimeOffset.UtcNow,adapter,()=>engine.ClearRunEphemera(run.StateKey));
+      var result=engine.RunCoordinator().Apply(request.RunId,request.PreviewToken,DateTimeOffset.UtcNow,
+        adapter,()=>engine.ClearRunEphemera(run.StateKey),successor=>
+          engine.EnsureRunStarted(successor.RunId,out var startError)
+            ?null:startError??"experience_start_failed");
       Write(request,result.State=="completed"?"completed":"failed",result.Detail??result.State,null,result);return;
     }catch(Exception e){Write(request,"rejected",e.Message,null,null);}
   }
   /// <summary>Bind one of the activated pack's experiences. It addresses the pack, not a run, so
   /// it runs before the run lookup — but behind the same machine, world, and private-world gates,
   /// because it changes what Runtime answers to.</summary>
-  void SelectExperience(RuntimeRunControlRequest request){if(!privateConfirmed()){Write(request,"rejected","private_world_confirmation_required",null,null);return;}try{var updated=new QuestPackStore(packRoot).SelectExperience(request.ExperienceId);Write(request,"completed","experience_selected:"+updated.ExperienceId,null,null);}catch(Exception e){Write(request,"rejected",e.Message,null,null);}}
+  void SelectExperience(RuntimeRunControlRequest request){if(!privateConfirmed()){Write(request,"rejected","private_world_confirmation_required",null,null);return;}try{var updated=new QuestPackStore(packRoot).SelectExperience(request.ExperienceId);engine.InvalidateBindingSelection();Write(request,"completed","experience_selected:"+updated.ExperienceId,null,null);}catch(Exception e){Write(request,"rejected",e.Message,null,null);}}
   void ListBindingCandidates(RuntimeRunControlRequest request){try{var candidates=bindings.Candidates();Write(request,"completed","binding_candidates_ready",null,null,candidates,null);}catch(Exception e){Write(request,"rejected",e.Message,null,null);}}
   void BindSelectedExperience(RuntimeRunControlRequest request,string actual){
     if(!privateConfirmed()){Write(request,"rejected","private_world_confirmation_required",null,null);return;}
@@ -142,6 +155,7 @@ sealed class RuntimeRunControlController {
       change=bindings.Bind(request.BindingZdo,actual,selection.Active,selection.Document,DateTimeOffset.UtcNow);
       try{
         new QuestPackStore(packRoot).SelectExperience(request.ExperienceId);
+        engine.InvalidateBindingSelection();
         if(!engine.StartBoundExperience(request.BindingZdo,out var startError))throw new InvalidOperationException(startError??"experience_start_failed");
       }catch(Exception operation){
         var recovery=new System.Collections.Generic.List<string>();
@@ -149,6 +163,8 @@ sealed class RuntimeRunControlController {
         catch(Exception error){recovery.Add("binding:"+error.Message);}
         try{new QuestPackStore(packRoot).RestoreExperienceSelection(selection.Active.ActivationId,selection.PreviousExperienceId);}
         catch(Exception error){recovery.Add("selection:"+error.Message);}
+        try{engine.InvalidateBindingSelection();}
+        catch(Exception error){recovery.Add("cache:"+error.Message);}
         if(recovery.Count>0)throw new InvalidOperationException(operation.Message+";binding_operation_recovery_failed:"+string.Join(",",recovery),operation);
         throw;
       }
@@ -157,7 +173,7 @@ sealed class RuntimeRunControlController {
   }
   void RestoreBinding(RuntimeRunControlRequest request,string actual){
     if(!privateConfirmed()){Write(request,"rejected","private_world_confirmation_required",null,null);return;}
-    try{var change=bindings.Restore(request.BindingZdo,request.BindingChangeId,actual,DateTimeOffset.UtcNow);Write(request,"completed","binding_restored",null,null,null,change);}
+    try{var change=bindings.Restore(request.BindingZdo,request.BindingChangeId,actual,DateTimeOffset.UtcNow);engine.InvalidateBindingSelection();Write(request,"completed","binding_restored",null,null,null,change);}
     catch(Exception e){Write(request,"rejected",e.Message,null,null);}
   }
   Selection ResolveExperience(string experienceId){
@@ -175,7 +191,7 @@ sealed class RuntimeRunControlController {
     var previousExperienceId=active.ExperienceId;active.ExperienceId=experienceId;
     return new Selection{Active=active,Document=compiled.Document,PreviousExperienceId=previousExperienceId};
   }
-  void Write(RuntimeRunControlRequest request,string state,string detail,RuntimeResetPreview preview,RuntimeResetResult result,IReadOnlyList<RuntimeBindingCandidate> candidates=null,RuntimeBindingChange change=null){try{if(!RuntimeRunControlRequestPolicy.CanAddressReceipt(request))throw new InvalidDataException("request_receipt_identity_invalid");var receipt=new RuntimeRunControlReceipt{RequestId=request.RequestId,Operation=request.Operation,State=state,Detail=detail,Machine=Environment.MachineName,WorldUid=worldLoaded()?worldUid():string.Empty,CreatorSessionId=request.CreatorSessionId,CompletedUtc=DateTimeOffset.UtcNow,Preview=preview,Result=result,BindingCandidates=candidates,BindingChange=change};var scope=RuntimeRunControlReceipts.Scope(request.RunId);var scopeDirectory=RuntimeRunControlReceipts.ScopeDirectory(packRoot,scope);Directory.CreateDirectory(scopeDirectory);string path=RuntimeRunControlReceipts.ReceiptPath(packRoot,scope,request.RequestId);string temp=path+".tmp";File.WriteAllText(temp,JsonConvert.SerializeObject(receipt,Formatting.Indented));if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);PruneReceipts(scope);var addressed=result?.NewRunId??request.RunId;var run=string.IsNullOrWhiteSpace(addressed)?null:engine.RunCoordinator().Registry.Find(addressed);ActiveSet active=null;try{active=new QuestPackStore(packRoot).ReadActive();}catch{}runtimeReceipts.Write(new RuntimeReceipt{Operation=request.Operation,Status=state,Error=state is "completed" or "previewed"?null:detail,PackId=active?.PackId,Version=active?.Version,ActivationId=active?.ActivationId,RunId=run?.RunId??addressed,WorldId=run?.Scope?.WorldId??change?.WorldId??(worldLoaded()?worldUid():null),ExperienceId=run?.Scope?.ExperienceId??request.ExperienceId??change?.Applied?.ExperienceId,ContentHash=run?.Scope?.ContentHash??change?.Applied?.ContentHash??active?.ContentHash,BindingZdo=run?.Scope?.BindingZdo??request.BindingZdo,CorrelationId=change?.ChangeId??result?.ResetId??preview?.PreviewToken??request.RequestId,CandidateCount=candidates?.Count??0,Diagnostics=Array.Empty<ContractDiagnostic>()});}catch(Exception e){log("[run-control] receipt failed: "+e.Message);}}
+  void Write(RuntimeRunControlRequest request,string state,string detail,RuntimeResetPreview preview,RuntimeResetResult result,IReadOnlyList<RuntimeBindingCandidate> candidates=null,RuntimeBindingChange change=null){try{if(!RuntimeRunControlRequestPolicy.CanAddressReceipt(request))throw new InvalidDataException("request_receipt_identity_invalid");var receipt=new RuntimeRunControlReceipt{RequestId=request.RequestId,Operation=request.Operation,State=state,Detail=detail,Machine=Environment.MachineName,WorldUid=worldLoaded()?worldUid():string.Empty,CreatorSessionId=request.CreatorSessionId,CompletedUtc=DateTimeOffset.UtcNow,Preview=preview,Result=result,BindingCandidates=candidates,BindingChange=change};var scope=RuntimeRunControlReceipts.Scope(request.RunId);var scopeDirectory=RuntimeRunControlReceipts.ScopeDirectory(packRoot,scope);Directory.CreateDirectory(scopeDirectory);string path=RuntimeRunControlReceipts.ReceiptPath(packRoot,scope,request.RequestId);string temp=path+".tmp";File.WriteAllText(temp,JsonConvert.SerializeObject(receipt,Formatting.Indented));if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);PruneReceipts(scope);var addressed=result?.NewRunId??request.RunId;var run=string.IsNullOrWhiteSpace(addressed)?null:engine.RunCoordinator().Registry.Find(addressed);ActiveSet active=null;try{active=new QuestPackStore(packRoot).ReadActive();}catch{}var restored=request.Operation=="restore_binding";var changedReference=restored?change?.Previous:change?.Applied;runtimeReceipts.Write(new RuntimeReceipt{Operation=request.Operation,Status=state,Error=state is "completed" or "previewed"?null:detail,PackId=restored?changedReference?.PackId:active?.PackId,Version=restored?changedReference?.Version:active?.Version,ActivationId=restored?null:active?.ActivationId,RunId=run?.RunId??addressed,WorldId=run?.Scope?.WorldId??change?.WorldId??(worldLoaded()?worldUid():null),ExperienceId=run?.Scope?.ExperienceId??request.ExperienceId??changedReference?.ExperienceId,ContentHash=run?.Scope?.ContentHash??changedReference?.ContentHash??(restored?null:active?.ContentHash),BindingZdo=run?.Scope?.BindingZdo??change?.ResolvedBindingZdo??request.BindingZdo,BindingInstanceId=run?.Scope?.BindingInstanceId??changedReference?.BindingInstanceId,CorrelationId=change?.ChangeId??result?.ResetId??preview?.PreviewToken??request.RequestId,CandidateCount=candidates?.Count??0,Diagnostics=Array.Empty<ContractDiagnostic>()});}catch(Exception e){log("[run-control] receipt failed: "+e.Message);}}
   sealed class Selection{public ActiveSet Active;public ExperienceDocument Document;public string PreviousExperienceId;}
   /// <summary>Retention, scoped to the run that was just written. Nothing here can read into
   /// another run's partition, which is the point: this used to order every receipt in one flat

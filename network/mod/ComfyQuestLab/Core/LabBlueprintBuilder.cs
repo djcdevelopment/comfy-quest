@@ -55,8 +55,10 @@ public sealed class LabBlueprintBuilder {
       AccessTools.FieldRefAccess<ZDOMan, Dictionary<ZDOID, ZDO>>("m_objectsByID");
 
   bool _running;
+  string _lastBuildResult = "no build-at request has completed.";
 
   public bool IsRunning { get { return _running; } }
+  public string LastBuildResult { get { return _lastBuildResult; } }
 
   static string BlueprintsDir {
     get {
@@ -312,6 +314,22 @@ public sealed class LabBlueprintBuilder {
   // ---- build -----------------------------------------------------------------------
 
   public IEnumerator Build(MonoBehaviour host, string name, bool sky = false) {
+    return BuildInternal(host, name, sky, false, Vector3.zero, 0f);
+  }
+
+  /// <summary>R&amp;D spatial slice: place the blueprint's minimum local corner at one exact
+  /// world position and compose one whole-building yaw with every piece rotation.</summary>
+  public IEnumerator BuildAt(
+      MonoBehaviour host, string name, float x, float y, float z, float yawDegrees) {
+    return BuildInternal(host, name, false, true, new Vector3(x, y, z), yawDegrees);
+  }
+
+  IEnumerator BuildInternal(
+      MonoBehaviour host, string name, bool sky, bool exactPlacement,
+      Vector3 requestedOrigin, float requestedYaw) {
+    _lastBuildResult = exactPlacement
+        ? "build-at did not reach completion."
+        : "ordinary build does not publish a placement receipt.";
     if (_running) {
       Report("already building.");
       yield break;
@@ -372,8 +390,8 @@ public sealed class LabBlueprintBuilder {
     // Ground mode builds at the player's feet. Sky mode anchors on whatever the
     // crosshair is aimed at — sampled NOW, before anything exists to hit — and rides
     // SkyLift above it, exactly the gallery's raised-platform move.
-    Vector3 anchor = player.transform.position;
-    if (sky && !TryCursorPoint(out anchor)) {
+    Vector3 anchor = exactPlacement ? requestedOrigin : player.transform.position;
+    if (!exactPlacement && sky && !TryCursorPoint(out anchor)) {
       anchor = player.transform.position + player.transform.forward * 3f;
       Report("no cursor target within range — anchoring just ahead of you instead.");
     }
@@ -383,8 +401,8 @@ public sealed class LabBlueprintBuilder {
     // would hoist the whole building by the tallest bump. The lowest authored piece sits
     // just above the ground (or SkyLift above it); a sloped site will bury or float the
     // edges, and the answer to that is picking flat ground, not per-piece sampling.
-    float ground;
-    if (!TryGroundHeight(anchor, out ground)) {
+    float ground = requestedOrigin.y;
+    if (!exactPlacement && !TryGroundHeight(anchor, out ground)) {
       ground = anchor.y;
     }
     // GetSolidHeight reports the highest solid at this X/Z. Under the raised gallery that
@@ -392,11 +410,18 @@ public sealed class LabBlueprintBuilder {
     // unreachable to every 20 m creator/runtime surface. Ground mode stays at the
     // operator's elevation when the sample is clearly overhead; sky mode deliberately
     // retains the highest-solid behavior before adding SkyLift.
-    if (!sky && ground > anchor.y + 1f) {
+    if (!exactPlacement && !sky && ground > anchor.y + 1f) {
       ground = anchor.y;
     }
-    Vector3 origin = new Vector3(anchor.x, 0f, anchor.z);
-    float baseY = ground + (sky ? SkyLift : GroundClearance) - bp.MinY;
+    Vector3 origin = exactPlacement
+        ? requestedOrigin
+        : new Vector3(anchor.x, 0f, anchor.z);
+    float baseY = exactPlacement
+        ? requestedOrigin.y
+        : ground + (sky ? SkyLift : GroundClearance) - bp.MinY;
+    Quaternion placementRotation = exactPlacement
+        ? Quaternion.Euler(0f, requestedYaw, 0f)
+        : Quaternion.identity;
 
     int placed = 0;
     int failed = 0;
@@ -421,7 +446,9 @@ public sealed class LabBlueprintBuilder {
     int total = bp.BuildablePieceCount;
     Report("building " + mark + " — " + total + " pieces, "
         + (bp.MaxX - bp.MinX).ToString("0") + " x " + (bp.MaxZ - bp.MinZ).ToString("0")
-        + " m " + (sky ? SkyLift.ToString("0") + " m overhead" : "at your feet")
+        + " m " + (exactPlacement
+            ? "at exact XYZ / yaw " + requestedYaw.ToString("0.###", CultureInfo.InvariantCulture)
+            : (sky ? SkyLift.ToString("0") + " m overhead" : "at your feet"))
         + ". Stand back.");
 
     int attempted = 0;
@@ -433,14 +460,22 @@ public sealed class LabBlueprintBuilder {
       if (piece.ScaleRejected) {
         continue;
       }
-      var at = new Vector3(origin.x + piece.PosX, baseY + piece.PosY,
-                           origin.z + piece.PosZ);
+      Vector3 at;
+      if (exactPlacement) {
+        var local = new Vector3(
+            piece.PosX - bp.MinX, piece.PosY - bp.MinY, piece.PosZ - bp.MinZ);
+        at = origin + placementRotation * local;
+      } else {
+        at = new Vector3(origin.x + piece.PosX, baseY + piece.PosY,
+                         origin.z + piece.PosZ);
+      }
       var rot = new Quaternion(piece.RotX, piece.RotY, piece.RotZ, piece.RotW);
       // A zero quaternion (all four components 0) is what a hand-edited line produces;
       // Unity would propagate NaNs through the transform rather than complain.
       if (rot.x == 0f && rot.y == 0f && rot.z == 0f && rot.w == 0f) {
         rot = Quaternion.identity;
       }
+      if (exactPlacement) rot = placementRotation * rot;
 
       GameObject built = Place(prefabs[piece.Prefab], piece.Prefab, at, rot, mark);
       if (built != null) {
@@ -488,6 +523,14 @@ public sealed class LabBlueprintBuilder {
     }
 
     _running = false;
+    _lastBuildResult = exactPlacement
+        ? "build-at " + mark + ": placed=" + placed.ToString(CultureInfo.InvariantCulture)
+            + " failed=" + failed.ToString(CultureInfo.InvariantCulture)
+            + " x=" + requestedOrigin.x.ToString("0.######", CultureInfo.InvariantCulture)
+            + " y=" + requestedOrigin.y.ToString("0.######", CultureInfo.InvariantCulture)
+            + " z=" + requestedOrigin.z.ToString("0.######", CultureInfo.InvariantCulture)
+            + " yaw=" + requestedYaw.ToString("0.######", CultureInfo.InvariantCulture)
+        : "ordinary build completed.";
     Report(mark + " raised: " + placed + " piece(s)"
         + (failed > 0 ? ", " + failed + " failed (see the log)" : "")
         + (sky ? ". The portal at your aim point binds \"" + portalTag + "\"" : "")

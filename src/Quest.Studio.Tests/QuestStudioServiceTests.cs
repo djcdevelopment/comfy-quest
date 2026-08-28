@@ -634,7 +634,9 @@ public sealed class QuestStudioServiceTests : IDisposable
             {
                 Operation = "dev_rebind", Status = "rebound", PackId = active.PackId,
                 Version = active.Version, ContentHash = active.ContentHash, ActivationId = active.ActivationId,
-                CorrelationId = correlation, Diagnostics = Array.Empty<ContractDiagnostic>()
+                ExperienceId = project.ExperienceId, WorldId = "123", BindingZdo = "10:20",
+                BindingInstanceId = "binding-instance-dev", CorrelationId = correlation,
+                Diagnostics = Array.Empty<ContractDiagnostic>()
             }
         });
 
@@ -662,8 +664,26 @@ public sealed class QuestStudioServiceTests : IDisposable
         {
             Operation = "event", Status = "matched", PackId = project.PackId, Version = project.Version,
             ContentHash = played.Receipt!.ContentHash, ActivationId = poll.ActiveSet.ActivationId,
-            CorrelationId = "evt-runtime-observed", CurrentStageId = project.EntryNodeId,
+            ExperienceId = project.ExperienceId, RunId = "run-dev", WorldId = "123",
+            BindingZdo = "10:20", BindingInstanceId = "binding-instance-dev",
+            CorrelationId = "evt-runtime-observed",
+            CurrentStageId = project.EntryNodeId,
             EventName = "chat_sent", Diagnostics = Array.Empty<ContractDiagnostic>()
+        });
+        new RuntimeRunStatusStore(runtimeRoot).Write(new RuntimeRunStatusDocument
+        {
+            ObservedUtc = DateTimeOffset.UtcNow, Machine = "OMEN", WorldUid = "123",
+            Runs = new[]
+            {
+                new RuntimeRunStatusEntry
+                {
+                    RunId = "run-dev", ScopeId = "scope-dev",
+                    ExperienceId = project.ExperienceId, BindingZdo = "10:20",
+                    BindingInstanceId = "binding-instance-dev",
+                    ParticipantIds = new[] { "hero" }, ContentHash = played.Receipt.ContentHash,
+                    StageId = project.EntryNodeId,
+                }
+            }
         });
 
         var view = service.RuntimeStatusView(project.ProjectId);
@@ -781,11 +801,30 @@ public sealed class QuestStudioServiceTests : IDisposable
         var receipts = new RuntimeReceiptStore(runtimeRoot);
         receipts.Write(new RuntimeReceipt { Operation = "bind", Status = "inscribed", PackId = candidate.Manifest.PackId,
             Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, ActivationId = activationId,
+            ExperienceId = project.ExperienceId, WorldId = "123", BindingZdo = "10:20",
+            BindingInstanceId = "binding-instance-live",
             Diagnostics = Array.Empty<ContractDiagnostic>() });
         receipts.Write(new RuntimeReceipt { Operation = "event", Status = "ignored", PackId = candidate.Manifest.PackId,
             Version = candidate.Manifest.Version, ContentHash = candidate.ContentHash, EventName = "chat_sent", EventTarget = "normal",
             ActivationId = activationId, CurrentStageId = "start", CurrentCount = 1, RequiredCount = 2,
+            ExperienceId = project.ExperienceId, RunId = "run-live", WorldId = "123", BindingZdo = "10:20",
+            BindingInstanceId = "binding-instance-live",
             Diagnostics = Array.Empty<ContractDiagnostic>() });
+        new RuntimeRunStatusStore(runtimeRoot).Write(new RuntimeRunStatusDocument
+        {
+            ObservedUtc = DateTimeOffset.UtcNow, Machine = "OMEN", WorldUid = "123",
+            Runs = new[]
+            {
+                new RuntimeRunStatusEntry
+                {
+                    RunId = "run-live", ScopeId = "scope-live",
+                    ExperienceId = project.ExperienceId, BindingZdo = "10:20",
+                    BindingInstanceId = "binding-instance-live",
+                    ParticipantIds = new[] { "hero" }, ContentHash = candidate.ContentHash,
+                    StageId = "start",
+                }
+            }
+        });
 
         var status = service.RuntimeStatus(project.ProjectId);
         Assert.Equal("bound", status.Phase);

@@ -6,9 +6,9 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Json;
 using System.Security.Cryptography;
 using System.Text;
+using Newtonsoft.Json;
 
 /// <summary>One portable, Unity-free description of a captured world piece.</summary>
 [DataContract]
@@ -71,8 +71,12 @@ public static class LabCaptureContract {
   public const float MinRadius = 1f;
   public const float MaxRadius = 40f;
 
-  static readonly DataContractJsonSerializer Serializer =
-      new DataContractJsonSerializer(typeof(LabCaptureArtifact));
+  static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings {
+    Culture = CultureInfo.InvariantCulture,
+    DateParseHandling = DateParseHandling.None,
+    MissingMemberHandling = MissingMemberHandling.Error,
+    MaxDepth = 32,
+  };
 
   public static LabCaptureArtifact Create(string name, string selection, float radius,
                                           IEnumerable<LabCapturePiece> pieces) {
@@ -97,16 +101,12 @@ public static class LabCaptureContract {
     if (!TryValidate(artifact, out error)) {
       throw new InvalidDataException(error);
     }
-    using (var stream = new MemoryStream()) {
-      Serializer.WriteObject(stream, artifact);
-      return Encoding.UTF8.GetString(stream.ToArray());
-    }
+    return JsonConvert.SerializeObject(artifact, Formatting.None, SerializerSettings);
   }
 
   public static LabCaptureArtifact Deserialize(string json) {
-    using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json ?? string.Empty))) {
-      return Serializer.ReadObject(stream) as LabCaptureArtifact;
-    }
+    return JsonConvert.DeserializeObject<LabCaptureArtifact>(json ?? string.Empty,
+      SerializerSettings);
   }
 
   public static bool TryValidate(LabCaptureArtifact artifact, out string error) {

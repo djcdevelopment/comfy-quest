@@ -216,8 +216,9 @@ not hosted by another Quest gateway:
     tools/workbench-provider/New-QuestWorkbenchProvider.ps1
 
 Mount the resulting verified zip read-only into an explicit Isolate profile. Isolate owns gateway
-authentication, caller identity, provider loading, and lifecycle; Quest owns only four
-fixed-mailbox tools for Runtime status, receipts, and Creator-Session-pinned creator/run controls.
+authentication, caller identity, provider loading, and lifecycle; Quest owns only five
+fixed-mailbox tools for bounded Runtime status and receipts, Creator-Session-pinned creator/run
+controls, and hash-verified ground-only replay of one reviewed Lab Godbuild.
 The bounded status result includes the current non-secret Creator Session identity, so a caller
 can derive the next control request without reading harness state or asking a human to relay it.
 The installed ERA17 slices are indexed in `docs/evidence/isolate-era17-runtime-20260827-r1.json`

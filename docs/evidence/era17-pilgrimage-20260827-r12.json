@@ -1,0 +1,240 @@
+{
+  "schema": "comfy-quest-era17-pilgrimage-evidence/v1",
+  "recorded_on": "2026-08-27",
+  "result": "cold_binding_durable_five_stage_opening_activated_and_ready_for_creative_play",
+  "source_revision": "38a16dcbbe4ae5986af9bc4a29939998734b26a5",
+  "source_dirty": true,
+  "local_evidence_root": "C:\\work\\comfy-quest\\captures\\broken-way-campaign",
+  "local_evidence_is_ignored": true,
+  "installed_identity": {
+    "machine": "OMEN",
+    "world_uid": "-523956327",
+    "world_name": "ComfyEra17",
+    "character_profile": "tugcorp",
+    "character_name": "Tugcorp",
+    "steam_account_id": "128445914",
+    "steam_account_name": "floooooobcakes",
+    "steam_persona_name": "wary.fool",
+    "creator_session_id": "era17-pilgrimage-20260827-r12",
+    "world_entry_request_id": "world-entry-6338716628d3438a887fe90a210af91e",
+    "world_entry_completed_utc": "2026-08-28T05:41:24.1652901+00:00",
+    "runtime_dll_sha256": "eacd8a09a506a48bded0f4414120ffb1cd582a7fb8b3c95ab1ec9f5c193989a4",
+    "contracts_dll_sha256": "93d7ee866563b8a8ceb20ad081739660dadf1af308fe29c98efb5bf82ccae46c",
+    "lab_dll_sha256": "4a19455e213549d4f137d4decda632e26a581aba4a9c7be751c0de9762804377"
+  },
+  "provider_release": {
+    "archive": "artifacts/quest-workbench-provider/comfy-quest-workbench-provider.zip",
+    "archive_sha256": "ac383971402302b3bf55b75300d67dab05c1bc6bf427e231cbbac982ffb1d7b8",
+    "archive_bytes": 5666,
+    "provider_sha256": "cc83fd888f17c327c7e7e4f2e2668bd22c62d719b705b5a65e5facc5f81ffad9",
+    "manifest_sha256": "3614629e7ff82eaa6e304a1af8ba6920981eed51821af3b04c8188f74ab32ae9",
+    "status_schema": "comfy-quest-workbench-status/v1",
+    "participant_projection": "participant_count_only"
+  },
+  "cold_durability": {
+    "creator_session_id": "era17-pilgrimage-20260827-r9",
+    "operation_rule": "No Arm, bind, or select operation occurred between the pre-cold and post-cold status reads.",
+    "run_id": "run-20260828T044359704Z-e5dc6393",
+    "scope_id": "scope-36a0c31b4020e272a702df76f0de3e53",
+    "experience_id": "quest-0d3372",
+    "binding_instance_id": "binding-20260828T044359683Z-fc3f2842",
+    "content_hash": "6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e",
+    "stage_id": "start",
+    "participant_count": 1,
+    "pre_cold_binding_zdo": "1:3177522",
+    "post_cold_binding_zdo": "1:3177521",
+    "proof_files": {
+      "pre_cold_runs.json": "8ef6b2c77ad30b93060949e26eb6c78fa9015e5e9cd15a40a05cec7235324c6a",
+      "post_cold_runs.json": "51920ec1c226626928a5db4081e600842b63ddacc8349dd2da424f934d8f7bee",
+      "post_cold_world-entry.json": "a388cfe591c9e986bca6d6a875244780f576ef495728ea94c89538cc644e7488",
+      "pre_cold_bind-receipt.json": "d26f0f4c3aee181ed07a2e90e1e26243ee665d54a55acdcd9311aca18f4efe59"
+    }
+  },
+  "authored_opening": {
+    "guild_id": "guild-2de197289aea",
+    "guild_title": "Pilgrimage of Ash and Ice",
+    "guild_revision": 29,
+    "guild_version": "0.1.3",
+    "guild_content_hash": "197bd6002f162c70ac25c2007ab587728e66d7dd58491eb20d333883bd1fb702",
+    "guild_package_sha256": "03107b9a1b7659b592796ee5abcf5d999cdc56c3af3b810f8bbec40b81a0aa31",
+    "project_id": "project-b1b79f0d3372",
+    "project_revision": 8,
+    "project_version": "1.0.1",
+    "experience_id": "quest-0d3372",
+    "title": "The Name in Ash",
+    "project_certification_hash": "6e09a61befa7eada0621a71a1ce1c1303aa0dac29b0d227056a7d74764021afd",
+    "binding_target": "sign",
+    "stages": [
+      {
+        "id": "start",
+        "route": "hear-the-ash",
+        "trigger": "experience_started",
+        "next": "name-in-ash"
+      },
+      {
+        "id": "name-in-ash",
+        "route": "name-the-pilgrim",
+        "trigger": "sign_written on the exact bound sign and player within 8 m",
+        "effects": ["grant Resin", "message"],
+        "next": "resin-offering"
+      },
+      {
+        "id": "resin-offering",
+        "route": "offer-resin",
+        "trigger": "drop Resin",
+        "effects": ["spawn one Greyling at radius 6", "message"],
+        "next": "greyling-trial"
+      },
+      {
+        "id": "greyling-trial",
+        "route": "break-cinder-thing",
+        "trigger": "local-player kill of $enemy_greyling and spawned_enemies_cleared >= 1 for raise-ash-greyling",
+        "effects": ["grant Resin", "grant Stone", "message"],
+        "next": "pilgrim-choice"
+      },
+      {
+        "id": "pilgrim-choice",
+        "routes": [
+          {
+            "id": "carry-memory",
+            "priority": 200,
+            "trigger": "drop Resin",
+            "outcome": "complete"
+          },
+          {
+            "id": "carry-oath",
+            "priority": 100,
+            "trigger": "drop Stone",
+            "outcome": "complete"
+          }
+        ]
+      }
+    ],
+    "rehearsal": {
+      "guided_complete": true,
+      "guided_path": "carry-memory",
+      "manual_memory_complete": true,
+      "manual_oath_complete": true,
+      "proof_level": "rehearsal",
+      "disclaimer": "Synthetic rehearsal only; this does not prove a Valheim adapter or live mutation.",
+      "limitations": [
+        "Route break-cinder-thing waits for staged objects to be cleared; rehearsal removes one on request, while live Runtime observes the object gone.",
+        "Stage pilgrim-choice has two routes; guided rehearsal followed carry-memory."
+      ]
+    }
+  },
+  "hot_activation": {
+    "observed_failed_branch": {
+      "creator_session_id": "era17-pilgrimage-20260827-r11",
+      "guild_revision": 28,
+      "guild_version": "0.1.2",
+      "activation_id": "act-20260828T053113350Z-028760a2",
+      "diagnostic": "active_experience_ambiguous",
+      "cause": "Same-guild activation cleared the explicit experience selector before an eight-experience pack was rebound. Runtime refused to guess."
+    },
+    "correction": "Same-pack activation now retains an explicit selector only when the new archive resolves that exact experience once. Removed, duplicated, unreadable, and cross-pack selectors still clear.",
+    "final": {
+      "creator_session_id": "era17-pilgrimage-20260827-r12",
+      "guild_revision": 29,
+      "guild_version": "0.1.3",
+      "activation_id": "act-20260828T054222834Z-e91eac71",
+      "activation_correlation_id": "dev-20260828T054222812Z-325bb1a4",
+      "experience_id": "quest-0d3372",
+      "run_id": "run-20260828T054222875Z-f3bc2ff5",
+      "scope_id": "scope-00e2758c59269d64eda0e82c3d625226",
+      "binding_instance_id": "binding-20260828T044359683Z-fc3f2842",
+      "binding_zdo": "1:3177522",
+      "stage_id": "name-in-ash",
+      "opening_event": "experience_started",
+      "opening_route": "hear-the-ash",
+      "participant_count": 1,
+      "additional_select_bind_or_move_requests": 0,
+      "superseded_historical_bindings": "skipped_with_superseded_binding"
+    }
+  },
+  "studio": {
+    "phase": "bound",
+    "active_relation": "current",
+    "active_title": "The Name in Ash",
+    "current_stage_id": "name-in-ash",
+    "dev_connected": true,
+    "dev_armed": true,
+    "dev_published": true,
+    "dev_state": "watching",
+    "last_rejection": null,
+    "pass_lines": [
+      "Validation:PASS",
+      "Transfer:PASS",
+      "Activation:PASS",
+      "Rebind:PASS",
+      "Runtime observed:PASS"
+    ]
+  },
+  "action_execution_hardening": {
+    "proof_level": "source_build_and_read_only_red_team",
+    "build_result": "ComfyQuestRuntime Release build succeeded with 0 warnings and 0 errors.",
+    "properties": [
+      "Durable action ledger distinguishes reserved from committed actions and migrates v1 completed keys fail-closed.",
+      "Grant capacity and spawn identity/capacity are checked before reservation.",
+      "Successful mutation commits before evidence so receipt failure cannot duplicate it.",
+      "Ambiguous post-mutation failure stays pending rather than risking a duplicate reward or spawn.",
+      "Partial spawn cleanup records each exact tagged ZDO and proves absence in the same ZDO manager/session before release and route-scoped replay.",
+      "Run reset, content change, world unload, and stale replay cannot advance a retired or later stage."
+    ]
+  },
+  "next_human_input": {
+    "purpose": "creative play and judgment only",
+    "steps": [
+      "Write a natural pilgrim name on the already-bound nearby sign while standing within 8 m.",
+      "Drop the granted Resin to make the ash answer.",
+      "Kill the spawned Greyling yourself.",
+      "Choose what the pilgrim carries by dropping Resin for memory or Stone for oath."
+    ],
+    "bound_sign": {
+      "binding_zdo": "1:3177522",
+      "binding_instance_id": "binding-20260828T044359683Z-fc3f2842",
+      "distance_metres_at_r9_scan": 3.2
+    },
+    "judgments": [
+      "whether the opening cue and sign affordance are clear",
+      "whether each response lands promptly and explains the next possibility",
+      "whether the Greyling beat is placed and paced well",
+      "whether the final Resin-versus-Stone choice feels meaningful",
+      "what to keep, revise, or reject"
+    ]
+  },
+  "evidence_files": {
+    "r9_pre_cold_root": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r9\\durability-proof\\pre-cold",
+    "r9_post_cold_root": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r9\\durability-proof\\post-cold",
+    "r12_root": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r12",
+    "r12_final_live_proof": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r12\\final-live-proof",
+    "r12_session_json_sha256": "93ef2331a807825a19b24c2e54de0c5b809e519a2fb491d11e0f406b4ba25bae",
+    "runtime_transition_receipt_sha256": "fb8fd61eae18b951f6ac63e82f89f269d4fb51a33c2cdfbe9be52eb380b69fed",
+    "runtime_rebind_receipt_sha256": "4b4e0c26f15381b9904a87a3b63caa5dd47643b8974141dc0b408f16e984a2af"
+  },
+  "verification": {
+    "tests_run_in_this_rnd_continuation": false,
+    "reason": "The explicitly requested /rnd mode remains unlocked; it forbids test-file work and baseline test execution until /rnd --lock.",
+    "builds": [
+      "ComfyQuestRuntime Release: 0 warnings, 0 errors",
+      "Quest.Studio.Host Release with package-hash-keyed NuGet cache: 0 warnings, 0 errors"
+    ],
+    "executed_choreography": [
+      "r9 pre-cold status -> graceful stop -> cold launch -> first read-only status",
+      "r12 Prepare -> Launch -> Arm -> Studio Play revision 29 -> automatic activation/rebind/start -> Isolate status -> fresh Studio status"
+    ]
+  },
+  "limitations": [
+    "Derek has not yet supplied the creative acceptance verdict; this record proves seat readiness, not that the experience is good.",
+    "Guided/manual rehearsal is synthetic and does not prove Valheim mutation; installed Runtime currently proves only activation, rebind, opening message action, and advancement to name-in-ash before the human play beats.",
+    "Spawn recovery queues are memory-only. Process or network-generation change preserves pending claims and rows for explicit reset rather than attempting automatic replay.",
+    "Spawn reset still records physical ZDO ids; a cold reload can reassign them, so cold cleanup of a partially spawned batch is not claimed.",
+    "There is a narrow crash window between tagging a newly spawned ZDO and persisting its row.",
+    "Spawn placement is a fixed offset from the binding and does not prove terrain or NavMesh clearance.",
+    "The kill signal and spawned-enemies-cleared tally are not mathematically subject-correlated, and the kill must be attributed to the local player.",
+    "Binding restore discovery remains bounded to 32 candidates within 20 m; global duplicate-marker uniqueness and the restore-to-empty crash window are not proven.",
+    "An ambiguous post-mutation action remains fail-closed pending and requires reset; a retained in-memory retry may repeat its warning but cannot duplicate the mutation.",
+    "The dev channel is intentionally retained armed with the game and Studio running for Derek's creative sitting; no production community release or final teardown is claimed.",
+    "Clean volunteer-machine Isolate setup, generated per-lap credentials, image source revision, and correlated teardown remain outside this evidence."
+  ]
+}

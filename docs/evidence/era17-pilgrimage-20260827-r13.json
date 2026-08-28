@@ -1,0 +1,202 @@
+{
+  "schema": "comfy-quest-era17-pilgrimage-evidence/v1",
+  "recorded_on": "2026-08-28",
+  "local_session_date": "2026-08-27",
+  "result": "world_specific_connection_caches_restored_and_recurring_static_topology_observed",
+  "source_revision": "38a16dcbbe4ae5986af9bc4a29939998734b26a5",
+  "source_dirty": true,
+  "local_evidence_root": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r13",
+  "local_evidence_is_ignored": true,
+  "session_json_sha256_at_evidence_capture": "4f678ecca5aa123723f5ecba6ec15bc8e475ea79b682f66cd1828258d15e32ab",
+  "installed_identity": {
+    "machine": "OMEN",
+    "world_uid": "-523956327",
+    "world_name": "ComfyEra17",
+    "character_profile": "tugcorp",
+    "character_name": "Tugcorp",
+    "steam_account_id": "128445914",
+    "steam_account_name": "floooooobcakes",
+    "steam_persona_name": "wary.fool",
+    "creator_session_id": "era17-pilgrimage-20260827-r13",
+    "quest_files": {
+      "ComfyQuestLab.dll": "4a19455e213549d4f137d4decda632e26a581aba4a9c7be751c0de9762804377",
+      "ComfyQuestRuntime.dll": "eacd8a09a506a48bded0f4414120ffb1cd582a7fb8b3c95ab1ec9f5c193989a4",
+      "ComfyQuestContracts.dll": "93d7ee866563b8a8ceb20ad081739660dadf1af308fe29c98efb5bf82ccae46c",
+      "Newtonsoft.Json.dll": "e1e27af7b07eeedf5ce71a9255f0422816a6fc5849a483c6714e1b472044fa9d"
+    }
+  },
+  "human_play_observation": {
+    "source": "Derek's first-hand r12 play report",
+    "stage_reached": "pilgrim-choice",
+    "mechanical_problem": "hard freeze every ~3 seconds was distracting",
+    "experience_otherwise": "pretty inspiring",
+    "interpretation_boundary": "The report is creative and perceptual evidence. It does not by itself identify the cache mechanism or prove the r13 rescue removed the perceived stall.",
+    "remaining_human_input": "Choose Resin for memory or Stone for oath, then judge whether the recurring distraction is gone and what should be kept or revised."
+  },
+  "cleanup_regression": {
+    "pre_cleanup_capture": "C:\\work\\comfy-quest\\captures\\install-cleanup\\omen-era17-20260827T102804Z",
+    "removed_support": "ComfyNetworkSense 0.5.80 and its managed dependency closure were non-Quest installed files, so the OMEN cleanup removed the connection-cache support ERA17 had been using.",
+    "r12_effect": "The retained Quest deployment no longer contained NetworkSense support. ERA17 fell back to Valheim's full portal and spawner connection scans while Derek was playing.",
+    "mechanical_evidence": [
+      "The preserved pre-cleanup log loads ComfyNetworkSense 0.5.80 and records its cached portal and spawner joins.",
+      "The r12 Creator Session inventory contains only the four Quest deployment files and no NetworkSense support closure.",
+      "The external-support manifest records that its bytes were preserved before cleanup removed non-Quest plugins."
+    ],
+    "causal_limit": "The missing support and fallback scans are machine-evidenced; the approximately three-second cadence is Derek's observation. Human confirmation that r13 removed the distraction remains outstanding."
+  },
+  "world_support_release": {
+    "package_id": "comfy-network-sense-portal-support",
+    "version": "0.5.80",
+    "release_id": "m7-c10b-20260807-r42",
+    "upstream_owner": "networksense",
+    "manifest": "tools/creator-session/world-support/ComfyNetworkSense.PortalSupport.0.5.80/manifest.json",
+    "manifest_sha256": "4dfe35b285541ca9c2db204672bef710715f31727f17615f62d2b11322a94e16",
+    "configuration": {
+      "name": "djcdevelopment.valheim.comfynetworksense.cfg",
+      "profile": "large_world_connection_caches_only",
+      "sha256": "b107fb269a25ef58f4318e7b42e9b560f5f19dbf8f41e6f6ef05ba764c73c083",
+      "enabled_capabilities": [
+        "portal_connection_dirty_tag_cache",
+        "spawner_connection_hash_cache"
+      ]
+    },
+    "files": [
+      {
+        "name": "ComfyNetworkSense.dll",
+        "bytes": 915456,
+        "sha256": "08bf698bba43cc9a25b79cc7222f3f2ac29d4e0ef18ea0128ccf42e9892c4e36"
+      },
+      {
+        "name": "System.Buffers.dll",
+        "bytes": 23816,
+        "sha256": "2d78d770c9cb997199154ae8c018b9f1d1efbc86729f7264dde6dbad2a12cac3"
+      },
+      {
+        "name": "System.Memory.dll",
+        "bytes": 145200,
+        "sha256": "d5e8e4866f9cfa66f7765660f84b210198893e55335487afe5ebda342c0e913d"
+      },
+      {
+        "name": "System.Numerics.Vectors.dll",
+        "bytes": 110344,
+        "sha256": "20c2fa81b8c70d651099d762954f285fd4f942e63b2d7217c145dab8d4b2f4c9"
+      },
+      {
+        "name": "System.Runtime.CompilerServices.Unsafe.dll",
+        "bytes": 19256,
+        "sha256": "08cbd7278b66f1e68425a82d4b97181a4130d93e3dd91831407aba7212ccdacf"
+      }
+    ],
+    "provenance": "Captured installed support bytes, pinned by size and SHA-256; not an authenticated upstream publication."
+  },
+  "launcher_edge": {
+    "first_attempt": {
+      "request": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r13\\20260828T062039Z-launch\\world-entry-request.json",
+      "request_sha256": "013123556315a69139ad6c00a27f4307a77bcee570775eff25a290b58ae0192a",
+      "game_side_result": "entered",
+      "entered_receipt_recovered_by_stop": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r13\\20260828T062431Z-stop\\world-entry.json",
+      "entered_receipt_sha256": "4c65757d00ef0e433f0da1e0ef779aa73f22eec5d4ae5c89d8feaac9ff831363",
+      "completed_utc": "2026-08-28T06:21:46.920827+00:00",
+      "launcher_result": "rejected",
+      "cause": "[IO.File]::ReadAllText requested sharing incompatible with BepInEx's open LogOutput.log. The caught sharing failure reset the sampled text to empty, so every required support signal appeared missing even though the game had entered and emitted them."
+    },
+    "correction": "The launcher now opens the live log with FileShare.ReadWrite | FileShare.Delete, copies it through that shared handle, validates the exact evidence copy, and only then hashes it.",
+    "proof_level": "executed_choreography",
+    "test_claim": false
+  },
+  "successful_launch": {
+    "evidence_directory": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r13\\20260828T062556Z-launch",
+    "operation_json_sha256": "0e0b62854de5f418e66526eeec8102256ec5fbffd6063dfb5185f98692a7cb85",
+    "world_support_log_sha256": "ec8035c300777c3307b519228d94f64ce7bd4b9cc1e6edd46562d7e793bde615",
+    "world_entry_request_sha256": "a6c75ad6b599d2449d5c533b562e7493a2099b8f1dee22b9513960882304623f",
+    "world_entry_receipt_sha256": "ab2d2839cd21b6f1f33a687420cafd13925caa71d4755517e324ad71684dd006",
+    "request_id": "world-entry-3a59a84dda3c41b7a90ea9f17b3e9154",
+    "request_created_utc": "2026-08-28T06:25:56.2025597+00:00",
+    "world_entry_completed_utc": "2026-08-28T06:27:08.3620021+00:00",
+    "operation_completed_utc": "2026-08-28T06:27:10.1635267+00:00",
+    "state": "entered",
+    "detail": "world_entry_complete",
+    "cached_startup": {
+      "saved_portal_links_connected": 5171,
+      "portal_sources": 5171,
+      "portal_targets": 5171,
+      "spawner_sources": 92359,
+      "spawner_targets": 19493,
+      "spawner_connected": 19493,
+      "spawner_done": 72866,
+      "locations_loaded": 18167
+    },
+    "forbidden_signals_absent": [
+      "ConnectPortals =>",
+      "ConnectSpawners =>",
+      "Could not load [ComfyNetworkSense",
+      "TypeLoadException",
+      "FileNotFoundException"
+    ]
+  },
+  "periodic_static_topology_proof": {
+    "evidence_directory": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r13\\20260828T062815Z-periodic-support",
+    "periodic_proof_json_sha256": "e71ab3dc8c1a52a91103f00cb0591c0081328f6655396591b8e45e4596c6dfbb",
+    "world_support_log_sha256": "0a0b9ddde9b8c4a42810808d041686d0a6348c4f253319d988b2f7a4e3f0ecad",
+    "captured_utc": "2026-08-28T06:30:08.2713723+00:00",
+    "valheim_responding": true,
+    "cycles": [
+      {
+        "local_time": "2026-08-27T23:27:15-07:00",
+        "portal_objects": 13875,
+        "dirty_tags": 0,
+        "connected": 0,
+        "disconnected": 0,
+        "force_send": 0
+      },
+      {
+        "local_time": "2026-08-27T23:28:15-07:00",
+        "portal_objects": 13875,
+        "dirty_tags": 0,
+        "connected": 0,
+        "disconnected": 0,
+        "force_send": 0
+      },
+      {
+        "local_time": "2026-08-27T23:29:15-07:00",
+        "portal_objects": 13875,
+        "dirty_tags": 0,
+        "connected": 0,
+        "disconnected": 0,
+        "force_send": 0
+      }
+    ],
+    "claim_boundary": "This proves recurring cached execution for ERA17's current static topology. It does not prove human portal traversal, live portal creation or retagging, or that Derek no longer perceives the stall."
+  },
+  "quest_continuity": {
+    "arm_evidence_directory": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r13\\20260828T062835Z-arm",
+    "arm_operation_sha256": "b2b394d059093c25c78dac04f5e40bca43ec453a9c0b68597b34c05ae8f94984",
+    "arm_receipt_sha256": "617fcf81c033045bf121fdff5a0d5bde1fd0b3b01728b947c73efa7463a4e331",
+    "arm_detail": "dev_channel_armed",
+    "dev_state": "watching",
+    "active_pack_id": "guild-2de197289aea",
+    "active_version": "0.1.3",
+    "active_content_hash": "197bd6002f162c70ac25c2007ab587728e66d7dd58491eb20d333883bd1fb702",
+    "active_activation_id": "act-20260828T054222834Z-e91eac71",
+    "current_stage_id": "pilgrim-choice",
+    "continuity_claim": "The r13 cold launch and Arm preserved the active r12 quest at pilgrim-choice; no replay of Derek's completed sign, offering, or Greyling beats was requested."
+  },
+  "verification": {
+    "tests_run": false,
+    "build_claim": false,
+    "executed_choreography": [
+      "The first r13 launch entered the correct world but exposed the launcher's shared-log read defect.",
+      "The corrected cold Launch entered the exact account/profile/world, captured and validated the support log, and wrote operation.json.",
+      "A separate periodic snapshot captured three recurring full-world cache cycles one minute apart.",
+      "Arm completed and reported the retained quest at pilgrim-choice."
+    ]
+  },
+  "limitations": [
+    "The support DLL is an unsigned captured external artifact. SHA-256 pins exact bytes but is not a publisher signature or an independently authenticated NetworkSense release.",
+    "ComfyNetworkSense 0.5.80 registers the full assembly patch graph at load. The sanitized profile disables its master activity switch and every telemetry, automation, MCP, HUD, probe, and network-cutover boolean, but it cannot turn this binary into a narrow cache-only assembly.",
+    "Portal runtime indexing is safe to claim only for the current static topology. Version 0.5.80 initializes its tag index before bulk world load and invalidates by ZDOMan identity rather than load generation, so portal creation or retagging after load is outside the claim.",
+    "The periodic proof observed idle recurring cache cycles; it did not traverse a portal or author a portal.",
+    "Derek has not yet confirmed in play that the distracting recurring freeze is gone, nor supplied the final Resin-or-Stone choice verdict.",
+    "This tactical restore does not replace a thin, published NetworkSense support release with generation-correct portal indexing and fail-open patch compatibility."
+  ]
+}

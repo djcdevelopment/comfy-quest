@@ -1,0 +1,16 @@
+{
+  "schema": "comfy-quest-creator-world-support/v1",
+  "worlds": [
+    {
+      "world_uid": "-523956327",
+      "world_name": "ComfyEra17",
+      "reason": "ERA17 contains thousands of portals; vanilla Game.ConnectPortals performs a full main-thread scan on its recurring coroutine and causes multi-second play stalls.",
+      "package_manifest": "tools/creator-session/world-support/ComfyNetworkSense.PortalSupport.0.5.80/manifest.json",
+      "package_manifest_sha256": "4dfe35b285541ca9c2db204672bef710715f31727f17615f62d2b11322a94e16",
+      "required_capabilities": [
+        "portal_connection_dirty_tag_cache",
+        "spawner_connection_hash_cache"
+      ]
+    }
+  ]
+}

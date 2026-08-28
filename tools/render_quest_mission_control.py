@@ -1257,7 +1257,7 @@ def render(manifest: dict[str, Any]) -> str:
 
   <section id="program" class="section" aria-labelledby="program-title"><div class="section-head"><div><span class="eyebrow">Five-intent program</span><h2 id="program-title">Guild dogfooding is the adoption path.</h2></div><p>Phase state is a cited program snapshot, not a live inference from checkboxes.</p></div><ol class="phase-list">{phases}</ol></section>
 
-  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">Adoption path</span><h2 id="queue-title">Integrate guild scale, drive it, then dogfood</h2></div><p>Portfolio and rerun are implemented. Standalone automation and guild-scale Runtime come next; world packaging waits until R&D stabilizes.</p></div><div class="queue-grid">{queue_cards}</div>
+  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">Adoption path</span><h2 id="queue-title">Drive the guild, judge it, then release it</h2></div><p>Portfolio, rerun, and guild-scale Runtime are implemented. ERA17 4B is active with a prepared creative seat; standalone portability remains bounded follow-up and world packaging waits until R&amp;D stabilizes.</p></div><div class="queue-grid">{queue_cards}</div>
     {phase3_panel}
   </section>
 

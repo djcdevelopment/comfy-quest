@@ -51,11 +51,11 @@ public sealed class RuntimeBindingTests {
       persisted.State="pending";
       File.WriteAllText(path,JsonConvert.SerializeObject(persisted,Formatting.Indented));
       adapter.Force("10:20",new RuntimeBindingReference{PackId=persisted.Applied.PackId,
-        ExperienceId=persisted.Applied.ExperienceId});
+        ExperienceId=persisted.Applied.ExperienceId,BindingInstanceId=persisted.Applied.BindingInstanceId});
       Assert.Equal("restored",coordinator.Restore("10:20",change.ChangeId,"123",DateTimeOffset.UtcNow).State);
 
       var second=coordinator.Bind("10:20","123",Active("alpha"),Document("alpha"),DateTimeOffset.UtcNow);
-      adapter.Force("10:20",new RuntimeBindingReference{PackId="foreign",ExperienceId="foreign",BindingId="default",Version="1.0.0",ContentHash=Hash});
+      adapter.Force("10:20",new RuntimeBindingReference{PackId="foreign",ExperienceId="foreign",BindingId="default",Version="1.0.0",ContentHash=Hash,BindingInstanceId=second.Applied.BindingInstanceId});
       Assert.Equal("binding_restore_state_changed",Assert.Throws<InvalidOperationException>(
         ()=>coordinator.Restore("10:20",second.ChangeId,"123",DateTimeOffset.UtcNow)).Message);
     });
@@ -104,6 +104,24 @@ public sealed class RuntimeBindingTests {
     });
   }
 
+  [Fact]
+  public void CandidateSelectionRetainsEachAvailableTargetKindWhenNearbyPiecesExceedTheBound() {
+    var crowded=Enumerable.Range(1,RuntimeBindingCoordinator.MaxCandidates)
+      .Select(index=>new RuntimeBindingCandidate{BindingZdo="10:"+index,
+        TargetKind="player_built_piece",Label="Nearby piece",DistanceMetres=1d+(index/10d)})
+      .Concat(new[]{new RuntimeBindingCandidate{BindingZdo="20:1",TargetKind="sign",
+        Label="Quest sign",DistanceMetres=5d}}).Reverse().ToArray();
+
+    var selected=RuntimeBindingCandidateSelector.Select(crowded,RuntimeBindingCoordinator.MaxCandidates);
+
+    Assert.Equal(RuntimeBindingCoordinator.MaxCandidates,selected.Count);
+    Assert.Contains(selected,value=>value.BindingZdo=="20:1"&&value.TargetKind=="sign");
+    Assert.DoesNotContain(selected,value=>value.BindingZdo=="10:32");
+    Assert.Equal(selected.Select(value=>value.BindingZdo),
+      RuntimeBindingCandidateSelector.Select(crowded.Reverse(),RuntimeBindingCoordinator.MaxCandidates)
+        .Select(value=>value.BindingZdo));
+  }
+
   static ActiveSet Active(string experience)=>new(){PackId="guild",Version="1.0.0",ContentHash=Hash,ExperienceId=experience};
   static ExperienceDocument Document(string id,params string[] prerequisites)=>new(){Schema=ExperienceSchema.Id,Id=id,EntryStage="start",Prerequisites=prerequisites.ToList(),Stages=new(){new ExperienceStage{Id="start",Transitions=new()}},Bindings=new(){new ExperienceBinding{Id="default",ExperienceId=id,TargetKinds=new(){"sign"}}}};
   static void Complete(RuntimeRunRegistry registry,string experience,string world,string binding,string hash=Hash){var run=registry.Resolve(new RuntimeRunScope{WorldId=world,ExperienceId=experience,BindingZdo=binding,ContentHash=hash,ParticipantIds=new(){"hero"}},false,DateTimeOffset.UtcNow);registry.MarkOutcome(run.RunId,"complete",DateTimeOffset.UtcNow);}
@@ -117,10 +135,10 @@ public sealed class RuntimeBindingTests {
     public IReadOnlyList<RuntimeBindingCandidate> ListCandidates()=>Candidates;
     public RuntimeBindingReference Read(string bindingZdo)=>values.TryGetValue(bindingZdo,out var value)?Clone(value):new RuntimeBindingReference();
     public bool TryWrite(string bindingZdo,RuntimeBindingReference reference,out string error){
-      if(FailNextWritePartially){FailNextWritePartially=false;var partial=Read(bindingZdo);partial.PackId=reference.PackId;partial.ExperienceId=reference.ExperienceId;values[bindingZdo]=partial;error="synthetic_partial_write";return false;}
+      if(FailNextWritePartially){FailNextWritePartially=false;var partial=Read(bindingZdo);if(string.IsNullOrWhiteSpace(partial.BindingInstanceId)&&!string.IsNullOrWhiteSpace(reference.BindingInstanceId))partial.BindingInstanceId=reference.BindingInstanceId;partial.PackId=reference.PackId;partial.ExperienceId=reference.ExperienceId;values[bindingZdo]=partial;error="synthetic_partial_write";return false;}
       values[bindingZdo]=Clone(reference);error=null;return true;
     }
     public void Force(string bindingZdo,RuntimeBindingReference reference)=>values[bindingZdo]=Clone(reference);
-    static RuntimeBindingReference Clone(RuntimeBindingReference value)=>new(){PackId=value.PackId,ExperienceId=value.ExperienceId,BindingId=value.BindingId,Version=value.Version,ContentHash=value.ContentHash};
+    static RuntimeBindingReference Clone(RuntimeBindingReference value)=>new(){PackId=value.PackId,ExperienceId=value.ExperienceId,BindingId=value.BindingId,Version=value.Version,ContentHash=value.ContentHash,BindingInstanceId=value.BindingInstanceId};
   }
 }

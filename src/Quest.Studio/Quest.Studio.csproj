@@ -19,6 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Game.Companion.Tests" />
+    <InternalsVisibleTo Include="Quest.Studio.Tests" />
   </ItemGroup>
   <ItemGroup>
     <!-- Cross-repo boundary (comfy-quest owns Comfy.Quest.Contracts): the compiled assembly only

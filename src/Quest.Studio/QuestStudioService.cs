@@ -338,7 +338,7 @@ public sealed class QuestStudioService
         return result;
     }
     public StudioRuntimeStatus RuntimeStatus(string projectId) =>
-        _workspace.RuntimeStatus(projectId, RuntimePackIdentity(projectId));
+        _workspace.RuntimeStatus(projectId, RuntimePackIdentity(projectId), _runControl.Status(projectId));
     public StudioRuntimeStatusView RuntimeStatusView(string projectId)
     {
         var status = RuntimeStatus(projectId);
@@ -367,7 +367,7 @@ public sealed class QuestStudioService
             DevSessionId = status.DevStatus?.SessionId,
             LastRejection = status.DevStatus?.LastRejection,
             PassLines = ComposePassLines(status.ActiveRelation == "current" && !string.IsNullOrWhiteSpace(active?.ActivationId)
-                ? status.Receipts.Where(receipt => receipt.ActivationId == active.ActivationId).ToArray()
+                ? status.CurrentEvidenceReceipts.Where(receipt => receipt.ActivationId == active.ActivationId).ToArray()
                 : Array.Empty<RuntimeReceipt>())
         };
     }

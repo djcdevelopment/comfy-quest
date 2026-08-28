@@ -1,0 +1,145 @@
+{
+  "schema": "comfy-quest-fastlane-evidence/v1",
+  "recorded_on": "2026-08-28",
+  "result": "demo_world_entered_and_runtime_armed",
+  "source_revision": "38a16dcbbe4ae5986af9bc4a29939998734b26a5",
+  "source_dirty": true,
+  "session_id": "quest-fastlane-20260828-r1",
+  "local_evidence_root": "C:\\work\\comfy-quest\\captures\\creator-session\\quest-fastlane-20260828-r1",
+  "local_evidence_is_ignored": true,
+  "identity": {
+    "machine": "OMEN",
+    "steam_account_id": "128445914",
+    "steam_account_name": "floooooobcakes",
+    "steam_persona_name": "wary.fool",
+    "world_uid": "-7600395338659582326",
+    "world_name": "ComfyQuestDemo",
+    "world_display_name": "Comfy Quest Demo",
+    "character_profile": "questyfour",
+    "character_name": "Questyfour",
+    "world_support": null
+  },
+  "plugin_pins": {
+    "ComfyQuestLab.dll": "3befe196d945cd348fc057cf93180c9a2ad70e8f81ea206662cde8376bad2408",
+    "ComfyQuestRuntime.dll": "eacd8a09a506a48bded0f4414120ffb1cd582a7fb8b3c95ab1ec9f5c193989a4",
+    "ComfyQuestContracts.dll": "93d7ee866563b8a8ceb20ad081739660dadf1af308fe29c98efb5bf82ccae46c",
+    "Newtonsoft.Json.dll": "e1e27af7b07eeedf5ce71a9255f0422816a6fc5849a483c6714e1b472044fa9d"
+  },
+  "prepare": {
+    "prepared_utc": "2026-08-28T07:13:12.4596460+00:00",
+    "session_json_sha256": "20cc76e41298e552f7c1e7599232d9b375ddbdaab86d9e59f43f0c40cce382ff",
+    "session_json_last_write_utc": "2026-08-28T07:13:12.5040594Z",
+    "world_db_backup_sha256": "880fc209a61bb6743297b51e686510a7acfddfe7e58e8ffc9c6c075a9f9bc87c",
+    "world_fwl_backup_sha256": "645b126df278c057429ac9f06509fabd9513f1289cb9937466c9be8f402e8ad5",
+    "character_backup_sha256": "840ded557f43bec800b61b90d131f20be2188c9a7d9c2e7ec89e8a352c74a8be"
+  },
+  "launch": {
+    "evidence_directory": "C:\\work\\comfy-quest\\captures\\creator-session\\quest-fastlane-20260828-r1\\20260828T071334Z-launch",
+    "request_id": "world-entry-570567116678413ebc0b5c374187887d",
+    "request_created_utc": "2026-08-28T07:13:34.6763628+00:00",
+    "entry_completed_utc": "2026-08-28T07:13:58.8448263+00:00",
+    "entry_elapsed_seconds": 24.1684635,
+    "state": "entered",
+    "detail": "world_entry_complete",
+    "operation_completed_utc": "2026-08-28T07:13:59.1153202+00:00",
+    "operation_json_sha256": "71d39ca71d47969a2bf3dca4fd59756f34d981c8d2176c257140b2813cd4911a",
+    "request_json_sha256": "61e6e55d91740962cc2b2ca232cccd13e19b6709a0061e5e651efa296e8a548c",
+    "receipt_json_sha256": "85cc10df0f80dc2b7d351b405bace23b1e1f5e4afd00c60912b176028296fd2a",
+    "world_support_proof": null
+  },
+  "runtime_arm": {
+    "evidence_directory": "C:\\work\\comfy-quest\\captures\\creator-session\\quest-fastlane-20260828-r1\\20260828T071438Z-arm",
+    "completed_utc": "2026-08-28T07:14:39.6672656+00:00",
+    "state": "completed",
+    "detail": "dev_channel_armed",
+    "dev_armed": true,
+    "dev_state": "watching",
+    "dev_session_id": "dev-session-e382282bb06a443f9b5fed1b48e83bee",
+    "active_pack_id": "guild-2de197289aea",
+    "active_version": "0.1.3",
+    "active_content_hash": "197bd6002f162c70ac25c2007ab587728e66d7dd58491eb20d333883bd1fb702",
+    "active_activation_id": "act-20260828T054222834Z-e91eac71",
+    "creator_build_enabled": false,
+    "operation_json_sha256": "4eebe4fc17663253055791c8b68897704693f9a67456de9afc16758ca90feb97",
+    "request_json_sha256": "9342df6cb60f5c1532fa63130be06bcddeac7cd66dfe8ad80cf4fbbec0f26692",
+    "receipt_json_sha256": "b5ab14120e227f3f76b92c9b8a98f6fcb34faf6100e8ebfcb8b2642efe36599f"
+  },
+  "source_output_preflight": {
+    "pivot_build_run": false,
+    "ComfyQuestLab": {
+      "newest_source": "network/mod/ComfyQuestLab/Core/LabBatchController.cs",
+      "newest_source_last_write_utc": "2026-08-28T06:42:36.8640429Z",
+      "output_last_write_utc": "2026-08-28T06:42:51.8899684Z",
+      "output_newer_than_source": true
+    },
+    "ComfyQuestRuntime": {
+      "newest_source": "network/mod/ComfyQuestRuntime/RuntimeExperienceEngine.cs",
+      "newest_source_last_write_utc": "2026-08-28T05:25:45.7488563Z",
+      "output_last_write_utc": "2026-08-28T05:35:14.6976601Z",
+      "output_newer_than_source": true
+    },
+    "ComfyQuestContracts": {
+      "newest_source": "network/mod/ComfyQuestContracts/RuntimeContract.cs",
+      "newest_source_last_write_utc": "2026-08-28T05:32:51.1324086Z",
+      "output_last_write_utc": "2026-08-28T05:35:14.3998633Z",
+      "output_newer_than_source": true
+    }
+  },
+  "startup_log_observation": {
+    "copied_to_session_evidence": true,
+    "source_bepinex_log_path": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Valheim\\BepInEx\\LogOutput.log",
+    "evidence_log_path": "C:\\work\\comfy-quest\\captures\\creator-session\\quest-fastlane-20260828-r1\\20260828T071531Z-startup-proof\\LogOutput.log",
+    "captured_utc": "2026-08-28T07:19:14.6788964+00:00",
+    "snapshot_bytes": 17502,
+    "snapshot_last_write_utc": "2026-08-28T07:15:31.8539122Z",
+    "snapshot_sha256": "eb5a4c07a9c6f6d5ca10d263079047825adbc0cc10bc00b174c42725390d1b47",
+    "quest_loads_observed": [
+      "ComfyQuestLab 0.2.0",
+      "ComfyQuestRuntime 0.1.0"
+    ],
+    "network_sense_mentions": 0,
+    "load_error_signatures": 0,
+    "searched_load_error_signatures": [
+      "Could not load",
+      "TypeLoadException",
+      "FileNotFoundException",
+      "Error loading"
+    ]
+  },
+  "era17_manual_close_recovery": {
+    "evidence_directory": "C:\\work\\comfy-quest\\captures\\broken-way-campaign\\era17-installed-20260827-r13\\20260828T070701Z-manual-close-recovery",
+    "recovery_json_sha256": "d57ac18564b9920976c4fb8bd907c544a24603e3a90552151fbec6283f09d29b",
+    "recovery_json_last_write_utc": "2026-08-28T07:12:57.4173873Z",
+    "retained_completed_world": {
+      "path": "C:\\Users\\derek\\AppData\\LocalLow\\IronGate\\Valheim\\worlds_local\\ComfyEra17.db",
+      "bytes": 1299575462,
+      "sha256": "e3854801f5e81b35890ba519c3d9555d7b2f6759ecb0a2673848677722e7cff6",
+      "completed_save_utc_from_player_log": "2026-08-28T06:56:53Z"
+    },
+    "quarantined_partial": {
+      "name": "ComfyEra17.db.new",
+      "bytes": 432058053,
+      "last_write_utc": "2026-08-28T07:07:15.7472151Z",
+      "sha256": "0e8ceecabddee304423a07674934f7f4c58af633dd6c00b4da2b6e5bc40934b8"
+    },
+    "player_log_sha256": "5dc97fc6cae008c0093734b89809aed69ad164fbf986ea2c8240a0a796d88cb0",
+    "recovery_claim": "The last completed ERA17 database was retained; the interrupted .db.new was moved intact out of the live world directory. No ERA17 .db, .fwl, or character file was restored or deleted."
+  },
+  "verification": {
+    "proof_level": "executed_choreography",
+    "tests_run": false,
+    "pivot_build_run": false,
+    "claims": [
+      "Prepare pinned the active wary.fool Steam account, ComfyQuestDemo, questyfour, and exactly four non-support deployment files.",
+      "Launch entered the pinned local world in approximately 24 seconds.",
+      "The observed startup log loaded Quest Lab and Runtime with no NetworkSense mention or searched load-error signature.",
+      "Arm completed and left Runtime watching the active 0.1.3 pack."
+    ]
+  },
+  "limitations": [
+    "This index records the completed fast-lane pivot, world entry, and Runtime arm; it does not claim a Quest mechanics lap or human play verdict in this session.",
+    "No tests or build were run for the pivot. The deployed source outputs were newer than the newest corresponding project source files and matched the four recorded install pins.",
+    "The startup-log negative observation is pinned by a byte-identical durable copy in the ignored session evidence root.",
+    "The preserved ERA17 world is the last completed 23:56:53 save. The later logout save was incomplete, so subsequent world changes may be absent even though its partial bytes were retained for forensics."
+  ]
+}

@@ -64,7 +64,9 @@ public sealed class RuntimeRunTests : IDisposable
     Assert.Equal("per_run",preview.Snapshot.SuccessorRewardPolicy);
 
     var cleared=0;
-    var result=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddSeconds(3),adapter,()=>cleared++);
+    var ensured=new List<string>();
+    var result=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddSeconds(3),adapter,
+      ()=>cleared++,successor=>{ensured.Add(successor.RunId);return null;});
     Assert.Equal("completed",result.State);
     Assert.Equal(run.RunId,result.PriorRunId);
     Assert.NotEqual(run.RunId,result.NewRunId);
@@ -74,6 +76,7 @@ public sealed class RuntimeRunTests : IDisposable
     Assert.Equal(1,result.SpawnRowsCleaned);
     Assert.Equal(3,result.NoticesCleared);
     Assert.Equal(1,cleared);
+    Assert.Equal(new[]{result.NewRunId},ensured);
     Assert.Equal("retained",result.PreviousRewards);
     Assert.Equal("per_run",result.SuccessorRewardPolicy);
 
@@ -94,10 +97,87 @@ public sealed class RuntimeRunTests : IDisposable
     Assert.Contains(due,value=>value.Identity.Key==other.StateKey);
     Assert.True(new ActionExecutionLedger(root).TryClaim(successor.StateKey+"|stage|route|reward"));
 
-    var replay=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddMinutes(1),adapter,()=>cleared++);
+    var replay=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddMinutes(1),adapter,
+      ()=>cleared++,successor=>{ensured.Add(successor.RunId);return null;});
     Assert.Equal(result.ResetId,replay.ResetId);
     Assert.Equal(result.NewRunId,replay.NewRunId);
     Assert.Equal(1,cleared);
+    Assert.Equal(new[]{result.NewRunId,result.NewRunId},ensured);
+  }
+
+  [Fact]
+  public void SuccessorStartFailureRemainsResumableAndReusesTheExactSuccessor()
+  {
+    var coordinator=new RuntimeRunCoordinator(root);
+    var run=coordinator.Resolve(Scope(),now);
+    SeedRun(run,1);
+    var preview=coordinator.Preview(run.RunId,now.AddSeconds(1),new FakeSpawnAdapter());
+    var attempts=new List<string>();
+
+    var incomplete=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddSeconds(2),
+      new FakeSpawnAdapter(),ensureSuccessorStarted:successor=>{
+        attempts.Add(successor.RunId);
+        return "binding_start_selection_mismatch";
+      });
+
+    Assert.Equal("successor_start_incomplete",incomplete.State);
+    Assert.Equal("binding_start_selection_mismatch",incomplete.Detail);
+    Assert.False(string.IsNullOrWhiteSpace(incomplete.NewRunId));
+    Assert.Equal("reset",new RuntimeRunRegistry(root).Find(run.RunId).Status);
+    Assert.Equal("active",new RuntimeRunRegistry(root).Find(incomplete.NewRunId).Status);
+    Assert.Equal(2,new RuntimeRunRegistry(root).List().Count);
+    var transactionPath=Path.Combine(root,"state","reset-transactions",preview.PreviewToken+".json");
+    var pending=Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(transactionPath));
+    Assert.Null(pending["result"]);
+
+    var completed=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddMinutes(10),
+      new FakeSpawnAdapter(),ensureSuccessorStarted:successor=>{
+        attempts.Add(successor.RunId);
+        return null;
+      });
+
+    Assert.Equal("completed",completed.State);
+    Assert.Equal(incomplete.ResetId,completed.ResetId);
+    Assert.Equal(incomplete.NewRunId,completed.NewRunId);
+    Assert.Equal(new[]{completed.NewRunId,completed.NewRunId},attempts);
+    Assert.Equal(2,new RuntimeRunRegistry(root).List().Count);
+  }
+
+  [Fact]
+  public void CompletedResetCanRepairItsSuccessorWithoutMintingAnotherRun()
+  {
+    var coordinator=new RuntimeRunCoordinator(root);
+    var run=coordinator.Resolve(Scope(),now);
+    SeedRun(run,1);
+    var adapter=new FakeSpawnAdapter();
+    var preview=coordinator.Preview(run.RunId,now.AddSeconds(1),adapter);
+    var completed=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddSeconds(2),adapter);
+    Assert.Equal("completed",completed.State);
+
+    var repairFailure=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddSeconds(3),adapter,
+      ensureSuccessorStarted:successor=>{
+        Assert.Equal(completed.NewRunId,successor.RunId);
+        return "binding_start_not_observed";
+      });
+
+    Assert.Equal("successor_start_incomplete",repairFailure.State);
+    Assert.Equal("binding_start_not_observed",repairFailure.Detail);
+    Assert.Equal(completed.ResetId,repairFailure.ResetId);
+    Assert.Equal(completed.NewRunId,repairFailure.NewRunId);
+    var transactionPath=Path.Combine(root,"state","reset-transactions",preview.PreviewToken+".json");
+    var retained=Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(transactionPath));
+    Assert.Equal("completed",(string)retained["result"]?["state"]);
+
+    var repaired=coordinator.Apply(run.RunId,preview.PreviewToken,now.AddSeconds(4),adapter,
+      ensureSuccessorStarted:successor=>{
+        Assert.Equal(completed.NewRunId,successor.RunId);
+        return null;
+      });
+
+    Assert.Equal("completed",repaired.State);
+    Assert.Equal(completed.ResetId,repaired.ResetId);
+    Assert.Equal(completed.NewRunId,repaired.NewRunId);
+    Assert.Equal(2,new RuntimeRunRegistry(root).List().Count);
   }
 
   [Fact]

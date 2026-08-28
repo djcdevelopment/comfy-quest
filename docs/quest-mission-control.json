@@ -4,7 +4,7 @@
     "id": "comfy-quest-program",
     "title": "Quest Creator OS",
     "subtitle": "Drive the whole vertical slice. Automate the evidence. Spend the seat on creation.",
-    "observed_on": "2026-08-27",
+    "observed_on": "2026-08-28",
     "program_commit": "89c0a71",
     "program_commit_label": "Wait for fresh run scope before preview"
   },
@@ -145,16 +145,16 @@
       "label": "OMEN",
       "state": "ready",
       "role": "Immersive creator seat",
-      "detail": "Dual Intel Arc B70s and two displays make this the place for Valheim feel, Studio authorship, spatial judgment, and visual review. It is not the fleet's manual KVM.",
-      "fact_kind": "operator-reported"
+      "detail": "Released from machine-only mechanics work. Dual Intel Arc B70s and two displays make this the place for Derek's Valheim feel, Studio authorship, spatial judgment, and visual review; it is not the fleet's manual KVM or unattended test display.",
+      "fact_kind": "operator-and-live-observed"
     },
     {
       "id": "am4",
       "label": "AM4",
-      "state": "online",
-      "role": "Always-on automation capacity",
-      "detail": "Online after the motherboard swap and available to the wider lab. Quest still integrates with platform services only through published packages and verified release files.",
-      "fact_kind": "operator-and-repo"
+      "state": "ready",
+      "role": "Unattended Valheim automation seat",
+      "detail": "Creator Session quest-am4-fastlane-20260828-r1 is retained on ComfyQuestDemo under Steam persona Zephar410, with Valheim stopped after a clean save. AM4 executed the reviewed fixture replay, exact sign bind, reset successor, provider build/no-op retries, clear recovery, and a final cold-load proof of the exact release-build Contracts, Runtime, and Lab bytes without taking Derek's foreground or input. It is ready for the next unattended launch; Quest still integrates with platform services only through published packages and verified release files.",
+      "fact_kind": "operator-and-live-observed"
     },
     {
       "id": "i5",
@@ -184,15 +184,15 @@
       "id": "env.runtime",
       "label": "Runtime creator surface",
       "state": "confirmed",
-      "detail": "The corrected live control plane passed Arm, armed/watching Status, Lab identity, and Disarm. A later hash-pinned launch passively captured the complete y=92 compact bar below the host band at the same 1026x740 viewport, restored minimized state without focus or input, and closed cleanly.",
+      "detail": "The corrected live control plane passed Arm, armed/watching Status, Lab identity, and Disarm. Studio's mutation preflight now opens the atomic run-status snapshot before inspecting it and retries only a bounded 5 x 10 ms filesystem replacement window; corrupt, invalid, stale, or persistently unreadable state still fails closed before mailbox dispatch. The combined browser suite proved the reset and restore flows together. A later hash-pinned launch passively captured the complete y=92 compact bar below the host band at the same 1026x740 viewport, restored minimized state without focus or input, and closed cleanly.",
       "fact_kind": "live-control-and-visual"
     },
     {
       "id": "env.godbuild",
       "label": "Godbuild round trip",
       "state": "confirmed",
-      "detail": "The first live human-spaced module contains 12 basic pieces with source hash e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd. Capture and plan agree. Its declared terrain and portal exclusions make the saved world the playable release authority; replay remains fixture-proven and awaits use only when a reusable module needs cloning.",
-      "fact_kind": "live-and-fixture"
+      "detail": "The first live human-spaced module contains 12 basic pieces with source hash e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd. AM4 replayed the reviewed blueprint/capture pair after a cold Linux serializer correction: check passed, build reported all 12 pieces including one sign, and diff returned expected 12 / selected 12 / missing 0 / extra 0. The packaged provider then performed the whole Runtime-authority plus Lab replay as one call, skipped building on an exact retry, and repeated that build/no-op pair after a corrected clear waited for Valheim object retirement. A final cold launch with the exact release-build Contracts, Runtime, and Lab hashes again returned no-build MATCH and independently confirmed build authority disabled before clean save and stop. Its declared terrain and portal exclusions still make the saved world the playable release authority; replay is fixture authority for the bounded fields only.",
+      "fact_kind": "live-installed-evidence"
     },
     {
       "id": "env.portfolio-run",
@@ -205,7 +205,14 @@
       "id": "env.era17-preflight",
       "label": "ERA17 creator seat",
       "state": "confirmed",
-      "detail": "Machine preflight era17-machine-preflight-20260827-r1 entered the exact ComfyEra17 / tugcorp local pair, found a nearby portal and multiple bounded sign candidates without human navigation, and restored the world pair, character, install, and prior world-entry status to their preflight hashes. The 58-image drone survey and rendered 12-frame premise brief produced Derek's choice C: Pilgrimage of Ash and Ice, with a mythic, uncanny, reverent tone. Automation staged all eight experiences, activated exact content hash 6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e, and bound the opening chapter The Name in Ash to the retained nearby sign. His next input is creative judgment rather than mechanical setup; docs/evidence/era17-premise-c-20260827-r1.json pins the installed receipt.",
+      "detail": "The retained ERA17 acceptance surface is pinned to Steam persona wary.fool / account 128445914, ComfyEra17 UID -523956327, and tugcorp. Derek played through pilgrim-choice and called the experience otherwise pretty inspiring while reporting a hard recurring stall. Session r13 restored and proved the world-specific NetworkSense connection caches, then closed with install rollback and without game-state rollback. Derek's manual exit interrupted the final world save; the 432,058,053-byte .db.new was moved intact into r13 recovery evidence, while the last completed 1.30 GB world save and character save remain canonical. ERA17 is now parked for batched acceptance/scale questions, including the final Resin-or-Stone choice, rather than routine mechanics work.",
+      "fact_kind": "live-installed-evidence"
+    },
+    {
+      "id": "env.quest-fastlane",
+      "label": "Quest mechanics fast lane",
+      "state": "confirmed",
+      "detail": "The original OMEN fast-lane session is released. Creator Session quest-am4-fastlane-20260828-r1 is retained on the unattended AM4 client under waryfool / persona Zephar410 with ComfyQuestDemo UID -7600395338659582326 and questyfour; Valheim is now stopped after a clean save. Its cold installed laps replayed the 12-piece fixture, found the sign inside the bounded candidate set, bound guild 0.1.3 experience quest-0d3372, advanced the initial run to name-in-ash, reset to exactly one successor on the same durable binding, proved both provider build/no-op paths, corrected the live clear-retirement edge, and cold-loaded the exact final three Quest DLLs for a no-op MATCH plus disabled-authority check. This is the ready mechanics and integration surface; OMEN remains reserved for human perception and authored choice.",
       "fact_kind": "live-installed-evidence"
     }
   ],
@@ -240,7 +247,7 @@
       {
         "id": "strategy.workbench",
         "title": "Keep Workbench standalone",
-        "detail": "Isolate owns gateway authentication, caller identity, provider loading, and lifecycle; Quest contributes a bounded released provider instead of rebuilding that tooling. The installed profile rejected a missing caller credential at tool invocation. The final profile must generate a credential for the lap, be identity-attested, work on a volunteer machine, and never discover, import, fall back to, or share credentials or state with HEARTH or private fleet topology."
+        "detail": "Isolate owns gateway authentication, caller identity, provider loading, and lifecycle; Quest contributes a bounded released provider instead of rebuilding that tooling. The installed profile rejected a missing caller credential at tool invocation, and target-local AM4 execution proved the provider's single-call reviewed Lab replay plus Runtime authority cleanup. The final profile must generate a credential for the lap, be identity-attested, work on a volunteer machine, and never discover, import, fall back to, or share credentials or state with HEARTH or private fleet topology."
       }
     ],
     "readiness_title": "Ready before the seat",
@@ -285,7 +292,7 @@
       "number": 4,
       "title": "Dogfood creator portfolio",
       "state": "active",
-      "summary": "The autonomous installed guild slice passed end to end, closing 4A / guild-scale-runtime. ERA17 machine entry, nearby binding discovery, exact recovery, and the drone-grounded premise brief are now preflighted for 4B; Derek supplies authorship and play-feel judgments while automation retains lifecycle, evidence, and recovery ownership. World packaging is deferred.",
+      "summary": "The autonomous installed guild slice closed 4A. Mechanics and integration now iterate on the ready, on-demand ComfyQuestDemo fast lane; only immutable content/package bytes that pass there advance to a separately pinned ERA17 acceptance/scale lap. ERA17 retains its durable Charm, five-stage opening, and pilgrim-choice progress for a later batched human judgment. Generalized portal support and world packaging remain deferred.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "The adoption gate is not another generated tutorial"
     },
@@ -302,14 +309,14 @@
   "recovery": {
     "id": "creator-os-active",
     "title": "Prepared human-acceptance lane",
-    "summary": "This checklist is not the development method or the next task queue. It becomes active only after automation has driven the real Studio-to-Valheim slice, corrected mechanical failures, retained evidence, and reduced the remaining work to one batch of human judgments.",
+    "summary": "This checklist is not the development method or the next task queue. It becomes active only after automation has driven the ComfyQuestDemo mechanics journey, corrected mechanical failures, retained evidence, promoted the same immutable content/package bytes into the intended acceptance world, and reduced the remaining work to one batch of human judgments.",
     "cold_load": {
       "id": "recovery.cold-load",
       "title": "Prepare one pinned Creator Session",
-      "instruction": "With Valheim closed, run Prepare once. Use its returned session id for every later operation; do not hand-copy files, relay console commands, or change worlds mid-session.",
+      "instruction": "With Valheim closed, sign in to the Steam account that owns the intended character and run Prepare once. Prepare pins that account and scopes profile discovery to it; Launch refuses account or Steam-executable drift. Use the returned session id for every later operation; do not hand-copy files, relay console commands, or change worlds mid-session.",
       "verdict": "Did this lane complete without turning Derek into the fleet's manual KVM?",
       "source": "docs/creator-os.md",
-      "source_contains": "With Valheim closed, run"
+      "source_contains": "With Valheim closed, sign in"
     },
     "creator_flow": {
       "title": "Run the machine-owned creator session",
@@ -396,7 +403,7 @@
         "FR-RESET-003"
       ],
       "title": "Make clean reruns a product operation",
-      "detail": "Installed session queue-full-width-journey-20260827-r9 previewed and applied an exact scoped reset to completed A, preserved completed B unchanged, created a distinct successor A run linked to its predecessor and reset, and completed the successor under the same world, binding, and content hash.",
+      "detail": "Installed session queue-full-width-journey-20260827-r9 previewed and applied an exact scoped reset to completed A, preserved completed B unchanged, created a distinct successor A run linked to its predecessor and reset, and completed the successor under the same world, binding, and content hash. AM4 session quest-am4-fastlane-20260828-r1 then closed the start-state gap: reset completion required the exact successor's workflow, automatically supplied experience_started to reach name-in-ash, and an identical apply retry returned the same reset/successor with one active run and no duplicate event/action/transition chain. The final combined browser gate exposed and corrected an atomic status-replacement race before reset/restore dispatch; bounded recovery passes, while an exhausted window remains rejected with no mailbox write.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "FR-RESET-001"
     },
@@ -409,7 +416,7 @@
         "NFR-MCP-001"
       ],
       "title": "Prove the standalone Workbench boundary",
-      "detail": "The 2026-08-27 installed slices in docs/evidence/isolate-era17-runtime-20260827-r1.json and r2 used the newer Isolate image plus an explicit Quest provider release to reject a missing caller credential and wrong world/session identities, arm ERA17, list bounded targets, bind the selected 0.1.1 experience, and return matching Isolate/Studio/Runtime evidence. Final r6 status supplied its own non-secret Creator Session identity for the successful follow-up control, so a later caller does not need harness-side session context. The r2 recovery lap also let the 1.30 GB world finish its 32.46-second save and exited without force or partial files. Keep this item ready, not complete: the image reports no source revision, the provider came from a dirty checkout-local mount, the credential and state are still operator-specific, and no clean volunteer-machine setup/teardown was run.",
+      "detail": "The installed Isolate slices in docs/evidence/isolate-era17-runtime-20260827-r1.json, r2, and era17-pilgrimage-20260827-r12.json reject missing caller or wrong world/session authority and return matching Isolate/Studio/Runtime evidence. Provider archive b4ec7d4aff381e929064b2b71f558f208c4019481109f76f8f6ddf8387dc020c adds a fifth bounded tool: hash-verified reviewed Godbuild replay with live Runtime build authority, Lab check/count/build/diff, no-op retry, and verified authority cleanup. AM4 executed its build and already-match paths, a clear/rebuild recovery, and an exact-final-DLL cold-load no-op MATCH target-locally. Keep this item ready, not complete: the Isolate image still reports no source revision, the provider is a dirty checkout-local release, credentials/state remain operator-specific, and clean volunteer-machine setup/teardown is unproven.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "NFR-MCP-001"
     },
@@ -422,7 +429,7 @@
         "FR-AUTH-005"
       ],
       "title": "Unlock guild-scale Runtime",
-      "detail": "Installed session queue-full-width-journey-20260827-r9 selected and played two experiences from one guild release through the real bounded sign binding. B failed closed before A, unlocked after A completed, and retained its own completed run while A was selected again, reset, and rerun.",
+      "detail": "Installed session queue-full-width-journey-20260827-r9 selected and played two experiences from one guild release through the real bounded sign binding: B failed closed before A, unlocked after A completed, and retained its own completed run while A was selected, reset, and rerun. ERA17 r9/r12 added cold durability and hot-revision proof, and r13 preserved pilgrim-choice while restoring the world's support precondition. AM4 then proved the crowded-candidate contract preserves a sign after the required fixture replay and that reset successors start the exact selected experience without a rebind crutch.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4A — Dogfood foundation"
     },
@@ -479,7 +486,7 @@
         "NFR-USE-001"
       ],
       "title": "Dogfood the first top-to-bottom guild",
-      "detail": "Autonomous readiness is proven against the exact ComfyEra17 / tugcorp pair, including nearby portal/sign discovery, Creator-Session-pinned Isolate and Studio control, and byte-exact recovery. Derek selected premise C, Pilgrimage of Ash and Ice. Retained session era17-broken-way-20260827-r6 is entered, armed, and bound/current on opening chapter The Name in Ash 0.1.1 at content hash 6e0f85f1bc2a26a7e7974817c17897281b1e722ea274509522a6bacb4aa3526e; it reports one fresh start-stage run on the retained sign after a 32-candidate scan. The remaining sitting asks only for authorship, composition, clarity, responsiveness, narrative tone, and play-feel judgments. Automation owns draft staging, launch, exact world/profile selection, deployment, retries, captures, receipts, logs, reset/rerun plumbing, shutdown, and recovery; any mechanical request reaching Derek is a defect.",
+      "detail": "The Name in Ash remains a rehearsed five-stage opening, and ERA17 retains Derek's run at pilgrim-choice for a later Resin-or-Stone, recurring-stall, and play-feel verdict. Session r13 is closed rather than consuming a 1.30 GB acceptance world for routine iteration. Retained AM4 session quest-am4-fastlane-20260828-r1 is the ready machine-only mechanics surface on ComfyQuestDemo / questyfour and has executed fixture replay, bind, initial start, reset successor start, provider build/no-op retry, clear recovery, exact-final-DLL cold-load proof, and clean shutdown against guild 0.1.3. OMEN is released; a mechanics change returns there and to ERA17 only after the Demo journey is green and the remaining question depends on topology, scale, spatial pacing, authored choice, or human perception.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4B — Guild campaign"
     },
@@ -558,6 +565,14 @@
       "source_contains": "the saved world is the playable release authority"
     },
     {
+      "id": "decision.world-routing",
+      "title": "World-lap routing",
+      "question": "Which world should mechanics development and installed integration use?",
+      "recommendation": "Use ComfyQuestDemo and questyfour by default. Promote the same immutable content/package bytes to ComfyEra17 only for retained-world compatibility, scale/load/save, actual topology, spatial pacing, or batched human acceptance; never migrate run state between them.",
+      "source": "docs/creator-os.md",
+      "source_contains": "ComfyQuestDemo` / UID `-7600395338659582326` is the default installed mechanics world"
+    },
+    {
       "id": "decision.dogfood",
       "title": "Adoption path",
       "question": "Do notebook patterns or auto-generation come before guild authoring?",
@@ -595,7 +610,7 @@
       "id": "command.prepare",
       "label": "Prepare Creator Session",
       "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Prepare",
-      "detail": "With Valheim closed: lease, build, back up the exact install, world pair, and character profile, deploy, hash-pin, and open the private-world safety window."
+      "detail": "With Valheim closed and the intended Steam account signed in: resolve and pin that active account, scope cloud-profile discovery to its userdata root, lease, build, back up the exact install/world/profile, deploy, hash-pin, and open the private-world safety window."
     },
     {
       "id": "command.status",
@@ -607,7 +622,7 @@
       "id": "command.launch",
       "label": "Enter the pinned local world",
       "command": "tools\\creator-session\\Invoke-CreatorSession.ps1 Launch -SessionId <id>",
-      "detail": "Launch Valheim through Steam and require a correlated receipt for the exact profile filename, local-world filename, display name and UID, machine, session, and expiry."
+      "detail": "Refuse Steam executable or active-account drift, launch through the exact pinned Steam executable, and require a correlated receipt for the exact profile filename, local-world filename, display name and UID, machine, session, and expiry."
     },
     {
       "id": "command.gallery-rebuild",
@@ -678,9 +693,11 @@
   ],
   "cautions": [
     "Golden rule: do not call Derek into the seat to discover, relay, or retry anything the fleet can build, drive, observe, capture, diagnose, or close itself.",
+    "A visible client needed only for machine work belongs on the unattended automation seat. Keep OMEN released until the remaining question actually requires Derek's perception or authored choice; focus theft and accidental tabbing are seat costs.",
     "A passing unit suite proves neither integration nor usability. Drive the installed Studio-to-Valheim journey and retain its real evidence before promoting a feature.",
     "Never connect by port alone. The development gateway must attest the exact standalone Isolate release and must have no HEARTH, private-machine, or sibling-checkout coupling.",
     "The Creator Session lease owns the shared Valheim installation. Do not run another deployment or Lab mutation beside it.",
+    "Run mechanics and integration on ComfyQuestDemo first. ERA17 is acceptance/scale-only and must not become the default iteration world merely because it holds the target creative experience.",
     "Rehearsal declares its own proof level, disclaimer, and limitations; it does not prove Unity, BepInEx, Harmony, or live mutation.",
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
     "Close -Restore restores prior install bytes plus quarantined one-shot world-entry request/status state and retains authored world state. After Stop, a disposable technical lap may add -RestoreGameState to restore the exact pinned world pair and character profile; this bounded rollback is not saved-world packaging.",

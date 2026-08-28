@@ -96,6 +96,10 @@
   <ItemGroup>
     <PackageReference Include="Comfy.Quest.Contracts" Version="[0.6.0-local]"
                        IncludeAssets="contentFiles" ExcludeAssets="compile;runtime" />
+    <!-- Mono's DataContractJsonSerializer consults an unavailable configuration section in
+         the Linux Valheim client. Lab's reviewed JSON artifacts use the same Newtonsoft
+         dependency already shipped beside Runtime, so serialization stays cross-platform. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>

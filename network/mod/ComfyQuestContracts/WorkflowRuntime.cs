@@ -11,6 +11,7 @@ public sealed class WorkflowIdentity {
   [JsonProperty("world_id")] public string WorldId {get;set;}
   [JsonProperty("character_id")] public string CharacterId {get;set;}
   [JsonProperty("binding_zdo")] public string BindingZdo {get;set;}
+  [JsonProperty("binding_instance_id",NullValueHandling=NullValueHandling.Ignore)] public string BindingInstanceId {get;set;}
   [JsonProperty("content_hash")] public string ContentHash {get;set;}
   [JsonProperty("experience_id", NullValueHandling=NullValueHandling.Ignore)] public string ExperienceId {get;set;}
   [JsonProperty("run_id", NullValueHandling=NullValueHandling.Ignore)] public string RunId {get;set;}

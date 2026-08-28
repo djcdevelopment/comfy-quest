@@ -14,6 +14,8 @@ sealed class RuntimeExperienceEngine {
   const int MaxIdenticalRejections = 3;
   const int RecheckTicks = 5;
   const int MaxArmedRechecks = 32;
+  const int MaxSpawnRecoveries = 32;
+  const int MaxPendingReplays = 32;
   readonly string root;
   readonly RuntimeReceiptStore receipts;
   readonly ActionExecutionLedger ledger;
@@ -26,6 +28,8 @@ sealed class RuntimeExperienceEngine {
       new(StringComparer.Ordinal);
   /// <summary>Bindings owed a bounded re-read, and how many ticks each is still owed (ADR 0006).</summary>
   readonly Dictionary<string, int> rechecks = new(StringComparer.Ordinal);
+  readonly Dictionary<string, SpawnRecovery> spawnRecoveries = new(StringComparer.Ordinal);
+  readonly Dictionary<string, PendingReplay> pendingReplays = new(StringComparer.Ordinal);
   readonly object evidenceGate = new();
   readonly List<CreatorEvidenceLine> recentEvidence = new();
   readonly Dictionary<string, CreatorEvidenceLine> activeAlerts =
@@ -48,7 +52,44 @@ sealed class RuntimeExperienceEngine {
   long cachedPackageLength;
   WearNTear[] cachedBindings = Array.Empty<WearNTear>();
   string cachedBindingContentHash;
+  string cachedBindingResolutionKey;
+  string cachedBindingSelectionKey;
+  BindingSelection cachedBindingSelection;
   double nextBindingRefresh;
+  double nextBindingSelectionRefresh;
+
+  enum BindingSelectionState { Unavailable, Legacy, Selected }
+  sealed class BindingSelection {
+    public BindingSelectionState State;
+    public string BindingInstanceId;
+    public string Error;
+    public string ResolutionKey => State + "\n" + (BindingInstanceId ?? "") + "\n" + (Error ?? "");
+    public static BindingSelection Unavailable(string error) => new() {
+      State = BindingSelectionState.Unavailable, Error = error,
+    };
+    public static BindingSelection Legacy() => new() { State = BindingSelectionState.Legacy };
+    public static BindingSelection Selected(string bindingInstanceId) => new() {
+      State = BindingSelectionState.Selected, BindingInstanceId = bindingInstanceId,
+    };
+  }
+
+  sealed class SpawnRecovery {
+    public string ActionKey;
+    public WorkflowIdentity Identity;
+    public ExperienceAction Action;
+    public ZDOMan Manager;
+    public long NetworkSessionId;
+    public IReadOnlyList<SpawnedObject> Records;
+  }
+
+  sealed class PendingReplay {
+    public string ActionKey;
+    public WorkflowIdentity Identity;
+    public string StageId;
+    public string TransitionId;
+    public ExperienceAction Action;
+    public DateTimeOffset NextUtc;
+  }
 
   public RuntimeExperienceEngine(
       string runtimeRoot,
@@ -106,9 +147,10 @@ sealed class RuntimeExperienceEngine {
     try {
       TryLoad(out var loaded, out _);
       foreach (var timer in timers.Due(now, identity => IsCurrentRun(identity, loaded))) {
+        if (!TryCurrentBinding(timer.Identity, loaded, out var binding)) continue;
         var elapsed = new RuntimeEvent {
           Name = ExperienceSchema.TimerElapsedEvent,
-          SourceId = timer.Identity.BindingZdo,
+          SourceId = binding.m_uid.ToString(),
           At = now,
           Fields = new Dictionary<string, string> { ["timer_id"] = timer.TimerId },
         };
@@ -124,6 +166,8 @@ sealed class RuntimeExperienceEngine {
         catch { }
       }
     }
+    RunSpawnRecoveries(now);
+    RunPendingReplays(now);
     RunRechecks(now);
     RefreshDeadline(now);
   }
@@ -146,7 +190,7 @@ sealed class RuntimeExperienceEngine {
         if (zdo == null || !view.IsOwner()) continue;
         var reference = Read(zdo);
         if (reference == null || reference.ContentHash != active.ContentHash) continue;
-        var identity = Identity(zdo, active);
+        if (!TryActiveIdentity(zdo, active, out var identity, out _)) continue;
         if (!rechecks.TryGetValue(identity.Key, out var remaining)) continue;
         var observed = RuntimeObservation.Facts(
             zdo, spawned, identity.Key, active.ContentHash);
@@ -286,7 +330,8 @@ sealed class RuntimeExperienceEngine {
             || reference.ContentHash != active.ContentHash) continue;
 
         foundBinding = true;
-        var identity = Identity(zdo, active);
+        var identity = ResolveIdentity(zdo, active);
+        if (identity == null) continue;
         var observed = RuntimeObservation.Facts(
             zdo, spawned, identity.Key, active.ContentHash);
         var before = workflows.Get(identity);
@@ -382,6 +427,7 @@ sealed class RuntimeExperienceEngine {
         ActivationId = active.ActivationId,
         CorrelationId = correlationId,
         BindingZdo = zdo.m_uid.ToString(),
+        BindingInstanceId = decision.Identity.BindingInstanceId,
         StageId = currentStage.Id,
         TransitionId = decision.Transition.Id,
         EventName = cause?.Name,
@@ -472,14 +518,210 @@ sealed class RuntimeExperienceEngine {
 
   IReadOnlyList<WearNTear> Bindings(Active active) {
     var now = UnityEngine.Time.realtimeSinceStartup;
+    var selection = SelectedBinding(active);
     if (!string.Equals(cachedBindingContentHash, active.ContentHash, StringComparison.Ordinal)
+        || !string.Equals(cachedBindingResolutionKey, selection.ResolutionKey, StringComparison.Ordinal)
         || now >= nextBindingRefresh) {
-      cachedBindings = WearNTear.GetAllInstances().Where(value => value != null).ToArray();
+      var candidates = selection.State == BindingSelectionState.Unavailable
+          ? Array.Empty<WearNTear>()
+          : WearNTear.GetAllInstances().Where(value => IsActiveBinding(value, active)).ToArray();
+      if (selection.State == BindingSelectionState.Selected) {
+        var matches = candidates.Where(value => string.Equals(
+            BindingInstanceIdentity(value), selection.BindingInstanceId,
+            StringComparison.Ordinal)).ToArray();
+        cachedBindings = matches.Length == 1 ? matches : Array.Empty<WearNTear>();
+      } else if (selection.State == BindingSelectionState.Legacy) {
+        // A marker without a journal is modern but ambiguous, not legacy. The old physical-ZDO
+        // fallback remains only for one marker-free binding; multiple old Charms fail closed.
+        cachedBindings = candidates.Length == 1
+            && string.IsNullOrWhiteSpace(BindingInstanceIdentity(candidates[0]))
+                ? candidates : Array.Empty<WearNTear>();
+      } else cachedBindings = Array.Empty<WearNTear>();
       cachedBindingContentHash = active.ContentHash;
+      cachedBindingResolutionKey = selection.ResolutionKey;
       nextBindingRefresh = now + 1.0;
     }
     return cachedBindings;
   }
+
+  bool IsActiveBinding(WearNTear wear, Active active) {
+    try {
+      var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
+      if (zdo == null || !zdo.Persistent) return false;
+      var reference = Read(zdo);
+      return reference != null
+          && reference.PackId == active.PackId
+          && reference.ExperienceId == active.Document.Id
+          && reference.BindingId == "default"
+          && reference.Version == active.Version
+          && string.Equals(reference.ContentHash, active.ContentHash,
+              StringComparison.OrdinalIgnoreCase);
+    } catch { return false; }
+  }
+
+  static string BindingInstanceIdentity(WearNTear wear) {
+    try {
+      return wear?.GetComponent<ZNetView>()?.GetZDO()
+          ?.GetString(Prefix + "bindingInstanceId", "");
+    }
+    catch { return null; }
+  }
+
+  /// <summary>The binding journal selects a durable marker, never a physical ZDO id. ZDO ids can
+  /// change across a cold load; the marker is written into the persistent object's own ZDO fields.
+  /// A journal-free, marker-free world gets the narrowly bounded legacy fallback. Ambiguous or
+  /// incomplete modern history fails closed.</summary>
+  BindingSelection SelectedBinding(Active active, bool force = false) {
+    if (active?.Document == null)
+      return BindingSelection.Unavailable("binding_selection_active_missing");
+    string world;
+    try {
+      if (ZNet.instance == null)
+        return BindingSelection.Unavailable("binding_selection_world_not_loaded");
+      world = ZNet.instance.GetWorldUID().ToString();
+      if (world == "0")
+        return BindingSelection.Unavailable("binding_selection_world_not_loaded");
+    } catch { return BindingSelection.Unavailable("binding_selection_world_unreadable"); }
+    var key = string.Join("\n", world, active.PackId, active.Document.Id);
+    var now = UnityEngine.Time.realtimeSinceStartup;
+    if (!force && string.Equals(cachedBindingSelectionKey, key, StringComparison.Ordinal)
+        && cachedBindingSelection != null
+        && now < nextBindingSelectionRefresh) return cachedBindingSelection;
+
+    var selected = BindingSelection.Legacy();
+    DateTimeOffset? selectedAt = null;
+    string selectedChange = null;
+    DateTimeOffset? markerlessAt = null;
+    string markerlessChange = null;
+    DateTimeOffset? pendingCreatedAt = null;
+    string pendingChange = null;
+    DateTimeOffset? finalCreatedAt = null;
+    string finalChange = null;
+    var relevant = false;
+    try {
+      var directory = Path.Combine(root, "state", "binding-changes");
+      if (Directory.Exists(directory)) {
+        var paths = Directory.GetFiles(directory, "binding-*.json");
+        if (paths.Length > RuntimeBindingCoordinator.MaxChanges)
+          selected = BindingSelection.Unavailable("binding_selection_history_limit");
+        foreach (var path in paths.OrderByDescending(Path.GetFileName, StringComparer.Ordinal)) {
+          if (selected.State == BindingSelectionState.Unavailable) break;
+          var info = new FileInfo(path);
+          if (info.Length <= 0 || info.Length > RuntimeBindingCoordinator.MaxChangeBytes) {
+            selected = BindingSelection.Unavailable("binding_selection_history_invalid");
+            break;
+          }
+          RuntimeBindingChange change;
+          using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                     FileShare.ReadWrite | FileShare.Delete))
+          using (var reader = new StreamReader(stream))
+            change = JsonConvert.DeserializeObject<RuntimeBindingChange>(reader.ReadToEnd());
+          if (change == null || string.IsNullOrWhiteSpace(change.WorldId)) {
+            selected = BindingSelection.Unavailable("binding_selection_history_invalid");
+            break;
+          }
+          if (change.WorldId != world) continue;
+          if (change.Applied == null) {
+            selected = BindingSelection.Unavailable("binding_selection_history_invalid");
+            break;
+          }
+          if (change.Applied.PackId != active.PackId
+              || change.Applied.ExperienceId != active.Document.Id) continue;
+          relevant = true;
+          if (change.Schema != RuntimeBindingChange.CurrentSchema
+              || change.ChangeId != Path.GetFileNameWithoutExtension(path)
+              || change.CreatedUtc == default
+              || !ValidBindingIdentity(change.BindingZdo)
+              || change.Previous == null
+              || change.Applied.BindingId != "default"
+              || change.State is not ("pending" or "applied" or "restored")
+              || !ValidBindingReference(change.Applied)) {
+            selected = BindingSelection.Unavailable("binding_selection_history_invalid");
+            break;
+          }
+          if (change.State == "pending") {
+            if (!pendingCreatedAt.HasValue || change.CreatedUtc > pendingCreatedAt.Value
+                || change.CreatedUtc == pendingCreatedAt.Value
+                    && string.CompareOrdinal(change.ChangeId, pendingChange) > 0) {
+              pendingCreatedAt = change.CreatedUtc;
+              pendingChange = change.ChangeId;
+            }
+            continue;
+          }
+          if (!change.CompletedUtc.HasValue
+              || change.CompletedUtc.Value < change.CreatedUtc) {
+            selected = BindingSelection.Unavailable("binding_selection_history_invalid");
+            break;
+          }
+          if (!finalCreatedAt.HasValue || change.CreatedUtc > finalCreatedAt.Value
+              || change.CreatedUtc == finalCreatedAt.Value
+                  && string.CompareOrdinal(change.ChangeId, finalChange) > 0) {
+            finalCreatedAt = change.CreatedUtc;
+            finalChange = change.ChangeId;
+          }
+          if (change.State == "restored") continue;
+          var completed = change.CompletedUtc.Value;
+          if (!ValidBindingInstanceIdentity(change.Applied.BindingInstanceId)) {
+            if (!markerlessAt.HasValue || completed > markerlessAt.Value
+                || completed == markerlessAt.Value
+                    && string.CompareOrdinal(change.ChangeId, markerlessChange) > 0) {
+              markerlessAt = completed;
+              markerlessChange = change.ChangeId;
+            }
+            continue;
+          }
+          if (selectedAt.HasValue && (completed < selectedAt.Value
+              || completed == selectedAt.Value
+                  && string.CompareOrdinal(change.ChangeId, selectedChange) <= 0)) continue;
+          selected = BindingSelection.Selected(change.Applied.BindingInstanceId);
+          selectedAt = completed;
+          selectedChange = change.ChangeId;
+        }
+      }
+      if (selected.State != BindingSelectionState.Unavailable) {
+        var pendingWins = pendingCreatedAt.HasValue && (!finalCreatedAt.HasValue
+            || pendingCreatedAt.Value > finalCreatedAt.Value
+            || pendingCreatedAt.Value == finalCreatedAt.Value
+                && string.CompareOrdinal(pendingChange, finalChange) > 0);
+        var markerlessWins = markerlessAt.HasValue && (!selectedAt.HasValue
+            || markerlessAt.Value > selectedAt.Value
+            || markerlessAt.Value == selectedAt.Value
+                && string.CompareOrdinal(markerlessChange, selectedChange) >= 0);
+        if (pendingWins)
+          selected = BindingSelection.Unavailable("binding_selection_history_pending");
+        else if (markerlessWins)
+          selected = BindingSelection.Unavailable("binding_selection_marker_missing");
+        else if (!selectedAt.HasValue && relevant)
+          selected = BindingSelection.Unavailable("binding_selection_marker_missing");
+      }
+    } catch { selected = BindingSelection.Unavailable("binding_selection_history_unreadable"); }
+    cachedBindingSelectionKey = key;
+    cachedBindingSelection = selected;
+    nextBindingSelectionRefresh = now + 1.0;
+    return selected;
+  }
+
+  static bool ValidBindingIdentity(string value) {
+    var parts = (value ?? string.Empty).Split(':');
+    return parts.Length == 2 && long.TryParse(parts[0], out _)
+        && uint.TryParse(parts[1], out _);
+  }
+
+  static bool ValidBindingInstanceIdentity(string value) =>
+      !string.IsNullOrWhiteSpace(value) && value.Length == 36
+      && value.StartsWith("binding-", StringComparison.Ordinal)
+      && value.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or 'T' or 'Z');
+
+  static string Null(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+  static bool ValidBindingReference(RuntimeBindingReference value) =>
+      value != null && CharmPolicy.ValidateReference(new CharmReference {
+        PackId = value.PackId,
+        ExperienceId = value.ExperienceId,
+        BindingId = value.BindingId,
+        Version = value.Version,
+        ContentHash = value.ContentHash,
+      }).Allowed;
 
   static RuntimeReceipt EventReceipt(
       string status,
@@ -501,6 +743,7 @@ sealed class RuntimeExperienceEngine {
     ActivationId = active.ActivationId,
     CorrelationId = correlationId,
     BindingZdo = bindingZdo,
+    BindingInstanceId = identity?.BindingInstanceId,
     ExperienceId = identity?.ExperienceId ?? active.Document.Id,
     RunId = identity?.RunId,
     WorldId = identity?.WorldId,
@@ -532,7 +775,8 @@ sealed class RuntimeExperienceEngine {
             if (zdo == null) continue;
             var reference = Read(zdo);
             if (reference == null || reference.ContentHash != active.ContentHash) continue;
-            var progress = workflows.Get(Identity(zdo, active));
+            if (!TryActiveIdentity(zdo, active, out var identity, out _)) continue;
+            var progress = workflows.Get(identity);
             if (progress == null || !string.IsNullOrWhiteSpace(progress.Outcome)) break;
             var stage = active.Document.Stages.FirstOrDefault(value => value.Id == progress.StageId);
             foreach (var transition in (stage?.Transitions ?? new())
@@ -668,15 +912,66 @@ sealed class RuntimeExperienceEngine {
       string correlationId) {
     WorkflowIdentity identity = null;
     var zdoId = zdo.m_uid.ToString();
+    string key = null;
     try {
-      identity = Identity(zdo, active);
-      var key = string.Join("|", identity.Key, stage, transition, action.Id);
-      if (!ledger.TryClaim(key)) {
+      identity = ResolveIdentity(zdo, active);
+      if (identity == null) throw new InvalidOperationException("runtime_player_missing");
+      key = string.Join("|", identity.Key, stage, transition, action.Id);
+      var prior = ledger.ExecutionState(key);
+      if (prior == ActionExecutionState.Committed) {
+        pendingReplays.Remove(key);
         WriteReceipt(ActionReceipt(
             "suppressed", "duplicate_suppressed", active, zdoId, stage,
             transition, action.Id, correlationId, identity), ActionLine(action, "duplicate suppressed"));
         return true;
       }
+      if (prior == ActionExecutionState.Pending) {
+        WriteReceipt(ActionReceipt(
+            "rejected", "action_execution_pending", active, zdoId, stage,
+            transition, action.Id, correlationId, identity),
+            ActionLine(action, "blocked: prior execution is unresolved"), CreatorEvidenceKind.Warning);
+        return false;
+      }
+
+      UnityEngine.GameObject grantPrefab = null;
+      var grantCount = 0;
+      if (action.Type == "grant_item"
+          && !TryPrepareGrant(action, out grantPrefab, out grantCount, out var grantError)) {
+        if (grantError == "grant_inventory_full")
+          SchedulePendingReplay(key, identity, action, DateTimeOffset.UtcNow.AddSeconds(1));
+        WriteReceipt(ActionReceipt(
+            "rejected", grantError, active, zdoId, stage,
+            transition, action.Id, correlationId, identity),
+            ActionLine(action, "blocked: " + grantError), CreatorEvidenceKind.Warning);
+        return false;
+      }
+
+      UnityEngine.GameObject spawnPrefab = null;
+      string spawnKind = null, spawnPrefabName = null;
+      var spawnCount = 0;
+      var spawnRadius = 0;
+      if (action.Type == "spawn"
+          && !TryPrepareSpawn(action, out spawnPrefab, out spawnKind, out spawnPrefabName,
+              out spawnCount, out spawnRadius, out var spawnError)) {
+        WriteReceipt(ActionReceipt(
+            "rejected", spawnError, active, zdoId, stage,
+            transition, action.Id, correlationId, identity),
+            ActionLine(action, "blocked: " + spawnError), CreatorEvidenceKind.Warning);
+        return false;
+      }
+
+      if (!ledger.TryReserve(key)) {
+        var raced = ledger.ExecutionState(key);
+        if (raced == ActionExecutionState.Committed) {
+          pendingReplays.Remove(key);
+          WriteReceipt(ActionReceipt(
+              "suppressed", "duplicate_suppressed", active, zdoId, stage,
+              transition, action.Id, correlationId, identity), ActionLine(action, "duplicate suppressed"));
+          return true;
+        }
+        throw new InvalidOperationException("action_execution_pending");
+      }
+
       switch (action.Type) {
         case "message":
           Say(Param(action, "text"));
@@ -689,11 +984,27 @@ sealed class RuntimeExperienceEngine {
           timers.Cancel(identity, Param(action, "timer_id"));
           break;
         case "grant_item":
-          if (!Grant(action)) throw new InvalidOperationException("grant_failed");
+          // AddItem can mutate a partial stack and still return false. Once the reservation exists,
+          // any false/throw is deliberately left pending rather than risking a duplicate reward.
+          if (Player.m_localPlayer == null
+              || !Player.m_localPlayer.GetInventory().AddItem(grantPrefab, grantCount))
+            throw new InvalidOperationException("grant_commit_ambiguous");
           break;
         case "spawn":
-          if (!Spawn(active, zdo, action, key, identity))
-            throw new InvalidOperationException("spawn_failed");
+          if (!Spawn(active, zdo, action, key, identity, spawnPrefab, spawnKind,
+              spawnPrefabName, spawnCount, spawnRadius, out var spawnRetrySafe,
+              out var spawnCommitError)) {
+            if (spawnRetrySafe) {
+              try {
+                if (!ledger.Release(key)) spawnRetrySafe = false;
+              } catch { spawnRetrySafe = false; }
+            }
+            if (spawnRetrySafe)
+              SchedulePendingReplay(key, identity, action, DateTimeOffset.UtcNow.AddSeconds(1));
+            throw new InvalidOperationException(spawnRetrySafe
+                ? spawnCommitError ?? "spawn_failed_retriable"
+                : spawnCommitError ?? "spawn_recovery_failed");
+          }
           break;
         case "clear_spawned":
           Clear(active, Param(action, "action_id"), identity, stage, transition);
@@ -701,16 +1012,24 @@ sealed class RuntimeExperienceEngine {
         default:
           throw new InvalidOperationException("action_not_implemented");
       }
+      // Commit before evidence. If receipt I/O fails after a successful mutation, the durable
+      // action remains complete and a replay suppresses it instead of duplicating the effect.
+      ledger.Commit(key);
+      pendingReplays.Remove(key);
+    } catch (Exception e) {
+      try {
+        WriteReceipt(ActionReceipt(
+            "rejected", e.Message, active, zdoId, stage, transition, action?.Id,
+            correlationId, identity), ActionLine(action, "failed: " + e.Message), CreatorEvidenceKind.Warning);
+      } catch { }
+      return false;
+    }
+    try {
       WriteReceipt(ActionReceipt(
           "executed", null, active, zdoId, stage, transition, action.Id,
           correlationId, identity), ActionLine(action, "executed"));
-      return true;
-    } catch (Exception e) {
-      WriteReceipt(ActionReceipt(
-          "rejected", e.Message, active, zdoId, stage, transition, action?.Id,
-          correlationId, identity), ActionLine(action, "failed: " + e.Message), CreatorEvidenceKind.Warning);
-      return false;
-    }
+    } catch { }
+    return true;
   }
 
   /// <summary>The authored story speaks twice: Center carries the moment, the chat log keeps it.
@@ -731,59 +1050,337 @@ sealed class RuntimeExperienceEngine {
       action.Parameters != null && action.Parameters.TryGetValue(name, out var value)
           ? value.ToObject<int>() : 0;
 
-  static bool Grant(ExperienceAction action) {
+  static bool TryPrepareGrant(
+      ExperienceAction action,
+      out UnityEngine.GameObject prefab,
+      out int count,
+      out string error) {
+    prefab = null;
     var item = Param(action, "item");
-    var count = IntParam(action, "quantity");
-    if (!MutationRegistry.TryGrant(item, count, out _)) return false;
-    var prefab = ZNetScene.instance?.GetPrefab(item);
+    count = IntParam(action, "quantity");
+    if (!MutationRegistry.TryGrant(item, count, out error)) return false;
+    prefab = ZNetScene.instance?.GetPrefab(item);
     if (prefab == null || prefab.GetComponent<ItemDrop>() == null
-        || Player.m_localPlayer == null) return false;
-    return Player.m_localPlayer.GetInventory().AddItem(prefab, count);
+        || Player.m_localPlayer == null) { error = "grant_prefab_unavailable"; return false; }
+    if (!Player.m_localPlayer.GetInventory().CanAddItem(prefab, count)) {
+      error = "grant_inventory_full";
+      return false;
+    }
+    error = null;
+    return true;
   }
 
-  bool Spawn(Active active, ZDO binding, ExperienceAction action, string key, WorkflowIdentity identity) {
-    var kind = Param(action, "kind");
-    var prefabName = Param(action, "prefab");
-    var count = IntParam(action, "count");
-    var radius = IntParam(action, "radius");
+  bool TryPrepareSpawn(
+      ExperienceAction action,
+      out UnityEngine.GameObject prefab,
+      out string kind,
+      out string prefabName,
+      out int count,
+      out int radius,
+      out string error) {
+    kind = Param(action, "kind");
+    prefabName = Param(action, "prefab");
+    count = IntParam(action, "count");
+    radius = IntParam(action, "radius");
+    prefab = null;
     if (!MutationRegistry.CanSpawn(kind, prefabName)
-        || count < 1 || count > 16 || radius < 0 || radius > 30) return false;
-    var prefab = ZNetScene.instance?.GetPrefab(prefabName);
-    if (prefab == null || !PrefabMatches(prefab, kind)) return false;
-    var center = binding.GetPosition();
-    for (var i = 0; i < count; i++) {
-      var angle = (float)(i * Math.PI * 2 / Math.Max(1, count));
-      var distance = Math.Min(radius, 2 + i / 4);
-      var position = center + new UnityEngine.Vector3(
-          (float)Math.Cos(angle) * distance, 0.5f, (float)Math.Sin(angle) * distance);
-      var go = UnityEngine.Object.Instantiate(
-          prefab, position, UnityEngine.Quaternion.identity);
-      var view = go?.GetComponent<ZNetView>();
-      var zdo = view?.GetZDO();
-      if (zdo == null) return false;
-      zdo.Set(Prefix + "spawnedContentHash", active.ContentHash);
-      zdo.Set(Prefix + "spawnedActionId", action.Id);
-      zdo.Set(Prefix + "spawnedActionKey", key);
-      var piece = go.GetComponent<Piece>();
-      if (piece != null && Player.m_localPlayer != null)
-        piece.SetCreator(Player.m_localPlayer.GetPlayerID());
-      spawned.Record(new SpawnedObject {
-        ActionKey = key,
-        RunId = identity.RunId,
-        WorldId = identity.WorldId,
-        ExperienceId = active.Document.Id,
-        ContentHash = active.ContentHash,
-        ActionId = action.Id,
-        Kind = kind,
-        Prefab = prefabName,
-        X = position.x,
-        Y = position.y,
-        Z = position.z,
-        UserId = zdo.m_uid.UserID,
-        ObjectId = zdo.m_uid.ID,
-      });
+        || count < 1 || count > 16 || radius < 0 || radius > 30) {
+      error = "spawn_parameters_invalid";
+      return false;
     }
+    prefab = ZNetScene.instance?.GetPrefab(prefabName);
+    if (prefab == null || !PrefabMatches(prefab, kind)) {
+      error = "spawn_prefab_unavailable";
+      return false;
+    }
+    if (!spawned.CanRecord(count, out error)) return false;
+    error = null;
     return true;
+  }
+
+  bool Spawn(
+      Active active,
+      ZDO binding,
+      ExperienceAction action,
+      string key,
+      WorkflowIdentity identity,
+      UnityEngine.GameObject prefab,
+      string kind,
+      string prefabName,
+      int count,
+      int radius,
+      out bool retrySafe,
+      out string error) {
+    retrySafe = false;
+    error = null;
+    var created = new List<UnityEngine.GameObject>();
+    var records = new List<SpawnedObject>();
+    try {
+      var center = binding.GetPosition();
+      for (var i = 0; i < count; i++) {
+        var angle = (float)(i * Math.PI * 2 / Math.Max(1, count));
+        var distance = Math.Min(radius, 2 + i / 4);
+        var position = center + new UnityEngine.Vector3(
+            (float)Math.Cos(angle) * distance, 0.5f, (float)Math.Sin(angle) * distance);
+        var go = UnityEngine.Object.Instantiate(
+            prefab, position, UnityEngine.Quaternion.identity);
+        if (go == null) throw new InvalidOperationException("spawn_instantiate_failed");
+        created.Add(go);
+        var view = go.GetComponent<ZNetView>();
+        var zdo = view?.GetZDO();
+        if (zdo == null) throw new InvalidOperationException("spawn_identity_unavailable");
+        zdo.Set(Prefix + "spawnedContentHash", active.ContentHash);
+        zdo.Set(Prefix + "spawnedActionId", action.Id);
+        zdo.Set(Prefix + "spawnedActionKey", key);
+        var piece = go.GetComponent<Piece>();
+        if (piece != null && Player.m_localPlayer != null)
+          piece.SetCreator(Player.m_localPlayer.GetPlayerID());
+        var record = new SpawnedObject {
+          ActionKey = key,
+          RunId = identity.RunId,
+          WorldId = identity.WorldId,
+          ExperienceId = active.Document.Id,
+          ContentHash = active.ContentHash,
+          ActionId = action.Id,
+          Kind = kind,
+          Prefab = prefabName,
+          X = position.x,
+          Y = position.y,
+          Z = position.z,
+          UserId = zdo.m_uid.UserID,
+          ObjectId = zdo.m_uid.ID,
+        };
+        records.Add(record);
+        // Record each exact tagged ZDO before creating the next one. A process loss can leave at
+        // most the narrow gap between tag and row, rather than an entire untracked batch.
+        spawned.Record(record);
+      }
+      return true;
+    } catch (Exception failure) {
+      error = failure.Message;
+      retrySafe = BeginSpawnRecovery(created, records, key, identity, action, out var queued);
+      if (!retrySafe) error = queued ? "spawn_recovery_pending" : "spawn_recovery_failed";
+      return false;
+    }
+  }
+
+  bool BeginSpawnRecovery(
+      IReadOnlyList<UnityEngine.GameObject> created,
+      IReadOnlyList<SpawnedObject> records,
+      string key,
+      WorkflowIdentity identity,
+      ExperienceAction action,
+      out bool queued) {
+    queued = false;
+    try {
+      foreach (var go in created) {
+        if (go == null) continue;
+        var view = go.GetComponent<ZNetView>();
+        var zdo = view?.GetZDO();
+        if (zdo == null) {
+          UnityEngine.Object.Destroy(go);
+          continue;
+        }
+        var record = records.FirstOrDefault(value => value.UserId == zdo.m_uid.UserID
+            && value.ObjectId == zdo.m_uid.ID);
+        if (record == null
+            || !string.Equals(zdo.GetString(Prefix + "spawnedActionKey", ""), key,
+                StringComparison.Ordinal)
+            || !string.Equals(zdo.GetString(Prefix + "spawnedContentHash", ""),
+                record.ContentHash, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(zdo.GetString(Prefix + "spawnedActionId", ""),
+                record.ActionId, StringComparison.Ordinal)) return false;
+        if (view != null) {
+          view.ClaimOwnership();
+          view.Destroy();
+        } else {
+          zdo.SetOwner(ZDOMan.GetSessionID());
+          ZDOMan.instance.DestroyZDO(zdo);
+        }
+      }
+      if (TryFinishSpawnRecovery(key, records)) return true;
+      if (!spawnRecoveries.ContainsKey(key) && spawnRecoveries.Count >= MaxSpawnRecoveries)
+        return false;
+      spawnRecoveries[key] = new SpawnRecovery {
+        ActionKey = key,
+        Identity = identity,
+        Action = action,
+        Manager = ZDOMan.instance,
+        NetworkSessionId = ZDOMan.GetSessionID(),
+        Records = records.ToArray(),
+      };
+      queued = true;
+      return false;
+    } catch { return false; }
+  }
+
+  bool TryFinishSpawnRecovery(string key, IReadOnlyList<SpawnedObject> records) {
+    try {
+      if (ZDOMan.instance == null) return false;
+      if ((records ?? Array.Empty<SpawnedObject>()).Any(value =>
+          ZDOMan.instance.GetZDO(new ZDOID(value.UserId, value.ObjectId)) != null)) return false;
+      spawned.Remove(records ?? Array.Empty<SpawnedObject>());
+      return spawned.ForAction(key).Count == 0;
+    } catch { return false; }
+  }
+
+  void RunSpawnRecoveries(DateTimeOffset now) {
+    if (spawnRecoveries.Count == 0) return;
+    foreach (var recovery in spawnRecoveries.Values.ToArray()) {
+      // Absence is evidence only while the addressed world/run is actually loaded. During unload
+      // ZDOMan is null; treating that as absence would erase the durable rows while leaving the
+      // objects in the world save.
+      if (ZDOMan.instance == null || !TryLoad(out var active, out _)) continue;
+      if (!ReferenceEquals(ZDOMan.instance, recovery.Manager)
+          || ZDOMan.GetSessionID() != recovery.NetworkSessionId) {
+        // Physical ZDO ids may be reassigned across a cold load. Keep the durable pending claim
+        // and rows for explicit reset; never infer absence in a different network generation.
+        spawnRecoveries.Remove(recovery.ActionKey);
+        continue;
+      }
+      if (!IsCurrentRun(recovery.Identity, active)) {
+        // A reset owns cleanup through its durable reset transaction. Never mutate rows or replay
+        // an in-memory recovery after that run is retired.
+        spawnRecoveries.Remove(recovery.ActionKey);
+        continue;
+      }
+      if (!TryFinishSpawnRecovery(recovery.ActionKey, recovery.Records)) continue;
+      try {
+        var state = ledger.ExecutionState(recovery.ActionKey);
+        if (state == ActionExecutionState.Committed) {
+          spawnRecoveries.Remove(recovery.ActionKey);
+          continue;
+        }
+        if (state == ActionExecutionState.Pending && !ledger.Release(recovery.ActionKey))
+          continue;
+      } catch { continue; }
+      // Keep the recovery until its automatic replay is durably represented in the bounded
+      // in-memory queue. A full queue or transient workflow read gets another tick.
+      if (SchedulePendingReplay(recovery.ActionKey, recovery.Identity, recovery.Action, now))
+        spawnRecoveries.Remove(recovery.ActionKey);
+    }
+  }
+
+  bool SchedulePendingReplay(
+      string actionKey,
+      WorkflowIdentity identity,
+      ExperienceAction action,
+      DateTimeOffset nextUtc) {
+    if (string.IsNullOrWhiteSpace(actionKey) || identity == null || action == null
+        || !TryPendingRoute(identity, out var stageId, out var transitionId)) return false;
+    if (pendingReplays.TryGetValue(actionKey, out var existing)) {
+      if (nextUtc < existing.NextUtc) existing.NextUtc = nextUtc;
+      return true;
+    }
+    if (pendingReplays.Count >= MaxPendingReplays) return false;
+    pendingReplays[actionKey] = new PendingReplay {
+      ActionKey = actionKey,
+      Identity = identity,
+      StageId = stageId,
+      TransitionId = transitionId,
+      Action = action,
+      NextUtc = nextUtc,
+    };
+    return true;
+  }
+
+  void RunPendingReplays(DateTimeOffset now) {
+    if (pendingReplays.Count == 0) return;
+    foreach (var group in pendingReplays.Values.Where(value => value.NextUtc <= now)
+        .GroupBy(value => value.Identity.Key, StringComparer.Ordinal).ToArray()) {
+      foreach (var stale in group.Where(value => !IsExpectedPending(value)).ToArray())
+        pendingReplays.Remove(stale.ActionKey);
+      var replay = group.Where(IsExpectedPending)
+          .OrderBy(value => value.ActionKey, StringComparer.Ordinal).FirstOrDefault();
+      if (replay == null) continue;
+      if (!ReplayPreconditionReady(replay.Action)) {
+        foreach (var pending in group.Where(IsExpectedPending))
+          pending.NextUtc = now.AddSeconds(2);
+        continue;
+      }
+      var accepted = ReplayPending(
+          replay.Identity, now, replay.StageId, replay.TransitionId);
+      var matching = pendingReplays.Where(value => value.Value.Identity.Key == group.Key
+          && string.Equals(value.Value.StageId, replay.StageId, StringComparison.Ordinal)
+          && string.Equals(value.Value.TransitionId, replay.TransitionId, StringComparison.Ordinal))
+          .Select(value => value.Key).ToArray();
+      if (accepted && !IsExpectedPending(replay)) {
+        foreach (var key in matching) pendingReplays.Remove(key);
+      } else {
+        foreach (var key in matching) pendingReplays[key].NextUtc = now.AddSeconds(2);
+      }
+    }
+  }
+
+  bool TryPendingRoute(
+      WorkflowIdentity identity,
+      out string stageId,
+      out string transitionId) {
+    stageId = null;
+    transitionId = null;
+    if (identity == null) return false;
+    var progress = workflows.Get(identity);
+    if (progress == null || string.IsNullOrWhiteSpace(progress.PendingTransitionId)
+        || !string.Equals(progress.StageId, progress.PendingFromStageId, StringComparison.Ordinal))
+      return false;
+    stageId = progress.StageId;
+    transitionId = progress.PendingTransitionId;
+    return true;
+  }
+
+  bool IsExpectedPending(PendingReplay replay) {
+    if (replay?.Identity == null) return false;
+    var progress = workflows.Get(replay.Identity);
+    return progress != null
+        && string.Equals(progress.StageId, replay.StageId, StringComparison.Ordinal)
+        && string.Equals(progress.PendingFromStageId, replay.StageId, StringComparison.Ordinal)
+        && string.Equals(progress.PendingTransitionId, replay.TransitionId, StringComparison.Ordinal);
+  }
+
+  bool ReplayPreconditionReady(ExperienceAction action) {
+    if (action?.Type == "grant_item")
+      return TryPrepareGrant(action, out _, out _, out _);
+    if (action?.Type == "spawn")
+      return TryPrepareSpawn(action, out _, out _, out _, out _, out _, out _);
+    return true;
+  }
+
+  bool ReplayPending(
+      WorkflowIdentity identity,
+      DateTimeOffset now,
+      string expectedStageId = null,
+      string expectedTransitionId = null) {
+    try {
+      if (!TryLoad(out var active, out _) || !IsCurrentRun(identity, active)
+          || !TryCurrentBinding(identity, active, out var binding)) return false;
+      var progress = workflows.Get(identity);
+      if (progress == null || string.IsNullOrWhiteSpace(progress.PendingTransitionId)
+          || !string.Equals(progress.StageId, progress.PendingFromStageId, StringComparison.Ordinal)
+          || (!string.IsNullOrWhiteSpace(expectedStageId)
+              && !string.Equals(progress.StageId, expectedStageId, StringComparison.Ordinal))
+          || (!string.IsNullOrWhiteSpace(expectedTransitionId)
+              && !string.Equals(progress.PendingTransitionId, expectedTransitionId,
+                  StringComparison.Ordinal))) return false;
+      var observed = RuntimeObservation.Facts(
+          binding, spawned, identity.Key, active.ContentHash);
+      // A pending transition was earned by a real prior event. Never fabricate a replay event:
+      // after another path has completed, such an event could be evaluated against the next stage.
+      var cause = LastEvent(identity);
+      if (cause == null) return false;
+      var decision = workflows.Begin(
+          identity, active.Document, cause, observed.Spatial, observed.Encounter);
+      if (decision != null
+          && string.Equals(decision.StageId, progress.StageId, StringComparison.Ordinal)
+          && string.Equals(decision.Transition?.Id, progress.PendingTransitionId,
+              StringComparison.Ordinal)) {
+        Apply(active, binding, decision, cause, NewRecheckId());
+        return true;
+      }
+    } catch (Exception e) {
+      try { Write("action", "action_replay_failed", active: null, status: null,
+          detail: e.Message, correlationId: null); } catch { }
+    }
+    return false;
   }
 
   static bool PrefabMatches(UnityEngine.GameObject prefab, string kind) =>
@@ -843,6 +1440,7 @@ sealed class RuntimeExperienceEngine {
     ActivationId = active.ActivationId,
     CorrelationId = correlationId,
     BindingZdo = zdo,
+    BindingInstanceId = identity?.BindingInstanceId,
     ExperienceId = identity?.ExperienceId ?? active.Document.Id,
     RunId = identity?.RunId,
     WorldId = identity?.WorldId,
@@ -864,27 +1462,97 @@ sealed class RuntimeExperienceEngine {
     return CharmPolicy.ValidateReference(reference).Allowed ? reference : null;
   }
 
-  WorkflowIdentity Identity(ZDO zdo, Active active) {
-    var participant = Player.m_localPlayer == null
-        ? "0" : Player.m_localPlayer.GetPlayerID().ToString();
-    var scope = new RuntimeRunScope {
-      WorldId = ZNet.instance.GetWorldUID().ToString(),
-      ExperienceId = active.Document.Id,
-      BindingZdo = zdo.m_uid.ToString(),
-      ContentHash = active.ContentHash,
-      ParticipantIds = new List<string> { participant },
-    };
-    return runs.Resolve(scope, DateTimeOffset.UtcNow).Identity();
+  bool TryRunScope(ZDO zdo, Active active, out RuntimeRunScope scope) {
+    scope = null;
+    try {
+      var player = Player.m_localPlayer;
+      if (zdo == null || active?.Document == null || player == null || ZNet.instance == null)
+        return false;
+      var participant = player.GetPlayerID();
+      var world = ZNet.instance.GetWorldUID();
+      if (participant == 0L || world == 0L) return false;
+      scope = new RuntimeRunScope {
+        WorldId = world.ToString(),
+        ExperienceId = active.Document.Id,
+        BindingZdo = zdo.m_uid.ToString(),
+        BindingInstanceId = Null(zdo.GetString(Prefix + "bindingInstanceId", "")),
+        ContentHash = active.ContentHash,
+        ParticipantIds = new List<string> { participant.ToString() },
+      };
+      return true;
+    } catch { return false; }
+  }
+
+  /// <summary>Run creation belongs only to an authored event (including the explicit
+  /// experience-started event). Status and progress callers use TryActiveIdentity instead.</summary>
+  WorkflowIdentity ResolveIdentity(ZDO zdo, Active active) {
+    if (!TryRunScope(zdo, active, out var scope)) return null;
+    return CurrentIdentity(runs.Resolve(scope, DateTimeOffset.UtcNow), scope);
+  }
+
+  bool TryActiveIdentity(ZDO zdo, Active active, out WorkflowIdentity identity,
+      out RuntimeRunRecord record) {
+    identity = null;
+    record = null;
+    if (!TryRunScope(zdo, active, out var scope)) return false;
+    record = runs.Registry.Active(scope);
+    if (record == null) return false;
+    identity = CurrentIdentity(record, scope);
+    return true;
+  }
+
+  /// <summary>The registry owns stable run identity. The loaded object owns today's physical ZDO
+  /// identity; never leak the pre-cold-load ZDO retained in the original run record.</summary>
+  static WorkflowIdentity CurrentIdentity(RuntimeRunRecord record, RuntimeRunScope current) {
+    var identity = record?.Identity();
+    if (identity == null) return null;
+    identity.BindingZdo = current.BindingZdo;
+    identity.BindingInstanceId = current.BindingInstanceId;
+    return identity;
+  }
+
+  bool TryCurrentBinding(WorkflowIdentity identity, Active active, out ZDO zdo) {
+    zdo = null;
+    if (identity == null || active?.Document == null) return false;
+    var selection = SelectedBinding(active);
+    if (selection.State == BindingSelectionState.Unavailable) return false;
+    if (selection.State == BindingSelectionState.Selected
+        && (!string.Equals(identity.BindingInstanceId, selection.BindingInstanceId,
+                StringComparison.Ordinal))) return false;
+    if (selection.State == BindingSelectionState.Legacy
+        && !string.IsNullOrWhiteSpace(identity.BindingInstanceId)) return false;
+    foreach (var wear in Bindings(active)) {
+      var candidate = wear?.GetComponent<ZNetView>()?.GetZDO();
+      if (candidate == null) continue;
+      var matches = !string.IsNullOrWhiteSpace(identity.BindingInstanceId)
+          ? string.Equals(candidate.GetString(Prefix + "bindingInstanceId", ""),
+              identity.BindingInstanceId, StringComparison.Ordinal)
+          : string.Equals(candidate.m_uid.ToString(), identity.BindingZdo,
+              StringComparison.Ordinal);
+      if (!matches) continue;
+      zdo = candidate;
+      return true;
+    }
+    return false;
   }
 
   bool IsCurrentRun(WorkflowIdentity identity, Active active) {
-    if (identity == null || active == null || !runs.Registry.IsActive(identity)
+    if (identity == null || active?.Document == null || !runs.Registry.IsActive(identity)
+        || identity.CharacterId == "0"
         || !string.Equals(identity.ContentHash, active.ContentHash, StringComparison.OrdinalIgnoreCase)
         || !string.IsNullOrWhiteSpace(identity.ExperienceId)
             && !string.Equals(identity.ExperienceId, active.Document.Id, StringComparison.Ordinal)) return false;
     try {
-      return ZNet.instance != null
-          && string.Equals(identity.WorldId, ZNet.instance.GetWorldUID().ToString(), StringComparison.Ordinal);
+      var player = Player.m_localPlayer;
+      if (ZNet.instance == null || player == null) return false;
+      var participant = player.GetPlayerID();
+      var world = ZNet.instance.GetWorldUID();
+      if (participant == 0L || world == 0L
+          || !string.Equals(identity.WorldId, world.ToString(),
+              StringComparison.Ordinal)
+          || !string.Equals(identity.CharacterId, participant.ToString(),
+              StringComparison.Ordinal)) return false;
+      return TryCurrentBinding(identity, active, out _);
     } catch { return false; }
   }
 
@@ -894,12 +1562,18 @@ sealed class RuntimeExperienceEngine {
   public string DescribeProgress() {
     try {
       if (!TryLoad(out var active, out _)) return "not ready";
-      foreach (var wear in WearNTear.GetAllInstances()) {
+      foreach (var wear in Bindings(active)) {
         var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
         if (zdo == null) continue;
         var reference = Read(zdo);
         if (reference == null || reference.ContentHash != active.ContentHash) continue;
-        var identity = Identity(zdo, active);
+        if (!TryRunScope(zdo, active, out _)) return "not ready";
+        if (!TryActiveIdentity(zdo, active, out var identity, out _)) {
+          var first = active.Document.Stages.FirstOrDefault(
+              value => value.Id == active.Document.EntryStage);
+          return "Not started - "
+              + Describe(first?.Transitions?.FirstOrDefault()?.When);
+        }
         var progress = workflows.Get(identity);
         if (progress == null) {
           var first = active.Document.Stages.FirstOrDefault(
@@ -947,12 +1621,15 @@ sealed class RuntimeExperienceEngine {
   public string CurrentStageId() {
     try {
       if (!TryLoad(out var active, out _)) return null;
-      foreach (var wear in WearNTear.GetAllInstances()) {
+      foreach (var wear in Bindings(active)) {
         var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
         if (zdo == null) continue;
         var reference = Read(zdo);
         if (reference == null || reference.ContentHash != active.ContentHash) continue;
-        return workflows.Get(Identity(zdo, active))?.StageId ?? active.Document.EntryStage;
+        if (!TryRunScope(zdo, active, out _)) return null;
+        return !TryActiveIdentity(zdo, active, out var identity, out _)
+            ? active.Document.EntryStage
+            : workflows.Get(identity)?.StageId ?? active.Document.EntryStage;
       }
     } catch { }
     return null;
@@ -973,26 +1650,97 @@ sealed class RuntimeExperienceEngine {
       var zdo = ZDOMan.instance?.GetZDO(new ZDOID(user, objectId));
       var view = zdo == null ? null : ZNetScene.instance?.FindInstance(zdo);
       var reference = zdo == null ? null : Read(zdo);
-      if (zdo == null || view == null || !view.IsOwner() || reference == null
+      if (zdo == null || !zdo.Persistent || view == null || !view.IsOwner() || reference == null
           || reference.PackId != active.PackId || reference.ExperienceId != active.Document.Id
           || reference.Version != active.Version
           || !string.Equals(reference.ContentHash, active.ContentHash, StringComparison.OrdinalIgnoreCase)) {
         error = "binding_start_scope_mismatch";
         return false;
       }
-      var started = new RuntimeEvent {
-        Name = ExperienceSchema.ExperienceStartedEvent,
-        SourceId = bindingZdo,
-        At = DateTimeOffset.UtcNow,
-      };
-      RuntimeObservation.StampLocalPlayer(started);
-      OnEvent(started);
-      return true;
+      InvalidateBindingSelection();
+      if (!Bindings(active).Any(wear => string.Equals(
+              wear?.GetComponent<ZNetView>()?.GetZDO()?.m_uid.ToString(), bindingZdo,
+              StringComparison.Ordinal))) {
+        error = "binding_start_selection_mismatch";
+        return false;
+      }
+      // Binding is an explicit run boundary even when the authored graph does not consume an
+      // experience_started event. Workflow state, rather than merely an active run record, is
+      // the durable proof that a subscribing experience received its one lifecycle fact.
+      var identity = ResolveIdentity(zdo, active);
+      if (identity == null) {
+        error = "binding_start_identity_unavailable";
+        return false;
+      }
+      return EnsureStarted(active, zdo, identity, out error);
     } catch (Exception e) { error = "experience_start_failed:" + e.GetType().Name; return false; }
   }
 
+  /// <summary>Finish the lifecycle stage of a reset transaction for one exact successor. The
+  /// durable binding-instance selection resolves today's physical ZDO after a cold load; the
+  /// expected run id prevents a retry from starting a newer run in the same scope.</summary>
+  public bool EnsureRunStarted(string expectedRunId, out string error) {
+    error = null;
+    try {
+      if (string.IsNullOrWhiteSpace(expectedRunId)) {
+        error = "experience_start_run_invalid";
+        return false;
+      }
+      if (!TryLoad(out var active, out error)) return false;
+      var expected = runs.Registry.Find(expectedRunId);
+      if (expected == null || expected.Status != "active") {
+        error = "experience_start_run_missing";
+        return false;
+      }
+      InvalidateBindingSelection();
+      foreach (var wear in Bindings(active)) {
+        var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
+        if (zdo == null) continue;
+        var reference = Read(zdo);
+        if (reference == null || reference.ContentHash != active.ContentHash) continue;
+        if (!TryActiveIdentity(zdo, active, out var identity, out var current)) continue;
+        if (!string.Equals(current.RunId, expectedRunId, StringComparison.Ordinal)) {
+          error = "experience_start_run_mismatch";
+          return false;
+        }
+        return EnsureStarted(active, zdo, identity, out error);
+      }
+      error = "binding_start_selection_mismatch";
+      return false;
+    } catch (Exception e) {
+      error = "experience_start_failed:" + e.GetType().Name;
+      return false;
+    }
+  }
+
+  bool EnsureStarted(Active active, ZDO zdo, WorkflowIdentity identity, out string error) {
+    error = null;
+    if (active?.Document == null || zdo == null || identity == null
+        || !runs.Registry.IsActive(identity)) {
+      error = "binding_start_identity_unavailable";
+      return false;
+    }
+    if (!active.Subscriptions.Contains(ExperienceSchema.ExperienceStartedEvent)) return true;
+    if (workflows.Get(identity) != null) return true;
+    var started = new RuntimeEvent {
+      Name = ExperienceSchema.ExperienceStartedEvent,
+      SourceId = zdo.m_uid.ToString(),
+      At = DateTimeOffset.UtcNow,
+    };
+    RuntimeObservation.StampLocalPlayer(started);
+    OnEvent(started);
+    if (workflows.Get(identity) != null) return true;
+    error = "experience_start_not_observed";
+    return false;
+  }
+
   public void ClearRunEphemera(string stateKey) {
-    if(!string.IsNullOrWhiteSpace(stateKey))rechecks.Remove(stateKey);
+    if(string.IsNullOrWhiteSpace(stateKey))return;
+    rechecks.Remove(stateKey);
+    foreach(var key in spawnRecoveries.Where(value=>value.Value.Identity?.Key==stateKey)
+        .Select(value=>value.Key).ToArray())spawnRecoveries.Remove(key);
+    foreach(var key in pendingReplays.Where(value=>value.Value.Identity?.Key==stateKey)
+        .Select(value=>value.Key).ToArray())pendingReplays.Remove(key);
   }
 
   public IReadOnlyList<RuntimeRunStatusEntry> CurrentRuns() {
@@ -1003,9 +1751,9 @@ sealed class RuntimeExperienceEngine {
       if(zdo==null)continue;
       var reference=Read(zdo);
       if(reference==null||reference.ContentHash!=active.ContentHash)continue;
-      var identity=Identity(zdo,active);var record=runs.Registry.Find(identity.RunId);var progress=workflows.Get(identity);
-      if(record==null)continue;
-      values.Add(new RuntimeRunStatusEntry{RunId=record.RunId,ScopeId=record.ScopeId,ExperienceId=active.Document.Id,BindingZdo=identity.BindingZdo,ParticipantIds=record.Scope.ParticipantIds.ToArray(),ContentHash=identity.ContentHash,StageId=progress?.StageId??active.Document.EntryStage,Outcome=progress?.Outcome,RewardPolicy=record.RewardPolicy});
+      if(!TryActiveIdentity(zdo,active,out var identity,out var record))continue;
+      var progress=workflows.Get(identity);
+      values.Add(new RuntimeRunStatusEntry{RunId=record.RunId,ScopeId=record.ScopeId,ExperienceId=active.Document.Id,BindingZdo=zdo.m_uid.ToString(),BindingInstanceId=identity.BindingInstanceId,ParticipantIds=record.Scope.ParticipantIds.ToArray(),ContentHash=identity.ContentHash,StageId=progress?.StageId??active.Document.EntryStage,Outcome=progress?.Outcome,RewardPolicy=record.RewardPolicy});
       if(values.Count>=64)break;
     }
     return values;
@@ -1162,8 +1910,7 @@ sealed class RuntimeExperienceEngine {
 
   void InvalidateActive() {
     cachedActive = null;
-    cachedBindings = Array.Empty<WearNTear>();
-    cachedBindingContentHash = null;
+    InvalidateBindingSelection();
     recentEventKeys.Clear();
     rechecks.Clear();
     lock (evidenceGate) {
@@ -1174,6 +1921,22 @@ sealed class RuntimeExperienceEngine {
       activeAlertOrder.Clear();
       recentEvidence.RemoveAll(value => !string.IsNullOrWhiteSpace(value.Key));
     }
+  }
+
+  void InvalidateBindingCache() {
+    cachedBindings = Array.Empty<WearNTear>();
+    cachedBindingContentHash = null;
+    cachedBindingResolutionKey = null;
+    nextBindingRefresh = 0;
+  }
+
+  /// <summary>A binding writer calls this after changing either the journal, durable marker, or
+  /// physical reference fields. It invalidates observation only; it never resolves or creates a run.</summary>
+  internal void InvalidateBindingSelection() {
+    InvalidateBindingCache();
+    cachedBindingSelectionKey = null;
+    cachedBindingSelection = null;
+    nextBindingSelectionRefresh = 0;
   }
 
   void ReportOrphanedBindings(Active active) {

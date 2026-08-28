@@ -1,0 +1,73 @@
+{
+  "schema": "comfy-quest-external-support-release/v1",
+  "package_id": "comfy-network-sense-portal-support",
+  "version": "0.5.80",
+  "release_id": "m7-c10b-20260807-r42",
+  "upstream_owner": "networksense",
+  "source": {
+    "kind": "captured_installed_support_bytes",
+    "captured_from": "captures/install-cleanup/omen-era17-20260827T102804Z/BepInEx/plugins",
+    "reason": "Preserved before the OMEN ERA17 install cleanup removed non-Quest plugins.",
+    "authentication": "Unsigned upstream assembly; identity is pinned here by release metadata, byte length, and SHA-256, not by a publisher signature."
+  },
+  "capabilities": [
+    "portal_connection_dirty_tag_cache",
+    "spawner_connection_hash_cache"
+  ],
+  "files": [
+    {
+      "name": "ComfyNetworkSense.dll",
+      "bytes": 915456,
+      "sha256": "08bf698bba43cc9a25b79cc7222f3f2ac29d4e0ef18ea0128ccf42e9892c4e36"
+    },
+    {
+      "name": "System.Buffers.dll",
+      "bytes": 23816,
+      "sha256": "2d78d770c9cb997199154ae8c018b9f1d1efbc86729f7264dde6dbad2a12cac3"
+    },
+    {
+      "name": "System.Memory.dll",
+      "bytes": 145200,
+      "sha256": "d5e8e4866f9cfa66f7765660f84b210198893e55335487afe5ebda342c0e913d"
+    },
+    {
+      "name": "System.Numerics.Vectors.dll",
+      "bytes": 110344,
+      "sha256": "20c2fa81b8c70d651099d762954f285fd4f942e63b2d7217c145dab8d4b2f4c9"
+    },
+    {
+      "name": "System.Runtime.CompilerServices.Unsafe.dll",
+      "bytes": 19256,
+      "sha256": "08cbd7278b66f1e68425a82d4b97181a4130d93e3dd91831407aba7212ccdacf"
+    }
+  ],
+  "config": {
+    "name": "djcdevelopment.valheim.comfynetworksense.cfg",
+    "sha256": "b107fb269a25ef58f4318e7b42e9b560f5f19dbf8f41e6f6ef05ba764c73c083",
+    "profile": "large_world_connection_caches_only",
+    "sensitive_values": false
+  },
+  "runtime_proof": {
+    "required_log_contains": [
+      "Loading [ComfyNetworkSense 0.5.80]",
+      "Portal connection cache enabled; interval=5s.",
+      "Portal connection cache processed portals=",
+      "Portal saved-connection hash join connected=",
+      "Spawner connection cache processed spawned=",
+      "[world-entry] entered: world_entry_complete"
+    ],
+    "forbidden_log_contains": [
+      "ConnectPortals =>",
+      "ConnectSpawners =>",
+      "Could not load [ComfyNetworkSense",
+      "TypeLoadException",
+      "FileNotFoundException"
+    ]
+  },
+  "limitations": [
+    "This is a pinned external release artifact, not NetworkSense source owned by this repository.",
+    "The unsigned captured assembly is not independently authenticated as an upstream publication.",
+    "NetworkSense still initializes its patch assembly; the profile sets its master activity switch and every telemetry, automation, MCP, HUD, probe, and network-cutover boolean false. Only the large-world portal and spawner caches are true.",
+    "Version 0.5.80 indexes portal tags by ZDOMan identity rather than a load generation. Existing saved portal topology is supported, but authoring or retagging portals during this static-topology seat is outside the claim."
+  ]
+}

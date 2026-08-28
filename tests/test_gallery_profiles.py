@@ -265,7 +265,15 @@ class GalleryProfileTests(unittest.TestCase):
             contract,
         )
         self.assertNotIn("List<LabTreeRecoveryRecord> Trees", contract)
-        self.assertIn("DataContractJsonSerializer", contract)
+        # Mono tried to load a machine-level dataContractSerializer configuration section before
+        # it could read a live sidecar. The shipping contract now uses the same Newtonsoft stack as
+        # the rest of the mods, while retaining strict, culture-independent reads.
+        self.assertNotIn("DataContractJsonSerializer", contract)
+        self.assertIn("JsonConvert.DeserializeObject<LabTreeRecoveryLedger>", contract)
+        self.assertIn("JsonConvert.SerializeObject(ledger, Formatting.None", contract)
+        self.assertIn("Culture = CultureInfo.InvariantCulture", contract)
+        self.assertIn("DateParseHandling = DateParseHandling.None", contract)
+        self.assertIn("MissingMemberHandling = MissingMemberHandling.Error", contract)
         self.assertIn('[DataMember(Name = "Trees", Order = 12)]', contract)
         self.assertIn("public int RecordCount;", contract)
         self.assertIn("public string RecordsSha256;", contract)

@@ -1,0 +1,323 @@
+{
+  "schema": "comfy-quest-am4-fastlane-evidence/v1",
+  "recorded_on": "2026-08-28",
+  "result": "demo_fixture_replayed_sign_bound_reset_successor_started_provider_replay_and_retries_idempotent_exact_final_bytes_cold_loaded",
+  "source_revision": "38a16dcbbe4ae5986af9bc4a29939998734b26a5",
+  "source_dirty": true,
+  "creator_session_id": "quest-am4-fastlane-20260828-r1",
+  "local_evidence_root": "C:\\work\\comfy-quest\\captures\\creator-session\\quest-am4-fastlane-20260828-r1\\evidence",
+  "mechanics_evidence_root": "C:\\work\\comfy-quest\\captures\\creator-session\\quest-am4-fastlane-20260828-r1\\evidence\\post-fix-restart",
+  "provider_replay_evidence_root": "C:\\work\\comfy-quest\\captures\\creator-session\\quest-am4-fastlane-20260828-r1\\evidence\\provider-lab-replay",
+  "local_evidence_is_ignored": true,
+  "installed_identity": {
+    "machine": "am4",
+    "steam_account_id": "15896021",
+    "steam_id_64": "76561197976161749",
+    "steam_account_name": "waryfool",
+    "steam_persona_name": "Zephar410",
+    "world_uid": "-7600395338659582326",
+    "world_name": "ComfyQuestDemo",
+    "character_profile": "questyfour",
+    "character_name": "Questyfour",
+    "world_entry_request_id": "world-entry-d7d1a207f78e47249ca635c1960aeb4a",
+    "world_entry_completed_utc": "2026-08-28T08:24:45.568886+00:00",
+    "plugin_sha256": {
+      "ComfyQuestContracts.dll": "fb04d708bb1b65e5b71f45236e09eaa8aca4a8976e11ad4f089e2915c47011ca",
+      "ComfyQuestRuntime.dll": "28d5265e9674c99b1e0d9de539268b2aeff10779113c6dcf1643b7b3b7a96dc2",
+      "ComfyQuestLab.dll": "7a0ced6eb493dc12db61269207ecd219d95146c7a0ee507246d06d3b8af7008f",
+      "Newtonsoft.Json.dll": "e1e27af7b07eeedf5ce71a9255f0422816a6fc5849a483c6714e1b472044fa9d"
+    }
+  },
+  "provider_replay_installed_identity": {
+    "machine": "am4",
+    "world_uid": "-7600395338659582326",
+    "world_name": "ComfyQuestDemo",
+    "character_profile": "questyfour",
+    "world_entry_request_id": "world-entry-9d13d04158914363a9fb62f6ff175a4a",
+    "world_entry_completed_utc": "2026-08-28T09:16:03.582136+00:00",
+    "world_entry_receipt_sha256": "07a3b3edcd62b53d798f48c6f2c455f7e86777977a9cb5bccd5850590ba9f14d",
+    "plugin_sha256": {
+      "ComfyQuestContracts.dll": "fb04d708bb1b65e5b71f45236e09eaa8aca4a8976e11ad4f089e2915c47011ca",
+      "ComfyQuestRuntime.dll": "28d5265e9674c99b1e0d9de539268b2aeff10779113c6dcf1643b7b3b7a96dc2",
+      "ComfyQuestLab.dll": "a629b8a44fe8649c36f209067682d1c7dad58a75a5627ccb14d6de4aba86f1eb",
+      "Newtonsoft.Json.dll": "e1e27af7b07eeedf5ce71a9255f0422816a6fc5849a483c6714e1b472044fa9d"
+    }
+  },
+  "exact_final_installed_identity": {
+    "machine": "am4",
+    "world_uid": "-7600395338659582326",
+    "world_name": "ComfyQuestDemo",
+    "character_profile": "questyfour",
+    "world_entry_request_id": "world-entry-final-bytes-fa1a31f842824cd8a2056e88c344b508",
+    "world_entry_completed_utc": "2026-08-28T09:53:52.228554+00:00",
+    "world_entry_receipt_sha256": "3c3df563a434b8c1733242404f717a97b0b7df6d0145588300d97bebffe00296",
+    "plugin_sha256": {
+      "ComfyQuestContracts.dll": "0cb3d6ca72132def41248e49d7762233b094342688c530ac5da733f5e04e27ea",
+      "ComfyQuestRuntime.dll": "c021103f642f168f9596091bc15d69d8a4db03889ef28c5cbe26a2957f08e92b",
+      "ComfyQuestLab.dll": "3325151a67779afc19f2c24e4c5967f94b1c3a8cdea8acc20aac0df4dcccb7e5",
+      "Newtonsoft.Json.dll": "e1e27af7b07eeedf5ce71a9255f0422816a6fc5849a483c6714e1b472044fa9d"
+    }
+  },
+  "observed_edges": [
+    {
+      "edge": "candidate_wire_bound_was_not_the_missing_sign_root_cause",
+      "observation": "After the diverse-kind candidate selector was deployed and the client was cold-started, the bounded list still contained no sign.",
+      "evidence": "binding-candidates-without-replay.json",
+      "evidence_sha256": "d919abd47d4746d28aef111406f060014d54a63612dd37c18085980267eb1db3"
+    },
+    {
+      "edge": "demo_fixture_replay_is_a_required_precondition",
+      "observation": "The pinned Demo save did not contain the reviewed 12-piece binding fixture. The proven Creator Session replay sequence was check, build, then diff before candidate discovery.",
+      "machine_result": "capture diff first-portal-progression-shelter: MATCH — expected 12, selected 12, missing 0, extra 0"
+    },
+    {
+      "edge": "data_contract_json_serializer_is_not_portable_to_the_linux_valheim_runtime",
+      "observation": "The first live blueprint_check rejected the deterministic capture sidecar because Mono attempted to load the dataContractSerializer configuration section. Replacing that serializer with the already-deployed Newtonsoft.Json dependency and cold-starting the client made the same reviewed bytes pass.",
+      "red_evidence": "blueprint-check-red-receipt.json",
+      "red_evidence_sha256": "8a04f362b8c6f45c122d97f2f3564eb1cad544140ca220e272b542156f0f3d0b",
+      "green_evidence": "blueprint-check-green-receipt.json",
+      "green_evidence_sha256": "d3eefe3ed6ea616e1b26da037dcfea3e6db81fbfdf78d50434d923c03ba41c72"
+    },
+    {
+      "edge": "blueprint_clear_completion_must_wait_for_valheim_object_retirement",
+      "observation": "The first live clear removed all 12 pieces but reported failed because same-frame standing-piece validation ran before Valheim retired their ZDOs. The corrected Lab operation waited for the marked count to reach zero and returned completed for the same 12-piece clear after a cold deploy.",
+      "red_request_id": "provider-clear-94641fa2284c4cfc9176af6634b173d9",
+      "red_receipt": "clear-receipt.json",
+      "red_receipt_sha256": "f80d073a2a7ae9ed336bc30784b8492add39ed24e31a1305ca9d94b64124c98e",
+      "green_request_id": "provider-clear-fixed-20260828T091833Z-9f43d8e1",
+      "green_receipt": "clear-receipt-fixed.json",
+      "green_receipt_sha256": "026b3df7a59d9ad749f036c00020ef60e30323270f889e103902d010f9af69bf"
+    },
+    {
+      "edge": "studio_status_preflight_must_ride_through_atomic_heartbeat_replacement",
+      "observation": "Two combined browser-suite runs failed before reset or restore dispatch with runtime_run_status_unreadable while each journey passed alone. Studio now opens the exact stream first and retries only a 5 x 10 ms filesystem replacement window; invalid, stale, corrupt, or exhausted status remains fail-closed with no mailbox write.",
+      "red_artifacts": [
+        "artifacts/quest-studio-e2e/20260828T092628199Z-3baef4b1f0e2430491625c94a0570727",
+        "artifacts/quest-studio-e2e/20260828T092745124Z-6ce895b7b3af49eab84cf9ec01536b3f"
+      ],
+      "green_browser_result": "2 passed, 1 expected installed-game opt-in skip, 0 failed"
+    }
+  ],
+  "reviewed_fixture_replay": {
+    "blueprint_name": "first-portal-progression-shelter",
+    "blueprint_source_sha256": "1c2e71857cfbf6ea08eb23b6e58256c484467a1dc22fa7e92f064ee19fcdc881",
+    "capture_source_sha256": "d9f8c8f49f15917aa3d96369e5d4c04829fa32d6c6c6327a4d8a714b4bf46798",
+    "deterministic_capture_hash": "e1e01ff675017bc6ed1d83868b3dcd5f9bb9a2f84089721dfa032fb79c537dfd",
+    "check_request_id": "blueprint-check-007dc1d703014ccdb2e7deb021623ef1",
+    "check_state": "completed",
+    "build_request_id": "blueprint-build-28bf345c548f462ab1c3c1c81d8ad9a3",
+    "build_state": "completed",
+    "pieces_built": 12,
+    "signs_built": 1,
+    "diff_request_id": "blueprint-diff-d665a56605244ea581eeebef88601e71",
+    "diff_state": "completed",
+    "diff_result": "MATCH — expected 12, selected 12, missing 0, extra 0",
+    "receipt_sha256": {
+      "blueprint-build-green-receipt.json": "eec4117b25a4ca2cdad16424bab1bedd1b952dec8c5acda881468a2031df9886",
+      "blueprint-diff-green-receipt.json": "328a1c44bfd4827a3541e944a60a524bf7478548fd4d66340c8ba0559c164931"
+    }
+  },
+  "binding_and_initial_run": {
+    "candidate_request_id": "mcp-run-list_binding_candidates-20260828T082836952283Z-c656e647",
+    "candidate_count": 32,
+    "sign": {
+      "binding_zdo": "631591890:63831",
+      "distance_metres": 5.6,
+      "target_kind": "sign"
+    },
+    "bind_request_id": "mcp-run-bind_selected_experience-20260828T082859616051Z-08eda377",
+    "binding_instance_id": "binding-20260828T082859963Z-05d8607d",
+    "experience_id": "quest-0d3372",
+    "pack_id": "guild-2de197289aea",
+    "version": "0.1.3",
+    "content_hash": "197bd6002f162c70ac25c2007ab587728e66d7dd58491eb20d333883bd1fb702",
+    "run_id": "run-20260828T082859977Z-eacae6c4",
+    "scope_id": "scope-c22584558475f21e1f00a7477a45eeea",
+    "stage_id": "name-in-ash",
+    "opening_event": "experience_started",
+    "evidence_sha256": {
+      "binding-candidates-after-replay.json": "187c8973f327d7316c0e3a83058a31dd43144d2ccbc45e02cece714d0d81c1ab",
+      "bind-selected-experience.json": "4a79741b0cb48499184516292bf525c4ad058855e35d2ad02c90ddc46302447f",
+      "runs-before-reset.json": "007db134f7ce380a01f26cbe0a6e5887e3e26828a01d8523d4771fe020787559",
+      "initial-experience-started.json": "a3ac6eaf257f3cd5e15320f14bd77d9be70afee9c27689bff0a0676bd1774eb4"
+    }
+  },
+  "reset_successor": {
+    "preview_request_id": "mcp-run-preview_reset-20260828T082954306659Z-903ab524",
+    "preview_confirmation": "exact reset preview value was intentionally omitted from committed evidence",
+    "apply_request_id": "mcp-run-apply_reset-20260828T083011483264Z-6d33cab1",
+    "reset_id": "reset-f4e521cf134f4a3581775556f18bce5f",
+    "prior_run_id": "run-20260828T082859977Z-eacae6c4",
+    "new_run_id": "run-20260828T083011921Z-c1818db2",
+    "scope_id": "scope-c22584558475f21e1f00a7477a45eeea",
+    "binding_zdo": "631591890:63831",
+    "binding_instance_id": "binding-20260828T082859963Z-05d8607d",
+    "active_run_count_after_reset": 1,
+    "successor_stage_id": "name-in-ash",
+    "successor_opening_event": "experience_started",
+    "additional_select_bind_or_move_requests": 0,
+    "evidence_sha256": {
+      "reset-preview.json": "b6f40f61cc179ba2856dc913afc5c165845c93422b82934b0508a964bf026efa",
+      "reset-apply.json": "fdbe43fb96c7b12035b64b120fa36da7d4808558c1cb5ef04c82fdea745a46e9",
+      "successor-experience-started.json": "bc004ea163297b0fff4c05b12ba84d36b31a7cbfab747226731f43a96c46f055",
+      "successor-start-transition.json": "a95603f45bb0246e6d5f680a0b82547717756d32ae0bfc5f7c3259085e4d0339",
+      "runs-after-reset.json": "e3be90454d74a7732b7bd5ebb54aef0fd00151c1b4a540a13670db5c7f3cae79"
+    }
+  },
+  "idempotent_reset_retry": {
+    "request_id": "mcp-run-apply_reset-20260828T083046248830Z-5a7f0610",
+    "returned_same_reset_id": true,
+    "returned_same_successor_run_id": true,
+    "active_run_count_after_retry": 1,
+    "new_event_receipts": 0,
+    "new_action_receipts": 0,
+    "new_transition_receipts": 0,
+    "evidence_sha256": {
+      "reset-apply-replay.json": "8000999484d7cdd3a0f9b2c36b277f4fa42f6969799640f96bc03b634b6303b1",
+      "runs-after-reset-replay.json": "55419f30935a05518f13a506e5ca59d1f07f3771c733d031ae8c62926aad2249",
+      "successor-reset-replay-completed.json": "74bebcad6b12952cf2c454c2bfaa3949b4625bf96e83270e31362e6891292cd4",
+      "reset-retry-audit.json": "8508617e22e18a36bf5d90ae570e1e0c517f4fc5b5df6403b08632a7d0bf4924"
+    }
+  },
+  "provider_releases": {
+    "mechanics_run_control": {
+      "archive_sha256": "ac3839714023023bf55b75300d67dab05c1bc6bf427e231cbbac982ffb1d7b8",
+      "tool_count": 4,
+      "used_for": "candidate discovery, exact binding, reset, and reset retry"
+    },
+    "lab_replay": {
+      "archive_sha256": "b4ec7d4aff381e929064b2b71f558f208c4019481109f76f8f6ddf8387dc020c",
+      "source_sha256": "595d4a616360ecea3908ee6e104389171e12df83d961f35821b068bbea145220",
+      "tool_count": 5,
+      "deterministic_second_build_match": true,
+      "focused_provider_tests": "26 passed",
+      "used_for": "creator authority and reviewed Lab replay",
+      "transport": "The hash-verified Quest provider was invoked target-locally on AM4. Isolate owns gateway authentication, caller identity, provider loading, and process lifecycle integration; no sibling checkout was read from this repository."
+    }
+  },
+  "provider_lab_replay": {
+    "blueprint_name": "first-portal-progression-shelter",
+    "reviewed_manifest_sha256": "9bcef10ceb988ee34308482d67810b349c68b75c79ff4340b78def43e4ada5ee",
+    "first_run": {
+      "result": "blueprint_replay_match",
+      "built": true,
+      "lab_request_ids": [
+        "mcp-lab-blueprint-check-20260828T091747388071Z-9a0ca34c",
+        "mcp-lab-blueprint-count-20260828T091748697536Z-d52516a8",
+        "mcp-lab-blueprint-build-20260828T091749414505Z-d511eb3a",
+        "mcp-lab-blueprint-diff-20260828T091750123379Z-a7e73d20"
+      ],
+      "result_file": "first-run.json",
+      "result_sha256": "efa0df87329b53ca2e33edca6127cb72e3edd9739c21b08508b944ce0fe508d1"
+    },
+    "immediate_retry": {
+      "result": "blueprint_replay_already_match",
+      "built": false,
+      "lab_operations": [
+        "blueprint_check",
+        "blueprint_count",
+        "blueprint_diff"
+      ],
+      "result_file": "retry.json",
+      "result_sha256": "3e303721c47a62b64ba483131109c2227291aa884c936c4d5ac7ab812fa57f78"
+    },
+    "clear_red_to_green": {
+      "red_state": "failed",
+      "red_detail": "cleared 12 piece(s), then same-frame validation observed deferred retirement",
+      "green_state": "completed",
+      "green_detail": "cleared 12 piece(s) after awaiting marked-piece retirement"
+    },
+    "post_clear_restore": {
+      "first_result": "blueprint_replay_match",
+      "first_built": true,
+      "first_result_file": "restore-run.json",
+      "first_result_sha256": "0a1e35f9498115ba7668a53872f4e5a6db6e7ca7307bb2d3361817d17e2c8ea5",
+      "retry_result": "blueprint_replay_already_match",
+      "retry_built": false,
+      "retry_result_file": "restore-retry.json",
+      "retry_result_sha256": "859dbb087f098fe7cc79555a8ef3924db4555bb8cc935e33b54a9689bf489058"
+    },
+    "exact_final_bytes_retry": {
+      "result": "blueprint_replay_already_match",
+      "built": false,
+      "result_file": "final-bytes-retry.json",
+      "result_sha256": "26c1a207d202943b2d73012d11133ed2f23297a6e131a2d8ebf76adffad4e931",
+      "lab_request_ids": [
+        "mcp-lab-blueprint-check-20260828T095439589298Z-7dc93387",
+        "mcp-lab-blueprint-count-20260828T095440698638Z-57dfd4d8",
+        "mcp-lab-blueprint-diff-20260828T095441415539Z-30cc2ac9"
+      ],
+      "cleanup_verified_disabled": true
+    },
+    "authority_cleanup": {
+      "every_replay_reasserted_build_on": true,
+      "every_replay_verified_build_off": true,
+      "final_creator_build_enabled": false,
+      "final_status_request_id": "mcp-creator-status-20260828T095501855389Z-f0ba5d7c",
+      "final_status_sha256": "a4f2e7c3c9adc62f8bb9fb3c6ad9bba7c3031e50d6d592d6b1c708508eb6a9e"
+    },
+    "raw_receipts_retained": {
+      "lab": 18,
+      "runtime": 16
+    }
+  },
+  "graceful_shutdown": {
+    "game_process_running_after_stop": false,
+    "tmux_session_running_after_stop": false,
+    "world_or_character_new_files": 0,
+    "world_db_sha256": "2ee519b826e8e7d876f3133be058e2513859de37f11cbcfd912fca0ed85ba02f",
+    "world_fwl_sha256": "645b126df278c057429ac9f06509fabd9513f1289cb9937466c9be8f402e8ad5",
+    "character_sha256": "7a51ef5e25181a4bde3a59bf946ec92c2466a1ca795d69baf92cb4edd2b9e8bd",
+    "player_log_sha256": "0a46043edb8e6aefd88187f8f9a64933c2f70e530593316ea50c5b9f01c20a8c",
+    "shutdown_summary_sha256": "92e11509a2a30359ce40eb7b7efa8b2a0f75886fd09e9836e8b7d55b1bc23b77"
+  },
+  "verification": {
+    "proof_level": "executed_choreography",
+    "executed_choreography": [
+      "cold AM4 launch and exact Demo world/profile entry",
+      "reviewed fixture check -> build -> MATCH diff",
+      "bounded candidate discovery -> exact sign bind -> automatic experience start",
+      "reset preview -> apply -> exact successor automatic experience start",
+      "same confirmed reset replay -> same result and no duplicated lifecycle chain",
+      "one provider call -> Runtime authority -> reviewed Lab check/count/build/diff -> verified authority cleanup",
+      "same provider replay -> no build and exact MATCH",
+      "clear red branch -> cold Lab correction -> completed clear -> provider restore -> no-op retry",
+      "exact final Contracts, Runtime, and Lab bytes -> cold AM4 entry -> provider no-op MATCH -> independent build-disabled status",
+      "graceful AM4 save and shutdown with no residual game process or .new save"
+    ],
+    "build_and_test_matrix": {
+      "mod_release_builds": "ComfyQuestLab and ComfyQuestRuntime: 0 warnings, 0 errors",
+      "lab_xunit": "357 passed, 0 failed, 0 skipped",
+      "studio_release_build": "0 warnings, 0 errors with .NET SDK 9.0.315 and package-hash-keyed cache",
+      "studio_xunit": "114 passed, 0 failed, 0 skipped",
+      "studio_browser_e2e": "2 passed, 1 expected installed-game opt-in skip, 0 failed",
+      "python_unittest": "390 passed",
+      "provider_focused": "26 passed",
+      "generator_and_drift": "3 gallery profiles; Quest Lab HTML; 91 atlas rows / 90 signatures / 77 methods; 34 creator events; 88 TryPatch calls; 57/57 creator-safe and 86/86 practical atlas coverage; Demo package; mission-control HTML; 5 source intents",
+      "repository_identity": "passed",
+      "repository_boundary": "passed, including injected-reach-in self-test",
+      "release_verifier_self_test": "passed valid, tampered, and standalone-drift cases",
+      "full_history_secret_scan": "passed across 215 commits with no leaks",
+      "contracts_package": {
+        "sha256": "ba3aa0304a1d7548d99ccfbb2bef414f25ec12f50dd0727dfe590644f9250e59",
+        "bytes": 124515,
+        "validator": "passed id/version/repository/source revision"
+      },
+      "studio_package": {
+        "sha256": "8b2bc04fecb26588bf3c09efe841a2ce6ffccef2bd4e4096b56f97e656eb22b8",
+        "bytes": 300181,
+        "validator": "passed id/version/repository/source revision"
+      },
+      "interim_package_pin": "passed with the external PortalSupport release stored outside the three-file interim NuGet feed; no public release was claimed.",
+      "toolchain_note": "The host PATH resolves dotnet 8.0.422, which correctly runs the net8 Lab tests but cannot build net9 Studio. Studio verification used C:\\work\\dotnet9\\dotnet.exe 9.0.315 and the exact Contracts-package-hash cache.",
+      "provider_responder_red_to_green": "A provider responder timeout recurred during the landing gate, disproving the earlier transient classification. Merely widening the synthetic authority and provider budgets did not fix it. Instrumented repetition exposed Windows sharing violation WinError 32 on the fake Lab authority's one-shot mailbox unlink; the responder exited and the provider correctly timed out. The synthetic authority now retries only that bounded PermissionError while its request wait outlives the provider wait; production provider timing is unchanged. The retry branch passed 100 fresh-process repetitions, the preexisting-build branch passed 50, all 26 provider tests passed, and the full 390-test Python suite passed three consecutive times."
+    }
+  },
+  "limitations": [
+    "This lap proves mechanics and retry behavior on the small Demo world. It does not sample ERA17 scale, portal topology, or the remaining Resin-versus-Stone creative verdict.",
+    "The Valheim Linux log contains a PlayFab Party native-library error, followed by successful Steam and PlayFab login. The local-world Quest path completed; multiplayer Party behavior was not sampled.",
+    "The target-local provider execution proves Quest's bounded replay choreography and authority cleanup. It does not complete Isolate's clean released-image identity, per-lap credential, volunteer-machine setup, or correlated teardown gate.",
+    "Provider fixed-mailbox staging is fail-closed but not crash-atomic as a pair, and its serialization lock is process-local rather than a cross-process lease. Expired requests remain for Runtime or Lab to claim and reject so the provider cannot delete a successor request.",
+    "AM4 was used as an unattended automation seat so no game window, focus change, or mechanical relay was required from Derek."
+  ]
+}

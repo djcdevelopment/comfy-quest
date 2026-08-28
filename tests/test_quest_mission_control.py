@@ -512,7 +512,11 @@ class RoadmapSurfaceTests(unittest.TestCase):
 
     def test_the_installed_evidence_caution_matches_the_environment_entry(self):
         # The caution may not send a reader back into machine work after the installed gate passed.
-        caution = self.manifest["cautions"][7]
+        caution = next(
+            value
+            for value in self.manifest["cautions"]
+            if "installed 4A journey is proven" in value
+        )
         environment = self.manifest["environment"][4]
         self.assertEqual("confirmed", environment["state"])
         self.assertIn("queue-full-width-journey-20260827-r9", environment["detail"])

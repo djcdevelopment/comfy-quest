@@ -189,9 +189,10 @@ public sealed class RuntimeExperienceSelectionTests {
     });
   }
 
-  /// <summary>Rollback restores a previous active set through the same schema check that has always
-  /// tolerated additive fields — the reason the selector is shaped this way.</summary>
-  [Fact] public void RollbackToleratesTheAdditiveSelector() {
+  /// <summary>Rollback is another same-pack activation. It preserves an explicit selector only
+  /// when the restored archive still resolves that exact experience once; the removed-id case
+  /// above proves the complementary fail-closed path.</summary>
+  [Fact] public void RollbackPreservesASelectorThatTheRestoredRevisionStillResolves() {
     Run(root => {
       WritePack(Path.Combine(root, "inbox", "one.questpack"), "1.0.0", ("experiences/a.json", Named("alpha")));
       WritePack(Path.Combine(root, "inbox", "two.questpack"), "2.0.0", ("experiences/a.json", Named("alpha")));
@@ -200,7 +201,7 @@ public sealed class RuntimeExperienceSelectionTests {
       store.SelectExperience("alpha");
       store.LoadVersion("demo", "2.0.0", Events);
       Assert.Equal("1.0.0", store.Rollback(Events).Manifest.Version);
-      Assert.Null(ReadActive(root).ExperienceId);
+      Assert.Equal("alpha", ReadActive(root).ExperienceId);
     });
   }
 

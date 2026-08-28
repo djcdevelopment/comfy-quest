@@ -171,13 +171,12 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         self.assertIn('Path.Combine(runtimeRoot,"inbox-dev")', channel)
         self.assertIn('Stage("dev_activation"', channel)
 
-    def test_dev_rebind_updates_only_the_existing_five_string_reference(self) -> None:
+    def test_dev_rebind_updates_only_the_two_mutable_revision_fields(self) -> None:
         binding = BINDING.read_text(encoding="utf-8")
         written = set(__import__("re").findall(r'zdo\.Set\(Prefix\+"([^"]+)"', binding))
-        self.assertEqual(
-            {"packId", "experienceId", "bindingId", "version", "contentHash"},
-            written,
-        )
+        self.assertEqual({"version", "contentHash"}, written)
+        self.assertIn("bindings.Bind(bindingZdo,worldId,active.Set,active.Document", binding)
+        self.assertIn('zdo.GetString(Prefix+"bindingInstanceId"', binding)
         self.assertIn("RebindDevActive", binding)
         self.assertIn('set.SourceChannel,"dev"', binding)
         self.assertIn('dev?"inbox-dev":"inbox"', binding)

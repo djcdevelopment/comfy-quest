@@ -312,7 +312,24 @@ public sealed class QuestStudioPortfolioTests : IDisposable
             Operation = "bind_selected_experience", Status = "completed",
             PackId = guild.GuildId, Version = guild.Version, ContentHash = published.ContentHash,
             ActivationId = active.ActivationId, ExperienceId = selected.ExperienceId,
-            BindingZdo = "10:20", Diagnostics = Array.Empty<ContractDiagnostic>()
+            WorldId = "123", BindingZdo = "10:20",
+            BindingInstanceId = "binding-instance-selected",
+            Diagnostics = Array.Empty<ContractDiagnostic>()
+        });
+        new RuntimeRunStatusStore(runtimeRoot).Write(new RuntimeRunStatusDocument
+        {
+            ObservedUtc = DateTimeOffset.UtcNow, Machine = "OMEN", WorldUid = "123",
+            Runs = new[]
+            {
+                new RuntimeRunStatusEntry
+                {
+                    RunId = "run-selected", ScopeId = "scope-selected",
+                    ExperienceId = selected.ExperienceId, BindingZdo = "10:20",
+                    BindingInstanceId = "binding-instance-selected",
+                    ParticipantIds = new[] { "hero" }, ContentHash = published.ContentHash,
+                    StageId = selected.EntryNodeId,
+                }
+            }
         });
 
         var current = service.RuntimeStatusView(selected.ProjectId);
