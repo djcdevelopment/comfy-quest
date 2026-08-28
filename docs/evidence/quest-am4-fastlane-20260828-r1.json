@@ -297,15 +297,15 @@
       "repository_identity": "passed",
       "repository_boundary": "passed, including injected-reach-in self-test",
       "release_verifier_self_test": "passed valid, tampered, and standalone-drift cases",
-      "full_history_secret_scan": "passed across 215 commits with no leaks",
+      "full_history_secret_scan": "passed across the full repository history with no leaks",
       "contracts_package": {
-        "sha256": "ba3aa0304a1d7548d99ccfbb2bef414f25ec12f50dd0727dfe590644f9250e59",
-        "bytes": 124515,
+        "sha256": "db0e9583abf787ca9da9548d0e435ab35e53135f3cb19d836dcdea9cf68185b0",
+        "bytes": 123343,
         "validator": "passed id/version/repository/source revision"
       },
       "studio_package": {
-        "sha256": "8b2bc04fecb26588bf3c09efe841a2ce6ffccef2bd4e4096b56f97e656eb22b8",
-        "bytes": 300181,
+        "sha256": "5b3413a170f38b4b72b937339af63ebfae12e5e98a71f99d0ff25c88a9d301f1",
+        "bytes": 300186,
         "validator": "passed id/version/repository/source revision"
       },
       "interim_package_pin": "passed with the external PortalSupport release stored outside the three-file interim NuGet feed; no public release was claimed.",

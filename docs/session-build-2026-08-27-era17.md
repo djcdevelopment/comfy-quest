@@ -601,12 +601,12 @@ evidence, and recovering remain fleet work.
 - Python: 390 passed; focused provider suite: 26 passed.
 - Gallery, Lab HTML, seam catalog, patch coverage, Demo package, mission-control drift, source
   intents, repository identity, boundary/self-test, and release-verifier self-test: passed.
-- Full-history gitleaks scan: 215 commits, no leaks.
-- Clean-packed Contracts artifact: 124,515 bytes, SHA-256
-  `ba3aa0304a1d7548d99ccfbb2bef414f25ec12f50dd0727dfe590644f9250e59`;
+- Full-history gitleaks scan: no leaks.
+- Clean-packed Contracts artifact: 123,343 bytes, SHA-256
+  `db0e9583abf787ca9da9548d0e435ab35e53135f3cb19d836dcdea9cf68185b0`;
   package identity/repository/source-revision validation passed.
-- Studio artifact: 300,181 bytes, SHA-256
-  `8b2bc04fecb26588bf3c09efe841a2ce6ffccef2bd4e4096b56f97e656eb22b8`;
+- Studio artifact: 300,186 bytes, SHA-256
+  `5b3413a170f38b4b72b937339af63ebfae12e5e98a71f99d0ff25c88a9d301f1`;
   package identity/repository/source-revision validation passed.
 - `repin_public.py --check-interim` passes with the hash-pinned external PortalSupport release
   stored beside Creator Session world support rather than inside the three-file interim NuGet
