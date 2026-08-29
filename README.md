@@ -107,6 +107,16 @@ check above.
 Studio lowers production beats into bounded acyclic Runtime graphs and certifies them
 against the shared contract. **Play this revision** writes an isolated dev artifact;
 an explicitly armed Runtime session pulls, validates, activates, and rebinds it.
+The Guild editor sits one level above individual quests: a steward imports immutable
+community source snapshots, publishes typed creative abstractions and evidence policy,
+and exposes those abstractions as a palette from which creators configure distinct
+artifacts and connect campaign progression. For the two-instance **Slayers Signature
+Hunt** R&D slice, **Play campaign** is one bounded operation: it validates or prepares the
+pinned Creator Session, launches the exact local world when needed, arms Runtime, prepares
+the fixed 17-object Lab fixture, publishes frozen campaign bytes, verifies exact activation,
+and atomically binds and starts the unique entry. Its correlated receipt proves only fixture
+preparation and campaign start; the kills, automatic successor completion, terminal outcome,
+and Slayers community credit require separate live evidence.
 **Import project JSON** accepts a bounded Studio schema-v3 document and opens it as
 a new local fork with fresh project, pack, and experience IDs; it never accepts a
 server filesystem path.

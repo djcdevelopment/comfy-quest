@@ -132,6 +132,23 @@ public sealed class LabCaptureContractTests {
     Assert.Equal(LabCaptureContract.Serialize(left), LabCaptureContract.Serialize(right));
   }
 
+  [Fact]
+  public void HalfTurnSurvivesZdoEulerRoundTripAtSignaturePrecision() {
+    LabCapturePiece authored = Piece("wood_wall", 0f, 0f, 0f);
+    authored.Qx = 0f; authored.Qy = 1f; authored.Qz = 0f; authored.Qw = 0f;
+    LabCapturePiece zdoRoundTrip = Piece("wood_wall", 0f, 0f, 0f);
+    zdoRoundTrip.Qx = 0f; zdoRoundTrip.Qy = 1f; zdoRoundTrip.Qz = 0f;
+    zdoRoundTrip.Qw = -0.00000004371139f;
+
+    LabCaptureArtifact expected = LabCaptureContract.Create("half-turn", "lab", 5f,
+        new[] { authored });
+    LabCaptureArtifact actual = LabCaptureContract.Create("half-turn", "lab", 5f,
+        new[] { zdoRoundTrip });
+
+    Assert.Equal(expected.PiecesSha256, actual.PiecesSha256);
+    Assert.True(LabCaptureContract.Diff(expected.Pieces, actual.Pieces).Equal);
+  }
+
   [Theory]
   [InlineData("../escape")]
   [InlineData("spaces are not portable")]

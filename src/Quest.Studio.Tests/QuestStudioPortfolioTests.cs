@@ -386,6 +386,112 @@ public sealed class QuestStudioPortfolioTests : IDisposable
     }
 
     [Fact]
+    public void SlayersPracticeBecomesOneGovernedAbstractionTwoInstancesAndOneEvidenceChain()
+    {
+        var service = CreateService();
+        var guild = service.CreateGuild(new StudioGuildCreateRequest("Slayers Creative System", "Derek"));
+        const string catalog = """
+        {"schema_version":1,"guild":"Slayers","era":17,"source":{"kind":"sheet-xlsx"},"quests":[
+          {"quest_id":"air_drop","name":"Air Drop","requirements":"Kill a Deathsquito with a thrown Spear","trigger":null},
+          {"quest_id":"cold_shot","name":"Cold Shot","requirements":"Kill a Drake with a thrown Spear","trigger":null},
+          {"quest_id":"can_i_pick_your_brain_3","name":"Can I Pick Your Brain 3","requirements":"Kill a Gjall with a thrown Spear","trigger":null}
+        ]}
+        """;
+        const string provenance = """
+        {"schema_version":1,"mode":"sheet","source":{"id":"slayers-summons"},"anomalies":[],"counts":{"quests":3,"anomalies":0}}
+        """;
+        var absorbed = service.ImportSource(guild.GuildId, new StudioSourceImportRequest(
+            guild.Revision, "slayers-e17", "Slayers Era 17 summons", catalog, provenance, "# No anomalies\n"));
+        Assert.True(absorbed.Ok, absorbed.Error);
+        Assert.Equal(3, absorbed.Snapshot!.EntryCount);
+        Assert.Equal(64, absorbed.Snapshot.SnapshotHash.Length);
+
+        var canonical = service.CreateProject("blank");
+        canonical.Title = "Slayers Signature Hunt";
+        canonical.Nodes[0].Label = "Hunt the named creature with a thrown spear.";
+        var signature = canonical.Nodes[0].Routes[0];
+        signature.Event = "kill";
+        signature.Target = "$enemy_deathsquito";
+        signature.Where = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["weapon_skill"] = "Spears",
+            ["projectile"] = "true",
+        };
+        signature.Actions[0].Text = "The signature hunt is complete.";
+        Assert.True(service.SaveDraft(canonical.ProjectId, new(canonical.Revision, canonical)).Ok);
+        canonical = service.ReadProject(canonical.ProjectId)!;
+
+        var promoted = service.PromoteAbstraction(guild.GuildId, new StudioAbstractionPromoteRequest(
+            absorbed.Guild!.Revision, "slayers-signature-hunt", "Slayers Signature Hunt",
+            "A steward-governed thrown-spear finishing hunt.", "slayers-e17",
+            new[] { "air_drop", "cold_shot", "can_i_pick_your_brain_3" }, canonical.ProjectId,
+            "finish", "message-finish", "Slayers, Era 17", "runtime",
+            "Runtime proves the local final ranged Spears hit; it is not Slayers guild credit.",
+            new[]
+            {
+                new StudioAbstractionTargetChoice { Id = "deathsquito", Label = "Deathsquito", RuntimeTarget = "$enemy_deathsquito", SourceQuestId = "air_drop" },
+                new StudioAbstractionTargetChoice { Id = "drake", Label = "Drake", RuntimeTarget = "$enemy_drake", SourceQuestId = "cold_shot" },
+            }));
+        Assert.True(promoted.Ok, promoted.Error);
+        Assert.Equal("runtime", promoted.Abstraction!.EvidencePolicy);
+
+        var air = service.InstantiateAbstraction(guild.GuildId, "slayers-signature-hunt", new(
+            promoted.Guild!.Revision, 1, "Air Drop", "deathsquito", "Drop the Deathsquito from the sky.", "Air Drop answered.", "Derek as creator"));
+        Assert.True(air.Ok, air.Error);
+        var cold = service.InstantiateAbstraction(guild.GuildId, "slayers-signature-hunt", new(
+            air.Guild!.Revision, 1, "Cold Shot", "drake", "Finish the Drake with a thrown spear.", "Cold Shot answered.", "Derek as creator"));
+        Assert.True(cold.Ok, cold.Error);
+        Assert.NotEqual(air.Project!.ProjectId, cold.Project!.ProjectId);
+        Assert.Equal(air.Project.Derivation!.AbstractionHash, cold.Project.Derivation!.AbstractionHash);
+        Assert.NotEqual(air.Project.Derivation.ConfigurationHash, cold.Project.Derivation.ConfigurationHash);
+
+        var campaign = Assert.Single(cold.Guild!.Campaigns, value => value.CampaignId == "campaign-default");
+        var firstPlaced = service.PlaceInCampaign(guild.GuildId, campaign.CampaignId, new(
+            campaign.Revision, air.Project.ProjectId, "quest", "questline", "main", null));
+        Assert.True(firstPlaced.Ok, firstPlaced.Error);
+        var secondPlaced = service.PlaceInCampaign(guild.GuildId, campaign.CampaignId, new(
+            firstPlaced.Campaign!.Revision, cold.Project.ProjectId, "quest", "questline", "main", null));
+        Assert.True(secondPlaced.Ok, secondPlaced.Error);
+        campaign = Clone(secondPlaced.Campaign!);
+        Assert.Collection(Assert.Single(campaign.Questlines).Quests,
+            first => Assert.Equal(air.Project.ProjectId, first.ProjectId),
+            second =>
+            {
+                Assert.Equal(cold.Project.ProjectId, second.ProjectId);
+                second.PrerequisiteProjectIds.Add(air.Project.ProjectId);
+            });
+        var ordered = service.SaveCampaign(guild.GuildId, campaign.CampaignId, new(campaign.Revision, campaign));
+        Assert.True(ordered.Ok, ordered.Error);
+
+        var certified = service.CertifyCampaign(guild.GuildId, campaign.CampaignId);
+        Assert.True(certified.Ok, certified.Error);
+        Assert.Equal(2, certified.ExperienceIds.Count);
+        var airLineage = Assert.Single(certified.CompilationReceipt!.Experiences, value => value.ProjectId == air.Project.ProjectId);
+        Assert.Equal(cold.Project.ExperienceId, Assert.Single(airLineage.SuccessorExperienceIds));
+
+        var r2 = service.ReviseAbstraction(guild.GuildId, "slayers-signature-hunt", new(
+            cold.Guild.Revision, "runtime", "Runtime verifies only the local final ranged Spears hit; source screenshot credit remains separate."));
+        Assert.True(r2.Ok, r2.Error);
+        Assert.Equal(2, r2.Abstraction!.Revision);
+        Assert.Equal(1, service.ReadProject(air.Project.ProjectId)!.Derivation!.AbstractionRevision);
+        using var evidence = JsonDocument.Parse(JsonSerializer.Serialize(service.CampaignEvidence(guild.GuildId, campaign.CampaignId), HostJson()));
+        Assert.Equal(absorbed.Snapshot.SnapshotHash,
+            Assert.Single(evidence.RootElement.GetProperty("source_snapshots").EnumerateArray()).GetProperty("snapshot_hash").GetString());
+        Assert.Equal(2, Assert.Single(evidence.RootElement.GetProperty("compilation_receipts").EnumerateArray()).GetProperty("experiences").GetArrayLength());
+
+        var changed = service.ReadProject(air.Project.ProjectId)!;
+        changed.Nodes[0].Routes[0].Where["projectile"] = "false";
+        Assert.True(service.SaveDraft(changed.ProjectId, new(changed.Revision, changed)).Ok);
+        var rejected = service.CertifyCampaign(guild.GuildId, campaign.CampaignId);
+        Assert.False(rejected.Ok);
+        Assert.Contains(rejected.Diagnostics, value => value.Code == "abstraction_invariant_changed");
+        var detached = service.DetachProject(changed.ProjectId, new(service.ReadProject(changed.ProjectId)!.Revision));
+        Assert.True(detached.Ok, detached.Error);
+        Assert.DoesNotContain(service.ReadCampaign(guild.GuildId, campaign.CampaignId)!.Questlines.SelectMany(value => value.Quests),
+            value => value.ProjectId == changed.ProjectId);
+    }
+
+    [Fact]
     public void CorruptPortfolioRollsBackToTheLastAtomicRevisionThenFailsClosedWithoutIt()
     {
         var service = CreateService();

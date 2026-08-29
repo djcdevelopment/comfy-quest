@@ -4,14 +4,15 @@ Status: adopted product baseline, 2026-08-24.
 
 ## Outcome
 
-The adoption gate is not another generated tutorial. It is this: **Derek can create,
-run, revise, reset, organize, and release a complete guild-scale body of quests and
-repeatable events through the Creator OS without becoming the fleet's KVM.** The work
-should feel like authoring a world, not operating a mod deployment.
+The adoption gate is not another generated tutorial. It is this: **a community steward
+can configure a Guild creative system, creators can turn its abstractions into distinct
+artifacts and campaigns, and players can receive and complete those campaigns through the
+Creator OS without Derek becoming the fleet's KVM.** The work should feel like shaping a
+community's creative language and authoring within it, not operating a mod deployment.
 
 The immediate product loop is:
 
-`Imagine -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release`
+`Steward configures -> Creator instantiates -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release`
 
 Automation, templates, and saved patterns may accelerate that loop after repeated use
 shows where they help. They are not substitutes for the authored source, the playable
@@ -22,12 +23,22 @@ world, or Runtime evidence, and they are not on the adoption critical path.
 These terms are the intended durable product model. They are requirements, not claims
 that the current v2 pack or Studio schema already implements them.
 
-- A **portfolio** is one creator's local library. It must remain useful with dozens or
-  hundreds of artifacts and may contain more than one guild.
-- A **guild** is a releasable authored experience: identity, version, world association,
-  questlines, standalone quests, repeatable events, progression coverage, dependencies,
-  provenance, and release history. During R&D the world association may remain local;
-  community distribution eventually binds it to a world bundle.
+- A **portfolio** is the local workspace for steward configuration and creator work. It
+  must remain useful with dozens or hundreds of artifacts and may contain more than one
+  Guild.
+- A **Guild** is a steward-owned creative system: stable configuration, a bounded creator
+  palette, declared progression, provenance, compatibility, many creator artifacts, and
+  campaigns as children. During R&D its world association may remain local; community
+  distribution eventually binds campaign releases to a world bundle.
+- A **creative abstraction** is one steward-configured, creator-facing construct with
+  stable identity, version, attribution, explanation, required primitives, and bounded
+  parameters. The first slice is the typed Slayers Signature Hunt, not a generic schema or
+  plug-in framework.
+- A **creator artifact** is one creator's concrete instance of a Guild abstraction. It
+  retains the abstraction and Guild-version lineage while using the same Studio and Runtime
+  contracts as hand-authored work.
+- A **campaign** is a creator-owned arrangement of artifacts, questlines, prerequisites,
+  events, progression placement, and release identity that becomes player-facing.
 - A **questline** orders or branches quests through explicit prerequisites and unlocks.
 - A **quest** is one bounded experience graph with bindings, named anchors, outcomes,
   eligibility, and a retry/reset policy.
@@ -65,13 +76,13 @@ rules in prose.
 
 ### Portfolio and progression
 
-- **FR-PORT-001 — Portfolio workspace.** Studio must let the creator create, name,
-  search, filter, archive, duplicate, import, and open guilds, questlines, quests, and
-  repeatable events without navigating a flat project pile. The current artifact and
-  unsaved state must remain obvious.
-- **FR-PORT-002 — Guild identity.** A guild must have a stable id, semantic version,
-  title, author, description, progression scope, compatibility declaration, provenance,
-  and release state. Renames must not change identity.
+- **FR-PORT-001 — Portfolio workspace.** Studio must let stewards and creators create,
+  name, search, filter, archive, duplicate, import, and open Guilds, abstractions,
+  campaigns, questlines, quests, and repeatable events without navigating a flat project
+  pile. The current role, artifact, and unsaved state must remain obvious.
+- **FR-PORT-002 — Guild identity.** A Guild must have a stable id, semantic version,
+  title, steward, description, bounded palette, progression scope, compatibility
+  declaration, provenance, and release state. Renames must not change identity.
 - **FR-PORT-003 — Questlines.** The creator must be able to order and branch quests,
   declare prerequisites and unlocks, see unreachable or cyclic content before release,
   and understand the rule in creator language.
@@ -179,13 +190,17 @@ are sufficient for local R&D and must not gate the creator loop.
   checked-in contract test and, where it claims live Valheim behavior, one genuine Runtime
   receipt. Guild artifacts show which capabilities they exercise; synthetic rehearsal is
   never labeled live proof.
-- **FR-EVID-003 — Dogfood friction ledger.** From the current guild/quest/run context,
-  the creator must be able to record a blocked idea or rough edge without reconstructing
-  identities. The entry tracks the authored intent, observed evidence, requirement, tool
-  change, and rerun result. Free text stays local unless explicitly exported.
-- **FR-OPT-001 — Earned reuse.** Pattern/notebook work begins with structures Derek has
-  actually repeated. Saving a pattern preserves identity, attribution, required
-  primitives, explanation, and canonical fragment, but using it stays optional.
+- **FR-EVID-003 — Contextual R&D ledger.** From the current Guild configuration,
+  abstraction, creator artifact, campaign, and run context, the steward or creator must be
+  able to record the concrete need or rough edge without reconstructing identities. The
+  entry tracks the authored intent, observed evidence, requirement, tool change, and rerun
+  result; absent live evidence remains explicitly absent. Free text stays local unless
+  explicitly exported.
+- **FR-OPT-001 — Earned reuse.** A reusable abstraction begins with concrete community
+  craft worth preserving, not an imagined framework. Before it expands beyond its first
+  typed slice, at least two distinct creator artifacts must instantiate it while preserving
+  Guild version, abstraction identity, attribution, required primitives, explanation, and
+  canonical source. Using it stays optional.
 - **FR-OPT-002 — Optional generation.** Auto-generation may suggest drafts, patterns,
   test inputs, or release metadata. It must use the same contracts and validation as a
   human edit, preserve authored source, declare omissions, and never gate the manual
@@ -281,23 +296,46 @@ The lane definition of record is
 [`creator-os-phases.json`](creator-os-phases.json) (`4A / guild-scale-runtime`); this
 section is a reference to it, not a competing definition.
 
-### 4B — Guild campaign
+### 4B — Guild creative-system bridge
 
-Use the prepared Creator OS to author a top-to-bottom guild campaign and additional
-repeatable creator events. Expand event/effect vocabulary, named anchors, portfolio-wide
-readiness, and creator controls only where the real campaign exposes a block or repeated
-friction. Each tooling change reruns the same full-width journey before another seat call.
+Use **Slayers Signature Hunt** to connect the hierarchy already chosen: one community
+steward configures a typed Signature Hunt abstraction and Guild progression; a creator
+makes two meaningfully distinct hunt artifacts from it, arranges them in one campaign, and
+drives that campaign through Studio, Runtime, installed Valheim, and correlated evidence.
+The checked-in Slayers catalog is source material and provenance, not permission to infer a
+generic authoring framework or silently invent completion rules from prose.
 
-Exit: one top-to-bottom guild campaign covers every progression band the creator declares,
-every included quest/event has rehearsal evidence, and all live-adapter claims used by
-the guild have real run receipts. Multiple author-to-rerun cycles complete without using
-Derek as process control, input relay, screenshot courier, or machine observer.
+This is the narrow bridge into earned reuse and contextual R&D evidence. It is not complete
+until both instances and the campaign have live evidence; existing multi-experience Guild
+proof does not satisfy that claim. After the bridge, continue the sustained campaign until
+every declared progression band is covered, every included quest/event has rehearsal
+evidence, every live-adapter claim has a real run receipt, and multiple author-to-rerun
+cycles complete without using Derek as process control, input relay, screenshot courier,
+or machine observer.
+
+Current implementation status: Studio can absorb the three immutable community source files,
+publish the typed Spears/projectile-kill abstraction with exact citations and target tokens,
+instantiate two revision-pinned artifacts, arrange them in a campaign, and show their exact
+hash/revision lineage. For that exact two-instance Signature Hunt shape, one Play operation now
+freezes and certifies bytes, prepares or resumes the pinned Creator Session, prepares the fixed
+Quest Lab fixture, publishes and verifies activation, selects the fixture-owned sign from bounded
+Runtime candidates, and binds/starts the unique campaign root. Its machine receipt deliberately
+ends at `started`. The simulated contract path verifies the exact fixture request/schema/id/
+revision/world and 17/17-object receipt hash/path; correlates raw Deathsquito/Drake and matcher
+targets to exactly the two compiled instances; carries prerequisite machine/world/session pins
+through candidate and bind dispatch; requires the entry's explicit successor to be the other
+experience; and validates the full applied binding reference. Campaign progression is editable on
+every campaign, and successor emission follows explicit prerequisite edges. None of those checks
+is installed evidence; collect kills, successor completion, terminal campaign state, reset/rerun,
+and cleanup/restoration in the next live lap.
 
 ### 4C — Refinement through use
 
-Author additional guild ideas, log friction in context, and expand events/effects only
-where a desired experience is blocked. Promote repeated structures into optional patterns
-after their value is observed.
+Generalize only what the Signature Hunt bridge and later campaign work actually repeat.
+Author additional Guild ideas, log friction in context, and expand events/effects only
+where a desired experience is blocked. Optional generation remains here and must use the
+same contracts and validators; the first typed abstraction does not authorize a generic
+palette, pattern registry, or alternate artifact format.
 
 Exit: multiple full author-to-rerun cycles complete without a KVM turn, every accepted
 tooling change links back to an authored need and forward to rerun evidence, and the

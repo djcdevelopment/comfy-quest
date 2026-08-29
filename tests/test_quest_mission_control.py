@@ -131,7 +131,8 @@ class QuestMissionControlTests(unittest.TestCase):
         revision_steps = revision["source_sequence"].split(" -> ")
         self.assertEqual(
             [
-                "Imagine",
+                "Steward configures",
+                "Creator instantiates",
                 "Author in the world and Studio",
                 "Rehearse",
                 "Play",
@@ -237,8 +238,8 @@ class QuestMissionControlTests(unittest.TestCase):
         self.assertEqual(0, parser.buttons_without_type)
         self.assertTrue(parser.checkbox_ids.issubset(parser.labels_for))
         self.assertEqual(len(parser.check_ids), len(set(parser.check_ids)))
-        self.assertEqual(19, len(parser.check_ids))
-        self.assertEqual(16, len([item for item in parser.check_ids if item.startswith("recovery.")]))
+        self.assertEqual(20, len(parser.check_ids))
+        self.assertEqual(17, len([item for item in parser.check_ids if item.startswith("recovery.")]))
         for href in parser.hrefs:
             if href.startswith("#"):
                 self.assertIn(href[1:], parser.ids)

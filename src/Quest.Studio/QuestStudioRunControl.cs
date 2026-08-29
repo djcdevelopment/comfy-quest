@@ -21,6 +21,7 @@ public sealed record StudioRunControlResult(
     string? Error,
     RuntimeRunControlReceipt? Receipt,
     string? RequestId = null);
+internal sealed record StudioRuntimeIdentity(string Machine, string WorldUid, string CreatorSessionId);
 
 internal sealed class QuestStudioRunControl
 {
@@ -142,7 +143,11 @@ internal sealed class QuestStudioRunControl
     }
 
     public Task<StudioRunControlResult> BindingCandidatesAsync(string projectId, CancellationToken cancellationToken) =>
-        SendPackAsync(projectId, "list_binding_candidates", null, null, null, cancellationToken);
+        SendPackAsync(projectId, "list_binding_candidates", null, null, null, null, cancellationToken);
+
+    internal Task<StudioRunControlResult> BindingCandidatesPinnedAsync(
+        string projectId, StudioRuntimeIdentity identity, CancellationToken cancellationToken) =>
+        SendPackAsync(projectId, "list_binding_candidates", null, null, null, identity, cancellationToken);
 
     public Task<StudioRunControlResult> BindExperienceAsync(string projectId, StudioBindExperienceRequest? request, CancellationToken cancellationToken)
     {
@@ -151,40 +156,73 @@ internal sealed class QuestStudioRunControl
         if (request is null || !string.Equals(request.ExperienceId, project.ExperienceId, StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(request.BindingZdo))
             return Task.FromResult(new StudioRunControlResult(false, false, "binding_selection_required", null));
-        return SendPackAsync(projectId, "bind_selected_experience", request.ExperienceId, request.BindingZdo, null, cancellationToken);
+        return SendPackAsync(projectId, "bind_selected_experience", request.ExperienceId, request.BindingZdo, null, null, cancellationToken);
+    }
+
+    internal Task<StudioRunControlResult> BindExperiencePinnedAsync(
+        string projectId, StudioBindExperienceRequest? request, StudioRuntimeIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        var project = _workspace.ReadProject(projectId);
+        if (project is null) return Task.FromResult(new StudioRunControlResult(false, false, "project_missing", null));
+        if (request is null || !string.Equals(request.ExperienceId, project.ExperienceId, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(request.BindingZdo))
+            return Task.FromResult(new StudioRunControlResult(false, false, "binding_selection_required", null));
+        return SendPackAsync(projectId, "bind_selected_experience", request.ExperienceId,
+            request.BindingZdo, null, identity, cancellationToken);
     }
 
     public Task<StudioRunControlResult> RestoreBindingAsync(string projectId, StudioRestoreBindingRequest? request, CancellationToken cancellationToken)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.BindingZdo) || string.IsNullOrWhiteSpace(request.BindingChangeId))
             return Task.FromResult(new StudioRunControlResult(false, false, "binding_restore_identity_required", null));
-        return SendPackAsync(projectId, "restore_binding", null, request.BindingZdo, request.BindingChangeId, cancellationToken);
+        return SendPackAsync(projectId, "restore_binding", null, request.BindingZdo, request.BindingChangeId, null, cancellationToken);
     }
 
     Task<StudioRunControlResult> SendPackAsync(string projectId, string operation, string? experienceId,
-        string? bindingZdo, string? bindingChangeId, CancellationToken cancellationToken)
+        string? bindingZdo, string? bindingChangeId, StudioRuntimeIdentity? expectedIdentity,
+        CancellationToken cancellationToken)
     {
         if (_workspace.ReadProject(projectId) is null)
             return Task.FromResult(new StudioRunControlResult(false, false, "project_missing", null));
         var status = Status(projectId);
         if (!status.Available || !status.Connected)
             return Task.FromResult(new StudioRunControlResult(false, false, status.Error ?? "runtime_disconnected", null));
+        if (expectedIdentity is not null
+            && (!string.Equals(status.Machine, expectedIdentity.Machine, StringComparison.OrdinalIgnoreCase)
+                || status.WorldUid != expectedIdentity.WorldUid))
+            return Task.FromResult(new StudioRunControlResult(false, false, "runtime_identity_changed", null));
         var root = RuntimeRoot()!;
         var creatorSessionId = ReadCreatorSessionId(root, status.Machine!, status.WorldUid!);
         if (creatorSessionId is null)
             return Task.FromResult(new StudioRunControlResult(false, false, "creator_session_unavailable", null));
+        if (expectedIdentity is not null && creatorSessionId != expectedIdentity.CreatorSessionId)
+            return Task.FromResult(new StudioRunControlResult(false, false, "runtime_identity_changed", null));
+        var addressedMachine = expectedIdentity?.Machine ?? status.Machine!;
+        var addressedWorld = expectedIdentity?.WorldUid ?? status.WorldUid!;
+        var addressedSession = expectedIdentity?.CreatorSessionId ?? creatorSessionId;
         var now = DateTimeOffset.UtcNow;
         return DispatchAsync(root, new RuntimeRunControlRequest
         {
             RequestId = RequestId(operation, now), Operation = operation,
             CreatedUtc = now.ToString("O"), ExpiresUtc = now.AddMinutes(2).ToString("O"),
-            ExpectedMachine = status.Machine!, ExpectedWorldUid = status.WorldUid!,
-            CreatorSessionId = creatorSessionId,
+            ExpectedMachine = addressedMachine, ExpectedWorldUid = addressedWorld,
+            CreatorSessionId = addressedSession,
             ExperienceId = experienceId, BindingZdo = bindingZdo, BindingChangeId = bindingChangeId,
         }, cancellationToken);
     }
 
-    public StudioRunControlResult Receipt(string projectId, string? requestId, string? runId)
+    public StudioRunControlResult Receipt(string projectId, string? requestId, string? runId) =>
+        ReceiptCore(projectId, requestId, runId, null, null);
+
+    internal StudioRunControlResult ReceiptPinned(
+        string projectId, string? requestId, string? runId,
+        StudioRuntimeIdentity identity, string operation) =>
+        ReceiptCore(projectId, requestId, runId, identity, operation);
+
+    StudioRunControlResult ReceiptCore(
+        string projectId, string? requestId, string? runId,
+        StudioRuntimeIdentity? expectedIdentity, string? expectedOperation)
     {
         if (_workspace.ReadProject(projectId) is null) return new(false, false, "project_missing", null);
         var identity = new RuntimeRunControlRequest { RequestId = requestId };
@@ -193,6 +231,12 @@ internal sealed class QuestStudioRunControl
         var root = RuntimeRoot();
         if (root is null) return new(false, false, "valheim_not_found", null, requestId);
         if (!TryReadScopedReceipt(root, runId, requestId!, out var receipt)) return new(true, true, null, null, requestId);
+        if (expectedIdentity is not null
+            && (!string.Equals(receipt!.Machine, expectedIdentity.Machine, StringComparison.OrdinalIgnoreCase)
+                || receipt.WorldUid != expectedIdentity.WorldUid
+                || receipt.CreatorSessionId != expectedIdentity.CreatorSessionId
+                || receipt.Operation != expectedOperation))
+            return new(false, false, "run_control_receipt_identity_mismatch", null, requestId);
         var receiptRun = receipt!.Preview?.RunId ?? receipt.Result?.PriorRunId;
         if (receiptRun is not null && receiptRun != runId) return new(false, false, "run_control_scope_mismatch", null, requestId);
         var ok = receipt.State is "previewed" or "completed";

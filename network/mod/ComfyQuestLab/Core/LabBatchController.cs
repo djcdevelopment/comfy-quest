@@ -23,6 +23,7 @@ public sealed class LabBatchController {
   readonly LabGalleryBuilder _gallery;
   readonly LabBlueprintBuilder _blueprints;
   readonly LabHistoryScenarioRunner _history;
+  readonly LabSignatureHuntProvider _signatureHunt;
   LabBatchSession _session;
   bool _preparing;
   string _preparedSuiteId;
@@ -33,10 +34,14 @@ public sealed class LabBatchController {
   float _nextRequestPoll;
   int _runSequence;
 
-  public LabBatchController(LabGalleryBuilder gallery, LabBlueprintBuilder blueprints = null) {
+  public LabBatchController(
+      LabGalleryBuilder gallery,
+      LabBlueprintBuilder blueprints = null,
+      LabSignatureHuntProvider signatureHunt = null) {
     _gallery = gallery ?? throw new ArgumentNullException(nameof(gallery));
     _blueprints = blueprints;
     _history = new LabHistoryScenarioRunner();
+    _signatureHunt = signatureHunt;
   }
 
   public LabBatchSession Session { get { return _session; } }
@@ -77,8 +82,10 @@ public sealed class LabBatchController {
   }
 
   public IEnumerator Prepare(MonoBehaviour host, string suiteId) {
-    if (_preparing || _gallery.IsRunning) {
-      ComfyQuestLab.Report("Quest Lab preparation is already changing the gallery; wait for it.");
+    if (_preparing || _gallery.IsRunning
+        || (_blueprints != null && _blueprints.IsRunning)
+        || (_signatureHunt != null && _signatureHunt.IsRunning)) {
+      ComfyQuestLab.Report("Another Quest Lab world mutation is running; wait before preparing a suite.");
       yield break;
     }
     if (_session != null && _session.State == "running") {
@@ -502,13 +509,19 @@ public sealed class LabBatchController {
       WriteRequestReceipt(request, "rejected", identityError);
       return;
     }
+    if (LabSignatureHuntContract.IsOperation(operation)) {
+      DispatchSignatureHunt(host, request, operation);
+      return;
+    }
     if (operation.StartsWith("blueprint_", StringComparison.Ordinal)) {
       DispatchBlueprint(host, request, operation);
       return;
     }
     if (operation == "prepare") {
-      if (_preparing || _gallery.IsRunning) {
-        WriteRequestReceipt(request, "rejected", "gallery_or_prepare_busy");
+      if (_preparing || _gallery.IsRunning
+          || (_blueprints != null && _blueprints.IsRunning)
+          || (_signatureHunt != null && _signatureHunt.IsRunning)) {
+        WriteRequestReceipt(request, "rejected", "world_mutation_busy");
         return;
       }
       host.StartCoroutine(RequestRoutine(
@@ -564,8 +577,10 @@ public sealed class LabBatchController {
       return;
     }
     if (operation == "gallery_clear") {
-      if (_gallery.IsRunning || _preparing) {
-        WriteRequestReceipt(request, "rejected", "gallery_or_prepare_busy");
+      if (_gallery.IsRunning || _preparing
+          || (_blueprints != null && _blueprints.IsRunning)
+          || (_signatureHunt != null && _signatureHunt.IsRunning)) {
+        WriteRequestReceipt(request, "rejected", "world_mutation_busy");
         return;
       }
       host.StartCoroutine(RequestRoutine(
@@ -576,8 +591,10 @@ public sealed class LabBatchController {
               && _gallery.StandingPieceCount(request.selector) == 0));
       return;
     }
-    if (_gallery.IsRunning || _preparing) {
-      WriteRequestReceipt(request, "rejected", "gallery_or_prepare_busy");
+    if (_gallery.IsRunning || _preparing
+        || (_blueprints != null && _blueprints.IsRunning)
+        || (_signatureHunt != null && _signatureHunt.IsRunning)) {
+      WriteRequestReceipt(request, "rejected", "world_mutation_busy");
       return;
     }
     if (operation == "gallery_build") {
@@ -607,12 +624,59 @@ public sealed class LabBatchController {
     }
   }
 
+  void DispatchSignatureHunt(
+      MonoBehaviour host, LabBatchRequest request, string operation) {
+    if (_signatureHunt == null) {
+      WriteRequestReceipt(request, "rejected", "signature_hunt_surface_unavailable");
+      return;
+    }
+    if (operation == LabSignatureHuntContract.StatusOperation) {
+      WriteRequestReceipt(
+          request,
+          "completed",
+          _signatureHunt.Status(),
+          evidencePath: _signatureHunt.LastReceiptPath);
+      return;
+    }
+    if (_gallery.IsRunning || _preparing
+        || (_blueprints != null && _blueprints.IsRunning)
+        || _signatureHunt.IsRunning) {
+      WriteRequestReceipt(request, "rejected", "world_mutation_busy");
+      return;
+    }
+    if (operation == LabSignatureHuntContract.PrepareOperation) {
+      string priorReceiptPath = _signatureHunt.LastReceiptPath;
+      host.StartCoroutine(RequestRoutine(
+          request,
+          _signatureHunt.Prepare(request.request_id),
+          () => _signatureHunt.LastResult,
+          () => _signatureHunt.LastLifecycleSucceeded
+              && _signatureHunt.StandingObjectCount()
+                  == LabSignatureHuntContract.Placements.Length,
+          () => _signatureHunt.LastLifecycleSucceeded
+                  && !string.Equals(_signatureHunt.LastReceiptPath, priorReceiptPath,
+                      StringComparison.Ordinal)
+              ? _signatureHunt.LastReceiptPath
+              : null));
+      return;
+    }
+    if (operation == LabSignatureHuntContract.ClearOperation) {
+      host.StartCoroutine(RequestRoutine(
+          request,
+          _signatureHunt.Clear(),
+          () => _signatureHunt.LastResult,
+          () => _signatureHunt.LastLifecycleSucceeded
+              && _signatureHunt.StandingObjectCount() == 0));
+    }
+  }
+
   void DispatchBlueprint(MonoBehaviour host, LabBatchRequest request, string operation) {
     if (_blueprints == null) {
       WriteRequestReceipt(request, "rejected", "blueprint_surface_unavailable");
       return;
     }
-    if (_gallery.IsRunning || _preparing || _blueprints.IsRunning) {
+    if (_gallery.IsRunning || _preparing || _blueprints.IsRunning
+        || (_signatureHunt != null && _signatureHunt.IsRunning)) {
       WriteRequestReceipt(request, "rejected", "world_mutation_busy");
       return;
     }
@@ -733,7 +797,8 @@ public sealed class LabBatchController {
       LabBatchRequest request,
       IEnumerator work,
       Func<string> detail,
-      Func<bool> success = null) {
+      Func<bool> success = null,
+      Func<string> evidencePath = null) {
     string failure = null;
     while (true) {
       bool moved;
@@ -752,7 +817,8 @@ public sealed class LabBatchController {
     WriteRequestReceipt(
         request,
         completed ? "completed" : "failed",
-        failure ?? (detail == null ? string.Empty : detail()));
+        failure ?? (detail == null ? string.Empty : detail()),
+        evidencePath: evidencePath == null ? null : evidencePath());
   }
 
   static bool TryReadRequest(
@@ -844,6 +910,12 @@ public sealed class LabBatchController {
         || !string.IsNullOrWhiteSpace(request.yaw_degrees)) {
       error = "request_argument_not_allowed";
       return false;
+    }
+    if (LabSignatureHuntContract.IsOperation(request.operation)) {
+      return LabSignatureHuntContract.ValidateRequest(
+          request.operation, request.suite, request.profile, request.compare_profile,
+          request.selector, request.corpus, request.step, request.seed,
+          request.expected_previous_step, out error);
     }
     return LabBatchRequestPolicy.Validate(
         request.operation,

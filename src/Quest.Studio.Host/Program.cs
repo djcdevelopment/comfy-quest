@@ -15,7 +15,9 @@ var json = new JsonSerializerOptions(JsonSerializerDefaults.Web)
     PropertyNameCaseInsensitive = true,
     WriteIndented = true
 };
-var host = new StandaloneQuestStudioHost(stateDirectory, json, port);
+var host = new StandaloneQuestStudioHost(
+    stateDirectory, json, port,
+    Environment.GetEnvironmentVariable("COMFY_QUEST_REPO_ROOT"));
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
 builder.Services.Configure<JsonOptions>(options =>
@@ -58,16 +60,17 @@ static int ReadPort(string[] arguments)
     return int.TryParse(configured, out var value) && value is >= 1024 and <= 65535 ? value : 8085;
 }
 
-sealed class StandaloneQuestStudioHost : IQuestStudioHost
+sealed class StandaloneQuestStudioHost : IQuestStudioHost, IQuestStudioRAndDHost
 {
     readonly int _port;
     readonly byte[] _tokenBytes;
 
-    public StandaloneQuestStudioHost(string stateDirectory, JsonSerializerOptions json, int port)
+    public StandaloneQuestStudioHost(string stateDirectory, JsonSerializerOptions json, int port, string? repositoryRoot)
     {
         StateDirectory = Path.GetFullPath(stateDirectory);
         Directory.CreateDirectory(StateDirectory);
         Json = json;
+        RepositoryRoot = string.IsNullOrWhiteSpace(repositoryRoot) ? null : Path.GetFullPath(repositoryRoot);
         _port = port;
         _tokenBytes = RandomNumberGenerator.GetBytes(32);
         BrowserToken = Convert.ToHexString(_tokenBytes).ToLowerInvariant();
@@ -76,6 +79,7 @@ sealed class StandaloneQuestStudioHost : IQuestStudioHost
     public string StateDirectory { get; }
     public string BrowserToken { get; }
     public JsonSerializerOptions Json { get; }
+    public string? RepositoryRoot { get; }
 
     public string? FindValheim()
     {

@@ -1,5 +1,15 @@
 # Changelog
 
+**Unreleased fixed Slayers Signature Hunt fixture.** Quest Lab now has one reviewed,
+parameter-free proof fixture for the identity-pinned private/local `ComfyQuestDemo` world. It
+preflights and stages Deathsquito and Drake targets in separate marked arenas with four usable
+Carapace spear drops, records each instantiated target's exact live `Character.m_name` and
+normalized matcher target in a preparation-only receipt, and clears only objects carrying its
+exact fixture mark. The console and bounded request mailbox expose only prepare, status, and
+clear; neither surface accepts prefab, count, position, item, selector, or world authority.
+Build and headless contract checks cover this implementation; the first live Unity preparation,
+identity receipt, and exact-mark clear remain intentionally unclaimed.
+
 **r31 Creator Session and Godbuild mailbox.** Quest Lab now accepts a closed set of
 identity-pinned, expiring blueprint capture/inspect/check/build/diff/count/clear requests.
 Artifacts live only in the Lab-owned blueprint directory; callers cannot supply paths,

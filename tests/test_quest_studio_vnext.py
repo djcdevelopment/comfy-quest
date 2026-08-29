@@ -92,6 +92,66 @@ class QuestStudioVNextTests(unittest.TestCase):
         self.assertIn("No binding targets nearby", script)
         self.assertIn("Approach an eligible sign, item stand, or player-built piece", script)
 
+    def test_guild_editor_connects_steward_creator_and_evidence_lenses(self) -> None:
+        html = raw_constant("Html")
+        script = raw_constant("Js")
+        for lens in ("configure", "create", "evidence"):
+            self.assertIn(f'data-guild-lens="{lens}"', html)
+            self.assertIn(f'id="guild-panel-{lens}"', html)
+        for element_id in (
+            "guild-steward",
+            "guild-source-catalog",
+            "guild-source-provenance",
+            "guild-source-anomalies",
+            "signature-source-quests",
+            "signature-target-a-runtime",
+            "signature-target-b-runtime",
+            "instantiate-abstraction",
+            "campaign-placement-artifact",
+            "campaign-evidence",
+        ):
+            self.assertIn(f'id="{element_id}"', html)
+        self.assertIn("Community steward", html)
+        self.assertIn("Default-campaign compatibility tools", html)
+        self.assertNotIn('id="guild-author"', html)
+        self.assertIn("Missing Runtime evidence is shown as absent", html)
+        for function_name in (
+            "importGuildSources",
+            "promoteSignatureHunt",
+            "instantiateSignatureHunt",
+            "createCampaign",
+            "placeCampaignArtifact",
+            "saveCampaignProgression",
+            "loadCampaignEvidence",
+            "renderCampaignEvidence",
+        ):
+            self.assertIn(f"function {function_name}", script)
+        for route in (
+            "/sources/import",
+            "/abstractions/promote",
+            "/instantiate",
+            "/campaigns",
+            "/place",
+            "/evidence",
+        ):
+            self.assertIn(route, script)
+        for payload_field in (
+            "source_snapshot_id",
+            "source_quest_ids",
+            "target_choices",
+            "abstraction_revision",
+            "target_choice_id",
+            "expected_guild_revision",
+            "expected_revision",
+        ):
+            self.assertIn(payload_field, script)
+        self.assertIn("weapon_skill==='Spears'", script)
+        self.assertIn("projectile).toLowerCase()==='true'", script)
+        self.assertIn("data-campaign-prerequisite", script)
+        self.assertIn("fixture_receipt_sha256", script)
+        self.assertIn("binding_instance_id", script)
+        self.assertIn("Runtime evidence absent.", script)
+
     def test_page_guides_creators_through_four_soft_stages(self) -> None:
         html = raw_constant("Html")
         script = raw_constant("Js")

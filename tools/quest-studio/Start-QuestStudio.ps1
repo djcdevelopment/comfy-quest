@@ -45,15 +45,18 @@ $arguments += @('--', '--port', [string]$Port)
 
 Write-Host "Quest Studio -> http://127.0.0.1:$Port/quest-studio"
 $previousNugetPackages = [Environment]::GetEnvironmentVariable('NUGET_PACKAGES', 'Process')
+$previousRepoRoot = [Environment]::GetEnvironmentVariable('COMFY_QUEST_REPO_ROOT', 'Process')
 try {
     # The interim package version stays fixed while its local bytes evolve. NuGet
     # otherwise reuses an older immutable-version cache and Studio compiles against
     # stale contract types. Keying the cache by package SHA keeps ordinary launches
     # aligned with the exact checked-in package, just like the synthetic E2E runner.
     [Environment]::SetEnvironmentVariable('NUGET_PACKAGES', $nugetPackages, 'Process')
+    [Environment]::SetEnvironmentVariable('COMFY_QUEST_REPO_ROOT', $repoRoot, 'Process')
     & $dotnetExe @arguments
     $runExit = $LASTEXITCODE
 } finally {
     [Environment]::SetEnvironmentVariable('NUGET_PACKAGES', $previousNugetPackages, 'Process')
+    [Environment]::SetEnvironmentVariable('COMFY_QUEST_REPO_ROOT', $previousRepoRoot, 'Process')
 }
 exit $runExit

@@ -257,6 +257,16 @@ public static class ActiveExperienceResolver {
   /// read: this answers "what could I have selected", never "what is selected".</summary>
   public static IReadOnlyList<string> Ids(ZipArchive zip){return Scan(zip,out var documents,out _)?documents.Select(value=>value.Id).ToArray():Array.Empty<string>();}
 
+  /// <summary>All raw experience documents in deterministic archive order. Runtime uses this to
+  /// resolve an authored continuation without changing the active selector merely to inspect it.</summary>
+  public static bool TryResolveAll(ZipArchive zip,out IReadOnlyList<ResolvedExperience> resolved,out string error){
+    if(!Scan(zip,out var documents,out error)){resolved=Array.Empty<ResolvedExperience>();return false;}
+    var available=documents.Select(value=>value.Id).ToArray();
+    foreach(var document in documents)document.Available=available;
+    resolved=documents;
+    return true;
+  }
+
   /// <summary>Resolve the bound document. An absent or blank <paramref name="requestedId"/> means
   /// "the pack holds exactly one" — every pack shipped before this field existed — and resolves
   /// exactly as it did then, including the same diagnostic when it holds more.</summary>
@@ -368,7 +378,7 @@ public sealed class QuestPackStore {
         if(compiled.Document!=null)documents.Add(compiled.Document);
         if(!string.IsNullOrWhiteSpace(compiled.Document?.Title))titles.Add(compiled.Document.Title);
       }
-      ValidatePrerequisites(documents,errors);
+      ValidatePackReferences(documents,errors);
       if(experiences.Length==0)errors.Add(new("pack.experiences","$","Pack has no experience documents."));
       if(manifest==null||manifest.Schema!="comfy-quest-pack/v2"||string.IsNullOrWhiteSpace(manifest.PackId)||!SemanticVersion.TryParse(manifest.Version,out _))
         errors.Add(new("pack.manifest","$.manifest","Pack schema, id, and semantic version are required."));
@@ -378,7 +388,7 @@ public sealed class QuestPackStore {
     return new(){Path=full,Manifest=manifest,Sha256=sha,ContentHash=contentHash,Lane=lane,Diagnostics=errors,Titles=titles};
   }
 
-  static void ValidatePrerequisites(IReadOnlyList<ExperienceDocument> documents,List<ContractDiagnostic> errors){
+  static void ValidatePackReferences(IReadOnlyList<ExperienceDocument> documents,List<ContractDiagnostic> errors){
     var unique=documents.Where(value=>value!=null&&!string.IsNullOrWhiteSpace(value.Id))
       .GroupBy(value=>value.Id,StringComparer.Ordinal).ToArray();
     foreach(var duplicate in unique.Where(group=>group.Count()!=1))
@@ -388,14 +398,28 @@ public sealed class QuestPackStore {
       foreach(var prerequisite in document.Prerequisites??new List<string>())
         if(!byId.ContainsKey(prerequisite))
           errors.Add(new("prerequisite.missing","$.experiences."+document.Id+".prerequisites","Prerequisite '"+prerequisite+"' is not present in this pack."));
+    foreach(var document in byId.Values)
+      foreach(var successor in document.SuccessorExperienceIds??new List<string>())
+        if(!byId.ContainsKey(successor))
+          errors.Add(new("successor.missing","$.experiences."+document.Id+".successor_experience_ids","Successor '"+successor+"' is not present in this pack."));
     var state=new Dictionary<string,int>(StringComparer.Ordinal);
     foreach(var id in byId.Keys.OrderBy(value=>value,StringComparer.Ordinal))Visit(id);
+
+    var successorState=new Dictionary<string,int>(StringComparer.Ordinal);
+    foreach(var id in byId.Keys.OrderBy(value=>value,StringComparer.Ordinal))VisitSuccessor(id);
 
     void Visit(string id){
       if(state.TryGetValue(id,out var known)){if(known==1)errors.Add(new("prerequisite.cycle","$.experiences."+id+".prerequisites","Prerequisite graph contains a cycle."));return;}
       state[id]=1;
       foreach(var dependency in byId[id].Prerequisites??new List<string>())if(byId.ContainsKey(dependency))Visit(dependency);
       state[id]=2;
+    }
+
+    void VisitSuccessor(string id){
+      if(successorState.TryGetValue(id,out var known)){if(known==1)errors.Add(new("successor.cycle","$.experiences."+id+".successor_experience_ids","Successor graph contains a cycle."));return;}
+      successorState[id]=1;
+      foreach(var successor in byId[id].SuccessorExperienceIds??new List<string>())if(byId.ContainsKey(successor))VisitSuccessor(successor);
+      successorState[id]=2;
     }
   }
   static bool SafeEntry(string name){if(string.IsNullOrWhiteSpace(name)||name.Contains("\\")||name.Contains("..")||Path.IsPathRooted(name))return false;if(name=="manifest.json")return true;return (name.StartsWith("experiences/",StringComparison.Ordinal)||name.StartsWith("quests/",StringComparison.Ordinal))&&name.EndsWith(".json",StringComparison.Ordinal)&&name.Count(c=>c=='/')==1;}
@@ -414,6 +438,13 @@ public sealed class QuestPackStore {
   /// is a no-op rather than a rewrite, so a repeated request cannot churn the file the engine
   /// watches for cache invalidation.</summary>
   public ActiveSet SelectExperience(string experienceId)=>SetExperienceSelection(experienceId,null,false);
+  /// <summary>Select within one exact activation. Runtime continuation uses this after its durable
+  /// decision so a concurrent pack activation cannot be overwritten by an older campaign.</summary>
+  public ActiveSet SelectExperienceForActivation(string expectedActivationId,string experienceId){
+    if(!ValidActivationId(expectedActivationId))throw new InvalidOperationException("active_activation_id_invalid");
+    if(string.IsNullOrWhiteSpace(experienceId))throw new InvalidOperationException("select_experience_id_required");
+    return SetExperienceSelection(experienceId,expectedActivationId,false);
+  }
   /// <summary>Undo a selector changed as one step of a failed binding transaction. The activation
   /// identity makes this incapable of overwriting a newer content activation; null restores the
   /// unselected state used by a freshly activated guild pack.</summary>

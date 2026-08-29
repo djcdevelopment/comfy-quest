@@ -18,14 +18,17 @@ public sealed class StudioPortfolioDocument
 
 public sealed class StudioGuildDocument
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string GuildId { get; set; } = string.Empty;
     public int Revision { get; set; } = 1;
     public DateTimeOffset UpdatedUtc { get; set; }
     public string Version { get; set; } = "0.1.0";
     public string Title { get; set; } = string.Empty;
-    public string Author { get; set; } = string.Empty;
+    public string Steward { get; set; } = string.Empty;
+    /// <summary>Schema-1 compatibility alias. Schema-2 callers use <see cref="Steward"/>.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Author { get; set; }
     public string Description { get; set; } = string.Empty;
     public string ProgressionScope { get; set; } = string.Empty;
     public List<string> Compatibility { get; set; } = new();
@@ -33,6 +36,13 @@ public sealed class StudioGuildDocument
     public string ReleaseState { get; set; } = "draft";
     public bool Archived { get; set; }
     public List<StudioProgressionBand> ProgressionBands { get; set; } = new();
+    public List<StudioGuildSourceSnapshot> SourceSnapshots { get; set; } = new();
+    public List<StudioGuildSourceRuling> SourceRulings { get; set; } = new();
+    public List<StudioGuildAbstractionDocument> Abstractions { get; set; } = new();
+    public List<StudioGuildPaletteEntry> Palette { get; set; } = new();
+    public List<StudioGuildArtifactMembership> Artifacts { get; set; } = new();
+    public List<StudioCampaignDocument> Campaigns { get; set; } = new();
+    /// <summary>Schema-1 aliases retained for one compatibility window. Campaigns are authoritative.</summary>
     public List<StudioQuestline> Questlines { get; set; } = new();
     public List<StudioGuildArtifact> StandaloneQuests { get; set; } = new();
     public List<StudioGuildArtifact> Events { get; set; } = new();
@@ -73,7 +83,7 @@ public sealed class StudioGuildArtifact
 
 public sealed record StudioPortfolioSaveRequest(int ExpectedRevision, StudioPortfolioDocument Portfolio);
 public sealed record StudioGuildSaveRequest(int ExpectedRevision, StudioGuildDocument Guild);
-public sealed record StudioGuildCreateRequest(string? Title, string? Author);
+public sealed record StudioGuildCreateRequest(string? Title, string? Steward, string? Author = null);
 public sealed record StudioGuildArchiveRequest(int ExpectedRevision, bool Archived);
 public sealed record StudioGuildPlacementRequest(
     int ExpectedRevision,
@@ -90,7 +100,7 @@ public sealed record StudioGuildSummary(
     string GuildId,
     string Version,
     string Title,
-    string Author,
+    string Steward,
     string ReleaseState,
     bool Archived,
     int QuestlineCount,
@@ -122,7 +132,7 @@ internal sealed class QuestStudioPortfolioStore
     internal const int MaxArtifactsPerGuild = 128;
     internal const int MaxQuestlinesPerGuild = 32;
     internal const int MaxBandsPerGuild = 64;
-    const int MaxDocumentBytes = 1024 * 1024;
+    const int MaxDocumentBytes = 8 * 1024 * 1024;
 
     readonly object _gate = new();
     readonly string _portfolioPath;
@@ -213,10 +223,10 @@ internal sealed class QuestStudioPortfolioStore
         {
             RecoverPlacementTransactions();
             var path = GuildPath(guildId!);
-            var value = Read<StudioGuildDocument>(path);
+            var value = UpgradeGuild(Read<StudioGuildDocument>(path));
             if (value is not null && ValidateGuild(value, checkGlobalMembership: false) is null) return value;
             if (!File.Exists(path)) return null;
-            var previous = Read<StudioGuildDocument>(path + ".previous");
+            var previous = UpgradeGuild(Read<StudioGuildDocument>(path + ".previous"));
             if (previous is not null && ValidateGuild(previous, checkGlobalMembership: false) is null) return previous;
             throw new InvalidDataException("guild_unreadable");
         }
@@ -232,13 +242,22 @@ internal sealed class QuestStudioPortfolioStore
             {
                 GuildId = id,
                 Title = Bounded(request?.Title, "New guild", 120),
-                Author = Bounded(request?.Author, Environment.UserName, 120),
+                Steward = Bounded(request?.Steward ?? request?.Author, Environment.UserName, 120),
                 UpdatedUtc = DateTimeOffset.UtcNow,
-                Questlines = new List<StudioQuestline>
+                Campaigns = new List<StudioCampaignDocument>
                 {
-                    new() { Id = "main", Title = "Main questline" },
+                    new()
+                    {
+                        CampaignId = "campaign-default",
+                        PackId = id,
+                        Title = Bounded(request?.Title, "New guild", 120),
+                        Creator = Bounded(request?.Steward ?? request?.Author, Environment.UserName, 120),
+                        UpdatedUtc = DateTimeOffset.UtcNow,
+                        Questlines = new List<StudioQuestline> { new() { Id = "main", Title = "Main questline" } },
+                    },
                 },
             };
+            SyncLegacyAliases(guild);
             AtomicWrite(GuildPath(id), guild, create: true);
             return guild;
         }
@@ -254,9 +273,29 @@ internal sealed class QuestStudioPortfolioStore
             if (current is null) return new(false, false, "guild_missing", null);
             if (request.ExpectedRevision != current.Revision)
                 return new(false, true, "revision_conflict", current);
-            var candidate = Clone(request.Guild);
+            var candidate = UpgradeGuild(Clone(request.Guild))!;
             if (!string.Equals(candidate.GuildId, current.GuildId, StringComparison.Ordinal))
                 return new(false, false, "guild_identity_immutable", null);
+            // Guild PUT edits steward configuration. Creative-system collections have their own
+            // mutation routes and Campaigns have their own revisions. Preserve the current values
+            // so a stale configuration form cannot erase a creator's parallel campaign edit.
+            candidate.SourceSnapshots = Clone(current.SourceSnapshots);
+            candidate.SourceRulings = Clone(current.SourceRulings);
+            candidate.Abstractions = Clone(current.Abstractions);
+            candidate.Palette = Clone(current.Palette);
+            candidate.Artifacts = Clone(current.Artifacts);
+            var legacyChanged = LegacyJson(candidate) != LegacyJson(current);
+            candidate.Campaigns = Clone(current.Campaigns);
+            if (legacyChanged)
+            {
+                var compatibility = DefaultCampaign(candidate);
+                compatibility.Questlines = Clone(request.Guild.Questlines ?? new());
+                compatibility.StandaloneQuests = Clone(request.Guild.StandaloneQuests ?? new());
+                compatibility.Events = Clone(request.Guild.Events ?? new());
+                compatibility.Revision++;
+                compatibility.UpdatedUtc = DateTimeOffset.UtcNow;
+            }
+            SyncLegacyAliases(candidate);
             candidate.Revision = current.Revision + 1;
             candidate.UpdatedUtc = DateTimeOffset.UtcNow;
             var error = ValidateGuild(candidate, checkGlobalMembership: true);
@@ -273,6 +312,150 @@ internal sealed class QuestStudioPortfolioStore
         current.Archived = request.Archived;
         current.ReleaseState = request.Archived ? "archived" : current.ReleaseState == "archived" ? "draft" : current.ReleaseState;
         return SaveGuild(guildId, new StudioGuildSaveRequest(request.ExpectedRevision, current));
+    }
+
+    public StudioGuildSaveResult MutateCreativeConfig(string? guildId, int expectedRevision, Action<StudioGuildDocument> mutation)
+    {
+        if (!SafeId(guildId) || mutation is null) return new(false, false, "guild_missing", null);
+        lock (_gate)
+        {
+            var current = ReadGuild(guildId);
+            if (current is null) return new(false, false, "guild_missing", null);
+            if (current.Revision != expectedRevision) return new(false, true, "revision_conflict", current);
+            var candidate = Clone(current);
+            mutation(candidate);
+            SyncLegacyAliases(candidate);
+            Advance(candidate);
+            var error = ValidateGuild(candidate, checkGlobalMembership: true);
+            if (error is not null) return new(false, false, error, null);
+            AtomicWrite(GuildPath(guildId!), candidate, create: false);
+            return new(true, false, null, candidate);
+        }
+    }
+
+    public StudioCampaignDocument? ReadCampaign(string? guildId, string? campaignId)
+    {
+        if (!SafeId(campaignId)) return null;
+        return ReadGuild(guildId)?.Campaigns.FirstOrDefault(value => value.CampaignId == campaignId);
+    }
+
+    public StudioCampaignMutationResult CreateCampaign(string? guildId, StudioCampaignCreateRequest? request)
+    {
+        if (!SafeId(guildId) || request is null) return new(false, false, "guild_missing", null, null);
+        StudioCampaignDocument? created = null;
+        var saved = MutateCreativeConfig(guildId, request.ExpectedGuildRevision, guild =>
+        {
+            created = new StudioCampaignDocument
+            {
+                CampaignId = "campaign-" + Guid.NewGuid().ToString("N")[..12],
+                PackId = guild.GuildId,
+                Version = guild.Version,
+                Title = Bounded(request.Title, "New campaign", 120),
+                Creator = Bounded(request.Creator, guild.Steward, 120),
+                UpdatedUtc = DateTimeOffset.UtcNow,
+                Questlines = new List<StudioQuestline> { new() { Id = "main", Title = "Main questline" } },
+            };
+            guild.Campaigns.Add(created);
+        });
+        return new(saved.Ok, saved.Conflict, saved.Error, saved.Guild, saved.Ok ? created : null);
+    }
+
+    public StudioCampaignMutationResult SaveCampaign(string? guildId, string? campaignId, StudioCampaignSaveRequest? request)
+    {
+        if (!SafeId(guildId) || !SafeId(campaignId) || request?.Campaign is null)
+            return new(false, false, "campaign_required", null, null);
+        lock (_gate)
+        {
+            var guild = ReadGuild(guildId);
+            if (guild is null) return new(false, false, "guild_missing", null, null);
+            var index = guild.Campaigns.FindIndex(value => value.CampaignId == campaignId);
+            if (index < 0) return new(false, false, "campaign_missing", guild, null);
+            var current = guild.Campaigns[index];
+            if (request.ExpectedRevision != current.Revision)
+                return new(false, true, "revision_conflict", guild, current);
+            var candidate = Clone(request.Campaign);
+            if (candidate.CampaignId != current.CampaignId || candidate.PackId != current.PackId)
+                return new(false, false, "campaign_identity_immutable", guild, null);
+            candidate.Revision = current.Revision + 1;
+            candidate.UpdatedUtc = DateTimeOffset.UtcNow;
+            guild.Campaigns[index] = candidate;
+            SyncLegacyAliases(guild);
+            var error = ValidateGuild(guild, checkGlobalMembership: true);
+            if (error is not null) return new(false, false, error, guild, null);
+            AtomicWrite(GuildPath(guildId!), guild, create: false);
+            return new(true, false, null, guild, candidate);
+        }
+    }
+
+    public StudioCampaignMutationResult PlaceInCampaign(string? guildId, string? campaignId, StudioCampaignPlacementRequest? request,
+        Func<string, bool> projectExists, Func<string, StudioGuildArtifactMembership> membership)
+    {
+        if (!SafeId(guildId) || !SafeId(campaignId) || request is null)
+            return new(false, false, "campaign_missing", null, null);
+        lock (_gate)
+        {
+            var guild = ReadGuild(guildId);
+            if (guild is null) return new(false, false, "guild_missing", null, null);
+            var campaign = guild.Campaigns.FirstOrDefault(value => value.CampaignId == campaignId);
+            if (campaign is null) return new(false, false, "campaign_missing", guild, null);
+            if (request.ExpectedRevision != campaign.Revision)
+                return new(false, true, "revision_conflict", guild, campaign);
+            if (!projectExists(request.ProjectId)) return new(false, false, "project_missing", guild, campaign);
+
+            campaign.StandaloneQuests.RemoveAll(value => value.ProjectId == request.ProjectId);
+            campaign.Events.RemoveAll(value => value.ProjectId == request.ProjectId);
+            foreach (var line in campaign.Questlines) line.Quests.RemoveAll(value => value.ProjectId == request.ProjectId);
+            if (request.ContainerKind != "unfile")
+            {
+                var artifact = new StudioGuildArtifact
+                {
+                    ProjectId = request.ProjectId,
+                    Kind = request.Kind,
+                    ProgressionBandId = NullIfWhite(request.ProgressionBandId),
+                    RewardPolicy = "per_run",
+                };
+                if (request.ContainerKind == "event") campaign.Events.Add(artifact);
+                else if (request.ContainerKind == "standalone") campaign.StandaloneQuests.Add(artifact);
+                else if (request.ContainerKind == "questline")
+                {
+                    var line = campaign.Questlines.FirstOrDefault(value => value.Id == request.QuestlineId);
+                    if (line is null) return new(false, false, "questline_missing", guild, campaign);
+                    line.Quests.Add(artifact);
+                }
+                else return new(false, false, "container_kind_invalid", guild, campaign);
+                if (!guild.Artifacts.Any(value => value.ProjectId == request.ProjectId)) guild.Artifacts.Add(membership(request.ProjectId));
+            }
+            else if (!guild.Campaigns.Any(value => value.StandaloneQuests.Any(item => item.ProjectId == request.ProjectId)
+                         || value.Events.Any(item => item.ProjectId == request.ProjectId)
+                         || value.Questlines.Any(line => line.Quests.Any(item => item.ProjectId == request.ProjectId))))
+                guild.Artifacts.RemoveAll(value => value.ProjectId == request.ProjectId);
+            campaign.Revision++;
+            campaign.UpdatedUtc = DateTimeOffset.UtcNow;
+            SyncLegacyAliases(guild);
+            var error = ValidateGuild(guild, checkGlobalMembership: true);
+            if (error is not null) return new(false, false, error, guild, null);
+            AtomicWrite(GuildPath(guildId!), guild, create: false);
+            return new(true, false, null, guild, campaign);
+        }
+    }
+
+    public void RemoveProjectFromCampaigns(string guildId, string projectId)
+    {
+        lock (_gate)
+        {
+            var guild = ReadGuild(guildId);
+            if (guild is null) return;
+            RemoveProject(guild, projectId);
+            foreach (var campaign in guild.Campaigns)
+            {
+                campaign.Revision++;
+                campaign.UpdatedUtc = DateTimeOffset.UtcNow;
+            }
+            SyncLegacyAliases(guild);
+            var error = ValidateGuild(guild, checkGlobalMembership: true);
+            if (error is not null) throw new InvalidDataException(error);
+            AtomicWrite(GuildPath(guildId), guild, create: false);
+        }
     }
 
     public StudioGuildSaveResult Place(string? guildId, StudioGuildPlacementRequest? request, Func<string, bool> projectExists)
@@ -293,6 +476,7 @@ internal sealed class QuestStudioPortfolioStore
 
             var targetAfter = Clone(target);
             RemoveProject(targetAfter, request.ProjectId);
+            var targetCampaign = DefaultCampaign(targetAfter);
             if (request.ContainerKind != "unfile")
             {
                 var artifact = new StudioGuildArtifact
@@ -302,16 +486,26 @@ internal sealed class QuestStudioPortfolioStore
                     ProgressionBandId = NullIfWhite(request.ProgressionBandId),
                     RewardPolicy = "per_run",
                 };
-                if (request.ContainerKind == "event") targetAfter.Events.Add(artifact);
-                else if (request.ContainerKind == "standalone") targetAfter.StandaloneQuests.Add(artifact);
+                if (request.ContainerKind == "event") targetCampaign.Events.Add(artifact);
+                else if (request.ContainerKind == "standalone") targetCampaign.StandaloneQuests.Add(artifact);
                 else if (request.ContainerKind == "questline")
                 {
-                    var line = targetAfter.Questlines.FirstOrDefault(value => value.Id == request.QuestlineId);
+                    var line = targetCampaign.Questlines.FirstOrDefault(value => value.Id == request.QuestlineId);
                     if (line is null) return new(false, false, "questline_missing", null);
                     line.Quests.Add(artifact);
                 }
                 else return new(false, false, "container_kind_invalid", null);
+                if (!targetAfter.Artifacts.Any(value => value.ProjectId == request.ProjectId))
+                    targetAfter.Artifacts.Add(new StudioGuildArtifactMembership
+                    {
+                        ProjectId = request.ProjectId,
+                        Kind = request.Kind,
+                        Creator = targetAfter.Steward,
+                    });
             }
+            targetCampaign.Revision++;
+            targetCampaign.UpdatedUtc = DateTimeOffset.UtcNow;
+            SyncLegacyAliases(targetAfter);
 
             StudioGuildDocument? sourceAfter = null;
             if (sourceId is not null && sourceId != guildId)
@@ -320,6 +514,7 @@ internal sealed class QuestStudioPortfolioStore
                 if (source is null) return new(false, false, "placement_source_missing", null);
                 sourceAfter = Clone(source);
                 RemoveProject(sourceAfter, request.ProjectId);
+                SyncLegacyAliases(sourceAfter);
                 Advance(sourceAfter);
             }
             Advance(targetAfter);
@@ -353,10 +548,13 @@ internal sealed class QuestStudioPortfolioStore
             {
                 var guild = ReadGuild(summary.GuildId);
                 if (guild is null) continue;
-                values.AddRange(guild.StandaloneQuests.Select(value => Placement(guild.GuildId, "standalone", null, value)));
-                values.AddRange(guild.Events.Select(value => Placement(guild.GuildId, "event", null, value)));
-                foreach (var line in guild.Questlines)
-                    values.AddRange(line.Quests.Select(value => Placement(guild.GuildId, "questline", line.Id, value)));
+                foreach (var campaign in guild.Campaigns)
+                {
+                    values.AddRange(campaign.StandaloneQuests.Select(value => Placement(guild.GuildId, "standalone", null, value)));
+                    values.AddRange(campaign.Events.Select(value => Placement(guild.GuildId, "event", null, value)));
+                    foreach (var line in campaign.Questlines)
+                        values.AddRange(line.Quests.Select(value => Placement(guild.GuildId, "questline", line.Id, value)));
+                }
             }
             return values;
         }
@@ -388,6 +586,17 @@ internal sealed class QuestStudioPortfolioStore
                     .Select(value => projectIds.TryGetValue(value, out var mapped) ? mapped : value)
                     .ToList();
             }
+            foreach (var membership in clone.Artifacts)
+                if (projectIds.TryGetValue(membership.ProjectId, out var replacement)) membership.ProjectId = replacement;
+            foreach (var campaign in clone.Campaigns)
+            {
+                campaign.CampaignId = campaign.CampaignId == "campaign-default" ? "campaign-default" : "campaign-" + Guid.NewGuid().ToString("N")[..12];
+                campaign.PackId = clone.GuildId;
+                campaign.Version = clone.Version;
+                campaign.Revision = 1;
+                campaign.UpdatedUtc = clone.UpdatedUtc;
+            }
+            SyncLegacyAliases(clone);
             var error = ValidateGuild(clone, checkGlobalMembership: true);
             if (error is not null) throw new InvalidDataException(error);
             AtomicWrite(GuildPath(clone.GuildId), clone, create: true);
@@ -401,7 +610,7 @@ internal sealed class QuestStudioPortfolioStore
         lock (_gate)
         {
             RecoverPlacementTransactions();
-            return ValidateGuild(Clone(source), checkGlobalMembership: false);
+            return ValidateGuild(UpgradeGuild(Clone(source))!, checkGlobalMembership: false);
         }
     }
 
@@ -409,10 +618,10 @@ internal sealed class QuestStudioPortfolioStore
         new(value.ProjectId, guildId, container, line, value.Kind, value.ProgressionBandId, value.RewardPolicy);
 
     static StudioGuildSummary Summary(StudioGuildDocument guild) => new(
-        guild.GuildId, guild.Version, guild.Title, guild.Author, guild.ReleaseState, guild.Archived,
-        guild.Questlines.Count,
-        guild.StandaloneQuests.Count + guild.Questlines.Sum(value => value.Quests.Count),
-        guild.Events.Count,
+        guild.GuildId, guild.Version, guild.Title, guild.Steward, guild.ReleaseState, guild.Archived,
+        guild.Campaigns.Sum(value => value.Questlines.Count),
+        guild.Campaigns.Sum(value => value.StandaloneQuests.Count + value.Questlines.Sum(line => line.Quests.Count)),
+        guild.Campaigns.Sum(value => value.Events.Count),
         guild.UpdatedUtc);
 
     string? ValidatePortfolio(StudioPortfolioDocument value)
@@ -431,10 +640,12 @@ internal sealed class QuestStudioPortfolioStore
         if (!SemanticVersion.TryParse(value.Version, out _)) return "guild_version_invalid";
         if (string.IsNullOrWhiteSpace(value.Title) || value.Title.Length > 120) return "guild_title_invalid";
         if (value.Revision < 1) return "guild_revision_invalid";
-        if (value.Author?.Length > 120 || value.Description?.Length > 4000 || value.ProgressionScope?.Length > 1000) return "guild_field_bounds_invalid";
+        if (value.Steward?.Length > 120 || value.Description?.Length > 4000 || value.ProgressionScope?.Length > 1000) return "guild_field_bounds_invalid";
         if (value.ReleaseState is not ("draft" or "released" or "archived")) return "guild_release_state_invalid";
         if (value.Archived != (value.ReleaseState == "archived")) return "guild_archive_state_invalid";
         if (value.Compatibility is null || value.Provenance is null || value.ProgressionBands is null
+            || value.SourceSnapshots is null || value.SourceRulings is null || value.Abstractions is null
+            || value.Palette is null || value.Artifacts is null || value.Campaigns is null
             || value.Questlines is null || value.StandaloneQuests is null || value.Events is null)
             return "guild_structure_invalid";
         if (value.Compatibility.Count > 64 || value.ProgressionBands.Count > MaxBandsPerGuild || value.Questlines.Count > MaxQuestlinesPerGuild) return "guild_limit_exceeded";
@@ -445,14 +656,81 @@ internal sealed class QuestStudioPortfolioStore
             || value.Provenance.SourceGuildId is not null && !SafeId(value.Provenance.SourceGuildId)
             || value.Provenance.SourceVersion is not null && !SemanticVersion.TryParse(value.Provenance.SourceVersion, out _))
             return "guild_provenance_invalid";
+        if (value.SourceSnapshots.Count > 16 || value.SourceRulings.Count > 4096 || value.Abstractions.Count > 256
+            || value.Palette.Count > 128 || value.Artifacts.Count > MaxArtifactsPerGuild)
+            return "guild_creative_system_limit";
+        var snapshotIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var snapshot in value.SourceSnapshots)
+        {
+            if (snapshot is null || !SafeId(snapshot.SourceSnapshotId) || !snapshotIds.Add(snapshot.SourceSnapshotId)
+                || string.IsNullOrWhiteSpace(snapshot.Title) || snapshot.Title.Length > 120
+                || string.IsNullOrWhiteSpace(snapshot.Guild) || snapshot.Guild.Length > 120
+                || snapshot.Era < 1 || snapshot.SourceKind.Length > 80
+                || !Hash(snapshot.SnapshotHash) || !Hash(snapshot.CatalogSha256) || !Hash(snapshot.ProvenanceSha256) || !Hash(snapshot.AnomaliesSha256)
+                || StudioCreativeHash.Text(snapshot.CatalogJson) != snapshot.CatalogSha256
+                || StudioCreativeHash.Text(snapshot.ProvenanceJson) != snapshot.ProvenanceSha256
+                || StudioCreativeHash.Text(snapshot.AnomaliesText) != snapshot.AnomaliesSha256
+                || StudioCreativeHash.Parts(snapshot.CatalogJson, snapshot.ProvenanceJson, snapshot.AnomaliesText) != snapshot.SnapshotHash
+                || snapshot.EntryCount < 0 || snapshot.AnomalyCount < 0)
+                return "source_snapshot_invalid";
+        }
+        if (value.SourceRulings.Any(ruling => ruling is null || !snapshotIds.Contains(ruling.SourceSnapshotId)
+                || !SafeId(ruling.AnomalyKey) || ruling.Disposition is not ("acknowledged" or "accepted" or "rejected")
+                || ruling.Note?.Length > 2000))
+            return "source_ruling_invalid";
+        var abstractionKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var abstraction in value.Abstractions)
+        {
+            var key = abstraction?.AbstractionId + "@" + abstraction?.Revision;
+            if (abstraction is null || !SafeId(abstraction.AbstractionId) || abstraction.Revision < 1 || !abstractionKeys.Add(key)
+                || !Hash(abstraction.ContentHash) || !Hash(abstraction.CanonicalProjectHash) || !Hash(abstraction.InvariantHash)
+                || !snapshotIds.Contains(abstraction.SourceSnapshotId) || !Hash(abstraction.SourceSnapshotHash)
+                || abstraction.SourceQuestIds is null || abstraction.SourceQuestIds.Count is < 1 or > 64
+                || abstraction.SourceQuestIds.Any(id => !SafeId(id))
+                || abstraction.SourceQuestIds.Distinct(StringComparer.Ordinal).Count() != abstraction.SourceQuestIds.Count
+                || abstraction.TargetChoices is null || abstraction.TargetChoices.Count is < 1 or > 32
+                || abstraction.TargetChoices.Any(choice => choice is null || !SafeId(choice.Id) || string.IsNullOrWhiteSpace(choice.Label)
+                    || choice.Label.Length > 120 || string.IsNullOrWhiteSpace(choice.RuntimeTarget) || choice.RuntimeTarget.Length > 120
+                    || !abstraction.SourceQuestIds.Contains(choice.SourceQuestId, StringComparer.Ordinal))
+                || abstraction.TargetChoices.Select(choice => choice.Id).Distinct(StringComparer.Ordinal).Count() != abstraction.TargetChoices.Count
+                || abstraction.EvidencePolicy is not ("preserve_source" or "community" or "runtime" or "both")
+                || string.IsNullOrWhiteSpace(abstraction.CanonicalProjectJson)
+                || StudioCreativeHash.Text(abstraction.CanonicalProjectJson) != abstraction.CanonicalProjectHash
+                || !SafeId(abstraction.EntryNodeId) || !SafeId(abstraction.RouteId)
+                || abstraction.CompletionActionId is not null && !SafeId(abstraction.CompletionActionId))
+                return "abstraction_invalid";
+        }
+        foreach (var palette in value.Palette)
+            if (palette is null || !abstractionKeys.Contains(palette.AbstractionId + "@" + palette.Revision)
+                || !Hash(palette.ContentHash)
+                || value.Abstractions.Single(item => item.AbstractionId == palette.AbstractionId && item.Revision == palette.Revision).ContentHash != palette.ContentHash)
+                return "palette_reference_invalid";
+        if (value.Palette.Select(item => item.AbstractionId).Distinct(StringComparer.Ordinal).Count() != value.Palette.Count)
+            return "palette_duplicate";
+        if (value.Artifacts.Any(item => item is null || !SafeId(item.ProjectId) || item.Kind is not ("quest" or "event")
+                || item.Creator?.Length > 120 || item.AbstractionId is not null && !SafeId(item.AbstractionId)
+                || item.AbstractionRevision < 1))
+            return "guild_artifact_membership_invalid";
+        if (value.Artifacts.Select(item => item.ProjectId).Distinct(StringComparer.Ordinal).Count() != value.Artifacts.Count)
+            return "guild_artifact_membership_duplicate";
         var bands = new HashSet<string>(StringComparer.Ordinal);
         foreach (var band in value.ProgressionBands)
             if (band is null || !SafeId(band.Id) || !bands.Add(band.Id) || string.IsNullOrWhiteSpace(band.Title) || band.Title.Length > 120 || band.Description?.Length > 1000) return "progression_band_invalid";
-        var lines = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var line in value.Questlines)
+        if (value.Campaigns.Count is < 1 or > 64) return "campaign_limit_exceeded";
+        var campaignIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var campaign in value.Campaigns)
         {
-            if (line is null || !SafeId(line.Id) || !lines.Add(line.Id) || string.IsNullOrWhiteSpace(line.Title)
-                || line.Title.Length > 120 || line.Quests is null) return "questline_invalid";
+            if (campaign is null || !SafeId(campaign.CampaignId) || !campaignIds.Add(campaign.CampaignId)
+                || campaign.Revision < 1 || !SafeId(campaign.PackId) || !SemanticVersion.TryParse(campaign.Version, out _)
+                || string.IsNullOrWhiteSpace(campaign.Title) || campaign.Title.Length > 120 || campaign.Creator?.Length > 120
+                || campaign.Description?.Length > 4000 || campaign.ReleaseState is not ("draft" or "released" or "archived")
+                || campaign.Questlines is null || campaign.StandaloneQuests is null || campaign.Events is null
+                || campaign.Questlines.Count > MaxQuestlinesPerGuild)
+                return "campaign_invalid";
+            var lines = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var line in campaign.Questlines)
+                if (line is null || !SafeId(line.Id) || !lines.Add(line.Id) || string.IsNullOrWhiteSpace(line.Title)
+                    || line.Title.Length > 120 || line.Quests is null) return "questline_invalid";
         }
         var artifacts = Artifacts(value).ToArray();
         if (artifacts.Length > MaxArtifactsPerGuild) return "guild_artifact_limit";
@@ -473,7 +751,10 @@ internal sealed class QuestStudioPortfolioStore
         var dependencyState = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var projectId in projects.OrderBy(value => value, StringComparer.Ordinal))
             if (Visit(projectId)) return "guild_prerequisite_cycle";
-        if (value.Events.Any(item => item.Kind != "event") || value.StandaloneQuests.Any(item => item.Kind != "quest") || value.Questlines.Any(line => line.Quests.Any(item => item.Kind != "quest"))) return "guild_artifact_kind_invalid";
+        if (value.Campaigns.Any(campaign => campaign.Events.Any(item => item.Kind != "event")
+                || campaign.StandaloneQuests.Any(item => item.Kind != "quest")
+                || campaign.Questlines.Any(line => line.Quests.Any(item => item.Kind != "quest"))))
+            return "guild_artifact_kind_invalid";
         if (checkGlobalMembership)
         {
             var ownedElsewhere = Placements().Where(item => item.GuildId != value.GuildId).Select(item => item.ProjectId).ToHashSet(StringComparer.Ordinal);
@@ -492,13 +773,20 @@ internal sealed class QuestStudioPortfolioStore
     }
 
     static IEnumerable<StudioGuildArtifact> Artifacts(StudioGuildDocument guild) =>
-        guild.StandaloneQuests.Concat(guild.Events).Concat(guild.Questlines.SelectMany(value => value.Quests));
+        guild.Campaigns.SelectMany(campaign => campaign.StandaloneQuests.Concat(campaign.Events).Concat(campaign.Questlines.SelectMany(value => value.Quests)))
+            .GroupBy(value => value.ProjectId, StringComparer.Ordinal).Select(value => value.First());
 
     static void RemoveProject(StudioGuildDocument guild, string projectId)
     {
-        guild.StandaloneQuests.RemoveAll(value => value.ProjectId == projectId);
-        guild.Events.RemoveAll(value => value.ProjectId == projectId);
-        foreach (var line in guild.Questlines) line.Quests.RemoveAll(value => value.ProjectId == projectId);
+        foreach (var campaign in guild.Campaigns)
+        {
+            campaign.StandaloneQuests.RemoveAll(value => value.ProjectId == projectId);
+            campaign.Events.RemoveAll(value => value.ProjectId == projectId);
+            foreach (var line in campaign.Questlines) line.Quests.RemoveAll(value => value.ProjectId == projectId);
+            foreach (var artifact in campaign.StandaloneQuests.Concat(campaign.Events).Concat(campaign.Questlines.SelectMany(value => value.Quests)))
+                artifact.PrerequisiteProjectIds.RemoveAll(value => value == projectId);
+        }
+        guild.Artifacts.RemoveAll(value => value.ProjectId == projectId);
     }
 
     static void Advance(StudioGuildDocument guild)
@@ -506,6 +794,101 @@ internal sealed class QuestStudioPortfolioStore
         guild.Revision++;
         guild.UpdatedUtc = DateTimeOffset.UtcNow;
     }
+
+    StudioGuildDocument? UpgradeGuild(StudioGuildDocument? guild)
+    {
+        if (guild is null) return null;
+        if (guild.SchemaVersion is not (1 or StudioGuildDocument.CurrentSchemaVersion)) return guild;
+        var incomingSchema = guild.SchemaVersion;
+        guild.Steward = Bounded(string.IsNullOrWhiteSpace(guild.Steward) ? guild.Author : guild.Steward, Environment.UserName, 120);
+        guild.Author = guild.Steward;
+        guild.SourceSnapshots ??= new();
+        guild.SourceRulings ??= new();
+        guild.Abstractions ??= new();
+        guild.Palette ??= new();
+        guild.Artifacts ??= new();
+        guild.Campaigns ??= new();
+        guild.Questlines ??= new();
+        guild.StandaloneQuests ??= new();
+        guild.Events ??= new();
+        if (guild.Campaigns.Count == 0)
+        {
+            guild.Campaigns.Add(new StudioCampaignDocument
+            {
+                CampaignId = "campaign-default",
+                Revision = 1,
+                UpdatedUtc = guild.UpdatedUtc,
+                PackId = guild.GuildId,
+                Version = guild.Version,
+                Title = guild.Title,
+                Creator = guild.Steward,
+                ReleaseState = guild.ReleaseState,
+                Questlines = guild.Questlines,
+                StandaloneQuests = guild.StandaloneQuests,
+                Events = guild.Events,
+            });
+        }
+        else
+        {
+            var compatibility = DefaultCampaign(guild);
+            var legacyDiffers = LegacyJson(guild) != CampaignLegacyJson(compatibility);
+            if (incomingSchema == 1 || legacyDiffers)
+            {
+                compatibility.Questlines = guild.Questlines;
+                compatibility.StandaloneQuests = guild.StandaloneQuests;
+                compatibility.Events = guild.Events;
+            }
+        }
+        foreach (var campaign in guild.Campaigns)
+        {
+            campaign.Questlines ??= new();
+            campaign.StandaloneQuests ??= new();
+            campaign.Events ??= new();
+        }
+        if (guild.Artifacts.Count == 0)
+            guild.Artifacts = Artifacts(guild).Select(item => new StudioGuildArtifactMembership
+            {
+                ProjectId = item.ProjectId,
+                Kind = item.Kind,
+                Creator = guild.Steward,
+            }).ToList();
+        guild.SchemaVersion = StudioGuildDocument.CurrentSchemaVersion;
+        SyncLegacyAliases(guild);
+        return guild;
+    }
+
+    static StudioCampaignDocument DefaultCampaign(StudioGuildDocument guild)
+    {
+        var campaign = guild.Campaigns.FirstOrDefault(value => value.CampaignId == "campaign-default");
+        if (campaign is not null) return campaign;
+        campaign = guild.Campaigns.First();
+        return campaign;
+    }
+
+    static void SyncLegacyAliases(StudioGuildDocument guild)
+    {
+        var campaign = DefaultCampaign(guild);
+        guild.Questlines = campaign.Questlines;
+        guild.StandaloneQuests = campaign.StandaloneQuests;
+        guild.Events = campaign.Events;
+        guild.Author = guild.Steward;
+    }
+
+    string LegacyJson(StudioGuildDocument guild) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        guild.Questlines,
+        guild.StandaloneQuests,
+        guild.Events,
+    }, _host.Json);
+
+    string CampaignLegacyJson(StudioCampaignDocument campaign) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        Questlines = campaign.Questlines,
+        StandaloneQuests = campaign.StandaloneQuests,
+        Events = campaign.Events,
+    }, _host.Json);
+
+    static bool Hash(string? value) => value is { Length: 64 } && value.All(ch => char.IsAsciiHexDigit(ch));
 
     void RecoverPlacementTransactions()
     {
@@ -520,6 +903,8 @@ internal sealed class QuestStudioPortfolioStore
                     || transaction.TargetAfter is null || !SafeId(transaction.TargetAfter.GuildId)
                     || transaction.SourceAfter is not null && !SafeId(transaction.SourceAfter.GuildId))
                     throw new InvalidDataException("portfolio_transaction_unreadable");
+                transaction.TargetAfter = UpgradeGuild(transaction.TargetAfter)!;
+                transaction.SourceAfter = UpgradeGuild(transaction.SourceAfter);
                 if (ValidateGuild(transaction.TargetAfter, checkGlobalMembership: false) is not null
                     || transaction.SourceAfter is not null && ValidateGuild(transaction.SourceAfter, checkGlobalMembership: false) is not null)
                     throw new InvalidDataException("portfolio_transaction_invalid");

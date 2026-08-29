@@ -355,9 +355,17 @@ and exact install/world/profile restoration. The committed proof index is
 
 The four work items that entered this lane as `implemented` and unproven — portfolio, reset,
 guild runtime, and receipt retention — now carry their installed promotion evidence.
-`NFR-SEAT-003` is satisfied for the technical slice. The next lane is 4B, and the remaining seat
-request is limited to a prepared batch of authorship, composition, clarity, narrative,
-responsiveness, and play-feel judgments.
+`NFR-SEAT-003` is satisfied for the technical slice. The next lane is 4B. The steward,
+abstraction, two-instance, campaign, evidence-lens, and one-operation campaign-start surfaces are
+implemented and contract-tested. The campaign-start receipt covers exact certification,
+prepare/resume, arm, fixture preparation, publish, activation, bounded binding candidates, and
+atomic bind/start of the unique root; it stops at `started`. The simulated path now correlates the
+exact 17-object fixture, Deathsquito/Drake matcher targets, both instances, and the full applied
+binding under the prerequisite machine/world/session pins. Every campaign exposes progression,
+and compiled successor emission follows explicit prerequisite edges. Drive that choreography on
+the installed stack, then continue through kills, successor completion, terminal campaign
+evidence, reset/rerun, and cleanup/restoration before requesting player judgment or promoting the
+bridge.
 
 ---
 
@@ -367,7 +375,9 @@ Not to be pulled forward, and to be recorded with explicit `deferred` or `parked
 in the ledger so the next agent does not re-derive them:
 
 - versioned `.db` / `.fwl` world packaging, inspection, installation, rollback (Phase 5);
-- pattern notebooks, auto-generation, and other optional accelerators (4C);
+- generic pattern notebooks, auto-generation, registries, and other optional accelerators (4C);
+  the one typed Slayers Signature Hunt abstraction is the narrow active bridge, not a general
+  exception;
 - the parked Phase-3 combat-feel verdicts — batched, **and blocked pending re-derivation per
   audit B7**;
 - named anchors, unless and until an authored slice needs spatial references.
@@ -389,6 +399,11 @@ ruling, and all four were signed off on **2026-08-24**:
 The four reinforce each other. 4A no longer waits on launch automation, so it can concentrate
 on guild-scale runtime; 4B concentrates on sustained use; world-entry automation can later move
 into comfy-quest without becoming a 4A gate; and field-lab stays cleanly outside the boundary.
+
+An approved 2026-08-29 refinement keeps those lane ids and order intact while correcting 4B's
+product hierarchy: Guild is steward-owned configuration, palette, and progression; creators make
+artifacts and campaigns; players receive the result. Only `FR-OPT-001` and `FR-EVID-003` move
+forward as the Slayers Signature Hunt bridge. `FR-OPT-002` and generic reuse machinery remain 4C.
 
 Future changes to the meaning of a lane, the lane vocabulary, the human boundary, or a
 repository ownership boundary need the same sign-off, and widening ADR 0012 or 0014 requires

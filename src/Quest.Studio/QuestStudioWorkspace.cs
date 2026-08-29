@@ -1900,6 +1900,7 @@ public sealed class StudioProjectDocument
     public string Version { get; set; } = "1.0.0";
     public string ExperienceId { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
+    public StudioProjectDerivation? Derivation { get; set; }
     public string? BindingTargetKind { get; set; }
     public List<string> BindingTargetKinds { get; set; } = new();
     public string EntryNodeId { get; set; } = string.Empty;

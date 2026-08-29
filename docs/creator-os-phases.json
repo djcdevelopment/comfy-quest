@@ -146,10 +146,13 @@
     {
       "id": "4B",
       "slug": "sustained-creator-campaign",
-      "title": "Sustained creator campaign",
-      "question": "Can I actually use Creator OS to build a guild over time?",
+      "title": "Guild creative systems",
+      "question": "Can a steward configure a Guild that creators use to make distinct player experiences over time?",
       "state": "active",
       "in_scope": [
+        "steward-owned Guild configuration, bounded palette, and declared progression",
+        "one typed creative abstraction instantiated as two meaningfully distinct creator artifacts",
+        "one campaign carrying those artifacts through installed Valheim and correlated live evidence",
         "repeated author, validate, play, observe, rerun cycles",
         "accumulated evidence across many runs",
         "portfolio operation at real density",
@@ -157,20 +160,21 @@
       ],
       "out_of_scope": [
         "saved-world packaging",
-        "new capability that no authored need has demanded"
+        "new capability that no authored need has demanded",
+        "a generic abstraction framework, palette registry, or alternate Runtime artifact format"
       ],
-      "exit": "One top-to-bottom guild campaign covers every progression band the creator declares; every included quest and event has rehearsal evidence; every live-adapter claim the guild uses has a real run receipt; and multiple author-to-rerun cycles complete without using the seat as process control, input relay, screenshot courier, or machine observer.",
-      "failure_mode": "The architecture works once and degrades, or authoring it is intolerable.",
-      "requirements": ["FR-PORT-001", "FR-PORT-004", "FR-PORT-005", "FR-EVID-001", "FR-EVID-002", "NFR-OBS-001", "NFR-USE-001"]
+      "exit": "One Guild proves the steward -> typed abstraction -> two creator artifacts -> campaign -> installed-player evidence chain; the sustained campaign then covers every declared progression band, every included quest and event has rehearsal evidence, every live-adapter claim has a real run receipt, and multiple author-to-rerun cycles complete without using the seat as process control, input relay, screenshot courier, or machine observer.",
+      "failure_mode": "Guild remains a creator-owned pack, the abstraction produces only one disguised copy, or the architecture works once and degrades under sustained use.",
+      "requirements": ["FR-PORT-001", "FR-PORT-004", "FR-PORT-005", "FR-EVID-001", "FR-EVID-002", "FR-EVID-003", "FR-OPT-001", "NFR-OBS-001", "NFR-USE-001"]
     },
     {
       "id": "4C",
       "slug": "optional-acceleration",
-      "title": "Optional acceleration and generation",
+      "title": "Earned acceleration and generation",
       "question": "Which repetitions have earned tooling?",
       "state": "planned",
       "in_scope": [
-        "patterns promoted from structures the campaign actually repeated",
+        "generalization only from structures the Guild bridge and campaign actually repeated",
         "optional generation using the same contracts and validators",
         "contextual friction capture"
       ],
@@ -180,7 +184,7 @@
       ],
       "exit": "Multiple full author-to-rerun cycles complete without a seat turn for machine work; every accepted tooling change links back to an authored need and forward to rerun evidence; and the common loop stays coherent at hundredth-use density.",
       "failure_mode": "Tooling is built for imagined rather than observed need.",
-      "requirements": ["FR-OPT-001", "FR-OPT-002", "FR-EVID-003"]
+      "requirements": ["FR-OPT-002"]
     },
     {
       "id": "5",

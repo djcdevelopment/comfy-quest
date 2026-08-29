@@ -20,6 +20,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Game.Companion.Tests" />
     <InternalsVisibleTo Include="Quest.Studio.Tests" />
+    <!-- Visual-audit captures may contain copied obj trees beneath the project directory.
+         They are evidence, never source inputs. -->
+    <Compile Remove="artifacts/**/*.cs" />
   </ItemGroup>
   <ItemGroup>
     <!-- Cross-repo boundary (comfy-quest owns Comfy.Quest.Contracts): the compiled assembly only

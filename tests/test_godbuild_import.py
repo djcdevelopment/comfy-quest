@@ -74,6 +74,57 @@ class GodbuildImportTests(unittest.TestCase):
             self.assertIn("keys differ", result.stderr)
             self.assertFalse((root / "out").exists())
 
+    def test_scar_architectural_source_requires_canonical_derivative(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            value = fixture()
+            value["Name"] = "architectural-source"
+            value["Selection"] = "architectural-import-candidate"
+            value["PiecesSha256"] = "1" * 64
+            value["Pieces"][0]["X"] = -0.25
+            value["Pieces"][0]["Z"] = 2.0
+            second = json.loads(json.dumps(value["Pieces"][0]))
+            second.update({
+                "Prefab": "wood_beam", "X": 1.75, "Z": -1.0,
+                "Qy": 0.7071068, "Qw": 0.7071067,
+            })
+            value["Pieces"].append(second)
+            value["PieceCount"] = 2
+            source = root / "architectural.capture.json"
+            source.write_text(json.dumps(value), encoding="utf-8")
+
+            rejected = self.run_import(source, root / "rejected")
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn("Selection must be 'mine' or 'lab'", rejected.stderr)
+            self.assertFalse((root / "rejected").exists())
+
+            derived = self.run_import(
+                source, root / "derived",
+                "--derive-architectural-name", "architectural-live",
+                "--derive-yaw-degrees", "90",
+            )
+            self.assertEqual(0, derived.returncode, derived.stderr)
+            folder = root / "derived" / "architectural-live"
+            capture = folder / "architectural-live.capture.json"
+            artifact = json.loads(capture.read_text(encoding="utf-8"))
+            self.assertEqual("lab", artifact["Selection"])
+            self.assertEqual(2, artifact["PieceCount"])
+            self.assertTrue(all(piece[axis] >= 0 for piece in artifact["Pieces"]
+                                for axis in ("X", "Y", "Z")))
+            half_turn = next(piece for piece in artifact["Pieces"]
+                             if piece["Prefab"] == "wood_beam")
+            self.assertEqual((0.0, 1.0, 0.0, 0.0), tuple(
+                half_turn[key] for key in ("Qx", "Qy", "Qz", "Qw")
+            ))
+            checked = self.run_import(capture, root / "derived", "--check")
+            self.assertEqual(0, checked.returncode, checked.stderr)
+
+            regenerated = self.run_import(capture, root / "regenerated")
+            self.assertEqual(0, regenerated.returncode, regenerated.stderr)
+            fresh = root / "regenerated" / "architectural-live"
+            for name in ("architectural-live.capture.json", "architectural-live.blueprint"):
+                self.assertEqual((folder / name).read_bytes(), (fresh / name).read_bytes())
+
 
 if __name__ == "__main__":
     unittest.main()

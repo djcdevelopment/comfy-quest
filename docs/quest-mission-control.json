@@ -290,9 +290,9 @@
     {
       "id": "phase-4",
       "number": 4,
-      "title": "Dogfood creator portfolio",
+      "title": "Guild creative systems",
       "state": "active",
-      "summary": "The autonomous installed guild slice closed 4A. Mechanics and integration now iterate on the ready, on-demand ComfyQuestDemo fast lane; only immutable content/package bytes that pass there advance to a separately pinned ERA17 acceptance/scale lap. ERA17 retains its durable Charm, five-stage opening, and pilgrim-choice progress for a later batched human judgment. Generalized portal support and world packaging remain deferred.",
+      "summary": "The autonomous installed guild slice closed 4A. In 4B, Studio now implements and contract-tests the Slayers steward -> typed abstraction -> two creator instances -> campaign hierarchy plus one operation that prepares or resumes the pinned world, arms Runtime, prepares the fixed fixture, publishes exact bytes, verifies activation, and binds/starts the unique root. Its receipt stops at `started`; no installed kill, successor, terminal campaign, reset/rerun, or cleanup/restoration evidence exists yet. Generic abstraction machinery, generation, and world packaging remain deferred.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "The adoption gate is not another generated tutorial"
     },
@@ -326,14 +326,14 @@
     },
     "revision_flow": {
       "id": "creator-os-product-loop",
-      "title": "Move one guild idea through the whole product",
-      "summary": "World and Studio authoring share one guild, quest, revision, world, and run context. Observe, reset, and rerun close the loop before release instead of consuming a new manual setup lap.",
+      "title": "Move one Guild abstraction through the whole product",
+      "summary": "Steward configuration, two creator instances, their campaign, and the installed player run share one Guild, abstraction, artifact, revision, world, and run context. One-operation start choreography is implemented through exact activation and bind/start; the next lap must execute it in installed Valheim and continue through both hunts, successor completion, terminal evidence, reset/rerun, and cleanup/restoration.",
       "source": "docs/creator-os.md",
-      "source_sequence": "Imagine -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release",
+      "source_sequence": "Steward configures -> Creator instantiates -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release",
       "source_contains": "The broader dogfood order is",
       "edit_source": "docs/creator-portfolio-requirements.md",
-      "edit_source_contains": "### 4A — Dogfood foundation",
-      "suggested_edit": "First drive a real multi-experience guild through Studio publication, Runtime selection, exact reset/rerun, process restart, and installed-Valheim receipts. Add named anchors only when the authored slice needs them; do not gate R&D on world packaging."
+      "edit_source_contains": "### 4B — Guild creative-system bridge",
+      "suggested_edit": "Execute the implemented and identity-correlated Slayers Signature Hunt campaign-start operation on installed Valheim, then continue from its explicit `started` receipt through both hunts, successor completion, terminal evidence, reset/rerun, and cleanup/restoration. Record every still-absent edge as absent; do not generalize the first slice into a framework."
     },
     "expectations": "docs/creator-os-expected.json"
   },
@@ -475,7 +475,7 @@
     },
     {
       "id": "queue.guild-campaign",
-      "state": "human",
+      "state": "implemented",
       "lane": "4B",
       "requirements": [
         "FR-PORT-001",
@@ -483,12 +483,14 @@
         "FR-PORT-005",
         "FR-EVID-001",
         "FR-EVID-002",
+        "FR-EVID-003",
+        "FR-OPT-001",
         "NFR-USE-001"
       ],
-      "title": "Dogfood the first top-to-bottom guild",
-      "detail": "The Name in Ash remains a rehearsed five-stage opening, and ERA17 retains Derek's run at pilgrim-choice for a later Resin-or-Stone, recurring-stall, and play-feel verdict. Session r13 is closed rather than consuming a 1.30 GB acceptance world for routine iteration. Retained AM4 session quest-am4-fastlane-20260828-r1 is the ready machine-only mechanics surface on ComfyQuestDemo / questyfour and has executed fixture replay, bind, initial start, reset successor start, provider build/no-op retry, clear recovery, exact-final-DLL cold-load proof, and clean shutdown against guild 0.1.3. OMEN is released; a mechanics change returns there and to ERA17 only after the Demo journey is green and the remaining question depends on topology, scale, spatial pacing, authored choice, or human perception.",
+      "title": "Prove Slayers Signature Hunt as a Guild creative system",
+      "detail": "The steward source/configuration, typed Signature Hunt abstraction, revision-pinned palette, two creator instances, campaign placement, evidence lens, every-campaign progression editing, and one-operation campaign-start choreography are implemented and contract-tested. For the exact two-instance shape, one Play call freezes bytes, prepares or resumes the pinned Creator Session, arms Runtime, prepares the fixed fixture, publishes and verifies exact activation, finds the fixture-owned sign, and atomically binds/starts the unique root. Before its stored receipt ends at `started`, the simulated path verifies the exact fixture request and 17/17-object receipt hash/path, correlates raw Deathsquito/Drake and matcher targets to exactly both compiled instances, carries prerequisite machine/world/session pins through candidate and bind dispatch, requires the entry's explicit successor to be the other experience, and validates the full applied binding reference. Successor emission follows explicit prerequisite edges. These are implementation and simulated-contract facts, not installed kill or campaign-completion proof. The next edge is the installed lap through both hunts, automatic successor continuation, terminal campaign evidence, reset/rerun, and owned cleanup/restoration. No such Signature Hunt live proof exists yet. Keep triggerless/manual source rows lossless and do not build a generic framework, notebook, generator, rank engine, Discord workflow, or world package.",
       "source": "docs/creator-portfolio-requirements.md",
-      "source_contains": "### 4B — Guild campaign"
+      "source_contains": "### 4B — Guild creative-system bridge"
     },
     {
       "id": "queue.world-bundle",
@@ -574,11 +576,11 @@
     },
     {
       "id": "decision.dogfood",
-      "title": "Adoption path",
-      "question": "Do notebook patterns or auto-generation come before guild authoring?",
-      "recommendation": "No. Integrate guild-scale Runtime and creator-event flow, then let real guild authoring earn anchors, palette, patterns, generation, and other tooling from observed need.",
+      "title": "Guild ownership hierarchy",
+      "question": "Who configures a Guild, who creates with it, and what proves the first abstraction?",
+      "recommendation": "A community steward owns Guild configuration, palette, and progression; creators instantiate its abstractions into artifacts and campaigns; players receive the resulting experiences. Prove that hierarchy first with one typed Slayers Signature Hunt abstraction, two distinct creator instances, one campaign, and live evidence — not a generic framework.",
       "source": "docs/creator-portfolio-requirements.md",
-      "source_contains": "They are not substitutes for the authored source"
+      "source_contains": "A **Guild** is a steward-owned creative system"
     },
     {
       "id": "decision.distribution",
@@ -702,6 +704,7 @@
     "A screenshot or checkbox is orientation, not machine proof. Preserve request receipts, identity pins, capture hashes, and MATCH.",
     "Close -Restore restores prior install bytes plus quarantined one-shot world-entry request/status state and retains authored world state. After Stop, a disposable technical lap may add -RestoreGameState to restore the exact pinned world pair and character profile; this bounded rollback is not saved-world packaging.",
     "The installed 4A journey is proven and its mechanical defects were fixed and rerun before the seat. Do not reopen deployment, lifecycle, binding, reset, retention, or recovery as human steps; a 4B seat turn is for authored choices and perception only.",
+    "A simulated `comfy-quest-studio-campaign-play/v1` receipt in state `started` can close the declared fixture, target, instance, machine/world/session, successor, and applied-binding identity chain through bind/start. Fixture preparation is still not kill proof, bind/start is still not successor completion or campaign-completion proof, and the installed 4B lap remains open.",
     "Receipts are authority, not logs. Retention archives rather than deletes, and the archive bound writes a `receipt_archive_evicted` receipt when it destroys anything — so a gap in a correlated proof set is a fact you can read, never something to infer from absence."
   ]
 }

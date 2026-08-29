@@ -44,6 +44,7 @@
     <Compile Include="..\ComfyQuestLab\Core\LabQuestAdvisor.cs" Link="LabQuestAdvisor.cs" />
     <Compile Include="..\ComfyQuestLab\Core\LabQuestSeed.cs" Link="LabQuestSeed.cs" />
     <Compile Include="..\ComfyQuestLab\Core\LabCreatureNaming.cs" Link="LabCreatureNaming.cs" />
+    <Compile Include="..\ComfyQuestLab\Core\LabSignatureHuntContract.cs" Link="LabSignatureHuntContract.cs" />
     <Compile Include="..\ComfyQuestLab\Core\LabActionDedupe.cs" Link="LabActionDedupe.cs" />
     <Compile Include="..\ComfyQuestLab\Core\LabBatchContract.cs" Link="LabBatchContract.cs" />
     <Compile Include="..\ComfyQuestLab\Core\LabGalleryOriginContract.cs" Link="LabGalleryOriginContract.cs" />

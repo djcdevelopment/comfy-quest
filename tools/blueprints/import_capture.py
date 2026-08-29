@@ -132,6 +132,124 @@ def pieces_hash(pieces: list[dict]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def rounded(value: object, digits: int) -> float:
+    result = float(number(value, digits))
+    return 0.0 if result == 0 else result
+
+
+def canonical_quaternion(piece: dict) -> None:
+    values = [float(piece[key]) for key in ("Qx", "Qy", "Qz", "Qw")]
+    norm = math.sqrt(sum(value * value for value in values))
+    if norm < 0.000001:
+        values = [0.0, 0.0, 0.0, 1.0]
+    else:
+        values = [value / norm for value in values]
+    values = [rounded(value, 6) for value in values]
+    qx, qy, qz, qw = values
+    if qw < 0 or (qw == 0 and (qz < 0 or (qz == 0 and (qy < 0 or (qy == 0 and qx < 0))))):
+        values = [rounded(-value, 6) for value in values]
+    for key, value in zip(("Qx", "Qy", "Qz", "Qw"), values):
+        piece[key] = value
+
+
+def normalize_and_sort(pieces: list[dict]) -> list[dict]:
+    canonical = [dict(piece) for piece in pieces]
+    minima = {axis: min(float(piece[axis]) for piece in canonical) for axis in ("X", "Y", "Z")}
+    for piece in canonical:
+        for axis in ("X", "Y", "Z"):
+            piece[axis] = rounded(float(piece[axis]) - minima[axis], 4)
+        canonical_quaternion(piece)
+        piece["Category"] = piece["Category"] or "Building"
+        for key in ("SignText", "ItemPrefab", "RuneSchool", "RuneStyle", "TextGlowSchool"):
+            piece[key] = piece[key] or ""
+    canonical.sort(key=signature)
+    return canonical
+
+
+def validate_architectural_source(value: object) -> dict:
+    """Validate the deliberately non-importable architectural handoff envelope."""
+    if not isinstance(value, dict):
+        raise CaptureError("architectural source must be a JSON object")
+    exact_keys(value, TOP_KEYS, "architectural source")
+    if value["Schema"] != CAPTURE_SCHEMA:
+        raise CaptureError(f"unsupported capture schema: {value['Schema']!r}")
+    if not isinstance(value["Name"], str) or not SAFE_NAME.fullmatch(value["Name"]):
+        raise CaptureError("Name must use 1-64 lowercase letters, digits, '-' or '_'")
+    if value["Selection"] != "architectural-import-candidate":
+        raise CaptureError("architectural derivation requires Selection='architectural-import-candidate'")
+    radius = finite_number(value["RadiusMetres"], "RadiusMetres")
+    if not 1 <= radius <= 40:
+        raise CaptureError("RadiusMetres must be in 1..40")
+    pieces = value["Pieces"]
+    if not isinstance(pieces, list) or not 1 <= len(pieces) <= MAX_PIECES:
+        raise CaptureError(f"Pieces must contain 1..{MAX_PIECES} records")
+    if value["PieceCount"] != len(pieces):
+        raise CaptureError("PieceCount does not match Pieces")
+    if not isinstance(value["PiecesSha256"], str) or not re.fullmatch(
+        r"[0-9a-fA-F]{64}", value["PiecesSha256"]
+    ):
+        raise CaptureError("architectural PiecesSha256 must be a SHA-256 provenance token")
+    for index, piece in enumerate(pieces):
+        if not isinstance(piece, dict):
+            raise CaptureError(f"piece {index} must be an object")
+        exact_keys(piece, PIECE_KEYS, f"piece {index}")
+        safe_token(piece["Prefab"], 128, f"piece {index} Prefab")
+        safe_token(piece["Category"], 64, f"piece {index} Category")
+        for key in ("ItemPrefab", "RuneSchool", "RuneStyle", "TextGlowSchool"):
+            safe_token(piece[key], 128 if key == "ItemPrefab" else 32, f"piece {index} {key}", True)
+        if not isinstance(piece["SignText"], str) or len(piece["SignText"]) > 1024:
+            raise CaptureError(f"piece {index} SignText is invalid")
+        if not isinstance(piece["HasSignText"], bool) or not isinstance(piece["HasItemStand"], bool):
+            raise CaptureError(f"piece {index} metadata flags must be boolean")
+        if not piece["HasItemStand"] and piece["ItemPrefab"]:
+            raise CaptureError(f"piece {index} has an item without HasItemStand")
+        bounded_int(piece["ItemVariant"], 0, 255, f"piece {index} ItemVariant")
+        bounded_int(piece["ItemQuality"], 0, 100, f"piece {index} ItemQuality")
+        bounded_int(piece["ItemType"], 0, 255, f"piece {index} ItemType")
+        for key in ("X", "Y", "Z", "Qx", "Qy", "Qz", "Qw"):
+            finite_number(piece[key], f"piece {index} {key}")
+        norm = sum(float(piece[key]) ** 2 for key in ("Qx", "Qy", "Qz", "Qw"))
+        if not 0.90 <= norm <= 1.10:
+            raise CaptureError(f"piece {index} has a non-unit rotation")
+    return value
+
+
+def derive_architectural_capture(value: object, name: str, yaw_degrees: float) -> dict:
+    source = validate_architectural_source(value)
+    if not SAFE_NAME.fullmatch(name or ""):
+        raise CaptureError("derived Name must use 1-64 lowercase letters, digits, '-' or '_'")
+    if name == source["Name"]:
+        raise CaptureError("derived Name must differ from the immutable architectural source")
+    if not math.isfinite(yaw_degrees) or abs(yaw_degrees) > 3600:
+        raise CaptureError("derived yaw must be finite and within +/-3600 degrees")
+    angle = math.radians(yaw_degrees)
+    sine, cosine = math.sin(angle), math.cos(angle)
+    half_sine, half_cosine = math.sin(angle / 2), math.cos(angle / 2)
+    rotated = []
+    for source_piece in source["Pieces"]:
+        piece = dict(source_piece)
+        x, z = float(piece["X"]), float(piece["Z"])
+        piece["X"] = cosine * x + sine * z
+        piece["Z"] = -sine * x + cosine * z
+        qx, qy, qz, qw = (float(piece[key]) for key in ("Qx", "Qy", "Qz", "Qw"))
+        piece["Qx"] = half_cosine * qx + half_sine * qz
+        piece["Qy"] = half_cosine * qy + half_sine * qw
+        piece["Qz"] = half_cosine * qz - half_sine * qx
+        piece["Qw"] = half_cosine * qw - half_sine * qy
+        rotated.append(piece)
+    pieces = normalize_and_sort(rotated)
+    derived = {
+        "Schema": CAPTURE_SCHEMA,
+        "Name": name,
+        "Selection": "lab",
+        "RadiusMetres": source["RadiusMetres"],
+        "PieceCount": len(pieces),
+        "PiecesSha256": pieces_hash(pieces),
+        "Pieces": pieces,
+    }
+    return validate_capture(derived)
+
+
 def validate_capture(value: object) -> dict:
     if not isinstance(value, dict):
         raise CaptureError("capture must be a JSON object")
@@ -352,6 +470,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("capture", type=Path, help="Lab *.capture.json artifact")
     parser.add_argument("--output-root", type=Path, default=repository_root() / "examples" / "worldbuild")
     parser.add_argument("--check", action="store_true", help="fail if generated artifacts differ")
+    parser.add_argument(
+        "--derive-architectural-name",
+        help="explicitly derive a canonical Lab pair from an architectural-import-candidate",
+    )
+    parser.add_argument(
+        "--derive-yaw-degrees", type=float, default=0.0,
+        help="rigid Unity-Y rotation applied only with --derive-architectural-name",
+    )
     return parser.parse_args(argv)
 
 
@@ -363,10 +489,23 @@ def main(argv: list[str] | None = None) -> int:
         raw = args.capture.read_bytes()
         if len(raw) > 4 * 1024 * 1024:
             raise CaptureError("capture exceeds 4 MiB")
-        capture = validate_capture(json.loads(raw.decode("utf-8-sig")))
+        value = json.loads(raw.decode("utf-8-sig"))
+        if args.derive_architectural_name:
+            capture = derive_architectural_capture(
+                value, args.derive_architectural_name, args.derive_yaw_degrees
+            )
+        else:
+            if args.derive_yaw_degrees:
+                raise CaptureError(
+                    "--derive-yaw-degrees requires --derive-architectural-name"
+                )
+            capture = validate_capture(value)
         folder = args.output_root.resolve() / capture["Name"]
         write_or_check(folder, output_files(capture), args.check)
-        print(f"{'checked' if args.check else 'imported'} {capture['Name']} · {capture['PieceCount']} pieces · {capture['PiecesSha256']}")
+        verb = "checked" if args.check else (
+            "derived" if args.derive_architectural_name else "imported"
+        )
+        print(f"{verb} {capture['Name']} · {capture['PieceCount']} pieces · {capture['PiecesSha256']}")
         return 0
     except (OSError, UnicodeError, json.JSONDecodeError, CaptureError) as error:
         print(f"capture import rejected: {error}", file=sys.stderr)

@@ -161,7 +161,7 @@ public class LabBatchContractTests {
 
   [Fact]
   public void RemotePolicyIsAClosedAllowlistWithNoConsoleOrKeystrokeLane() {
-    Assert.Equal(18, LabBatchRequestPolicy.Operations.Length);
+    Assert.Equal(21, LabBatchRequestPolicy.Operations.Length);
     Assert.True(LabBatchRequestPolicy.Validate(
         "prepare", "all-schools", null, null, null, out string _));
     Assert.True(LabBatchRequestPolicy.Validate(

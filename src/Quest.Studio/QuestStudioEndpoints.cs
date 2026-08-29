@@ -16,6 +16,7 @@ namespace Comfy.Quest.Studio;
 public static class QuestStudioEndpoints
 {
     const long MaxImportRequestBytes = 1024 * 1024 + 1024;
+    const long MaxSourceImportRequestBytes = 10L * 1024 * 1024;
 
     public static void Map(WebApplication app, IQuestStudioHost host)
     {
@@ -127,6 +128,108 @@ public static class QuestStudioEndpoints
                 : result.Conflict ? StatusCodes.Status409Conflict
                 : result.Error == "guild_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
         });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/sources/import", (string guildId, HttpRequest request, HttpResponse response, StudioSourceImportRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.ImportSource(guildId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status201Created
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error == "guild_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        }).WithMetadata(new RequestSizeLimitAttribute(MaxSourceImportRequestBytes));
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/abstractions/promote", (string guildId, HttpRequest request, HttpResponse response, StudioAbstractionPromoteRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.PromoteAbstraction(guildId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status201Created
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error == "guild_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/abstractions/{abstractionId}/revisions", (string guildId, string abstractionId, HttpRequest request, HttpResponse response, StudioAbstractionReviseRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.ReviseAbstraction(guildId, abstractionId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status201Created
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error is "guild_missing" or "abstraction_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/abstractions/{abstractionId}/instantiate", (string guildId, string abstractionId, HttpRequest request, HttpResponse response, StudioAbstractionInstantiateRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.InstantiateAbstraction(guildId, abstractionId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status201Created
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error is "guild_missing" or "abstraction_revision_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/campaigns", (string guildId, HttpRequest request, HttpResponse response, StudioCampaignCreateRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.CreateCampaign(guildId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status201Created
+                : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+        });
+        app.MapGet("/api/v2/quest-studio/guilds/{guildId}/campaigns/{campaignId}", (string guildId, string campaignId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var campaign = studio.ReadCampaign(guildId, campaignId);
+            return campaign is null ? Results.NotFound() : Results.Json(campaign, host.Json);
+        });
+        app.MapPut("/api/v2/quest-studio/guilds/{guildId}/campaigns/{campaignId}", (string guildId, string campaignId, HttpRequest request, HttpResponse response, StudioCampaignSaveRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.SaveCampaign(guildId, campaignId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error is "guild_missing" or "campaign_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/campaigns/{campaignId}/place", (string guildId, string campaignId, HttpRequest request, HttpResponse response, StudioCampaignPlacementRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.PlaceInCampaign(guildId, campaignId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error is "guild_missing" or "campaign_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/campaigns/{campaignId}/certify", (string guildId, string campaignId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.CertifyCampaign(guildId, campaignId);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Error is "guild_missing" or "campaign_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/campaigns/{campaignId}/publish", async (string guildId, string campaignId, HttpRequest request, HttpResponse response, StudioCampaignPublishRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.PublishCampaignAsync(guildId, campaignId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error is "guild_missing" or "campaign_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/guilds/{guildId}/campaigns/{campaignId}/play", async (string guildId, string campaignId, HttpRequest request, HttpResponse response, StudioCampaignPublishRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.PlayCampaignAsync(guildId, campaignId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error is "guild_missing" or "campaign_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        });
+        app.MapGet("/api/v2/quest-studio/guilds/{guildId}/campaigns/{campaignId}/evidence", (string guildId, string campaignId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var evidence = studio.CampaignEvidence(guildId, campaignId);
+            return evidence is null ? Results.NotFound() : Results.Json(evidence, host.Json);
+        });
         app.MapGet("/api/v2/quest-studio/projects", (HttpRequest request, HttpResponse response, QuestStudioService studio) =>
         {
             NoStore(response);
@@ -159,6 +262,14 @@ public static class QuestStudioEndpoints
             NoStore(response);
             if (!host.Authorize(request)) return Forbidden(host);
             var result = studio.SaveDraft(projectId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/detach", (string projectId, HttpRequest request, HttpResponse response, StudioProjectDetachRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.DetachProject(projectId, body);
             return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
                 : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
         });

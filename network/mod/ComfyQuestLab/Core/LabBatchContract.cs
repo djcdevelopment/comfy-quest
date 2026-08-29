@@ -232,6 +232,9 @@ public static class LabBatchContract {
 public static class LabBatchRequestPolicy {
   public static readonly string[] Operations = {
     "prepare", "run", "reset", "report", "export",
+    LabSignatureHuntContract.PrepareOperation,
+    LabSignatureHuntContract.StatusOperation,
+    LabSignatureHuntContract.ClearOperation,
     "gallery_build", "gallery_compare", "gallery_identify", "gallery_evidence",
     "gallery_clear", "gallery_rebuild",
     "blueprint_capture", "blueprint_inspect", "blueprint_diff", "blueprint_check",
@@ -247,6 +250,10 @@ public static class LabBatchRequestPolicy {
       out string error) {
     error = string.Empty;
     operation = (operation ?? string.Empty).Trim().ToLowerInvariant();
+    if (LabSignatureHuntContract.IsOperation(operation)) {
+      return LabSignatureHuntContract.ValidateRequest(
+          operation, suite, profile, compareProfile, selector, out error);
+    }
     if (operation == "prepare" || operation == "run") {
       if (LabBatchContract.FindSuite(suite) == null) {
         error = "suite_not_allowlisted";

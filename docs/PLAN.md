@@ -1,6 +1,6 @@
 # The plan
 
-Quest Creator OS. Updated 2026-08-28.
+Quest Creator OS. Updated 2026-08-29.
 
 **This is the plan of record.** Read it alone and you know the goal, where we are, and what
 happens next. Everything else in `docs/` is detail this document points at; if this document and
@@ -10,8 +10,9 @@ a cited surface disagree, the surface wins and this document is stale.
 
 ## 1. What we are building, and why
 
-A creator system for authoring Valheim quests and guilds — where a person composes small,
-unimpressive primitives into something nobody designed for them.
+A creator ecosystem for Valheim: Derek builds community-level configuration tools, a
+community steward uses them to define a Guild's bounded creative language and progression,
+creators turn that language into artifacts and campaigns, and players live inside the result.
 
 > Say, drop, pickup, wait are individually unimpressive. `Say → within 10s Drop ×2 → Pickup →
 > Equip → Consume → Heal` is an authored ritual. The ecosystem effect is people combining
@@ -69,7 +70,7 @@ Four questions. Each is a lane; each fails one specific way. Cite a lane as
 | Lane | The question | Fails if |
 | --- | --- | --- |
 | **4A** guild-scale-runtime | Can Creator OS operate a guild? | The architecture cannot express or execute a guild |
-| **4B** sustained-creator-campaign | Can I actually use it to build a guild over time? | It works once and degrades, or authoring it is intolerable |
+| **4B** sustained-creator-campaign | Can a steward configure a Guild that creators use to make distinct player experiences over time? | Guild remains a creator-owned pack, the abstraction yields one disguised copy, or sustained use degrades |
 | **4C** optional-acceleration | Which repetitions have earned tooling? | Tooling is built for imagined rather than observed need |
 | **5** distribution-release | Can someone else receive, inspect, and run what was built? | The work is only runnable on the machine that made it |
 
@@ -111,9 +112,21 @@ also exposed an order-dependent atomic heartbeat read at reset/restore. Studio n
 bounded filesystem replacement window while stale, invalid, corrupt, or exhausted status still
 fails before mailbox dispatch; both journeys pass together.
 
+That evidence proves the creator-to-Runtime loop, not the corrected product hierarchy. The next
+slice is **Slayers Signature Hunt**: a community steward owns Guild configuration, palette, and
+progression; a creator must make two meaningfully distinct hunt artifacts from one typed
+abstraction and arrange them in a campaign; the installed player run must then produce
+correlated live evidence.
+The steward/configuration, typed-abstraction, two-instance, campaign, evidence-lens, and
+one-operation campaign-start surfaces are now implemented and contract-tested. They have not
+been driven through installed Valheim. None of that Signature Hunt live proof exists yet. This
+is the narrow 4B -> 4C bridge, not authorization for a generic abstraction framework.
+
 | What | State | What is actually missing |
 | --- | --- | --- |
-| Portfolio hierarchy | complete for the 4A journey | sustained human authorship at real density in 4B |
+| Portfolio hierarchy | complete for the 4A creator-owned Guild journey | installed proof of the newer steward configuration, abstraction lineage, creator artifacts, and campaign children |
+| Guild creative-system control plane | implemented and contract-tested | installed execution of the steward -> abstraction -> two instances -> campaign lineage |
+| One-operation Signature Hunt start | implemented and simulated with fixture/target and machine/world/session identity closed through the full applied binding | installed kills, successor transition, campaign completion, reset/rerun, and cleanup/restoration evidence |
 | Scoped reset / rerun | installed-proven, including successor start and idempotent confirmation retry | human clarity and hundredth-use judgment in 4B |
 | Guild-scale runtime selector | installed-proven | real authored campaign breadth in 4B |
 | Receipt retention | installed-proven across its per-run bound | sustained campaign volume in 4B |
@@ -178,7 +191,7 @@ defined under 4A in `creator-os-phases.json` and projected here:
 - **Result:** 4A / guild-scale-runtime is complete. The technical lap used generated A/B content,
   so it deliberately does not claim human acceptance of authorship or play feel.
 
-### Step 2 — In progress: machine-lock the first 4B campaign before the next sitting
+### Step 2 — Retained precursor: machine-lock the first creator-authored campaign
 
 The 4A lap is technical integration evidence; it does not manufacture Derek's creative answer.
 The first 4B sitting has already supplied more than the old plan recorded: Derek selected premise
@@ -217,19 +230,52 @@ and the world-support correction in
 The AM4 mechanics lock is recorded separately because immutable content may move between worlds,
 but binding, run, receipt, and saved-world state may not be equated across them.
 
-### Step 3 — 4B, the sustained campaign `queue.guild-campaign`
+### Step 3 — Implemented, awaiting installed lap: the 4B Guild creative-system bridge `queue.guild-campaign`
 
-Author a top-to-bottom guild for real. This is where the portfolio is tested at density and where
-friction gets recorded in context rather than remembered.
+Build **Slayers Signature Hunt** through one full visible edge:
+
+1. a community steward configures one typed Signature Hunt abstraction and Guild progression;
+2. a creator makes two meaningfully distinct hunt artifacts from it;
+3. the creator arranges both in one campaign; and
+4. the campaign crosses Studio, Runtime, installed Valheim, and correlated live evidence.
+
+Preserve triggerless and manual Slayers source rows without inventing completion behavior. Record
+the abstraction, both instances, campaign, missing evidence, tooling changes, and eventual rerun
+result in one context. Stop at this typed slice: no generic schema framework, pattern registry,
+notebook, generator, rank engine, Discord workflow, or world package.
+
+The implementation now connects those authoring surfaces to one bounded **Play campaign**
+operation for the exact two-instance Signature Hunt shape. It validates and freezes campaign
+bytes before mutation, requires one unambiguous prerequisite root, prepares or resumes the pinned
+Creator Session, enters ComfyQuestDemo, arms Runtime, obtains a `fixture-preparation` receipt for
+the fixed Quest Lab hunt, publishes and verifies the exact activation, finds the fixture-owned
+sign in Runtime's bounded candidates, and atomically binds and starts the first experience. The
+stored `comfy-quest-studio-campaign-play/v1` receipt stops at state `started` and declares that
+fixture preparation is not kill/completion proof and bind/start is not campaign-completion proof.
+
+The simulated path now closes its declared identity chain before that `started` claim. It verifies
+the exact fixture request, schema, id, revision, world, 17/17-object receipt hash/path, raw
+Deathsquito/Drake targets, and matcher targets against the two compiled instances; preserves the
+prerequisite machine, world, and Creator Session pins through candidate and bind dispatch; requires
+the compiled entry's explicit successor to be the other experience; and checks the full applied
+binding reference. Campaign progression is editable on every campaign, and successor emission
+follows explicit prerequisite edges. Those are implemented and simulated contract facts, not
+installed evidence.
+
+The next R&D move is to drive this exact operation against the installed stack and retain the real
+receipt chain through both hunts, automatic successor continuation, terminal campaign evidence,
+reset/rerun, and owned cleanup/restoration. Until then, `queue.guild-campaign` is `implemented`,
+not complete.
 
 - **Claims:** `FR-PORT-001`, `FR-PORT-004`, `FR-PORT-005`, `FR-EVID-001`, `FR-EVID-002`,
-  `NFR-USE-001`
+  `FR-EVID-003`, `FR-OPT-001`, `NFR-USE-001`
 
 ### Then, and not before
 
-**4C** promotes tooling only for repetitions the campaign actually produced. **5** is release and
-distribution. Both are explicitly out of scope until 4A and 4B have happened, because both are
-the kind of work that feels productive while proving nothing.
+**4C** may generalize only what the two Signature Hunt instances and later campaign work actually
+repeat; `FR-OPT-002` generation remains there. **5** is release and distribution. Generic reuse
+machinery and distribution are explicitly out of scope until the connected slice produces live
+evidence, because both are the kind of work that feels productive while proving nothing.
 
 ## 5. What needs Derek, and nothing else can
 
@@ -250,10 +296,10 @@ the obvious lane — the ledger is built so it cannot.
 | `FR-WORLD-001/002` | Whether the authored slice needs spatial references at all |
 | `NFR-TEST-002` | Whether evidence-over-counts earns an executable gate |
 
-Outside those rulings, Derek is needed only for the prepared 4B guild's premise, authored
-choices, composition, clarity, narrative tone, responsiveness, and play-feel judgments. He does
-not owe an in-game mechanical step while the seat packet is being staged. The machine driver owns
-the game install, lifecycle, evidence, and recovery.
+Outside those rulings, Derek builds the community-level tool and is needed only for product
+judgment that cannot be delegated; he does not silently stand in for the Slayers steward, creator,
+and player as one collapsed persona. No person owes an in-game mechanical step while a seat packet
+is being staged. The machine driver owns the game install, lifecycle, evidence, and recovery.
 
 ## 6. What we are deliberately not doing
 
@@ -263,7 +309,7 @@ Recorded so nobody re-derives them as new ideas, and so nobody quietly fixes the
 | --- | --- |
 | Saved-world `.db`/`.fwl` packaging | Lane 5. Ordinary recoverable copies are enough for R&D (ADR 0010) |
 | Named anchors | Only if an authored slice needs spatial references |
-| Pattern notebooks / generation | 4C, and only for observed repetition |
+| Generic pattern notebooks / generation | 4C, and only after the typed Signature Hunt bridge produces observed repetition; the one typed abstraction is the narrow active exception |
 | Audit D2, D4, D5, C5 | Real, small, tempting. Each has a ledger entry; none gets fixed as collateral |
 | Punch items 16 and 18 | The interim package and ~20 `Get-FileHash` sites CI never runs |
 | Playwright E2E in CI | Still ungated |

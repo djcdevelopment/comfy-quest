@@ -48,6 +48,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
   LabGalleryBuilder _gallery;
   LabBatchController _batch;
   LabBlueprintBuilder _blueprints;
+  LabSignatureHuntProvider _signatureHunt;
   LabEventArchive _eventArchive;
 
   public static LabEventRing Ring { get { return Instance == null ? null : Instance._ring; } }
@@ -63,7 +64,8 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     _panel = new LabPanel(_ring);
     _gallery = new LabGalleryBuilder();
     _blueprints = new LabBlueprintBuilder();
-    _batch = new LabBatchController(_gallery, _blueprints);
+    _signatureHunt = new LabSignatureHuntProvider();
+    _batch = new LabBatchController(_gallery, _blueprints, _signatureHunt);
 
     // A dedicated server has no screen and no player to teach. Bail before patching so
     // a server operator who installs this by accident gets a no-op, not a surprise.
@@ -263,6 +265,10 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       new Terminal.ConsoleCommand("lab_setup",
           "set up the lab practice area and read the welcome note: lab_setup",
           delegate {
+            if (_blueprints.IsRunning || _signatureHunt.IsRunning || _batch.IsPreparing) {
+              Report("another Quest Lab world mutation is in progress; wait before resetting the lab.");
+              return;
+            }
             // Seed before the gallery, and synchronously: the starter file is the thing a
             // creator opens next, so it should exist by the time the console stops talking.
             string seeded = LabQuestSeed.EnsureSeeded(LabQuestEngine.QuestDir);
@@ -290,6 +296,10 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
       new Terminal.ConsoleCommand("lab_target",
           "put a fresh practice target in front of you: lab_target [school]",
           delegate (Terminal.ConsoleEventArgs args) {
+            if (_signatureHunt.IsRunning || _blueprints.IsRunning || _batch.IsPreparing) {
+              Report("another Quest Lab world mutation is in progress; wait before restocking.");
+              return;
+            }
             Report(_gallery.Restock(args.Length >= 2 ? args[1] : null));
           });
 
@@ -337,6 +347,12 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
           delegate (Terminal.ConsoleEventArgs args) {
             string verb = args.Length >= 2 ? args[1].ToLowerInvariant() : "check";
             string value = args.Length >= 3 ? args[2] : null;
+            bool changesWorld = verb == "build" || verb == "compare" || verb == "clear"
+                || verb == "rebuild" || verb == "restore-trees";
+            if (changesWorld && (_signatureHunt.IsRunning || _blueprints.IsRunning)) {
+              Report("another Quest Lab world mutation is in progress; wait before changing the gallery.");
+              return;
+            }
             if (verb == "build") {
               StartCoroutine(_gallery.Build(this, value));
             } else if (verb == "compare") {
@@ -390,6 +406,40 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
             }
           });
 
+      new Terminal.ConsoleCommand("questlab_signature_hunt",
+          "fixed Slayers proof fixture: questlab_signature_hunt <prepare|status|clear>; "
+          + "no prefab, position, count, item, or world parameters",
+          delegate (Terminal.ConsoleEventArgs args) {
+            if (args.Length > 2) {
+              Report("Slayers Signature Hunt is parameter-free. Use exactly: "
+                  + "questlab_signature_hunt prepare, status, or clear.");
+              return;
+            }
+            string verb = args.Length == 2 ? args[1].ToLowerInvariant() : "status";
+            if (verb == "status") {
+              Report(_signatureHunt.Status());
+              return;
+            }
+            if (verb != "prepare" && verb != "clear") {
+              Report("unknown Signature Hunt operation. One of: prepare, status, clear.");
+              return;
+            }
+            if (_gallery.IsRunning || _batch.IsPreparing || _blueprints.IsRunning
+                || _signatureHunt.IsRunning) {
+              Report("another Quest Lab world mutation is in progress; wait before changing "
+                  + "the Signature Hunt fixture.");
+              return;
+            }
+            if (verb == "prepare") {
+              Report("preflighting the fixed Slayers Signature Hunt fixture before any world "
+                  + "object is changed.");
+              StartCoroutine(_signatureHunt.Prepare());
+            } else {
+              Report("clearing only exact-mark Slayers Signature Hunt objects.");
+              StartCoroutine(_signatureHunt.Clear());
+            }
+          });
+
       // The other world-changing lane. Same rule as the gallery: it only ever moves
       // when somebody types one of these, and check comes before build, always.
       new Terminal.ConsoleCommand("questlab_blueprint",
@@ -401,6 +451,11 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
             string name = args.Length >= 3 ? args[2] : null;
             bool sky = args.Length >= 4
                 && string.Equals(args[3], "sky", StringComparison.OrdinalIgnoreCase);
+            if ((verb == "build" || verb == "clear")
+                && (_signatureHunt.IsRunning || _gallery.IsRunning || _batch.IsPreparing)) {
+              Report("another Quest Lab world mutation is in progress; wait before changing a blueprint build.");
+              return;
+            }
             if (verb == "build") {
               StartCoroutine(_blueprints.Build(this, name, sky));
             } else if (verb == "capture") {
@@ -493,6 +548,7 @@ public sealed class ComfyQuestLab : BaseUnityPlugin {
     sb.AppendLine("  questlab_gallery trees|restore-trees [profile-or-build-id]   inspect or recover pruned trees");
     sb.AppendLine("  questlab_batch suites|prepare|run|reset|report|export [suite]   "
         + "bounded live, contract, or scenario evidence runs");
+    sb.AppendLine("  questlab_signature_hunt prepare|status|clear   fixed Demo-world Slayers proof fixture");
     sb.AppendLine("  questlab_blueprint capture <n> <1-40m> [mine|lab] [replace]   copy a bounded live build");
     sb.AppendLine("  questlab_blueprint inspect|diff <n> | check|build|count|clear <n>   verify or replay it");
     sb.AppendLine("  questlab_prefabs <name> | inspect <exact-name> | dump   search or inspect rendered state");

@@ -19,7 +19,8 @@ param(
         'gallery_build', 'gallery_compare', 'gallery_identify', 'gallery_evidence',
         'gallery_clear', 'gallery_rebuild',
         'blueprint_capture', 'blueprint_inspect', 'blueprint_diff', 'blueprint_check',
-        'blueprint_build', 'blueprint_count', 'blueprint_clear'
+        'blueprint_build', 'blueprint_count', 'blueprint_clear',
+        'signature_hunt_prepare', 'signature_hunt_status', 'signature_hunt_clear'
     )]
     [string]$Operation,
 
@@ -402,18 +403,24 @@ if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
 if (-not [string]::IsNullOrWhiteSpace([string]$receipt.evidence_path)) {
     $evidencePathRaw = [string]$receipt.evidence_path
     $evidencePathNormalized = $evidencePathRaw.Replace('\', '/')
+    $signatureHuntEvidence = $Operation -in @(
+        'signature_hunt_prepare', 'signature_hunt_status', 'signature_hunt_clear')
+    $evidenceDirectory = if ($signatureHuntEvidence) { 'fixtures' } else { 'truth' }
     $expectedEvidenceRoot = if ($Lane -eq 'i5') {
-        "$i5ValheimRoot/BepInEx/config/comfy-quest-lab/receipts/truth/"
+        "$i5ValheimRoot/BepInEx/config/comfy-quest-lab/receipts/$evidenceDirectory/"
     } else {
-        ($omenValheimRoot.Replace('\', '/') + '/BepInEx/config/comfy-quest-lab/receipts/truth/')
+        ($omenValheimRoot.Replace('\', '/') + "/BepInEx/config/comfy-quest-lab/receipts/$evidenceDirectory/")
     }
     if (-not $evidencePathNormalized.StartsWith(
             $expectedEvidenceRoot, [StringComparison]::OrdinalIgnoreCase)) {
         throw "truth evidence escaped the fixed receipt directory: $evidencePathRaw"
     }
     $evidenceLeaf = $evidencePathNormalized.Substring($expectedEvidenceRoot.Length)
-    if ($evidenceLeaf -notmatch '^[A-Za-z0-9._-]+\.json$') {
-        throw "truth evidence did not name one fixed-directory JSON file: $evidencePathRaw"
+    $evidenceLeafPattern = if ($signatureHuntEvidence) {
+        '^signature-hunt-[A-Za-z0-9._-]+\.json$'
+    } else { '^[A-Za-z0-9._-]+\.json$' }
+    if ($evidenceLeaf -notmatch $evidenceLeafPattern) {
+        throw "evidence did not name one fixed-directory JSON file: $evidencePathRaw"
     }
     if ($Lane -eq 'i5') {
         $escapedEvidencePath = $evidencePathRaw.Replace("'", "''")
@@ -435,16 +442,24 @@ if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
         $evidenceJson = [System.IO.File]::ReadAllText($evidencePathRaw)
     }
     $evidenceObject = $evidenceJson | ConvertFrom-Json
-    if ($evidenceObject.schema -ne 'comfy-questlab-gallery-truth/v1') {
-        throw "unexpected truth evidence schema: $($evidenceObject.schema)"
+    $expectedEvidenceSchema = if ($signatureHuntEvidence) {
+        'comfy-questlab-signature-hunt-fixture/v1'
+    } else { 'comfy-questlab-gallery-truth/v1' }
+    if ($evidenceObject.schema -ne $expectedEvidenceSchema) {
+        throw "unexpected evidence schema: $($evidenceObject.schema)"
     }
-    $localEvidence = Join-Path $OutputDirectory "$requestId-truth.json"
+    $evidenceSuffix = if ($signatureHuntEvidence) { 'fixture.json' } else { 'truth.json' }
+    $localEvidence = Join-Path $OutputDirectory "$requestId-$evidenceSuffix"
     [System.IO.File]::WriteAllText(
         $localEvidence,
         $evidenceJson + [Environment]::NewLine,
         (New-Object System.Text.UTF8Encoding($false)))
-    Write-Host "truth evidence: $localEvidence"
-    Write-Host "truth verdict: $($evidenceObject.verdict)"
+    Write-Host "evidence: $localEvidence"
+    if ($signatureHuntEvidence) {
+        Write-Host "fixture proof level: $($evidenceObject.proof_level)"
+    } else {
+        Write-Host "truth verdict: $($evidenceObject.verdict)"
+    }
 }
 
 # Build-by-example artifacts are copied only from the Lab's fixed blueprint directory.

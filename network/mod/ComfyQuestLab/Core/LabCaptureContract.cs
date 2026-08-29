@@ -310,11 +310,18 @@ public static class LabCaptureContract {
     if (n < 0.000001) { p.Qx = p.Qy = p.Qz = 0f; p.Qw = 1f; return; }
     p.Qx = (float)(p.Qx / n); p.Qy = (float)(p.Qy / n);
     p.Qz = (float)(p.Qz / n); p.Qw = (float)(p.Qw / n);
-    bool flip = p.Qw < 0f || (p.Qw == 0f && (p.Qz < 0f
-        || (p.Qz == 0f && (p.Qy < 0f || (p.Qy == 0f && p.Qx < 0f)))));
-    if (flip) { p.Qx = -p.Qx; p.Qy = -p.Qy; p.Qz = -p.Qz; p.Qw = -p.Qw; }
+    // Decide the q/-q representative at the same precision the signature retains.
+    // ZDO persists Euler angles; a 180-degree round trip comes back with |w| ~= 4e-8.
+    // Looking at that discarded residue before rounding makes an authored (0,1,0,0)
+    // compare different from the same live half-turn and is not idempotent.
     p.Qx = Round(p.Qx, 6); p.Qy = Round(p.Qy, 6);
     p.Qz = Round(p.Qz, 6); p.Qw = Round(p.Qw, 6);
+    bool flip = p.Qw < 0f || (p.Qw == 0f && (p.Qz < 0f
+        || (p.Qz == 0f && (p.Qy < 0f || (p.Qy == 0f && p.Qx < 0f)))));
+    if (flip) {
+      p.Qx = Round(-p.Qx, 6); p.Qy = Round(-p.Qy, 6);
+      p.Qz = Round(-p.Qz, 6); p.Qw = Round(-p.Qw, 6);
+    }
   }
 
   static string Signature(LabCapturePiece p) {

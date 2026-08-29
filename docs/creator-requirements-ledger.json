@@ -271,15 +271,17 @@
     },
     {
       "id": "FR-EVID-003",
-      "disposition": "deferred",
-      "phase": "4C",
-      "lane_authority": "phase-authority"
+      "disposition": "active",
+      "lane": "4B",
+      "lane_authority": "phase-authority",
+      "note": "Activated only for the Guild creative-system bridge: retain the Slayers Signature Hunt need, abstraction identity, two creator instances, campaign placement, implemented campaign-start receipt, and still-missing then eventual installed completion evidence in one context. A `started` receipt is not kill, successor, or campaign-completion proof. This does not activate a general feedback product."
     },
     {
       "id": "FR-OPT-001",
-      "disposition": "deferred",
-      "phase": "4C",
-      "lane_authority": "phase-authority"
+      "disposition": "active",
+      "lane": "4B",
+      "lane_authority": "phase-authority",
+      "note": "Activated only for one typed Slayers Signature Hunt abstraction implemented through two meaningfully distinct creator artifacts and awaiting installed proof. Generic patterns, notebooks, registries, and generation remain outside this bridge."
     },
     {
       "id": "FR-OPT-002",

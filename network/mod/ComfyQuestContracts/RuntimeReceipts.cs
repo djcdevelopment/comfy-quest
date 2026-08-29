@@ -28,6 +28,10 @@ public sealed class RuntimeReceipt {
   [JsonProperty("binding_instance_id", NullValueHandling=NullValueHandling.Ignore)] public string BindingInstanceId { get; set; }
   [JsonProperty("experience_id", NullValueHandling=NullValueHandling.Ignore)] public string ExperienceId { get; set; }
   [JsonProperty("run_id", NullValueHandling=NullValueHandling.Ignore)] public string RunId { get; set; }
+  [JsonProperty("handoff_id", NullValueHandling=NullValueHandling.Ignore)] public string HandoffId { get; set; }
+  [JsonProperty("successor_experience_id", NullValueHandling=NullValueHandling.Ignore)] public string SuccessorExperienceId { get; set; }
+  [JsonProperty("successor_run_id", NullValueHandling=NullValueHandling.Ignore)] public string SuccessorRunId { get; set; }
+  [JsonProperty("participant_ids", NullValueHandling=NullValueHandling.Ignore)] public IReadOnlyList<string> ParticipantIds { get; set; }
   [JsonProperty("world_id", NullValueHandling=NullValueHandling.Ignore)] public string WorldId { get; set; }
   [JsonProperty("event_name", NullValueHandling=NullValueHandling.Ignore)] public string EventName { get; set; }
   [JsonProperty("event_target", NullValueHandling=NullValueHandling.Ignore)] public string EventTarget { get; set; }
@@ -152,6 +156,25 @@ public sealed class RuntimeReceiptStore {
   public string Write(RuntimeReceipt receipt){if(receipt==null)throw new ArgumentNullException(nameof(receipt));string target;lock(gate){Directory.CreateDirectory(directory);receipt.AtUtc=receipt.AtUtc==default?DateTimeOffset.UtcNow:receipt.AtUtc;receipt.Id=string.IsNullOrWhiteSpace(receipt.Id)?receipt.AtUtc.ToUniversalTime().ToString("yyyyMMdd'T'HHmmssfff'Z'",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N"):receipt.Id;var safe=receipt.Id.Replace("/","_").Replace("\\","_");target=Path.Combine(directory,safe+".json");var temp=target+".tmp";File.WriteAllText(temp,JsonConvert.SerializeObject(receipt,Formatting.Indented));File.Move(temp,target);}
     if(Interlocked.Increment(ref writesSinceSweep)>=SweepEveryWrites)Sweep(DateTimeOffset.UtcNow);
     return target;}
+  /// <summary>Write a receipt with a caller-owned deterministic id, or return the exact existing
+  /// receipt. Campaign handoff retries call this every time so a crash cannot lose or duplicate the
+  /// pending/start boundary.</summary>
+  public string WriteOnce(RuntimeReceipt receipt){
+    if(receipt==null||string.IsNullOrWhiteSpace(receipt.Id))throw new ArgumentException("receipt_id_required");
+    string target;var wrote=false;
+    lock(gate){
+      Directory.CreateDirectory(directory);receipt.AtUtc=receipt.AtUtc==default?DateTimeOffset.UtcNow:receipt.AtUtc;
+      var safe=receipt.Id.Replace("/","_").Replace("\\","_");target=Path.Combine(directory,safe+".json");
+      if(File.Exists(target))return target;
+      var archived=Path.Combine(archiveDirectory,safe+".json");if(File.Exists(archived))return archived;
+      var temp=target+".tmp-"+Guid.NewGuid().ToString("N");
+      try{File.WriteAllText(temp,JsonConvert.SerializeObject(receipt,Formatting.Indented));try{File.Move(temp,target);wrote=true;}catch(IOException)when(File.Exists(target)){} }
+      finally{try{if(File.Exists(temp))File.Delete(temp);}catch{}}
+    }
+    if(wrote&&Interlocked.Increment(ref writesSinceSweep)>=SweepEveryWrites)Sweep(DateTimeOffset.UtcNow);
+    return target;
+  }
+  public bool ContainsId(string id){if(string.IsNullOrWhiteSpace(id))return false;var safe=id.Replace("/","_").Replace("\\","_");lock(gate){return File.Exists(Path.Combine(directory,safe+".json"))||File.Exists(Path.Combine(archiveDirectory,safe+".json"));}}
   /// <summary>Apply retention now. Archiving moves files, so nothing an operation wrote is lost at
   /// the live boundary; only the archive bound destroys anything, and that writes its own receipt
   /// so a reader can tell a pruned chain from an incomplete one.</summary>

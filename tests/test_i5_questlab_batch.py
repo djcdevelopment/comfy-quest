@@ -37,6 +37,9 @@ EXPECTED_OPERATIONS = {
     "blueprint_build",
     "blueprint_count",
     "blueprint_clear",
+    "signature_hunt_prepare",
+    "signature_hunt_status",
+    "signature_hunt_clear",
 }
 
 
@@ -67,6 +70,12 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
         self.assertIn("const int maxRetirementFrames = 120", self.controller)
         self.assertIn("StandingPieceCount(blueprintName) > 0", self.controller)
         self.assertIn("BlueprintClearAccepted(detail)", dispatch)
+
+    def test_signature_hunt_sender_is_parameter_free_and_copies_only_fixture_evidence(self) -> None:
+        self.assertIn("'signature_hunt_prepare', 'signature_hunt_status', 'signature_hunt_clear'", self.source)
+        self.assertIn("$evidenceDirectory = if ($signatureHuntEvidence) { 'fixtures' }", self.source)
+        self.assertIn("comfy-questlab-signature-hunt-fixture/v1", self.source)
+        self.assertIn("^signature-hunt-[A-Za-z0-9._-]+\\.json$", self.source)
 
     def test_uses_verified_config_lane_and_batchmode_reads(self) -> None:
         self.assertIn("Deploy-ToI5.ps1", self.source)
@@ -240,7 +249,8 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
             self.assertNotIn("path", envelope)
 
         self.assertIn("comfy-questlab-gallery-truth/v1", self.source)
-        self.assertIn("receipts/truth/", self.source)
+        self.assertIn("{ 'fixtures' } else { 'truth' }", self.source)
+        self.assertIn("receipts/$evidenceDirectory/", self.source)
 
     def test_blueprint_capture_envelope_is_bounded_and_identity_pinned(self) -> None:
         with tempfile.TemporaryDirectory() as output_directory:

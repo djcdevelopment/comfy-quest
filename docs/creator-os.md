@@ -302,7 +302,14 @@ the corrected live Arm/Disarm receipts cover that exact branch.
 
 The single-experience reading order remains **Author -> Rehearse -> Play -> Observe -> Capture Godbuild -> Replay elsewhere**. Runtime opens Studio with the active pack, version, requested stage, and current beat in the loopback query so Observe lands on the same telling rather than asking the creator to find it again.
 
-The broader dogfood order is **Imagine -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release**. The adoption gate is Derek creating a guild-scale portfolio of questlines, standalone quests, and rerunnable events through that loop. The requirements and exit gates are in `docs/creator-portfolio-requirements.md`.
+The broader dogfood order is **Steward configures -> Creator instantiates -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release**. A Guild is the steward-owned creative system around configuration, palette, and progression; creators use its abstractions to make artifacts and campaigns for players. The active proof is deliberately narrower than a framework: Slayers Signature Hunt must produce two meaningfully distinct creator instances, one campaign, and correlated installed-Valheim evidence. Studio now implements that hierarchy and one bounded campaign-start operation through exact activation and bind/start of the unique root. Its receipt says `started`, not completed: the fixed fixture is preparation evidence only, and no installed Signature Hunt kill, successor, terminal campaign, reset/rerun, or cleanup/restoration proof exists yet. The requirements and exit gates are in `docs/creator-portfolio-requirements.md`.
+
+The simulated start path now verifies the exact fixture and its 17/17-object receipt, correlates
+the Deathsquito and Drake matcher targets to the two compiled instances, carries the prerequisite
+machine/world/Creator Session pins through binding, requires the entry's explicit successor, and
+checks the full applied binding reference before `started`. Campaign progression is editable on
+every campaign and compiles successor flow from explicit prerequisite edges. Those are contract
+facts, not a substitute for the still-missing installed run.
 
 The first real Godbuild target is complete. Its 12 basic pieces demonstrate the useful
 part of capture: human spacing can become reviewable source, a typed plan, and a stable
@@ -330,11 +337,16 @@ cannot decide.
    Quest's bounded inbox/outbox, browser driving, captures, logs, and receipts completed the
    installed journey without Derek. The separate standalone Isolate boundary remains its own
    unassigned ruling and may not borrow HEARTH.
-4. **Dogfood real guilds — active 4B.** With the machine loop ready, Derek authors and runs
-   quests and repeatable creator events using ordinary building language and the current
-   local working world. Add named anchors, event/effect vocabulary, and creator tooling
-   when a real authored idea needs them. Feed observed friction directly into the next
-   sweeping product change and rerun the same journey.
+4. **Prove a Guild creative system — implemented, installed lap pending in 4B.** Studio now
+   persists a Slayers steward's source snapshot, typed Signature Hunt abstraction, palette,
+   two derived artifacts, campaign, and lineage evidence. One Play operation can prepare or
+   resume the pinned world, arm Runtime, prepare the fixed fixture, publish exact campaign bytes,
+   verify
+   activation, and bind/start the unique root. Run that operation on the installed stack and
+   continue through both hunts, successor transition, terminal evidence, reset/rerun, and
+   cleanup/restoration before calling the slice proven. Record friction in that exact context.
+   Add named anchors or event/effect vocabulary only when the slice needs them, and do not
+   generalize the abstraction until the two instances prove what is actually shared.
 5. **Stabilize, then distribute.** After repeated guild authoring stabilizes the content,
    world, anchor, run, and compatibility contracts, build clean-profile community
    installation and release artifacts. Versioned `.db`/`.fwl` packaging, inspection,
@@ -354,5 +366,6 @@ cannot decide.
   using Derek for that operation is a test defect, not an acceptance step.
 - A screenshot or checkbox is orientation, not machine proof. Request receipts, active-set
   identity, capture hashes, and `MATCH` are the machine facts.
-- Auto-generation and the planned pattern notebook are optional accelerators. They earn
-  critical-path priority only when repeated guild authoring demonstrates the need.
+- The typed Signature Hunt abstraction is the only earned-reuse bridge now active.
+  Auto-generation, a generic pattern notebook, registries, and alternate artifact formats
+  remain optional 4C accelerators and require later repeated use.

@@ -172,6 +172,73 @@ public sealed class RuntimeBindingCoordinator {
     }
   }
 
+  /// <summary>Move an existing Charm to an authored in-pack successor without minting a new
+  /// binding identity. Eligibility is decided before this call; this transaction proves that the
+  /// exact source reference was still present and that the same target kind is accepted.</summary>
+  public RuntimeBindingChange Continue(string bindingZdo,string worldId,ActiveSet active,
+      string sourceExperienceId,ExperienceDocument successor,string expectedBindingInstanceId,
+      string targetKind,DateTimeOffset now){
+    if(!SafeZdo(bindingZdo)||!SafeWorld(worldId)||active==null||successor==null
+        ||!string.Equals(active.ExperienceId,successor.Id,StringComparison.Ordinal)
+        ||string.IsNullOrWhiteSpace(sourceExperienceId)||!TargetKinds.Contains(targetKind))
+      throw new ArgumentException("continuation_binding_scope_invalid");
+    var binding=(successor.Bindings??new List<ExperienceBinding>()).FirstOrDefault(value=>value?.Id=="default")
+      ??throw new InvalidOperationException("binding_default_missing");
+    if((binding.TargetKinds??new List<string>()).Count>0&&!binding.TargetKinds.Contains(targetKind,StringComparer.Ordinal))
+      throw new InvalidOperationException("binding_target_incompatible");
+    var expected=new RuntimeBindingReference{PackId=active.PackId,ExperienceId=sourceExperienceId,
+      BindingId="default",Version=active.Version,ContentHash=active.ContentHash,
+      BindingInstanceId=expectedBindingInstanceId};
+    var applied=new RuntimeBindingReference{PackId=active.PackId,ExperienceId=successor.Id,
+      BindingId="default",Version=active.Version,ContentHash=active.ContentHash,
+      BindingInstanceId=expectedBindingInstanceId};
+    ValidateReference(expected,false);ValidateReference(applied,false);
+    lock(gate){
+      var current=adapter.Read(bindingZdo)??new RuntimeBindingReference();
+      ValidateReference(current,false);
+      if(Same(current,applied)){
+        Directory.CreateDirectory(changesRoot);
+        var recovered=Directory.GetFiles(changesRoot,"binding-*.json")
+          .Select(Read).Where(value=>value!=null&&value.WorldId==worldId
+            &&value.Applied!=null&&Same(value.Applied,applied)
+            &&value.Previous!=null&&Same(value.Previous,expected)
+            &&value.State is "pending" or "applied")
+          .OrderByDescending(value=>value.CreatedUtc).ThenByDescending(value=>value.ChangeId,StringComparer.Ordinal)
+          .FirstOrDefault();
+        if(recovered!=null){
+          if(recovered.State=="pending"){recovered.State="applied";recovered.CompletedUtc=now;Write(ChangePath(recovered.ChangeId),recovered,create:false);}
+          return recovered;
+        }
+        if(Directory.GetFiles(changesRoot,"binding-*.json").Length>=MaxChanges)
+          throw new InvalidOperationException("binding_change_limit");
+        var recoveredId=NewChangeId(now);
+        recovered=new RuntimeBindingChange{ChangeId=recoveredId,BindingZdo=bindingZdo,
+          WorldId=worldId,CreatedUtc=now,CompletedUtc=now,State="applied",Previous=expected,Applied=applied};
+        var recoveredPath=ChangePath(recovered.ChangeId);Write(recoveredPath,recovered,create:true);
+        return recovered;
+      }
+      if(!Same(current,expected))throw new InvalidOperationException("continuation_binding_changed");
+      Directory.CreateDirectory(changesRoot);
+      if(Directory.GetFiles(changesRoot,"binding-*.json").Length>=MaxChanges)
+        throw new InvalidOperationException("binding_change_limit");
+      var changeId=NewChangeId(now);
+      var change=new RuntimeBindingChange{ChangeId=changeId,BindingZdo=bindingZdo,
+        WorldId=worldId,CreatedUtc=now,Previous=expected,Applied=applied};
+      var path=ChangePath(change.ChangeId);Write(path,change,create:true);
+      string failure=null;
+      try{
+        if(!adapter.TryWrite(bindingZdo,applied,out var error))failure=error??"binding_write_failed";
+        else if(!Same(adapter.Read(bindingZdo)??new RuntimeBindingReference(),applied))failure="binding_write_verification_failed";
+      }catch(Exception error){failure="binding_write_failed:"+error.GetType().Name;}
+      if(failure!=null){
+        try{Restore(bindingZdo,change.ChangeId,worldId,DateTimeOffset.UtcNow);}
+        catch(Exception recovery){throw new InvalidOperationException(failure+";binding_recovery_failed:"+recovery.Message,recovery);}
+        throw new InvalidOperationException(failure);
+      }
+      change.State="applied";change.CompletedUtc=DateTimeOffset.UtcNow;Write(path,change,create:false);return change;
+    }
+  }
+
   public RuntimeBindingChange Restore(string bindingZdo,string changeId,string worldId,DateTimeOffset now){
     if(!SafeZdo(bindingZdo)||!SafeChangeId(changeId)||!SafeWorld(worldId))throw new ArgumentException("binding_restore_identity_invalid");
     lock(gate){

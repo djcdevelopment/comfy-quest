@@ -14,6 +14,7 @@ public static class ExperienceSchema {
   public const int MaxActions = 256;
   public const int MaxExpressionDepth = 3;
   public const int MaxPrerequisites = 64;
+  public const int MaxSuccessors = 16;
   public const string TimerElapsedEvent = "timer_elapsed";
   public const string ExperienceStartedEvent = "experience_started";
   public const string ChatReceivedEvent = CooperativeEventContract.ChatReceivedEvent;
@@ -29,6 +30,9 @@ public sealed class ExperienceDocument {
   [JsonProperty("bindings")] public List<ExperienceBinding> Bindings { get; set; }
   [JsonProperty("anchors", NullValueHandling=NullValueHandling.Ignore)] public List<ExperienceAnchor> Anchors { get; set; }
   [JsonProperty("prerequisites", NullValueHandling=NullValueHandling.Ignore)] public List<string> Prerequisites { get; set; }
+  /// <summary>Authored continuation preference within this exact pack. Runtime considers the ids
+  /// in order after a successful terminal outcome and starts the first eligible experience.</summary>
+  [JsonProperty("successor_experience_ids", NullValueHandling=NullValueHandling.Ignore)] public List<string> SuccessorExperienceIds { get; set; }
 }
 
 /// <summary>A named authored position creators can reference from spatial predicates.</summary>
@@ -211,6 +215,16 @@ public static class ExperienceCompiler {
         e.Add(new("prerequisite.invalid", "$.prerequisites", "Prerequisite experience ids must be unique stable identifiers."));
       else if (string.Equals(prerequisite, d.Id, StringComparison.Ordinal))
         e.Add(new("prerequisite.self", "$.prerequisites", "An experience cannot require itself."));
+    }
+    var successors = d.SuccessorExperienceIds ?? new();
+    if (successors.Count > ExperienceSchema.MaxSuccessors)
+      e.Add(new("successors.bounds", "$.successor_experience_ids", "At most 16 successor experience ids are allowed."));
+    var successorIds = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var successor in successors) {
+      if (!Stable(successor) || !successorIds.Add(successor))
+        e.Add(new("successor.invalid", "$.successor_experience_ids", "Successor experience ids must be unique stable identifiers."));
+      else if (string.Equals(successor, d.Id, StringComparison.Ordinal))
+        e.Add(new("successor.self", "$.successor_experience_ids", "An experience cannot continue to itself."));
     }
     var stages = d.Stages ?? new();
     if (stages.Count == 0 || stages.Count > ExperienceSchema.MaxStages) e.Add(new("stages.bounds", "$.stages", "An experience requires 1..64 stages."));

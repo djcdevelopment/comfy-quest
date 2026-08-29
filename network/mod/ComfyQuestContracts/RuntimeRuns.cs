@@ -35,6 +35,8 @@ public sealed class RuntimeRunRecord {
   [JsonProperty("outcome",NullValueHandling=NullValueHandling.Ignore)] public string Outcome {get;set;}
   [JsonProperty("predecessor_run_id",NullValueHandling=NullValueHandling.Ignore)] public string PredecessorRunId {get;set;}
   [JsonProperty("reset_id",NullValueHandling=NullValueHandling.Ignore)] public string ResetId {get;set;}
+  [JsonProperty("continuation_predecessor_run_id",NullValueHandling=NullValueHandling.Ignore)] public string ContinuationPredecessorRunId {get;set;}
+  [JsonProperty("continuation_id",NullValueHandling=NullValueHandling.Ignore)] public string ContinuationId {get;set;}
   [JsonProperty("legacy_storage")] public bool LegacyStorage {get;set;}
   [JsonProperty("reward_policy")] public string RewardPolicy {get;set;}="per_run";
 
@@ -68,6 +70,36 @@ public sealed class RuntimeRunRegistry {
   public IReadOnlyList<RuntimeRunRecord> List(){lock(gate){var file=Read();return file.Unreadable?Array.Empty<RuntimeRunRecord>():file.Runs.OrderByDescending(x=>x.StartedUtc).ToArray();}}
   public bool IsActive(WorkflowIdentity identity){if(identity==null)return false;lock(gate){var file=Read();if(file.Unreadable)return false;var matches=file.Runs.Where(x=>x.StateKey==identity.Key||(!string.IsNullOrWhiteSpace(identity.RunId)&&x.RunId==identity.RunId)).ToArray();return matches.Length==0&&string.IsNullOrWhiteSpace(identity.RunId)||matches.Any(x=>x.Status=="active");}}
   public RuntimeRunRecord StartSuccessor(string priorRunId,string resetId,DateTimeOffset now){lock(gate){var file=Read();if(file.Unreadable)throw new InvalidDataException("run_registry_unreadable");var prior=file.Runs.FirstOrDefault(x=>x.RunId==priorRunId);if(prior==null)throw new InvalidOperationException("run_missing");var existing=file.Runs.FirstOrDefault(x=>x.PredecessorRunId==priorRunId&&x.ResetId==resetId);if(existing!=null)return existing;if(prior.Status!="active")throw new InvalidOperationException("run_not_active");if(file.Runs.Count>=MaxRuns)throw new InvalidOperationException("run_registry_limit");prior.Status="reset";prior.EndedUtc=now;prior.ResetId=resetId;var next=new RuntimeRunRecord{RunId=NewRunId(now),ScopeId=prior.ScopeId,Scope=CloneScope(prior.Scope),StateKey=null,Status="active",StartedUtc=now,PredecessorRunId=prior.RunId,ResetId=resetId,RewardPolicy="per_run"};next.StateKey=next.RunId;file.Runs.Add(next);Write(file);return next;}}
+  /// <summary>Start, or recover, the one run pinned by a campaign handoff. Unlike a reset the
+  /// completed predecessor remains intact; only the experience id changes in the exact scope.</summary>
+  public RuntimeRunRecord StartContinuation(string priorRunId,string continuationId,
+      string successorExperienceId,string currentBindingZdo,DateTimeOffset now){
+    if(!Safe(priorRunId,96)||!Safe(continuationId,96)||!Safe(successorExperienceId,80)||!Safe(currentBindingZdo,80))
+      throw new ArgumentException("continuation_run_scope_invalid");
+    lock(gate){
+      var file=Read();if(file.Unreadable)throw new InvalidDataException("run_registry_unreadable");
+      var prior=file.Runs.FirstOrDefault(value=>value.RunId==priorRunId)??throw new InvalidOperationException("run_missing");
+      var existing=file.Runs.FirstOrDefault(value=>value.ContinuationId==continuationId);
+      if(existing!=null){if(existing.ContinuationPredecessorRunId!=priorRunId||existing.Scope?.ExperienceId!=successorExperienceId)throw new InvalidOperationException("continuation_run_conflict");return existing;}
+      if(prior.Outcome!="complete")throw new InvalidOperationException("continuation_predecessor_incomplete");
+      var scope=CloneScope(prior.Scope);scope.ExperienceId=successorExperienceId;
+      if(string.IsNullOrWhiteSpace(scope.BindingInstanceId)&&scope.BindingZdo!=currentBindingZdo)
+        throw new InvalidOperationException("continuation_binding_changed");
+      scope.BindingZdo=currentBindingZdo;Validate(scope);
+      var active=file.Runs.LastOrDefault(value=>value.Status=="active"&&value.ScopeId==scope.ScopeId);
+      if(active!=null){
+        if(active.Outcome=="complete")throw new InvalidOperationException("continuation_successor_complete");
+        if(!string.IsNullOrWhiteSpace(active.ContinuationId)&&active.ContinuationId!=continuationId)
+          throw new InvalidOperationException("continuation_successor_claimed");
+        active.ContinuationId=continuationId;active.ContinuationPredecessorRunId=priorRunId;Write(file);return active;
+      }
+      if(file.Runs.Count>=MaxRuns)throw new InvalidOperationException("run_registry_limit");
+      var next=new RuntimeRunRecord{RunId=NewRunId(now),ScopeId=scope.ScopeId,Scope=scope,
+        StateKey=null,Status="active",StartedUtc=now,ContinuationPredecessorRunId=priorRunId,
+        ContinuationId=continuationId,RewardPolicy="per_run"};
+      next.StateKey=next.RunId;file.Runs.Add(next);Write(file);return next;
+    }
+  }
   public void MarkOutcome(string runId,string outcome,DateTimeOffset at){if(string.IsNullOrWhiteSpace(runId)||string.IsNullOrWhiteSpace(outcome))return;lock(gate){var file=Read();if(file.Unreadable)return;var record=file.Runs.FirstOrDefault(x=>x.RunId==runId);if(record==null||record.Outcome!=null)return;record.Outcome=outcome;Write(file);}}
 
   static string NewRunId(DateTimeOffset at)=>"run-"+at.ToUniversalTime().ToString("yyyyMMdd'T'HHmmssfff'Z'",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N").Substring(0,8);
@@ -75,7 +107,7 @@ public sealed class RuntimeRunRegistry {
   static void Validate(RuntimeRunScope scope){if(scope==null||!Safe(scope.WorldId,80)||!Safe(scope.ExperienceId,80)||!Safe(scope.BindingZdo,80)||!OptionalSafe(scope.BindingInstanceId,80)||!Safe(scope.ContentHash,128)||scope.ParticipantIds==null||scope.ParticipantIds.Count<1||scope.ParticipantIds.Count>16||scope.ParticipantIds.Any(x=>!Safe(x,80)))throw new ArgumentException("run_scope_invalid");}
   static bool OptionalSafe(string value,int max)=>string.IsNullOrWhiteSpace(value)||Safe(value,max);
   static bool Safe(string value,int max)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=max&&value.All(c=>char.IsLetterOrDigit(c)||c=='-'||c=='_'||c==':'||c=='$');
-  State Read(){if(!File.Exists(path))return new();try{var info=new FileInfo(path);if(info.Length<=0||info.Length>MaxRegistryBytes)return new State{Unreadable=true};var value=JsonConvert.DeserializeObject<State>(File.ReadAllText(path))??new();value.Runs??=new();var ids=new HashSet<string>(StringComparer.Ordinal);var activeScopes=new HashSet<string>(StringComparer.Ordinal);if(value.Schema!="comfy-quest-runtime-run-registry/v1"||value.Runs.Count>MaxRuns)value.Unreadable=true;foreach(var run in value.Runs){if(run==null||!Safe(run.RunId,96)||!ids.Add(run.RunId)||run.Scope==null||run.ScopeId!=run.Scope.ScopeId||string.IsNullOrWhiteSpace(run.StateKey)||run.StateKey.Length>1024||run.Status is not ("active" or "reset")||run.RewardPolicy!="per_run"||run.Status=="active"&&!activeScopes.Add(run.ScopeId)){value.Unreadable=true;break;}try{Validate(run.Scope);}catch{value.Unreadable=true;break;}}return value;}catch{return new State{Unreadable=true};}}
+  State Read(){if(!File.Exists(path))return new();try{var info=new FileInfo(path);if(info.Length<=0||info.Length>MaxRegistryBytes)return new State{Unreadable=true};var value=JsonConvert.DeserializeObject<State>(File.ReadAllText(path))??new();value.Runs??=new();var ids=new HashSet<string>(StringComparer.Ordinal);var activeScopes=new HashSet<string>(StringComparer.Ordinal);var continuationIds=new HashSet<string>(StringComparer.Ordinal);if(value.Schema!="comfy-quest-runtime-run-registry/v1"||value.Runs.Count>MaxRuns)value.Unreadable=true;foreach(var run in value.Runs){var continuationEmpty=string.IsNullOrWhiteSpace(run?.ContinuationId)&&string.IsNullOrWhiteSpace(run?.ContinuationPredecessorRunId);var continuationValid=!string.IsNullOrWhiteSpace(run?.ContinuationId)&&!string.IsNullOrWhiteSpace(run?.ContinuationPredecessorRunId)&&Safe(run.ContinuationId,96)&&Safe(run.ContinuationPredecessorRunId,96)&&continuationIds.Add(run.ContinuationId);if(run==null||!Safe(run.RunId,96)||!ids.Add(run.RunId)||run.Scope==null||run.ScopeId!=run.Scope.ScopeId||string.IsNullOrWhiteSpace(run.StateKey)||run.StateKey.Length>1024||run.Status is not ("active" or "reset")||run.RewardPolicy!="per_run"||run.Status=="active"&&!activeScopes.Add(run.ScopeId)||!continuationEmpty&&!continuationValid){value.Unreadable=true;break;}try{Validate(run.Scope);}catch{value.Unreadable=true;break;}}return value;}catch{return new State{Unreadable=true};}}
   void Write(State value){Directory.CreateDirectory(Path.GetDirectoryName(path));var json=JsonConvert.SerializeObject(value,Formatting.Indented);if(Encoding.UTF8.GetByteCount(json)>MaxRegistryBytes)throw new InvalidDataException("run_registry_too_large");var temp=path+".tmp";File.WriteAllText(temp,json);if(File.Exists(path))File.Replace(temp,path,path+".previous");else File.Move(temp,path);}
   sealed class State{[JsonProperty("schema")]public string Schema{get;set;}="comfy-quest-runtime-run-registry/v1";[JsonProperty("runs")]public List<RuntimeRunRecord> Runs{get;set;}=new();[JsonIgnore]public bool Unreadable{get;set;}}
 }

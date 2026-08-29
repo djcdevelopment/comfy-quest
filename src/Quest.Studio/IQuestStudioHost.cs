@@ -34,3 +34,11 @@ public interface IQuestStudioHost
     /// </summary>
     JsonSerializerOptions Json { get; }
 }
+
+/// <summary>Optional sovereign-repository capability used only by the local R&amp;D campaign lap.
+/// Package hosts that do not own the comfy-quest checkout simply omit it; Studio never reaches
+/// into a sibling repository or guesses a source root.</summary>
+public interface IQuestStudioRAndDHost
+{
+    string? RepositoryRoot { get; }
+}

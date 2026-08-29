@@ -16,6 +16,7 @@ sealed class RuntimeExperienceEngine {
   const int MaxArmedRechecks = 32;
   const int MaxSpawnRecoveries = 32;
   const int MaxPendingReplays = 32;
+  const int MaxPendingContinuations = 32;
   readonly string root;
   readonly RuntimeReceiptStore receipts;
   readonly ActionExecutionLedger ledger;
@@ -23,6 +24,8 @@ sealed class RuntimeExperienceEngine {
   readonly WorkflowStateStore workflows;
   readonly DurableTimerStore timers;
   readonly RuntimeRunCoordinator runs;
+  readonly RuntimeContinuationStore continuations;
+  readonly RuntimeBindingCoordinator continuationBindings;
   readonly Func<bool> privateConfirmed;
   readonly Dictionary<string, DateTimeOffset> recentEventKeys =
       new(StringComparer.Ordinal);
@@ -102,6 +105,9 @@ sealed class RuntimeExperienceEngine {
     workflows = new WorkflowStateStore(root);
     timers = new DurableTimerStore(root);
     runs = new RuntimeRunCoordinator(root);
+    continuations = new RuntimeContinuationStore(root);
+    continuationBindings = new RuntimeBindingCoordinator(
+        root, new RuntimeBindingWorldAdapter(), runs.Registry);
     privateConfirmed = isPrivateConfirmed;
   }
 
@@ -168,6 +174,8 @@ sealed class RuntimeExperienceEngine {
     }
     RunSpawnRecoveries(now);
     RunPendingReplays(now);
+    RunPendingContinuations(now);
+    RecoverCompletedContinuation(now);
     RunRechecks(now);
     RefreshDeadline(now);
   }
@@ -442,10 +450,168 @@ sealed class RuntimeExperienceEngine {
         RejectedEvidence = rejectedEvidence,
         Diagnostics = Array.Empty<ContractDiagnostic>(),
       }, TransitionLine(currentStage.Id, decision.Transition), CreatorEvidenceKind.Story);
-      if (!string.IsNullOrWhiteSpace(decision.Transition.Outcome))
-        runs.Registry.MarkOutcome(decision.Identity.RunId, decision.Transition.Outcome, DateTimeOffset.UtcNow);
+      if (!string.IsNullOrWhiteSpace(decision.Transition.Outcome)) {
+        var ended = DateTimeOffset.UtcNow;
+        runs.Registry.MarkOutcome(decision.Identity.RunId, decision.Transition.Outcome, ended);
+        if (string.Equals(decision.Transition.Outcome, "complete", StringComparison.Ordinal)
+            && (active.Document.SuccessorExperienceIds?.Count ?? 0) > 0)
+          BeginContinuation(active, zdo, decision.Identity, ended);
+      }
     }
   }
+
+  void BeginContinuation(Active active,ZDO zdo,WorkflowIdentity identity,DateTimeOffset now) {
+    try {
+      var source=runs.Registry.Find(identity?.RunId);
+      if(source?.Outcome!="complete")throw new InvalidOperationException("continuation_predecessor_incomplete");
+      var successor=ExperienceContinuationSelector.FirstEligible(
+          active.Document,active.Documents,runs.Registry.List(),source.Scope);
+      if(string.IsNullOrWhiteSpace(successor)) {
+        receipts.WriteOnce(ContinuationReceipt("ended",active,source,null,null,
+            "continuation-end-"+source.RunId,null,now));
+        return;
+      }
+      var handoff=continuations.Begin(source,successor,active.PackId,active.Version,
+          active.ContentHash,active.ActivationId,now);
+      receipts.WriteOnce(ContinuationReceipt("pending",active,source,handoff,null,
+          handoff.HandoffId+"-pending",null,now));
+      ResumeContinuation(handoff,now);
+    } catch(Exception error) {
+      Write("continuation","continuation_begin_failed",active,"pending",error.Message,null);
+    }
+  }
+
+  void RunPendingContinuations(DateTimeOffset now) {
+    try {
+      foreach(var handoff in continuations.Pending().Take(MaxPendingContinuations))
+        ResumeContinuation(handoff,now);
+    } catch(Exception error) {
+      Write("continuation","continuation_recovery_failed",null,"pending",error.Message,null);
+    }
+  }
+
+  /// <summary>Close the only pre-journal crash window: workflow completion and run outcome are
+  /// durable writes made just before the handoff decision. A cold retry reconstructs that decision
+  /// from the exact selected binding, but never revisits a source already journaled or ended.</summary>
+  void RecoverCompletedContinuation(DateTimeOffset now) {
+    try {
+      if(!TryLoad(out var active,out _)||(active.Document.SuccessorExperienceIds?.Count??0)==0)return;
+      foreach(var wear in Bindings(active)) {
+        var zdo=wear?.GetComponent<ZNetView>()?.GetZDO();if(zdo==null)continue;
+        if(!TryActiveIdentity(zdo,active,out var identity,out var run))continue;
+        var progress=workflows.Get(identity);
+        if(progress?.Outcome is not ("complete" or "fail"))continue;
+        if(string.IsNullOrWhiteSpace(run.Outcome)){
+          runs.Registry.MarkOutcome(run.RunId,progress.Outcome,now);
+          run=runs.Registry.Find(run.RunId);
+        }
+        if(run?.Outcome!="complete")return;
+        if(continuations.FindBySourceRun(run.RunId)!=null
+            ||receipts.ContainsId("continuation-end-"+run.RunId))return;
+        BeginContinuation(active,zdo,identity,now);return;
+      }
+    } catch(Exception error) {
+      Write("continuation","continuation_completion_recovery_failed",null,"pending",error.Message,null);
+    }
+  }
+
+  void ResumeContinuation(RuntimeContinuationRecord handoff,DateTimeOffset now) {
+    Active active=null;
+    try {
+      if(handoff==null||handoff.State!="pending")return;
+      receipts.WriteOnce(ContinuationReceipt("pending",null,runs.Registry.Find(handoff.SourceRunId),
+          handoff,runs.Registry.Find(handoff.SuccessorRunId),handoff.HandoffId+"-pending",null,
+          handoff.CreatedUtc));
+      if(!TryLoad(out active,out var loadError))throw new InvalidOperationException(loadError);
+      if(active.PackId!=handoff.PackId||active.Version!=handoff.Version
+          ||!string.Equals(active.ContentHash,handoff.ContentHash,StringComparison.OrdinalIgnoreCase)
+          ||active.ActivationId!=handoff.ActivationId)
+        throw new InvalidOperationException("continuation_active_content_changed");
+      if(!active.Documents.TryGetValue(handoff.SourceExperienceId,out _)
+          ||!active.Documents.TryGetValue(handoff.SuccessorExperienceId,out var successor))
+        throw new InvalidOperationException("continuation_experience_missing");
+      if(!TryContinuationBinding(handoff,out var wear,out var zdo,out var targetKind,out var bindingError))
+        throw new InvalidOperationException(bindingError);
+      var reference=Read(zdo);
+      if(reference==null||reference.PackId!=handoff.PackId||reference.BindingId!="default"
+          ||reference.Version!=handoff.Version
+          ||!string.Equals(reference.ContentHash,handoff.ContentHash,StringComparison.OrdinalIgnoreCase)
+          ||reference.ExperienceId!=handoff.SourceExperienceId
+              &&reference.ExperienceId!=handoff.SuccessorExperienceId)
+        throw new InvalidOperationException("continuation_binding_changed");
+      var targetSet=new ActiveSet{Schema=active.Set.Schema,PackId=handoff.PackId,
+        Version=handoff.Version,ContentHash=handoff.ContentHash,
+        PackageSha256=active.Set.PackageSha256,Source=active.Set.Source,
+        ActivatedUtc=active.Set.ActivatedUtc,ActivationId=handoff.ActivationId,
+        ExperienceId=handoff.SuccessorExperienceId,SourceChannel=active.Set.SourceChannel,
+        PreviousActivationId=active.Set.PreviousActivationId};
+      var change=continuationBindings.Continue(zdo.m_uid.ToString(),handoff.WorldId,
+          targetSet,handoff.SourceExperienceId,successor,handoff.BindingInstanceId,targetKind,now);
+      if(change!=null)continuations.SetBindingChange(handoff.HandoffId,change.ChangeId);
+      new QuestPackStore(root).SelectExperienceForActivation(
+          handoff.ActivationId,handoff.SuccessorExperienceId);
+      InvalidateActive();
+      if(!TryLoad(out active,out loadError))throw new InvalidOperationException(loadError);
+      if(active.Document.Id!=handoff.SuccessorExperienceId)
+        throw new InvalidOperationException("continuation_selection_mismatch");
+      var successorRun=runs.Registry.StartContinuation(handoff.SourceRunId,handoff.HandoffId,
+          handoff.SuccessorExperienceId,zdo.m_uid.ToString(),now);
+      continuations.SetSuccessorRun(handoff.HandoffId,successorRun.RunId);
+      if(!EnsureRunStarted(successorRun.RunId,out var startError))
+        throw new InvalidOperationException(startError??"continuation_start_failed");
+      var sourceRun=runs.Registry.Find(handoff.SourceRunId);
+      handoff=continuations.Find(handoff.HandoffId)??handoff;
+      receipts.WriteOnce(ContinuationReceipt("started",active,sourceRun,handoff,successorRun,
+          handoff.HandoffId+"-started",null,now));
+      continuations.Complete(handoff.HandoffId,now);
+    } catch(Exception error) {
+      try {
+        if(handoff!=null&&continuations.RecordError(handoff.HandoffId,error.Message))
+          receipts.Write(ContinuationReceipt("pending",active,runs.Registry.Find(handoff.SourceRunId),
+              handoff,runs.Registry.Find(handoff.SuccessorRunId),null,error.Message,now));
+      } catch { }
+    }
+  }
+
+  bool TryContinuationBinding(RuntimeContinuationRecord handoff,out WearNTear wear,out ZDO zdo,
+      out string targetKind,out string error) {
+    wear=null;zdo=null;targetKind=null;error="continuation_binding_not_loaded";
+    try {
+      if(ZNet.instance==null||ZNet.instance.GetWorldUID().ToString()!=handoff.WorldId) {
+        error="continuation_world_changed";return false;
+      }
+      var matches=WearNTear.GetAllInstances().Where(value=>{
+        var candidate=value?.GetComponent<ZNetView>()?.GetZDO();
+        if(candidate==null||!candidate.Persistent)return false;
+        return !string.IsNullOrWhiteSpace(handoff.BindingInstanceId)
+          ?candidate.GetString(Prefix+"bindingInstanceId","")==handoff.BindingInstanceId
+          :candidate.m_uid.ToString()==handoff.BindingZdo;
+      }).ToArray();
+      if(matches.Length!=1){error=matches.Length==0?"continuation_binding_not_loaded":"continuation_binding_ambiguous";return false;}
+      wear=matches[0];var view=wear.GetComponent<ZNetView>();zdo=view?.GetZDO();
+      if(zdo==null||!view.IsOwner()){error="continuation_binding_not_owned";return false;}
+      targetKind=wear.GetComponent<Sign>()!=null?"sign":wear.GetComponent<ItemStand>()!=null
+        ?"item_stand":"player_built_piece";
+      return true;
+    } catch(Exception exception) {error="continuation_binding_unreadable:"+exception.GetType().Name;return false;}
+  }
+
+  static RuntimeReceipt ContinuationReceipt(string status,Active active,RuntimeRunRecord source,
+      RuntimeContinuationRecord handoff,RuntimeRunRecord successor,string id,string error,
+      DateTimeOffset at)=>new(){Id=id,AtUtc=at,Operation="continuation",Status=status,Error=error,
+        PackId=handoff?.PackId??active?.PackId,Version=handoff?.Version??active?.Version,
+        ContentHash=handoff?.ContentHash??active?.ContentHash,
+        ActivationId=handoff?.ActivationId??active?.ActivationId,
+        ExperienceId=handoff?.SourceExperienceId??source?.Scope?.ExperienceId,
+        RunId=handoff?.SourceRunId??source?.RunId,HandoffId=handoff?.HandoffId,
+        SuccessorExperienceId=handoff?.SuccessorExperienceId,
+        SuccessorRunId=successor?.RunId??handoff?.SuccessorRunId,
+        ParticipantIds=(IReadOnlyList<string>)(handoff?.ParticipantIds??source?.Scope?.ParticipantIds),
+        WorldId=handoff?.WorldId??source?.Scope?.WorldId,
+        BindingZdo=handoff?.BindingZdo??source?.Scope?.BindingZdo,
+        BindingInstanceId=handoff?.BindingInstanceId??source?.Scope?.BindingInstanceId,
+        EvidenceKind=CreatorEvidenceLine.KindName(error==null?CreatorEvidenceKind.Story:CreatorEvidenceKind.Warning),
+        Diagnostics=Array.Empty<ContractDiagnostic>()};
 
   /// <summary>The counted clause the player is actually working on: the unmet node with the most left
   /// to do. Without this an ignored receipt reports the top-level ALL's pass/fail, which is 0/1 no
@@ -1879,6 +2045,21 @@ sealed class RuntimeExperienceEngine {
         error = "active_experience_invalid";
         return false;
       }
+      if(!ActiveExperienceResolver.TryResolveAll(zip,out var available,out selection)) {
+        InvalidateActive();
+        error=selection;
+        return false;
+      }
+      var documents=new Dictionary<string,ExperienceDocument>(StringComparer.Ordinal);
+      foreach(var candidate in available) {
+        var member=ExperienceCompiler.CompileProductionJson(candidate.Json);
+        if(!member.IsValid||member.Document==null) {
+          InvalidateActive();
+          error="active_experience_invalid";
+          return false;
+        }
+        documents[member.Document.Id]=member.Document;
+      }
       var packageInfo = new FileInfo(package);
       var previousContentHash = cachedActive?.ContentHash;
       cachedActive = new Active {
@@ -1886,7 +2067,9 @@ sealed class RuntimeExperienceEngine {
         Version = set.Version,
         ContentHash = set.ContentHash,
         ActivationId = set.ActivationId,
+        Set = set,
         Document = compiled.Document,
+        Documents = documents,
         Subscriptions = RuntimeSubscriptionIndex.Create(compiled.Document),
         PackagePath = package,
       };
@@ -2032,7 +2215,9 @@ sealed class RuntimeExperienceEngine {
     public string Version;
     public string ContentHash;
     public string ActivationId;
+    public ActiveSet Set;
     public ExperienceDocument Document;
+    public IReadOnlyDictionary<string, ExperienceDocument> Documents;
     public RuntimeSubscriptionIndex Subscriptions;
     public string PackagePath;
   }

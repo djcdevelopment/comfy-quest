@@ -149,6 +149,7 @@ update.
 | `questlab_batch prepare scenario-<event>` | export one deterministic, editable schema-1 draft plus its scenario manifest without loading it or changing the world |
 | `questlab_batch run [all-schools\|creator-events\|scenario-<event>]` | start live witnessing, run the 34-event contract probe, or rehearse one event through the exact evaluator |
 | `questlab_batch reset\|report\|export` | reset safely, show progress, or write a machine-readable receipt |
+| `questlab_signature_hunt prepare\|status\|clear` | manage the fixed, parameter-free Slayers proof fixture in the identity-pinned `ComfyQuestDemo` world |
 | `questlab_blueprint capture <name> <radius> [mine\|lab] [replace]` | copy your pieces or Quest Lab-marked pieces inside a 1–40 m sphere into a deterministic PlanBuild file plus metadata sidecar |
 | `questlab_blueprint inspect <name>` | validate the sidecar hash and prove its PlanBuild projection still agrees |
 | `questlab_blueprint diff <name> [radius] [mine\|lab]` | compare a live selection with the capture, independent of world translation |
@@ -456,6 +457,28 @@ deploys one expiring request through the SHA-verified config lane and collects i
 suite, Gallery Truth, and relevant-log receipts. Its eleven operations, two release suites,
 34 exact scenario IDs, and three gallery profiles are fixed allowlists. The request schema has
 no console text, key, path, or prefab field.
+
+### Fixed Slayers Signature Hunt fixture
+
+`questlab_signature_hunt` exposes only `prepare`, `status`, and `clear`. The same three
+parameter-free operations are available to the Lab request mailbox as
+`signature_hunt_prepare`, `signature_hunt_status`, and `signature_hunt_clear`. There is no
+fixture, prefab, count, position, item, selector, or world argument: this is one reviewed proof
+fixture, not general spawn authority.
+
+Preparation is identity-pinned to the private/local `ComfyQuestDemo` world, UID
+`-7600395338659582326`. It preflights the entire fixed plan before changing the standing
+fixture, then places marked Deathsquito and Drake arenas 40 metres apart and four marked
+`SpearCarapace` world drops at the start. The Drake's reviewed Valheim prefab is `Hatchling`;
+the preparation receipt records each instantiated target's actual `Character.m_name` and its
+normalized kill-matcher target rather than treating the creator-facing label as evidence.
+
+Fixture receipts use `comfy-questlab-signature-hunt-fixture/v1` under
+`BepInEx/config/comfy-quest-lab/receipts/fixtures/`. They claim fixture preparation only, not a
+live kill or quest completion. Prepare and clear select objects only by the exact
+`slayers-signature-hunt/v1` ownership mark and verify the resulting count. A spear picked up by
+a player, and loot or ragdolls later created by Valheim, are not fixture-owned and are not
+removed by fixture cleanup.
 
 ## Writing a quest
 
