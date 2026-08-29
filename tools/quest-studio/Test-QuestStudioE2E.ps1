@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$DotNet,
+    [string]$ContractsPackage,
     [string]$Filter,
     [switch]$Headed,
     [switch]$KeepArtifacts,
@@ -50,7 +51,12 @@ if (-not $dotnetExe) {
 $hostProject = Join-Path $repoRoot 'src\Quest.Studio.Host\Quest.Studio.Host.csproj'
 $testProject = Join-Path $repoRoot 'src\Quest.Studio.E2E.Tests\Quest.Studio.E2E.Tests.csproj'
 $testOutput = Join-Path $repoRoot 'src\Quest.Studio.E2E.Tests\bin\Release\net9.0'
-$contractsPackage = Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.6.0-local.nupkg'
+$contractsPackageWasExplicit = -not [string]::IsNullOrWhiteSpace($ContractsPackage)
+$contractsPackage = if ($contractsPackageWasExplicit) {
+    (Resolve-Path -LiteralPath $ContractsPackage).Path
+} else {
+    Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.6.0-local.nupkg'
+}
 $packageCacheKey = if (Test-Path -LiteralPath $contractsPackage) {
     (Get-FileHash -LiteralPath $contractsPackage -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0, 16)
 } else {
@@ -87,8 +93,28 @@ try {
     [Environment]::SetEnvironmentVariable('COMFY_QUEST_E2E_HEADED', $(if ($Headed) { '1' } else { '0' }), 'Process')
     [Environment]::SetEnvironmentVariable('COMFY_QUEST_E2E_KEEP_ARTIFACTS', $(if ($KeepArtifacts) { '1' } else { '0' }), 'Process')
 
+    $verificationConfig = $null
+    if ($contractsPackageWasExplicit) {
+        $verificationConfigRoot = Join-Path $hostBuildArtifacts 'verification-nuget'
+        New-Item -ItemType Directory -Path $verificationConfigRoot -Force | Out-Null
+        & $dotnetExe new nugetconfig --output $verificationConfigRoot --force | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not create the verification NuGet config.' }
+        $verificationConfig = Join-Path $verificationConfigRoot 'NuGet.Config'
+        & $dotnetExe nuget add source (Split-Path -Parent $contractsPackage) `
+            --name current-contracts --configfile $verificationConfig | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not add the current Contracts verification source.' }
+        & $dotnetExe restore $hostProject --configfile $verificationConfig "-p:ArtifactsPath=$hostBuildArtifacts"
+        if ($LASTEXITCODE -ne 0) { throw 'Quest Studio host verification restore failed.' }
+    }
+
     Write-Host 'Publishing the real Quest Studio host to an isolated E2E output...'
-    & $dotnetExe publish $hostProject --configuration Release --output $hostOutput "-p:ArtifactsPath=$hostBuildArtifacts"
+    $publishArguments = @(
+        'publish', $hostProject,
+        '--configuration', 'Release',
+        '--output', $hostOutput,
+        "-p:ArtifactsPath=$hostBuildArtifacts")
+    if ($contractsPackageWasExplicit) { $publishArguments += '--no-restore' }
+    & $dotnetExe @publishArguments
     if ($LASTEXITCODE -ne 0) { throw "Quest Studio host build failed with exit code $LASTEXITCODE." }
 
     # Only the Studio host consumes the evolving interim package. Let the E2E

@@ -25,6 +25,16 @@ public static class QuestStudioEndpoints
         app.MapGet("/quest-studio/studio.js", () => Results.Text(QuestStudioPage.Js, "text/javascript", Encoding.UTF8));
 
         app.MapGet("/api/v2/quest-studio/catalog", (QuestStudioService studio) => Results.Json(studio.WorkspaceCatalog(), host.Json));
+        app.MapGet("/api/v2/quest-studio/builds", (HttpRequest request, HttpResponse response, [FromServices] QuestStudioBuildService builds) =>
+        { NoStore(response); return !host.Authorize(request) ? Forbidden(host) : Results.Json(new { schema = "comfy-quest-studio-build-list/v1", builds = builds.List() }, host.Json); });
+        app.MapPost("/api/v2/quest-studio/builds/import", async (HttpRequest request, HttpResponse response, [FromServices] QuestStudioBuildService builds, CancellationToken token) =>
+        { NoStore(response); if (!host.Authorize(request)) return Forbidden(host); return BuildResult(await builds.ImportAsync(request, token), host); }).WithMetadata(new RequestSizeLimitAttribute(2 * 1024 * 1024));
+        app.MapGet("/api/v2/quest-studio/builds/{buildId}", (string buildId, HttpRequest request, HttpResponse response, [FromServices] QuestStudioBuildService builds) =>
+        { NoStore(response); if (!host.Authorize(request)) return Forbidden(host); var build = builds.Read(buildId); return build is null ? Results.NotFound() : Results.Json(build, host.Json); });
+        app.MapPut("/api/v2/quest-studio/builds/{buildId}/placement", (string buildId, HttpRequest request, HttpResponse response, StudioBuildPlacementRequest? body, [FromServices] QuestStudioBuildService builds) =>
+        { NoStore(response); if (!host.Authorize(request)) return Forbidden(host); if (body is null) return Results.BadRequest(new { ok = false, error = "placement_required" }); return BuildResult(builds.Placement(buildId, body), host); });
+        app.MapPost("/api/v2/quest-studio/builds/{buildId}/stage", (string buildId, HttpRequest request, HttpResponse response, [FromServices] QuestStudioBuildService builds) =>
+        { NoStore(response); if (!host.Authorize(request)) return Forbidden(host); return BuildResult(builds.Stage(buildId), host); });
         app.MapGet("/api/v2/quest-studio/portfolio", (HttpRequest request, HttpResponse response, QuestStudioService studio) =>
         {
             NoStore(response);
@@ -488,6 +498,16 @@ public static class QuestStudioEndpoints
         new { error = "browser_authorization_required", detail = "Refresh the loopback browser token and retry." },
         host.Json,
         statusCode: StatusCodes.Status403Forbidden);
+
+    static IResult BuildResult(StudioBuildOperationResult result, IQuestStudioHost host) => Results.Json(new
+    {
+        result.Ok,
+        result.Error,
+        result.Build,
+        result.Receipt,
+        result.AlreadyPresent,
+        result.Revision,
+    }, host.Json, statusCode: result.Status);
 
     static IResult Download(HttpResponse response, StudioDownloadResult result, IQuestStudioHost host)
     {

@@ -231,13 +231,57 @@ public sealed class LabBlueprintBuilder {
     // Capture's broad "lab" selection remains available for deliberately capturing a
     // mixed Lab scene; replay proof is scoped by the canonical artifact being proved.
     string blueprintMark = selection == "lab" ? canonical : null;
-    if (!TrySelect(player, radius, selection, out actual, out error, blueprintMark)) return error;
+    if (!TrySelectAround(player, player.transform.position, radius, selection,
+        out actual, out error, blueprintMark)) return error;
     LabCaptureDiff diff = LabCaptureContract.Diff(artifact.Pieces, actual);
+    return DiffDetail(canonical, diff, null);
+  }
+
+  /// <summary>Prove a build against the exact Studio placement without changing the
+  /// canonical capture. Selection is centered on the requested origin instead of the
+  /// operator, then the live records are inverse-transformed before comparison.</summary>
+  public string DiffAt(
+      string name, string radiusArg, string selectionArg,
+      float worldX, float worldY, float worldZ, float yawDegrees) {
+    Player player = Player.m_localPlayer;
+    if (player == null || ZNetScene.instance == null || ZDOMan.instance == null) {
+      return "not in a world yet.";
+    }
+    string canonical = LabCaptureContract.CanonicalName(name);
+    LabCaptureArtifact artifact;
+    string error = LoadCapture(canonical, out artifact);
+    if (error != null) return error;
+    float radius = artifact.RadiusMetres;
+    if (!string.IsNullOrEmpty(radiusArg)
+        && (!float.TryParse(radiusArg, NumberStyles.Float, CultureInfo.InvariantCulture,
+                           out radius)
+            || radius < LabCaptureContract.MinRadius || radius > LabCaptureContract.MaxRadius)) {
+      return "diff radius must be 1-40 metres.";
+    }
+    string selection = string.IsNullOrEmpty(selectionArg)
+        ? artifact.Selection : selectionArg.Trim().ToLowerInvariant();
+    if (selection != "lab") return "diff-at selection must be lab.";
+    var origin = new Vector3(worldX, worldY, worldZ);
+    List<LabCapturePiece> actual;
+    if (!TrySelectAround(player, origin, radius, selection, out actual, out error, canonical)) {
+      return error;
+    }
+    LabCaptureDiff diff = LabCaptureContract.DiffAt(
+        artifact.Pieces, actual, worldX, worldY, worldZ, yawDegrees);
+    string placement = "placement x=" + worldX.ToString("0.######", CultureInfo.InvariantCulture)
+        + " y=" + worldY.ToString("0.######", CultureInfo.InvariantCulture)
+        + " z=" + worldZ.ToString("0.######", CultureInfo.InvariantCulture)
+        + " yaw=" + yawDegrees.ToString("0.######", CultureInfo.InvariantCulture);
+    return DiffDetail(canonical, diff, placement);
+  }
+
+  static string DiffDetail(string canonical, LabCaptureDiff diff, string placement) {
     var sb = new StringBuilder();
     sb.Append("capture diff ").Append(canonical).Append(": ")
       .Append(diff.Equal ? "MATCH" : "DIFFERENT").Append(" — expected ")
       .Append(diff.ExpectedCount).Append(", selected ").Append(diff.ActualCount)
       .Append(", missing ").Append(diff.MissingCount).Append(", extra ").Append(diff.ExtraCount);
+    if (!string.IsNullOrEmpty(placement)) sb.Append("\n  ").Append(placement);
     foreach (string example in diff.Examples) sb.Append("\n  ").Append(example);
     if (!diff.Equal) sb.Append("\nSelection is translation-independent, but rotation and metadata must match.");
     return sb.ToString();
@@ -779,9 +823,15 @@ public sealed class LabBlueprintBuilder {
   bool TrySelect(Player player, float radius, string selection,
                  out List<LabCapturePiece> records, out string error,
                  string blueprintMark = null) {
+    return TrySelectAround(player, player.transform.position, radius, selection,
+        out records, out error, blueprintMark);
+  }
+
+  bool TrySelectAround(Player player, Vector3 center, float radius, string selection,
+                 out List<LabCapturePiece> records, out string error,
+                 string blueprintMark = null) {
     records = new List<LabCapturePiece>();
     error = null;
-    Vector3 center = player.transform.position;
     float radiusSquared = radius * radius;
     long playerId = player.GetPlayerID();
     try {

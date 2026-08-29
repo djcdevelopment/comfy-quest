@@ -1,0 +1,147 @@
+{
+  "schema": "comfy-quest-architectural-warm-evidence-index/v1",
+  "recorded_on": "2026-08-29",
+  "result": "passed",
+  "state": "active-warm",
+  "work_item": "architectural-capsule-warm-rnd",
+  "fixture": "tn0304",
+  "driver": "tools/quest-studio/Invoke-ArchitecturalWarmLap.ps1",
+  "target_probe": "tools/quest-studio/architectural_live_probe.py",
+  "identity": {
+    "machine": "am4",
+    "world": "ComfyQuestDemo",
+    "world_uid": "-7600395338659582326",
+    "character": "questyfour",
+    "creator_session_id": "architectural-tn0304-warm-rnd",
+    "capsule_sha256": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+    "stage_id": "8ea1838ec535b4a3d20b171da8f0da3ffd9c3370eaa37f6bf7d13b2b1a013dd5",
+    "blueprint_name": "tn0304-6ue2ukrad7ntjfoa7cvdmvwkcvsccusli5wrfvhq2rnkhtm2ehuq"
+  },
+  "architecture": {
+    "footprint_m": [
+      7.953375,
+      7.4676
+    ],
+    "wall_datum_m": 2.2225,
+    "ridge_m": 5.8166,
+    "pitch_degrees": 43.907838,
+    "ridge_reconciliation_m": -0.029171,
+    "pieces": {
+      "floors": 16,
+      "walls": 16,
+      "roofs": 8,
+      "total": 40
+    }
+  },
+  "placement": {
+    "revision": 2,
+    "x": 12.5,
+    "y": 1.25,
+    "z": -3.75,
+    "yaw": 22.5
+  },
+  "canonical_artifacts": {
+    "capture": {
+      "bytes": 18307,
+      "sha256": "5d466cdaa5a213ef958d07636325b9398eee9a74584019da8dc16a5603654251"
+    },
+    "blueprint": {
+      "bytes": 2440,
+      "sha256": "02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f"
+    },
+    "canonical_pieces_sha256": "0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578"
+  },
+  "candidate_lab": {
+    "bytes": 877056,
+    "sha256": "44d971dc1ca75c6d9b1775d552c5f86ad33b428208e5cf9347ebca24f6dfb45c"
+  },
+  "first_lap": {
+    "started_utc": "2026-08-29T11:55:38.594563Z",
+    "completed_utc": "2026-08-29T11:56:13.443782Z",
+    "game_launched": true,
+    "session_opened": true,
+    "build_action": "created",
+    "placed": 40,
+    "failed": 0,
+    "standing_piece_count": 40,
+    "diff": {
+      "result": "MATCH",
+      "expected": 40,
+      "selected": 40,
+      "missing": 0,
+      "extra": 0
+    },
+    "build_receipt_sha256": "95ae7abd69a0e0011a47d76a221169e1af0f9eec726dab68ded47c37e8781cc3",
+    "diff_receipt_sha256": "52bbbc901906b54a7cfbd6f7c04f16a872c65775704aeaf1d3736f11a10b5c36",
+    "warm_lap_sha256": "2092c937ad3aff17759e5731fd16fb3feb6a844936fef07dd11426937e99855e",
+    "screenshot_sha256": "6d2d0f52c3fe98a88c94cf13f082614e0dcf78323c8943ee128429367c6487f9"
+  },
+  "second_lap": {
+    "started_utc": "2026-08-29T11:56:32.245869Z",
+    "completed_utc": "2026-08-29T11:56:37.008387Z",
+    "game_was_running": true,
+    "game_launched": false,
+    "session_opened": false,
+    "build_action": "reused",
+    "standing_piece_count": 40,
+    "diff": {
+      "result": "MATCH",
+      "expected": 40,
+      "selected": 40,
+      "missing": 0,
+      "extra": 0
+    },
+    "operations": [
+      "status",
+      "blueprint_check",
+      "blueprint_count",
+      "blueprint_diff",
+      "status"
+    ],
+    "diff_receipt_sha256": "2fda16314d9b61bdbdcdbf7121ae3167b509d519ce01ad47790bb2febd6de419",
+    "warm_lap_sha256": "b3c706f33dfacf54222124d8fa036f7b56595202036825a7507a437ec267e02e",
+    "acceptance_receipt_sha256": "58aad90c09dbaef8306af5126ff54104bee83fec8f23d0feb7227aa91592b227",
+    "screenshot_sha256": "a129d3690a28af7dd80f7d3932ad146758d70793c59bd1187a3b6d1bc12fbba4"
+  },
+  "warm_state": {
+    "valheim_running": true,
+    "steam_running": true,
+    "marked_pieces_retained": 40,
+    "creator_build_enabled": false,
+    "pending_runtime_mailbox": false,
+    "pending_lab_mailbox": false,
+    "canonical_artifacts_unchanged": true,
+    "identity_matching_lap_skips": [
+      "plugin_deploy",
+      "world_entry",
+      "blueprint_build",
+      "blueprint_clear",
+      "valheim_stop",
+      "state_restore"
+    ]
+  },
+  "rollback_snapshot": {
+    "state": "retained-not-applied",
+    "prepare_sha256": "43b1cd27019335b5d555a0e5ea8bc2254af6360c804639c95c6b6f0e0d35c5be",
+    "before_sha256": "a86f04de3c825f0410923b6f21e015b771a5dd293a7c44978088df03bad3f2b7",
+    "plugin_sha256": "3325151a67779afc19f2c24e4c5967f94b1c3a8cdea8acc20aac0df4dcccb7e5",
+    "world_db_sha256": "2ee519b826e8e7d876f3133be058e2513859de37f11cbcfd912fca0ed85ba02f",
+    "character_sha256": "7a51ef5e25181a4bde3a59bf946ec92c2466a1ca795d69baf92cb4edd2b9e8bd",
+    "close_command": "tools\\quest-studio\\Invoke-ArchitecturalWarmLap.ps1 -Close"
+  },
+  "source_hashes": {
+    "tools/quest-studio/architectural_live_probe.py": "0078fc0972a78ecccb89f49b23cddbee2c025f1ce69ec8879250b884eb025ec1",
+    "tools/quest-studio/Invoke-ArchitecturalWarmLap.ps1": "b5781da54ed252e5e4f2189266b75b237659914ef319479dcaed9d0163e58079"
+  },
+  "evidence_roots": {
+    "remote": "/home/derek/valheim-capture/architectural-warm/tn0304-6ue2ukrad7ntjfoa7cvdmvwkcvsccusli5wrfvhq2rnkhtm2ehuq",
+    "local_first_lap": "C:\\work\\comfy-quest\\artifacts\\architectural-warm\\laps\\20260829T115513Z",
+    "local_second_lap": "C:\\work\\comfy-quest\\artifacts\\architectural-warm\\laps\\20260829T115627Z",
+    "local_evidence_is_ignored": true
+  },
+  "limitations": [
+    "This is an active R&D state, not a closed acceptance snapshot: Valheim and Steam intentionally remain running and the 40 marked pieces intentionally remain in the loaded world.",
+    "Identity drift fails closed and requires the explicit close command before a new plugin or canonical pair can be deployed.",
+    "The retained rollback snapshot is not applied on ordinary laps; explicit close stops the client and restores the exact pre-session plugin, Runtime, Lab, world, and character bytes."
+  ]
+}

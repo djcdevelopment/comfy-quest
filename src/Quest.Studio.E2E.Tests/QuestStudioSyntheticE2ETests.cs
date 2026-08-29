@@ -23,6 +23,16 @@ public sealed class InstalledGuildFactAttribute : FactAttribute
     }
 }
 
+public sealed class ArchitecturalBuildFactAttribute : FactAttribute
+{
+    public ArchitecturalBuildFactAttribute()
+    {
+        var capsule = Environment.GetEnvironmentVariable("COMFY_QUEST_ARCHITECTURAL_CAPSULE");
+        if (string.IsNullOrWhiteSpace(capsule) || !File.Exists(capsule))
+            Skip = "Set COMFY_QUEST_ARCHITECTURAL_CAPSULE through the architectural Build journey harness.";
+    }
+}
+
 public sealed class QuestStudioSyntheticE2ETests
 {
     const string SentinelName = ".quest-studio-synthetic-e2e";
@@ -479,6 +489,226 @@ public sealed class QuestStudioSyntheticE2ETests
         }
     }
 
+    [ArchitecturalBuildFact]
+    public async Task Architectural_capsule_is_inspected_placed_and_staged_without_world_entry()
+    {
+        var repoRoot = FindRepoRoot();
+        var capsule = Path.GetFullPath(Environment.GetEnvironmentVariable(
+            "COMFY_QUEST_ARCHITECTURAL_CAPSULE")!);
+        var run = SyntheticRun.Create(repoRoot, SentinelName, SentinelContents);
+        var externalStudio = Environment.GetEnvironmentVariable(
+            "COMFY_QUEST_ARCHITECTURAL_STUDIO_URL");
+        StudioHost? host = null;
+        IPlaywright? playwright = null;
+        IBrowser? browser = null;
+        IBrowserContext? context = null;
+        IPage? page = null;
+        var succeeded = false;
+        try
+        {
+            var studioUrl = externalStudio;
+            if (string.IsNullOrWhiteSpace(studioUrl))
+            {
+                host = await StudioHost.StartAsync(repoRoot, run);
+                studioUrl = host.StudioUrl;
+            }
+            playwright = await Playwright.CreateAsync();
+            browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+            {
+                Headless = Environment.GetEnvironmentVariable("COMFY_QUEST_E2E_HEADED") != "1",
+            });
+            context = await browser.NewContextAsync(new BrowserNewContextOptions
+            {
+                ViewportSize = new ViewportSize { Width = 1600, Height = 1000 },
+            });
+            page = await context.NewPageAsync();
+            page.SetDefaultTimeout(20_000);
+            page.SetDefaultNavigationTimeout(30_000);
+            await page.GotoAsync(studioUrl, new PageGotoOptions
+            {
+                WaitUntil = WaitUntilState.DOMContentLoaded,
+            });
+            await page.WaitForFunctionAsync("() => Boolean(token && catalog)");
+            await page.Locator("#build-open").ClickAsync();
+            await WaitUntilAsync(() => page.Locator("#build-workspace").IsVisibleAsync(),
+                "Build workspace open");
+            await page.Locator("#build-capsule").SetInputFilesAsync(capsule);
+            await page.Locator("#build-import").ClickAsync();
+            await WaitForTextAsync(page.Locator("#build-status"), "40 pieces",
+                "40-piece architectural import", 30_000);
+
+            Assert.Equal("Architecture", (await page.Locator(
+                "[data-build-view='architecture']").TextContentAsync())?.Trim());
+            await WaitForTextAsync(page.Locator("[data-build-metric='width_m']"),
+                "7.953375 m", "measured footprint width");
+            await WaitForTextAsync(page.Locator("[data-build-metric='depth_m']"),
+                "7.4676 m", "measured footprint depth");
+            await WaitForTextAsync(page.Locator("[data-build-metric='wall_height_m']"),
+                "2.2225 m", "wall datum");
+            await WaitForTextAsync(page.Locator("[data-build-metric='ridge_height_m']"),
+                "5.8166 m", "true ridge");
+            await WaitForTextAsync(page.Locator("[data-build-metric='roof_pitch_degrees']"),
+                "43.907838°", "roof pitch");
+            await WaitForTextAsync(page.Locator("[data-build-reconciliation]"),
+                "-0.029171 m", "bounded ridge reconciliation");
+            await WaitForTextAsync(page.Locator("[data-build-reconciliation]"),
+                "minimum horizontal snap", "ridge reconciliation reason");
+            await WaitForTextAsync(page.Locator("#build-viewport"), "GAME_ONLY",
+                "game-only adaptation");
+            await WaitForTextAsync(page.Locator("#build-viewport"),
+                "REJECTED_NARRATIVE_NOT_GEOMETRIC", "conflicting constraint");
+
+            var captureHashBefore = await page.Locator(
+                "[data-build-hash='canonical capture']").TextContentAsync();
+            var blueprintHashBefore = await page.Locator(
+                "[data-build-hash='canonical blueprint']").TextContentAsync();
+            await page.Locator("#build-pieces").ClickAsync();
+            Assert.Equal(40, await page.Locator("[data-piece-index]").CountAsync());
+            await WaitForTextAsync(page.Locator("[data-prefab='wood_floor']"),
+                "x 16", "floor prefab count");
+            await WaitForTextAsync(page.Locator("[data-prefab='woodwall']"),
+                "x 16", "wall prefab count");
+            await WaitForTextAsync(page.Locator("[data-prefab='wood_roof_45']"),
+                "x 8", "roof prefab count");
+            await WaitForTextAsync(page.Locator("[data-prefab='wood_roof_45']"),
+                "2.8284", "capsule prefab geometry");
+
+            await page.Locator("#build-x").FillAsync("12.5");
+            await page.Locator("#build-y").FillAsync("1.25");
+            await page.Locator("#build-z").FillAsync("-3.75");
+            await page.Locator("#build-yaw").FillAsync("22.5");
+            await page.Locator("#build-save-placement").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"),
+                "Placement intent saved", "placement save");
+            await WaitForTextAsync(page.Locator("#build-placement-state"),
+                "not been applied", "unapplied placement boundary");
+            Assert.Equal(captureHashBefore, await page.Locator(
+                "[data-build-hash='canonical capture']").TextContentAsync());
+            Assert.Equal(blueprintHashBefore, await page.Locator(
+                "[data-build-hash='canonical blueprint']").TextContentAsync());
+
+            await page.Locator("#build-stage").ClickAsync();
+            await WaitUntilAsync(() => page.Locator("#build-stage-receipt").IsVisibleAsync(),
+                "stage receipt", 30_000);
+            await WaitForTextAsync(page.Locator("#build-stage-receipt"),
+                "Staged, not applied", "staged boundary");
+            await WaitForTextAsync(page.Locator("#build-stage-receipt"),
+                "Creator Session started: false", "Creator Session absence");
+            await WaitForTextAsync(page.Locator("#build-stage-receipt"),
+                "mailbox written: false", "mailbox absence");
+            await WaitForTextAsync(page.Locator("#build-stage-receipt"),
+                "world mutation: false", "world mutation absence");
+            var stagedCaptureHash = (await page.Locator(
+                "[data-stage-hash='capture']").TextContentAsync())?.Trim();
+            var stagedBlueprintHash = (await page.Locator(
+                "[data-stage-hash='blueprint']").TextContentAsync())?.Trim();
+            Assert.Equal(captureHashBefore?.Trim(), stagedCaptureHash);
+            Assert.Equal(blueprintHashBefore?.Trim(), stagedBlueprintHash);
+
+            await page.Locator("#build-import").ClickAsync();
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Build reopened",
+                "idempotent browser reimport", 30_000);
+
+            var deepLinkBuildId = await page.EvaluateAsync<string>(
+                "() => (activeBuild?.build||activeBuild)?.build_id");
+            Assert.False(string.IsNullOrWhiteSpace(deepLinkBuildId));
+            var studioBase = studioUrl!.Split('?', 2)[0];
+            await page.GotoAsync(
+                $"{studioBase}?workspace=build&build={Uri.EscapeDataString(deepLinkBuildId)}&view=pieces",
+                new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await page.WaitForFunctionAsync("() => Boolean(token && catalog)");
+            await WaitUntilAsync(() => page.Locator("#build-workspace").IsVisibleAsync(),
+                "deep-linked Build workspace");
+            Assert.Equal("Game pieces", (await page.Locator(
+                "[data-build-view='pieces']").TextContentAsync())?.Trim());
+            await WaitForTextAsync(page.Locator("[data-build-ready='footprint']"),
+                "7.953375", "demo footprint width readiness");
+            await WaitForTextAsync(page.Locator("[data-build-ready='footprint']"),
+                "7.4676 m", "demo footprint depth readiness");
+            await WaitForTextAsync(page.Locator("[data-build-ready='ridge']"),
+                "5.8166 m ridge", "demo ridge readiness");
+            await WaitForTextAsync(page.Locator("[data-build-ready='ridge']"),
+                "40 canonical pieces", "demo piece readiness");
+            await WaitForTextAsync(page.Locator("[data-build-ready='placement']"),
+                "12.5, 1.25, -3.75", "demo placement readiness");
+            await WaitForTextAsync(page.Locator("[data-build-ready='stage']"),
+                "Staged, not applied", "demo staging readiness");
+            Assert.Contains("workspace=build", page.Url);
+            Assert.Contains("view=pieces", page.Url);
+
+            await page.GotoAsync($"{studioBase}?workspace=build&build=missing-build&view=architecture",
+                new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await page.WaitForFunctionAsync("() => Boolean(token && catalog)");
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Build not found",
+                "missing deep-link fallback");
+            await WaitForTextAsync(page.Locator("#build-status"), "40 pieces",
+                "missing deep-link newest build fallback");
+
+            await page.GotoAsync(
+                $"{studioBase}?workspace=build&build={Uri.EscapeDataString(deepLinkBuildId)}&view=architecture",
+                new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await page.WaitForFunctionAsync("() => Boolean(token && catalog)");
+            await WaitUntilAsync(() => page.Locator("[data-build-view='architecture']").IsVisibleAsync(),
+                "deep-linked Architecture view");
+            var browserEvidence = await page.EvaluateAsync<JsonElement>("""
+                () => {
+                  const b=activeBuild?.build||activeBuild, r=b?.latest_stage;
+                  return {build_id:b?.build_id,capsule_sha256:b?.capsule_sha256,
+                    source_revision:b?.source_revision,revision:b?.revision,
+                    placement:b?.placement,piece_count:b?.piece_count,
+                    prefab_counts:b?.prefab_counts,reconciliation_ids:b?.reconciliation_ids,
+                    graph_sha256:b?.graph_sha256,compiled_pieces_sha256:b?.compiled_pieces_sha256,
+                    canonical_capture_sha256:b?.canonical_capture_sha256,
+                    canonical_blueprint_sha256:b?.canonical_blueprint_sha256,
+                    importer_sha256:b?.importer_sha256,importer_bundle_sha256:b?.importer_bundle_sha256,
+                    stage:r};
+                }
+                """);
+            WriteJson(Path.Combine(run.Root, "architectural-browser-receipt.json"), new
+            {
+                schema = "comfy-quest-studio-architectural-browser-proof/v1",
+                completed_utc = DateTimeOffset.UtcNow,
+                studio_url = studioUrl,
+                capsule_path = capsule,
+                evidence = browserEvidence,
+            });
+
+            if (string.IsNullOrWhiteSpace(externalStudio))
+            {
+                var stageRoot = Path.Combine(run.ValheimRoot, "BepInEx", "config",
+                    "comfy-quest-lab", "blueprints");
+                var staged = Directory.GetFiles(stageRoot);
+                Assert.Equal(2, staged.Length);
+                Assert.Equal(stagedCaptureHash, Sha256(File.ReadAllBytes(Assert.Single(staged,
+                    path => path.EndsWith(".capture.json", StringComparison.Ordinal)))));
+                Assert.Equal(stagedBlueprintHash, Sha256(File.ReadAllBytes(Assert.Single(staged,
+                    path => path.EndsWith(".blueprint", StringComparison.Ordinal)))));
+                Assert.False(Directory.Exists(Path.Combine(run.ValheimRoot, "BepInEx", "config",
+                    "comfy-quest-lab", "requests")));
+                Assert.False(Directory.Exists(Path.Combine(run.ValheimRoot, "BepInEx", "config",
+                    "comfy-creator-session")));
+                Assert.Empty(Directory.GetFiles(run.ValheimRoot, "*.db",
+                    SearchOption.AllDirectories));
+            }
+            await page.ScreenshotAsync(new PageScreenshotOptions
+            {
+                Path = Path.Combine(run.Root, "architectural-build-staged.png"),
+                FullPage = true,
+            });
+            succeeded = true;
+            _output.WriteLine($"ARCHITECTURAL BUILD E2E proof preserved: {run.Root}");
+        }
+        finally
+        {
+            if (context is not null) await context.DisposeAsync();
+            if (browser is not null) await browser.DisposeAsync();
+            playwright?.Dispose();
+            if (host is not null) await host.DisposeAsync();
+            if (!succeeded)
+                _output.WriteLine($"ARCHITECTURAL BUILD E2E failure preserved: {run.Root}");
+        }
+    }
+
     [Fact]
     public async Task Guild_journey_drives_locked_B_then_A_to_B_to_A_scoped_reset_and_retention()
     {
@@ -531,22 +761,29 @@ public sealed class QuestStudioSyntheticE2ETests
                 () => page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"),
                 "open guild library");
             await page.Locator("#create-guild").ClickAsync();
-            await WaitForTextAsync(page.Locator("#selected-guild-name"), "Synthetic Guild settings", "selected guild editor");
+            await WaitForTextAsync(page.Locator("#selected-guild-name"), "Synthetic Guild creative system", "selected guild editor");
             var guildId = await page.EvaluateAsync<string>("() => selectedGuildId");
 
             var a = await CreateGuildJourneyStepAsync(page, guildId, "Guild Quest A");
             var b = await CreateGuildJourneyStepAsync(page, guildId, "Guild Quest B");
             await page.Locator($"[data-select-guild='{guildId}']").ClickAsync();
-            var prerequisite = page.Locator($"[data-guild-prerequisite='{b.ProjectId}']");
+            await page.Locator("#guild-lens-create").ClickAsync();
+            var campaignProgression = page.Locator("#guild-campaigns details.guild-compatibility");
+            if (!await campaignProgression.EvaluateAsync<bool>("element => element.open"))
+                await campaignProgression.Locator("summary").ClickAsync();
+            var prerequisite = page.Locator($"[data-campaign-prerequisite][data-project-id='{b.ProjectId}']");
             await WaitForCountAsync(prerequisite, 1, "B prerequisite control");
             await prerequisite.SelectOptionAsync(new[] { new SelectOptionValue { Value = a.ProjectId } });
-            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild progression saved", "saved A before B prerequisite");
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Campaign progression saved", "saved A before B prerequisite");
 
+            var compatibility = page.Locator("#guild-panel-create > details.guild-compatibility");
+            if (!await compatibility.EvaluateAsync<bool>("element => element.open"))
+                await compatibility.Locator("summary").ClickAsync();
             await page.Locator("#certify-guild").ClickAsync();
-            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack certified", "multi-experience guild certification");
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Default campaign certified", "multi-experience guild certification");
             await WaitForTextAsync(page.Locator("#status-detail"), "2 experiences", "two certified experiences");
             await page.Locator("#publish-guild").ClickAsync();
-            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack published", "multi-experience guild publication", 30_000);
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Default campaign published", "multi-experience guild publication", 30_000);
             await WaitForFileCountAsync(run.InboxRoot, "*.questpack", 1, "one guild questpack");
             await page.Locator("#library-close").ClickAsync();
             await WaitUntilAsync(
@@ -738,20 +975,27 @@ public sealed class QuestStudioSyntheticE2ETests
             if (!await page.Locator("#library-panel").EvaluateAsync<bool>("element => element.classList.contains('open')"))
                 await page.Locator("#library-toggle").ClickAsync();
             await page.Locator("#create-guild").ClickAsync();
-            await WaitForTextAsync(page.Locator("#selected-guild-name"), "Full-width Journey settings", "installed guild editor");
+            await WaitForTextAsync(page.Locator("#selected-guild-name"), "Full-width Journey creative system", "installed guild editor");
             var guildId = await page.EvaluateAsync<string>("() => selectedGuildId");
 
             var a = await CreateGuildJourneyStepAsync(page, guildId, "Installed Guild Quest A");
             var b = await CreateGuildJourneyStepAsync(page, guildId, "Installed Guild Quest B");
             await page.Locator($"[data-select-guild='{guildId}']").ClickAsync();
-            var prerequisite = page.Locator($"[data-guild-prerequisite='{b.ProjectId}']");
+            await page.Locator("#guild-lens-create").ClickAsync();
+            var campaignProgression = page.Locator("#guild-campaigns details.guild-compatibility");
+            if (!await campaignProgression.EvaluateAsync<bool>("element => element.open"))
+                await campaignProgression.Locator("summary").ClickAsync();
+            var prerequisite = page.Locator($"[data-campaign-prerequisite][data-project-id='{b.ProjectId}']");
             await WaitForCountAsync(prerequisite, 1, "installed B prerequisite control");
             await prerequisite.SelectOptionAsync(new[] { new SelectOptionValue { Value = a.ProjectId } });
-            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild progression saved", "installed A before B prerequisite");
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Campaign progression saved", "installed A before B prerequisite");
+            var compatibility = page.Locator("#guild-panel-create > details.guild-compatibility");
+            if (!await compatibility.EvaluateAsync<bool>("element => element.open"))
+                await compatibility.Locator("summary").ClickAsync();
             await page.Locator("#certify-guild").ClickAsync();
-            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack certified", "installed guild certification");
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Default campaign certified", "installed guild certification");
             await page.Locator("#publish-guild").ClickAsync();
-            await WaitForExactTextAsync(page.Locator("#status-title"), "Guild pack published", "installed immutable guild publication", 30_000);
+            await WaitForExactTextAsync(page.Locator("#status-title"), "Default campaign published", "installed immutable guild publication", 30_000);
             var production = WaitForPack(run.RuntimeRoot, QuestPackLane.Production, guildId, TimeSpan.FromSeconds(30));
             await EvidenceShotAsync(page, run, "01-authored-published");
 
@@ -1525,6 +1769,9 @@ public sealed class QuestStudioSyntheticE2ETests
         input.CopyTo(output);
         return output.ToArray();
     }
+
+    static string Sha256(byte[] bytes) => Convert.ToHexString(
+        SHA256.HashData(bytes)).ToLowerInvariant();
 
     static string UsageAggregatePath(SyntheticRun run) =>
         Path.Combine(run.StateRoot, "quest-studio", "usage", "aggregate.json");
@@ -2503,6 +2750,9 @@ public sealed class QuestStudioSyntheticE2ETests
             start.ArgumentList.Add(port.ToString());
             start.Environment["COMFY_QUEST_STUDIO_STATE"] = run.StateRoot;
             start.Environment["COMFY_VALHEIM_DIR"] = run.ValheimRoot;
+            start.Environment["COMFY_QUEST_REPO_ROOT"] = repoRoot;
+            start.Environment["COMFY_QUEST_PYTHON"] = OperatingSystem.IsWindows()
+                ? "python" : "python3";
             start.Environment["ASPNETCORE_ENVIRONMENT"] = "Production";
             var process = Process.Start(start) ?? throw new InvalidOperationException("Failed to start Quest Studio host.");
             var stdout = process.StandardOutput.ReadToEndAsync();

@@ -42,3 +42,19 @@ public interface IQuestStudioRAndDHost
 {
     string? RepositoryRoot { get; }
 }
+
+/// <summary>
+/// Exact, host-owned entrypoint for the architectural capture importer. Package hosts omit
+/// this capability and the Build workspace fails closed instead of carrying a second importer.
+/// A standalone bundle manifest is optional for a normal sovereign checkout and mandatory for
+/// a staged source-less R&amp;D bundle.
+/// </summary>
+public sealed record QuestStudioArchitecturalImporter(
+    string ScriptPath,
+    string PythonExecutable,
+    string? StandaloneBundleManifestPath);
+
+public interface IQuestStudioArchitecturalRAndDHost
+{
+    QuestStudioArchitecturalImporter? ArchitecturalImporter { get; }
+}

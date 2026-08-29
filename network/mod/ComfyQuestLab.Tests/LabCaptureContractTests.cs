@@ -116,6 +116,32 @@ public sealed class LabCaptureContractTests {
   }
 
   [Fact]
+  public void PlacementDiffVerifiesExactWorldOriginAndWholeBuildYaw() {
+    LabCapturePiece floor = Piece("wood_floor", 0f, 0f, 0f);
+    LabCapturePiece wall = Piece("wood_wall", 4f, 2f, 3f);
+    const double x = 12.5, y = 1.25, z = -3.75, yaw = 22.5;
+    double radians = yaw * Math.PI / 180d;
+    double sine = Math.Sin(radians), cosine = Math.Cos(radians);
+    double halfSine = Math.Sin(radians / 2d), halfCosine = Math.Cos(radians / 2d);
+    LabCapturePiece World(LabCapturePiece source) {
+      LabCapturePiece result = Piece(source.Prefab,
+          (float)(x + cosine * source.X + sine * source.Z),
+          (float)(y + source.Y),
+          (float)(z - sine * source.X + cosine * source.Z));
+      result.Qy = (float)halfSine;
+      result.Qw = (float)halfCosine;
+      return result;
+    }
+    LabCapturePiece[] expected = { floor, wall };
+    LabCapturePiece[] actual = { World(floor), World(wall) };
+
+    Assert.True(LabCaptureContract.DiffAt(expected, actual, x, y, z, yaw).Equal);
+    Assert.False(LabCaptureContract.Diff(expected, actual).Equal);
+    Assert.False(LabCaptureContract.DiffAt(expected, actual, x + .25, y, z, yaw).Equal);
+    Assert.False(LabCaptureContract.DiffAt(expected, actual, x, y, z, yaw + 1).Equal);
+  }
+
+  [Fact]
   public void QuaternionSignAndLengthNormalizeDeterministically() {
     LabCapturePiece first = Piece("wood_wall", 0f, 0f, 0f);
     first.Qx = 0f; first.Qy = 1.4142135f; first.Qz = 0f; first.Qw = -1.4142135f;

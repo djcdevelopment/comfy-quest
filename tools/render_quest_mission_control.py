@@ -137,6 +137,13 @@ def require_list(value: Any, where: str) -> list[Any]:
     return value
 
 
+def require_sha256(value: Any, where: str) -> str:
+    digest = require_text(value, where)
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise MissionControlError(f"{where} must be a lowercase SHA-256")
+    return digest
+
+
 def source_path(relative: str) -> Path:
     candidate = (REPO / require_text(relative, "source path")).resolve()
     try:
@@ -692,6 +699,167 @@ def validate_guardrail_taxonomy() -> None:
         )
 
 
+def validate_architectural_build(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise MissionControlError("next_attack must be an object")
+    if require_text(value.get("status"), "next_attack.status") != "accepted-am4-warm":
+        raise MissionControlError("next_attack.status must be accepted-am4-warm")
+    if require_text(value.get("fixture"), "next_attack.fixture") != "tn0304":
+        raise MissionControlError("next_attack.fixture must be tn0304")
+    require_text(value.get("completed_utc"), "next_attack.completed_utc")
+    if value.get("capsule_schema") != "creator-os-architectural-build-capsule/v0":
+        raise MissionControlError("next_attack carries an unsupported capsule schema")
+
+    journey = require_list(value.get("journey"), "next_attack.journey")
+    if len(journey) != 10:
+        raise MissionControlError("next_attack.journey must contain the ten accepted stages")
+    for index, step in enumerate(journey):
+        require_text(step, f"next_attack.journey[{index}]")
+
+    acceptance = value.get("acceptance")
+    expected_acceptance = {
+        "footprint_m": [7.953375, 7.4676],
+        "wall_datum_m": 2.2225,
+        "ridge_m": 5.8166,
+        "pitch_degrees": 43.907838,
+        "ridge_reconciliation_m": -0.029171,
+        "pieces": {"floors": 16, "walls": 16, "roofs": 8, "total": 40},
+    }
+    if acceptance != expected_acceptance:
+        raise MissionControlError("next_attack.acceptance must pin the accepted tn0304 envelope")
+
+    evidence = value.get("evidence")
+    if not isinstance(evidence, dict):
+        raise MissionControlError("next_attack.evidence must be an object")
+    evidence_path = source_path(require_text(evidence.get("source"), "next_attack.evidence.source"))
+    if evidence.get("receipt_schema") != "comfy-quest-architectural-warm-evidence-index/v1":
+        raise MissionControlError("next_attack.evidence has an unsupported receipt schema")
+    staging_path = source_path(require_text(
+        evidence.get("staging_source"), "next_attack.evidence.staging_source"))
+    if evidence.get("staging_receipt_schema") != "comfy-quest-architectural-build-evidence-index/v1":
+        raise MissionControlError("next_attack.evidence has an unsupported staging evidence schema")
+    cold_path = source_path(require_text(
+        evidence.get("cold_acceptance_source"),
+        "next_attack.evidence.cold_acceptance_source"))
+    if evidence.get("cold_acceptance_receipt_schema") != "comfy-quest-architectural-live-evidence-index/v1":
+        raise MissionControlError("next_attack.evidence has an unsupported cold acceptance schema")
+    if evidence.get("stage_receipt_schema") != "comfy-quest-studio-build-stage/v1":
+        raise MissionControlError("next_attack.evidence has an unsupported stage receipt schema")
+    capsule_sha = require_sha256(evidence.get("capsule_sha256"), "next_attack.evidence.capsule_sha256")
+    stage_id = require_sha256(evidence.get("stage_id"), "next_attack.evidence.stage_id")
+    capture_sha = require_sha256(evidence.get("capture_sha256"), "next_attack.evidence.capture_sha256")
+    blueprint_sha = require_sha256(evidence.get("blueprint_sha256"), "next_attack.evidence.blueprint_sha256")
+    first_build_sha = require_sha256(
+        evidence.get("first_build_receipt_sha256"),
+        "next_attack.evidence.first_build_receipt_sha256")
+    first_diff_sha = require_sha256(
+        evidence.get("first_diff_receipt_sha256"),
+        "next_attack.evidence.first_diff_receipt_sha256")
+    first_lap_sha = require_sha256(
+        evidence.get("first_warm_lap_sha256"),
+        "next_attack.evidence.first_warm_lap_sha256")
+    reuse_diff_sha = require_sha256(
+        evidence.get("reuse_diff_receipt_sha256"),
+        "next_attack.evidence.reuse_diff_receipt_sha256")
+    reuse_lap_sha = require_sha256(
+        evidence.get("reuse_warm_lap_sha256"),
+        "next_attack.evidence.reuse_warm_lap_sha256")
+    rollback_before_sha = require_sha256(
+        evidence.get("rollback_before_sha256"),
+        "next_attack.evidence.rollback_before_sha256")
+    screenshot_sha = require_sha256(
+        evidence.get("screenshot_sha256"),
+        "next_attack.evidence.screenshot_sha256")
+
+    try:
+        receipt = json.loads(read_text(evidence_path))
+    except json.JSONDecodeError as exc:
+        raise MissionControlError(f"invalid architectural-build evidence JSON: {exc}") from exc
+    if (receipt.get("schema") != evidence["receipt_schema"]
+            or receipt.get("result") != "passed"
+            or receipt.get("state") != "active-warm"):
+        raise MissionControlError("architectural-build evidence receipt is not a passing supported receipt")
+    if receipt.get("fixture") != value["fixture"] or receipt.get("architecture") != acceptance:
+        raise MissionControlError("architectural-build evidence disagrees with mission-control acceptance")
+    identity = receipt.get("identity", {})
+    artifacts = receipt.get("canonical_artifacts", {})
+    if identity.get("capsule_sha256") != capsule_sha or identity.get("stage_id") != stage_id:
+        raise MissionControlError("architectural-build evidence identity disagrees with mission control")
+    if artifacts.get("capture", {}).get("sha256") != capture_sha:
+        raise MissionControlError("architectural-build capture hash disagrees with mission control")
+    if artifacts.get("blueprint", {}).get("sha256") != blueprint_sha:
+        raise MissionControlError("architectural-build blueprint hash disagrees with mission control")
+
+    try:
+        staging_receipt = json.loads(read_text(staging_path))
+        cold_receipt = json.loads(read_text(cold_path))
+    except json.JSONDecodeError as exc:
+        raise MissionControlError(f"invalid architectural prerequisite evidence JSON: {exc}") from exc
+    if (staging_receipt.get("schema") != evidence["staging_receipt_schema"]
+            or staging_receipt.get("result") != "passed"):
+        raise MissionControlError("architectural staging evidence is not a passing supported receipt")
+    if (cold_receipt.get("schema") != evidence["cold_acceptance_receipt_schema"]
+            or cold_receipt.get("result") != "passed"):
+        raise MissionControlError("architectural cold acceptance evidence is not a passing supported receipt")
+
+    first = receipt.get("first_lap", {})
+    second = receipt.get("second_lap", {})
+    rollback = receipt.get("rollback_snapshot", {})
+    if (first.get("build_action") != "created" or first.get("standing_piece_count") != 40
+            or first.get("diff", {}).get("result") != "MATCH"
+            or first.get("build_receipt_sha256") != first_build_sha
+            or first.get("diff_receipt_sha256") != first_diff_sha
+            or first.get("warm_lap_sha256") != first_lap_sha):
+        raise MissionControlError("architectural first warm lap disagrees with mission control")
+    if (second.get("build_action") != "reused" or second.get("standing_piece_count") != 40
+            or second.get("game_was_running") is not True
+            or second.get("game_launched") is not False
+            or second.get("diff", {}).get("result") != "MATCH"
+            or second.get("diff_receipt_sha256") != reuse_diff_sha
+            or second.get("warm_lap_sha256") != reuse_lap_sha
+            or second.get("screenshot_sha256") != screenshot_sha):
+        raise MissionControlError("architectural reuse lap disagrees with mission control")
+    if (rollback.get("state") != "retained-not-applied"
+            or rollback.get("before_sha256") != rollback_before_sha):
+        raise MissionControlError("architectural warm rollback snapshot disagrees with mission control")
+
+    safety = value.get("safety")
+    expected_safety = {
+        "creator_session_started": True,
+        "mailbox_request_written": True,
+        "world_mutation_performed": True,
+        "valheim_started": True,
+        "canonical_artifacts_unchanged": True,
+        "build_created_once": True,
+        "running_client_reused": True,
+        "existing_build_reused": True,
+        "marked_pieces_retained": True,
+        "creator_build_disabled": True,
+        "valheim_running": True,
+        "rollback_snapshot_retained": True,
+        "ordinary_lap_performed_teardown": False,
+    }
+    if safety != expected_safety:
+        raise MissionControlError("next_attack.safety must retain the accepted warm-loop boundary")
+    warm_state = receipt.get("warm_state", {})
+    if (warm_state.get("valheim_running") is not True
+            or warm_state.get("marked_pieces_retained") != 40
+            or warm_state.get("creator_build_enabled") is not False
+            or warm_state.get("canonical_artifacts_unchanged") is not True
+            or warm_state.get("pending_runtime_mailbox") is not False
+            or warm_state.get("pending_lab_mailbox") is not False):
+        raise MissionControlError("architectural warm-state evidence disagrees with mission control")
+    skipped = warm_state.get("identity_matching_lap_skips")
+    expected_skipped = ["plugin_deploy", "world_entry", "blueprint_build",
+                        "blueprint_clear", "valheim_stop", "state_restore"]
+    if skipped != expected_skipped:
+        raise MissionControlError("architectural warm lap does not retain the no-teardown contract")
+    require_text(value.get("boundary"), "next_attack.boundary")
+    for index, route in enumerate(require_list(value.get("studio_routes"), "next_attack.studio_routes")):
+        require_text(route, f"next_attack.studio_routes[{index}]")
+    return value
+
+
 def validate_manifest(value: Any, *, validate_projection_state: bool = True) -> None:
     if not isinstance(value, dict) or value.get("schema") != SCHEMA:
         raise MissionControlError(f"mission-control schema must be {SCHEMA}")
@@ -734,6 +902,9 @@ def validate_manifest(value: Any, *, validate_projection_state: bool = True) -> 
         validate_source_pin(item, f"queue[{index}]")
     for index, item in enumerate(value["decisions"]):
         validate_source_pin(item, f"decisions[{index}]")
+
+    architectural_build = validate_architectural_build(value.get("next_attack"))
+    take_id(architectural_build, "next_attack")
 
     strategy = value.get("strategy")
     if not isinstance(strategy, dict):
@@ -1078,6 +1249,31 @@ def render(manifest: dict[str, Any]) -> str:
         for item in manifest["queue"]
     )
 
+    architectural_build = manifest["next_attack"]
+    build_acceptance = architectural_build["acceptance"]
+    build_evidence = architectural_build["evidence"]
+    build_steps = "".join(
+        f'''<li><span>{index}</span><div><strong>{html.escape(step)}</strong></div></li>'''
+        for index, step in enumerate(architectural_build["journey"], 1)
+    )
+    build_artifacts = "".join(
+        f'''<li><code>{html.escape(label)}</code><span>SHA-256</span><small>{html.escape(digest)}</small></li>'''
+        for label, digest in (
+            ("capsule", build_evidence["capsule_sha256"]),
+            ("stage receipt", build_evidence["stage_id"]),
+            ("capture", build_evidence["capture_sha256"]),
+            ("blueprint", build_evidence["blueprint_sha256"]),
+            ("first build", build_evidence["first_build_receipt_sha256"]),
+            ("warm reuse diff", build_evidence["reuse_diff_receipt_sha256"]),
+            ("rollback snapshot", build_evidence["rollback_before_sha256"]),
+        )
+    )
+    architectural_build_panel = f'''
+    <div class="recovery-grid">
+      <article class="panel flow-panel"><div class="card-heading"><div><span class="eyebrow">Warm on AM4</span><h3>Architectural capsule &rarr; Studio Build &rarr; exact live build &rarr; reusable R&amp;D lap</h3></div><span class="badge badge-complete">PASS</span></div><p>The tn0304 handoff crossed the real Studio and Lab, built once, then proved a second identity-matching lap could reuse the running client and standing structure.</p><ol class="build-sequence">{build_steps}</ol><div class="revision-proof build-metrics"><span><strong>Footprint</strong>{build_acceptance["footprint_m"][0]} &times; {build_acceptance["footprint_m"][1]} m</span><span><strong>Wall datum</strong>{build_acceptance["wall_datum_m"]} m</span><span><strong>True ridge</strong>{build_acceptance["ridge_m"]} m</span><span><strong>Roof pitch</strong>{build_acceptance["pitch_degrees"]}&deg;</span><span><strong>Reconciliation</strong>&minus;0.029171 m</span><span><strong>Standing pieces</strong>40 &middot; 16 floors / 16 walls / 8 roofs</span></div><div class="guardrail"><strong>Warm boundary:</strong> {html.escape(architectural_build["boundary"])}</div></article>
+      <aside class="panel proof-panel build-proof"><span class="eyebrow">Immutable warm-state evidence</span><h3>{html.escape(build_evidence["receipt_schema"])}</h3><p>Observed {html.escape(architectural_build["completed_utc"])}. Valheim remains running, the exact 40-piece build remains standing, creator build mode is off, and the rollback snapshot is retained for explicit close.</p><ol class="proof-list">{build_artifacts}</ol>{source_link(build_evidence["source"], "Tracked warm-state index")}</aside>
+    </div>'''
+
     decision_cards = "".join(
         f'''<article class="decision-card"><span class="eyebrow">Decision in force</span><h3>{html.escape(item["title"])}</h3><p>{html.escape(item["question"])}</p><small>{html.escape(item["recommendation"])}</small>{source_link(item["source"])}</article>'''
         for item in manifest["decisions"]
@@ -1134,6 +1330,7 @@ def render(manifest: dict[str, Any]) -> str:
 
     css = r'''
 :root{color-scheme:dark;--ink:#f5f1e8;--muted:#aaa99f;--dim:#74766f;--panel:#111713;--panel-2:#18201b;--panel-3:#202b24;--line:#344139;--gold:#e9a83f;--gold-soft:#ffd98b;--green:#65d68b;--violet:#c9a7ff;--red:#ff8b7d;--blue:#7fc8ff;--shadow:0 18px 50px rgba(0,0,0,.34);--radius:18px}
+.build-sequence{list-style:none;padding:0;margin:15px 0;display:grid;gap:9px}.build-sequence li{display:grid;grid-template-columns:28px 1fr;gap:9px}.build-sequence li>span{width:25px;height:25px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;font-size:.7rem;color:var(--gold)}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 16% 0,rgba(233,168,63,.11),transparent 30rem),radial-gradient(circle at 90% 18%,rgba(100,214,139,.07),transparent 34rem),#090d0b;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5}.skip-link{position:fixed;top:8px;left:8px;z-index:20;transform:translateY(-150%);padding:10px 14px;background:var(--gold);color:#151008;border-radius:8px}.skip-link:focus{transform:none}a{color:var(--gold-soft);text-underline-offset:3px}button,input,select,textarea{font:inherit}.shell{width:min(1540px,calc(100% - 40px));margin:auto}.masthead{padding:34px 0 22px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(9,13,11,.84);backdrop-filter:blur(18px);position:sticky;top:0;z-index:10}.masthead-row{display:flex;align-items:flex-end;justify-content:space-between;gap:30px}.brand{display:flex;align-items:center;gap:16px}.sigil{width:52px;height:52px;display:grid;place-items:center;border:1px solid rgba(233,168,63,.52);border-radius:15px;color:var(--gold);font:700 28px Georgia,serif;box-shadow:inset 0 0 24px rgba(233,168,63,.08)}h1,h2,h3,p{margin-top:0}h1{font:650 clamp(1.55rem,2.3vw,2.25rem) Georgia,serif;margin-bottom:3px;letter-spacing:.01em}.subtitle{margin:0;color:var(--muted);font-size:.93rem}.snapshot{text-align:right}.snapshot strong{display:block;color:var(--green);font-size:.9rem}.snapshot small{color:var(--muted)}.topnav{display:flex;gap:18px;margin-top:18px;overflow:auto}.topnav a{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;text-decoration:none;white-space:nowrap}.topnav a:hover,.topnav a:focus-visible{color:var(--ink)}main{padding:36px 0 76px}.hero-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(330px,.75fr);gap:22px}.panel{background:linear-gradient(145deg,rgba(24,32,27,.97),rgba(14,20,16,.98));border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.now{padding:30px;position:relative;overflow:hidden}.now:after{content:"";position:absolute;right:-90px;top:-90px;width:250px;height:250px;border-radius:50%;border:1px solid rgba(233,168,63,.15);box-shadow:0 0 0 34px rgba(233,168,63,.035),0 0 0 68px rgba(233,168,63,.025);pointer-events:none}.eyebrow{display:block;color:var(--gold);font-size:.68rem;font-weight:750;letter-spacing:.16em;text-transform:uppercase;margin-bottom:7px}.now h2,.section-head h2{font:600 clamp(1.35rem,2vw,1.8rem) Georgia,serif;margin-bottom:8px}.lede{color:var(--muted);max-width:70ch}.next-callout{border-left:3px solid var(--gold);padding:13px 16px;margin:22px 0;background:rgba(233,168,63,.07);border-radius:0 10px 10px 0}.next-callout strong{display:block}.next-callout span{color:var(--muted);font-size:.9rem}.progress-line{display:flex;align-items:center;gap:13px;margin-top:20px}.progress-track{height:7px;flex:1;background:#080b09;border-radius:99px;overflow:hidden}.progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--green));transition:width .2s ease}.progress-copy{color:var(--muted);font-size:.78rem;min-width:94px;text-align:right}.session-panel{padding:24px}.session-panel h2{font-size:1rem;margin-bottom:6px}.session-panel p{font-size:.84rem;color:var(--muted)}textarea{width:100%;min-height:145px;resize:vertical;background:#090d0b;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:12px;margin:9px 0}textarea:focus,select:focus,button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.button-row{display:flex;flex-wrap:wrap;gap:8px}.button{border:1px solid var(--line);border-radius:9px;background:var(--panel-3);color:var(--ink);padding:8px 11px;cursor:pointer;font-size:.78rem}.button:hover{border-color:var(--gold)}.button-danger{color:var(--red)}#session-status{display:block;min-height:1.4em;margin-top:9px;color:var(--green);font-size:.76rem}.section{margin-top:42px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:18px}.section-head p{margin:0;color:var(--muted);max-width:72ch}.strategy-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.strategy-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:19px}.strategy-card h3{margin:0;font-size:1rem}.strategy-card p{color:var(--muted);font-size:.82rem;margin:7px 0}.readiness-panel{margin-top:14px;padding:20px}.readiness-list{margin:10px 0 0;padding-left:21px;columns:2;column-gap:42px}.readiness-list li{break-inside:avoid;margin-bottom:8px;color:var(--muted);font-size:.84rem}.recovery-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.65fr);gap:22px}.flow-panel{padding:24px}.flow-panel h3{margin-bottom:5px}.flow-panel>p{color:var(--muted);font-size:.9rem}.check-list{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:10px}.check-item{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:14px;border:1px solid var(--line);background:rgba(0,0,0,.13);border-radius:12px;transition:border-color .15s,opacity .15s}.check-item:has(input:checked){border-color:rgba(101,214,139,.42);opacity:.66}.check-item input,.session-confirm input{accent-color:var(--green);width:18px;height:18px;margin-top:3px}.check-item label{cursor:pointer}.check-item label>span{display:grid;gap:3px}.check-item small{color:var(--muted);line-height:1.45}.check-item:has(input:checked) label>span{text-decoration:line-through;text-decoration-color:rgba(101,214,139,.65)}.source-link{display:inline-block;margin-top:7px;font-size:.72rem;color:var(--gold-soft)}.checkpoint-c{margin-top:34px}.revision-proof{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:14px}.revision-proof span{padding:10px 12px;background:rgba(101,214,139,.05);border:1px solid rgba(101,214,139,.18);border-radius:9px;color:var(--muted);font-size:.78rem}.revision-proof strong{display:block;color:var(--green);font-size:.65rem;text-transform:uppercase;letter-spacing:.09em}.verdict-box{margin:14px 0 22px;padding:16px;border:1px solid rgba(201,167,255,.35);background:rgba(201,167,255,.06);border-radius:12px}.verdict-box label{display:block;font-weight:700;margin-bottom:9px}.verdict-box select{width:100%;background:#0b100d;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px}.proof-panel{padding:24px}.proof-panel h3{margin-bottom:4px}.proof-panel>p{color:var(--muted);font-size:.85rem}.proof-list{list-style:none;padding:0;margin:16px 0;display:grid;gap:7px}.proof-list li{display:grid;grid-template-columns:1fr auto;gap:10px;padding:9px 10px;background:#0b100d;border-radius:8px;border-left:2px solid var(--green)}.proof-list code{color:var(--ink)}.proof-list span{color:var(--green);font-size:.75rem;text-transform:uppercase;letter-spacing:.08em}.proof-list small{grid-column:1/-1;color:var(--red)}.guardrail{padding:13px;border-radius:10px;background:rgba(255,139,125,.07);border:1px solid rgba(255,139,125,.22);font-size:.83rem;color:#d8c7c0}.machine-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.machine-card,.queue-card,.decision-card,.command-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:19px}.machine-card h3,.queue-card h3,.decision-card h3{margin:0;font-size:1rem}.machine-card>strong{font-size:.84rem}.machine-card p,.queue-card p,.decision-card p{color:var(--muted);font-size:.82rem;margin:7px 0}.session-confirm{display:flex;gap:8px;align-items:center;margin-top:15px;color:var(--muted);font-size:.76rem}.card-heading{display:flex;align-items:start;justify-content:space-between;gap:12px}.badge{display:inline-flex;align-items:center;border-radius:99px;padding:4px 8px;border:1px solid var(--line);font-size:.64rem;font-weight:750;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}.badge-complete,.badge-ready,.badge-confirmed,.badge-online{color:var(--green);border-color:rgba(101,214,139,.35);background:rgba(101,214,139,.07)}.badge-implemented{color:var(--blue);border-color:rgba(127,200,255,.35);background:rgba(127,200,255,.07)}.badge-active,.badge-human,.badge-attention{color:var(--gold-soft);border-color:rgba(233,168,63,.4);background:rgba(233,168,63,.08)}.badge-planned,.badge-gated,.badge-deferred,.badge-on-demand{color:var(--muted)}.environment{margin:16px 0 0;padding:18px 22px}.environment h3{font-size:.83rem;color:var(--muted);text-transform:uppercase;letter-spacing:.11em}.environment ul{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,1fr);gap:14px 24px}.environment li{display:grid;grid-template-columns:11px 1fr;gap:10px}.environment strong{font-size:.82rem}.environment p{font-size:.77rem;color:var(--muted);margin:2px 0}.fact-kind{font-size:.62rem;text-transform:uppercase;color:var(--dim);letter-spacing:.09em}.status-dot{width:9px;height:9px;margin-top:6px;border-radius:50%;background:var(--dim);box-shadow:0 0 0 3px rgba(255,255,255,.03)}.status-confirmed{background:var(--green)}.status-automated,.status-implemented{background:var(--blue)}.status-attention{background:var(--gold)}.phase-list{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}.phase{display:grid;grid-template-rows:auto 1fr;background:var(--panel);min-width:0}.phase-rail{height:46px;display:flex;align-items:center;padding:0 18px;border-bottom:1px solid var(--line);position:relative}.phase-rail:after{content:"";height:2px;background:var(--line);position:absolute;left:47px;right:0}.phase:last-child .phase-rail:after{display:none}.phase-rail span{width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:var(--panel-3);border:1px solid var(--line);font-size:.76rem;z-index:1}.phase-complete .phase-rail span{background:var(--green);color:#07120b;border-color:var(--green)}.phase-active .phase-rail span{background:var(--gold);color:#1a1204;border-color:var(--gold);box-shadow:0 0 22px rgba(233,168,63,.24)}.phase-copy{padding:17px}.phase-copy h3{font-size:.9rem;margin:0}.phase-copy p{color:var(--muted);font-size:.77rem;margin:9px 0}.queue-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.decision-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.decision-card small{display:block;color:var(--gold-soft);margin:10px 0;font-size:.76rem}.command-list{display:grid;gap:10px}.command-card{display:grid;grid-template-columns:minmax(200px,.55fr) 1fr;gap:18px;align-items:center}.command-card small{display:block;color:var(--muted);margin-top:3px}.command-row{display:flex;min-width:0}.command-row code{flex:1;overflow:auto;padding:10px;background:#080b09;border:1px solid var(--line);border-radius:9px 0 0 9px;color:var(--blue);white-space:nowrap}.copy-button{border:1px solid var(--line);border-left:0;background:var(--panel-3);color:var(--ink);border-radius:0 9px 9px 0;padding:0 13px;cursor:pointer}.copy-button:hover{color:var(--gold)}details.future{border:1px solid var(--line);border-radius:14px;background:var(--panel)}details.future summary{cursor:pointer;padding:19px;font-weight:700}details.future>div{padding:0 20px 22px}.derived-sequence,.reading-order{list-style:none;padding:0;margin:15px 0;display:grid;gap:9px}.derived-sequence li,.reading-order li{display:grid;grid-template-columns:28px 1fr;gap:9px}.derived-sequence li>span,.reading-order li>span{width:25px;height:25px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;font-size:.7rem;color:var(--gold)}.derived-sequence p,.reading-order p{font-size:.82rem;color:var(--muted);margin:1px 0}.judgment-list{color:var(--muted);font-size:.84rem}.cautions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0;padding:0;list-style:none}.cautions li{padding:14px 16px;border-left:2px solid var(--red);background:rgba(255,139,125,.05);color:#cfcbc3;font-size:.82rem}.footer{border-top:1px solid var(--line);padding:27px 0 45px;color:var(--dim);font-size:.76rem}.footer-row{display:flex;justify-content:space-between;gap:20px}.local-only{color:var(--violet)}code{font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace}body.compact .section:not(#recovery),body.compact .machine-grid,body.compact .environment{display:none}@media(max-width:1100px){.hero-grid,.recovery-grid{grid-template-columns:1fr}.strategy-grid{grid-template-columns:repeat(2,1fr)}.phase-list{grid-template-columns:1fr}.phase{grid-template-columns:50px 1fr;grid-template-rows:1fr}.phase-rail{height:100%;border:0;border-right:1px solid var(--line);padding:14px 11px}.phase-rail:after{width:2px;height:auto;top:45px;bottom:0;left:24px;right:auto}.machine-grid,.decision-grid{grid-template-columns:1fr}.queue-grid{grid-template-columns:1fr 1fr}}@media(max-width:720px){.shell{width:min(100% - 24px,1540px)}.masthead{position:static;padding-top:20px}.masthead-row,.section-head,.footer-row{align-items:start;flex-direction:column}.snapshot{text-align:left}.strategy-grid,.machine-grid,.queue-grid,.environment ul,.decision-grid,.cautions,.revision-proof{grid-template-columns:1fr}.readiness-list{columns:1}.command-card{grid-template-columns:1fr}.now,.session-panel,.flow-panel,.proof-panel{padding:19px}.topnav{padding-bottom:4px}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.progress-fill{transition:none}}@media print{.masthead{position:static}.topnav,.session-panel,.button,.copy-button,.session-confirm{display:none!important}.panel,.strategy-card,.machine-card,.queue-card,.decision-card{box-shadow:none;break-inside:avoid}body{background:#fff;color:#111}.subtitle,.lede,p,small,.phase-copy p{color:#444!important}.shell{width:100%}}
 '''
 
@@ -1231,7 +1428,7 @@ def render(manifest: dict[str, Any]) -> str:
 <header class="masthead"><div class="shell">
   <div class="masthead-row"><div class="brand"><div class="sigil" aria-hidden="true">Q</div><div><h1>{html.escape(page["title"])}</h1><p class="subtitle">{html.escape(page["subtitle"])}</p></div></div>
   <div class="snapshot"><strong>Program reconciled through {html.escape(page["program_commit"])}</strong><small>{html.escape(page["observed_on"])} · {html.escape(page["program_commit_label"])}</small></div></div>
-  <nav class="topnav" aria-label="Mission control sections"><a href="#strategy">Strategy</a><a href="#program">Roadmap</a><a href="#queue">Queue</a><a href="#machines">Machines</a><a href="#recovery">Prepared seat gate</a><a href="#decisions">Decisions</a><a href="#commands">Reference commands</a></nav>
+  <nav class="topnav" aria-label="Mission control sections"><a href="#strategy">Strategy</a><a href="#build">Build proof</a><a href="#program">Roadmap</a><a href="#queue">Queue</a><a href="#machines">Machines</a><a href="#recovery">Prepared seat gate</a><a href="#decisions">Decisions</a><a href="#commands">Reference commands</a></nav>
 </div></header>
 <main id="main" class="shell">
   <div class="hero-grid">
@@ -1243,6 +1440,8 @@ def render(manifest: dict[str, Any]) -> str:
   </div>
 
   <section id="strategy" class="section" aria-labelledby="strategy-title"><div class="section-head"><div><span class="eyebrow">Why and how</span><h2 id="strategy-title">{html.escape(strategy["title"])}</h2></div><p>{html.escape(strategy["summary"])}</p></div><div class="strategy-grid">{strategy_cards}</div><article class="panel readiness-panel"><div class="card-heading"><div><span class="eyebrow">Golden readiness gate</span><h3>{html.escape(strategy["readiness_title"])}</h3></div>{source_link(strategy["source"], "Operating strategy")}</div><ul class="readiness-list">{readiness_items}</ul></article></section>
+
+  <section id="build" class="section" aria-labelledby="build-title"><div class="section-head"><div><span class="eyebrow">Latest autonomous attack</span><h2 id="build-title">The architectural handoff is live and warm on AM4.</h2></div><p>The exact structure was built once; identity-matching R&amp;D laps now reuse it without paying teardown and rebuild costs.</p></div>{architectural_build_panel}</section>
 
   <section id="recovery" class="section" aria-labelledby="recovery-title"><div class="section-head"><div><span class="eyebrow">Use only after autonomous readiness</span><h2 id="recovery-title">{html.escape(manifest["recovery"]["title"])}</h2></div><p>{html.escape(manifest["recovery"]["summary"])}</p></div>
     <div class="recovery-grid"><article class="panel flow-panel"><span class="eyebrow">Checkpoint A · exact session precondition</span><h3>Prepare the acceptance session</h3><ul class="check-list">{cold_item}</ul>

@@ -701,8 +701,14 @@ public sealed class LabBatchController {
       return;
     }
     if (operation == "blueprint_diff") {
-      string detail = _blueprints.Diff(
-          request.blueprint_name, request.radius_metres, request.selection);
+      bool diffAt = string.Equals(request.build_mode, "at", StringComparison.Ordinal);
+      string detail = diffAt
+          ? _blueprints.DiffAt(request.blueprint_name, request.radius_metres,
+              request.selection, ParseInvariantFloat(request.world_x),
+              ParseInvariantFloat(request.world_y), ParseInvariantFloat(request.world_z),
+              ParseInvariantFloat(request.yaw_degrees))
+          : _blueprints.Diff(
+              request.blueprint_name, request.radius_metres, request.selection);
       WriteRequestReceipt(request,
           detail.StartsWith("capture diff ", StringComparison.Ordinal) ? "completed" : "failed",
           detail, artifactPath: File.Exists(capturePath) ? capturePath : null);
@@ -976,7 +982,8 @@ public sealed class LabBatchController {
           + LabBatchContract.Json(artifactPath ?? string.Empty) + "\",");
       sb.AppendLine("  \"blueprint_path\": \""
           + LabBatchContract.Json(blueprintPath ?? string.Empty) + "\",");
-      if (string.Equals(request.operation, "blueprint_build", StringComparison.Ordinal)
+      if ((string.Equals(request.operation, "blueprint_build", StringComparison.Ordinal)
+              || string.Equals(request.operation, "blueprint_diff", StringComparison.Ordinal))
           && string.Equals(request.build_mode, "at", StringComparison.Ordinal)
           && TryCanonicalNumber(request.world_x, out string canonicalX)
           && TryCanonicalNumber(request.world_y, out string canonicalY)

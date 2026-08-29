@@ -1,0 +1,195 @@
+{
+  "schema": "comfy-quest-architectural-live-evidence-index/v1",
+  "recorded_on": "2026-08-29",
+  "result": "passed",
+  "work_item": "architectural-capsule-live-replay",
+  "fixture": "tn0304",
+  "driver": "tools/quest-studio/Invoke-ArchitecturalLiveJourney.ps1",
+  "target_probe": "tools/quest-studio/architectural_live_probe.py",
+  "local_evidence_root": "C:\\work\\comfy-quest\\artifacts\\architectural-live\\runs\\20260829T114304Z",
+  "local_evidence_is_ignored": true,
+  "remote_evidence_root": "/home/derek/valheim-capture/architectural-live/20260829T114304Z-f509aa2a201f",
+  "sources": {
+    "comfy_quest_revision": "d2187c04cddb3913f47ecf502e954b05f4c7d2a0",
+    "comfy_quest_source_tree_sha256": "728ae4872c510ee96a905d6c310554db7587959f57fa3306e6818ae01b99a4e2",
+    "staged_evidence": "docs/evidence/architectural-build-tn0304-20260829-r1.json",
+    "staged_evidence_sha256": "feb3cee4d69f5b75761868132eb5eb934d5d74d46bc472b82f100e32d89d64cd"
+  },
+  "identity": {
+    "machine": "am4",
+    "world": "ComfyQuestDemo",
+    "world_uid": "-7600395338659582326",
+    "character": "questyfour",
+    "creator_session_id": "architectural-tn0304-live-20260829-r1",
+    "capsule_sha256": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+    "stage_id": "8ea1838ec535b4a3d20b171da8f0da3ffd9c3370eaa37f6bf7d13b2b1a013dd5",
+    "blueprint_name": "tn0304-6ue2ukrad7ntjfoa7cvdmvwkcvsccusli5wrfvhq2rnkhtm2ehuq"
+  },
+  "architecture": {
+    "footprint_m": [
+      7.953375,
+      7.4676
+    ],
+    "wall_datum_m": 2.2225,
+    "ridge_m": 5.8166,
+    "pitch_degrees": 43.907838,
+    "ridge_reconciliation_m": -0.029171,
+    "pieces": {
+      "floors": 16,
+      "walls": 16,
+      "roofs": 8,
+      "total": 40
+    }
+  },
+  "placement": {
+    "revision": 2,
+    "x": 12.5,
+    "y": 1.25,
+    "z": -3.75,
+    "yaw": 22.5,
+    "applied": true
+  },
+  "canonical_artifacts": {
+    "capture": {
+      "name": "tn0304-6ue2ukrad7ntjfoa7cvdmvwkcvsccusli5wrfvhq2rnkhtm2ehuq.capture.json",
+      "bytes": 18307,
+      "sha256": "5d466cdaa5a213ef958d07636325b9398eee9a74584019da8dc16a5603654251"
+    },
+    "blueprint": {
+      "name": "tn0304-6ue2ukrad7ntjfoa7cvdmvwkcvsccusli5wrfvhq2rnkhtm2ehuq.blueprint",
+      "bytes": 2440,
+      "sha256": "02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f"
+    },
+    "canonical_pieces_sha256": "0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578"
+  },
+  "lab_plugin": {
+    "candidate_sha256": "44d971dc1ca75c6d9b1775d552c5f86ad33b428208e5cf9347ebca24f6dfb45c",
+    "candidate_bytes": 877056,
+    "restored_sha256": "3325151a67779afc19f2c24e4c5967f94b1c3a8cdea8acc20aac0df4dcccb7e5",
+    "restored_bytes": 847360
+  },
+  "live_replay": {
+    "schema": "comfy-quest-architectural-live-replay/v1",
+    "started_utc": "2026-08-29T11:43:30.209975Z",
+    "completed_utc": "2026-08-29T11:44:06.868836Z",
+    "world_entry_state": "entered",
+    "check": {
+      "buildable_pieces": 40,
+      "distinct_prefabs": 3,
+      "canonical_pieces_sha256": "0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578"
+    },
+    "build": {
+      "placed": 40,
+      "failed": 0
+    },
+    "standing_piece_counts": {
+      "wood_floor": 16,
+      "wood_roof_45": 8,
+      "woodwall": 16,
+      "total": 40
+    },
+    "diff": {
+      "result": "MATCH",
+      "expected": 40,
+      "selected": 40,
+      "missing": 0,
+      "extra": 0
+    },
+    "clear": {
+      "cleared": 40,
+      "remaining": 0
+    },
+    "assertions": {
+      "canonical_artifacts_unchanged": true,
+      "check_completed": true,
+      "creator_build_disabled": true,
+      "marked_pieces_cleared": true,
+      "placed_diff_match": true,
+      "placement_applied": true
+    },
+    "receipt_chain": [
+      {
+        "operation": "status",
+        "receipt_sha256": "607f2c6877661254804fa16ee1a79f02bad983f891f3d04b03a788e067a42112"
+      },
+      {
+        "operation": "blueprint_check",
+        "receipt_sha256": "57251d8ab00e6426ba0c709b96cc181a10cab7290b87ea0e50031edb9a09aab6"
+      },
+      {
+        "operation": "blueprint_count_before",
+        "receipt_sha256": "5604d54625336ebb411bfb136a8ce1076de16884ddff3b67df614f2d2958ce11"
+      },
+      {
+        "operation": "build_on",
+        "receipt_sha256": "6708e22824f5d53e83d844463b2b4c4e5bd935bf046b3fcfdb14b93b88b29fc6"
+      },
+      {
+        "operation": "blueprint_build_at",
+        "receipt_sha256": "e24dec3ed85de364408fded4936a9985ce6d2f7628663cbca4300484cfe5c030"
+      },
+      {
+        "operation": "blueprint_count_applied",
+        "receipt_sha256": "1de7ed5e20ecdfa942185874eb1abd63d25474969a09a5b1269affa04e5a4acc"
+      },
+      {
+        "operation": "blueprint_diff_at",
+        "receipt_sha256": "d859815478e438f1d8918ebd2573cb1693b8dfbbab1b1d96910255d13beec205"
+      },
+      {
+        "operation": "blueprint_clear",
+        "receipt_sha256": "1eca1313c2a68938128fd6b0f5edfde328a780da21269c8ca2d3b3c2a4026915"
+      },
+      {
+        "operation": "blueprint_count_after",
+        "receipt_sha256": "081e98c82c1142c04d2635e2588777e381d602aadccdf284092e5599e653718f"
+      },
+      {
+        "operation": "build_off",
+        "receipt_sha256": "251d4f70377f27c2fe97961e74d4aaa92283da1a838d52e8051592a2e4532752"
+      },
+      {
+        "operation": "status_final",
+        "receipt_sha256": "faa9ad42ac2906bf3d761f0691bb3ec90a82d0d9b8f3b0336df69702578e9b3d"
+      }
+    ],
+    "screenshot": {
+      "name": "architectural-live-applied.png",
+      "bytes": 3618333,
+      "sha256": "25ccc19f8169311d83aa30d3ce7b5a3e3b0066921c0d7cbcaab274646b057059"
+    }
+  },
+  "restoration": {
+    "schema": "comfy-quest-architectural-live-restoration/v1",
+    "status": "PASS",
+    "difference_count": 0,
+    "missing_log_marker_count": 0,
+    "graceful_shutdown": true,
+    "forced_termination": false,
+    "valheim_and_steam_stopped": true,
+    "canonical_pair_retained": true,
+    "world_db_before_after_sha256": "2ee519b826e8e7d876f3133be058e2513859de37f11cbcfd912fca0ed85ba02f",
+    "character_before_after_sha256": "7a51ef5e25181a4bde3a59bf946ec92c2466a1ca795d69baf92cb4edd2b9e8bd",
+    "assertions": {
+      "graceful_shutdown_and_live_sequence_logged": true,
+      "lab_state_and_staged_pair_restored": true,
+      "plugin_restored": true,
+      "runtime_state_restored": true,
+      "valheim_stopped": true,
+      "world_and_character_bytes_restored": true
+    }
+  },
+  "evidence_sha256": {
+    "acceptance-receipt.json": "2eacf00ac109b657ee35772e84d7551df2fc2ed0c838354db4fc0eb206b63043",
+    "live-replay.json": "2d506d73086ff6e770bc223bc03279a9fab3e5064ff0ee4c9cc05e0244280764",
+    "restoration.json": "a3a81598780bf66f6f9172d41cf6eeb5a91170ade0d3d87261a9307db9e0b5e6",
+    "shutdown.json": "45dcad45575cc170d240f92e28b441f1c15ba46697c5ef0c494ddc6d8c59ba9d",
+    "world-entry-receipt.json": "ff92883a1a3a24b5d302a89859296382114fd64588bc41b841720832fc1ef7b2",
+    "architectural-live-applied.png": "25ccc19f8169311d83aa30d3ce7b5a3e3b0066921c0d7cbcaab274646b057059"
+  },
+  "limitations": [
+    "This is a disposable technical replay: the exact staged pair was applied, proved, and then cleared rather than retained as authored world state.",
+    "The saved placement was exercised exactly, but its final spatial and aesthetic suitability still requires human review before a retained creator build.",
+    "The full machine evidence is retained locally and on AM4; this tracked index pins its identities, operation receipts, outcomes, rollback, and hashes."
+  ]
+}

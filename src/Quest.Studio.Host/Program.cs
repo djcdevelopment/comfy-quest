@@ -30,6 +30,7 @@ builder.Services.AddSingleton<IQuestStudioHost>(host);
 builder.Services.AddSingleton(host);
 builder.Services.AddSingleton<QuestPackPublisher>();
 builder.Services.AddSingleton<QuestStudioService>();
+builder.Services.AddSingleton<QuestStudioBuildService>();
 
 var app = builder.Build();
 app.MapGet("/", () => Results.Redirect("/quest-studio"));
@@ -60,7 +61,7 @@ static int ReadPort(string[] arguments)
     return int.TryParse(configured, out var value) && value is >= 1024 and <= 65535 ? value : 8085;
 }
 
-sealed class StandaloneQuestStudioHost : IQuestStudioHost, IQuestStudioRAndDHost
+sealed class StandaloneQuestStudioHost : IQuestStudioHost, IQuestStudioRAndDHost, IQuestStudioArchitecturalRAndDHost
 {
     readonly int _port;
     readonly byte[] _tokenBytes;
@@ -80,6 +81,19 @@ sealed class StandaloneQuestStudioHost : IQuestStudioHost, IQuestStudioRAndDHost
     public string BrowserToken { get; }
     public JsonSerializerOptions Json { get; }
     public string? RepositoryRoot { get; }
+
+    public QuestStudioArchitecturalImporter? ArchitecturalImporter
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(RepositoryRoot)) return null;
+            var script = Path.Combine(RepositoryRoot, "tools", "blueprints", "import_capture.py");
+            var python = Environment.GetEnvironmentVariable("COMFY_QUEST_PYTHON");
+            if (string.IsNullOrWhiteSpace(python)) python = OperatingSystem.IsWindows() ? "python" : "python3";
+            var bundle = Environment.GetEnvironmentVariable("COMFY_QUEST_RND_BUNDLE_MANIFEST");
+            return new(script, python, string.IsNullOrWhiteSpace(bundle) ? null : Path.GetFullPath(bundle));
+        }
+    }
 
     public string? FindValheim()
     {

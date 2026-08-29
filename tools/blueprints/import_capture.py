@@ -25,6 +25,7 @@ import sys
 CAPTURE_SCHEMA = "comfy-questlab-capture/v1"
 PLAN_SCHEMA = "comfy-quest-godbuild-plan/v1"
 MANIFEST_SCHEMA = "comfy-quest-godbuild/v1"
+STANDALONE_BUNDLE_SCHEMA = "comfy-quest-standalone-rnd-bundle/v1"
 MAX_PIECES = 2048
 TOP_KEYS = {
     "Schema", "Name", "Selection", "RadiusMetres", "PieceCount",
@@ -61,6 +62,50 @@ def assert_repo_identity(root: Path) -> None:
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
         raise CaptureError(f"repository identity rejected: {detail}")
+
+
+def assert_standalone_bundle(manifest_path: Path) -> None:
+    """Verify this exact importer inside a source-less, hash-pinned R&D bundle."""
+    try:
+        raw = manifest_path.resolve().read_bytes()
+        if len(raw) > 64 * 1024:
+            raise CaptureError("standalone bundle manifest exceeds 64 KiB")
+        manifest = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise CaptureError(f"standalone bundle manifest is unreadable: {error}") from error
+    if not isinstance(manifest, dict):
+        raise CaptureError("standalone bundle manifest must be an object")
+    required = {
+        "schema", "repository_id", "source_revision", "source_dirty",
+        "source_tree_sha256", "host_bundle_sha256", "host_bundle_bytes", "files",
+    }
+    exact_keys(manifest, required, "standalone bundle manifest")
+    if manifest["schema"] != STANDALONE_BUNDLE_SCHEMA:
+        raise CaptureError("standalone bundle schema is unsupported")
+    if manifest["repository_id"] != "djcdevelopment/comfy-quest":
+        raise CaptureError("standalone bundle repository identity differs")
+    for field in ("source_revision", "source_tree_sha256", "host_bundle_sha256"):
+        value = manifest[field]
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}" if field != "source_revision" else r"[0-9a-f]{40}", value):
+            raise CaptureError(f"standalone bundle {field} is invalid")
+    if not isinstance(manifest["source_dirty"], bool):
+        raise CaptureError("standalone bundle source_dirty must be boolean")
+    if not isinstance(manifest["host_bundle_bytes"], int) or manifest["host_bundle_bytes"] < 1:
+        raise CaptureError("standalone bundle host_bundle_bytes is invalid")
+    files = manifest["files"]
+    if not isinstance(files, dict) or set(files) != {"tools/blueprints/import_capture.py"}:
+        raise CaptureError("standalone bundle files must pin only the authoritative importer")
+    pin = files["tools/blueprints/import_capture.py"]
+    if not isinstance(pin, dict):
+        raise CaptureError("standalone importer pin must be an object")
+    exact_keys(pin, {"bytes", "sha256"}, "standalone importer pin")
+    script = Path(__file__).resolve()
+    expected = manifest_path.resolve().parent / "tools" / "blueprints" / "import_capture.py"
+    if script != expected.resolve():
+        raise CaptureError("standalone importer path differs from the bundle manifest")
+    payload = script.read_bytes()
+    if pin["bytes"] != len(payload) or pin["sha256"] != hashlib.sha256(payload).hexdigest():
+        raise CaptureError("standalone importer bytes differ from the bundle manifest")
 
 
 def exact_keys(value: dict, expected: set[str], label: str) -> None:
@@ -478,14 +523,21 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--derive-yaw-degrees", type=float, default=0.0,
         help="rigid Unity-Y rotation applied only with --derive-architectural-name",
     )
+    parser.add_argument(
+        "--standalone-bundle-manifest", type=Path,
+        help="verified source-less R&D bundle identity; normal checkout use keeps repository verification",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     root = repository_root()
-    assert_repo_identity(root)
     try:
+        if args.standalone_bundle_manifest:
+            assert_standalone_bundle(args.standalone_bundle_manifest)
+        else:
+            assert_repo_identity(root)
         raw = args.capture.read_bytes()
         if len(raw) > 4 * 1024 * 1024:
             raise CaptureError("capture exceeds 4 MiB")

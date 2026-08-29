@@ -1,0 +1,90 @@
+{
+  "schema": "comfy-quest-architectural-build-evidence-index/v1",
+  "recorded_on": "2026-08-29",
+  "result": "passed",
+  "work_item": "architectural-capsule-studio-build",
+  "fixture": "tn0304",
+  "driver": "tools/quest-studio/Invoke-ArchitecturalBuildJourney.ps1",
+  "local_evidence_root": "C:\\work\\comfy-quest\\artifacts\\architectural-build\\runs\\20260829T105210Z",
+  "local_evidence_is_ignored": true,
+  "remote_evidence_root": "/home/derek/valheim-capture/architectural-build/20260829T105210Z-f509aa2a201f",
+  "sources": {
+    "comfy_quest_revision": "d2187c04cddb3913f47ecf502e954b05f4c7d2a0",
+    "comfy_quest_source_tree_sha256": "91e4000ac9045ca9e59e3bed81cdc179cce1504c93cb63379620a767969fd4cb",
+    "baseline_revision": "c8961ec828bf9a2b6d40aa570f4473280b503274",
+    "lumberjacks_platform_revision": "2510553bddf1fbae6a4ea9c14ff923ca05b153d8"
+  },
+  "identity": {
+    "machine": "am4",
+    "world": "ComfyQuestDemo",
+    "world_uid": "-7600395338659582326",
+    "character": "questyfour",
+    "capsule_sha256": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+    "build_id": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+    "stage_id": "8ea1838ec535b4a3d20b171da8f0da3ffd9c3370eaa37f6bf7d13b2b1a013dd5"
+  },
+  "architecture": {
+    "footprint_m": [
+      7.953375,
+      7.4676
+    ],
+    "wall_datum_m": 2.2225,
+    "ridge_m": 5.8166,
+    "pitch_degrees": 43.907838,
+    "ridge_reconciliation_m": -0.029171,
+    "pieces": {
+      "floors": 16,
+      "walls": 16,
+      "roofs": 8,
+      "total": 40
+    }
+  },
+  "placement_intent": {
+    "revision": 2,
+    "x": 12.5,
+    "y": 1.25,
+    "z": -3.75,
+    "yaw": 22.5,
+    "applied": false
+  },
+  "canonical_artifacts": {
+    "capture": {
+      "name": "tn0304-6ue2ukrad7ntjfoa7cvdmvwkcvsccusli5wrfvhq2rnkhtm2ehuq.capture.json",
+      "bytes": 18307,
+      "sha256": "5d466cdaa5a213ef958d07636325b9398eee9a74584019da8dc16a5603654251"
+    },
+    "blueprint": {
+      "name": "tn0304-6ue2ukrad7ntjfoa7cvdmvwkcvsccusli5wrfvhq2rnkhtm2ehuq.blueprint",
+      "bytes": 2440,
+      "sha256": "02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f"
+    }
+  },
+  "source_hashes": {
+    "graph_sha256": "29402c6c9d85c66d3b3760d88b6323ec64b1cb938aa29158c7501309ac0bed46",
+    "compiled_pieces_sha256": "dd14abd8a969aa789df70902862bd77243ff277c2a3c83e3bd6074385f3f9890",
+    "canonical_pieces_sha256": "0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578",
+    "importer_sha256": "eadd147307c0540706bdfa7633c9cc887f4130ec6a2bbb67bb88a228eee0a5df",
+    "importer_bundle_sha256": "664e8ec89830248e0fbd4cccdf0608a578c36360953b582f05674c5bc31c67c1",
+    "standalone_host_sha256": "aed391a046e37d3c4138b5f4092afda7dc95feadc30ef393653bcff8966075b2"
+  },
+  "safety": {
+    "creator_session_started": false,
+    "mailbox_request_written": false,
+    "world_mutation_performed": false,
+    "valheim_started": false,
+    "world_and_character_bytes_unchanged": true,
+    "only_canonical_pair_staged": true
+  },
+  "evidence_sha256": {
+    "acceptance-receipt.json": "2fbc9b68ef4a6bece1689507eafa2b5647c953b39cf5a2bff775a8b3d01c2ab0",
+    "am4-proof.json": "779a145ced18a654aa26b57c1a4c46eaaf62a62a5408567fbb9cc15376f54779",
+    "latest-stage.json": "dcd4b3e0b92c5237521c98a8633d46f4820c86fb3090cf4d512e815e0fc99240",
+    "architectural-browser-receipt.json": "6419d7c67d184f2d0fbfdc67ed5e1491c6d4050606784543af6ab8535a6b8615",
+    "architectural-build-staged.png": "89ced7f2c86e6d131eb47d259e8c269045c84963c8dccc4c92574d109d349bd1"
+  },
+  "limitations": [
+    "This journey proves export, Studio inspection and placement intent, canonical derivation, and staging. It intentionally does not prove a live-game build.",
+    "The next attack must consume this exact staged pair and placement intent for check, apply, diff, and clear without regenerating the structure.",
+    "The full machine evidence is retained locally and on AM4; this tracked index pins its identities, outcomes, and hashes."
+  ]
+}

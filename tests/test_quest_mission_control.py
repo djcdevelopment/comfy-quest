@@ -385,6 +385,50 @@ class RoadmapSurfaceTests(unittest.TestCase):
         with self.assertRaisesRegex(self.renderer.MissionControlError, "lowercase SHA-256"):
             self.renderer.validate_manifest(wrong_hash)
 
+    def test_architectural_build_journey_is_rendered_and_hash_pinned(self):
+        attack = self.manifest["next_attack"]
+        self.assertEqual("accepted-am4-warm", attack["status"])
+        self.assertEqual("tn0304", attack["fixture"])
+        self.assertEqual(10, len(attack["journey"]))
+        receipt_path = REPO / attack["evidence"]["source"]
+        self.assertTrue(receipt_path.is_file())
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        self.assertEqual("passed", receipt["result"])
+        self.assertEqual("active-warm", receipt["state"])
+        self.assertEqual("created", receipt["first_lap"]["build_action"])
+        self.assertEqual("reused", receipt["second_lap"]["build_action"])
+        self.assertEqual(
+            ["status", "blueprint_check", "blueprint_count", "blueprint_diff", "status"],
+            receipt["second_lap"]["operations"],
+        )
+        self.assertTrue(receipt["warm_state"]["valheim_running"])
+        self.assertEqual(40, receipt["warm_state"]["marked_pieces_retained"])
+        self.assertFalse(receipt["warm_state"]["creator_build_enabled"])
+        self.assertEqual("retained-not-applied", receipt["rollback_snapshot"]["state"])
+        for marker in (
+            "Architectural capsule",
+            "reusable R&amp;D lap",
+            "built once",
+            "7.953375",
+            "43.907838",
+            "0.029171",
+            "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+            "5d466cdaa5a213ef958d07636325b9398eee9a74584019da8dc16a5603654251",
+            "02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.committed)
+
+        changed = copy.deepcopy(self.manifest)
+        changed["next_attack"]["evidence"]["capture_sha256"] = "0" * 64
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "capture hash disagrees"):
+            self.renderer.validate_manifest(changed)
+
+        drifted = copy.deepcopy(self.manifest)
+        drifted["next_attack"]["evidence"]["reuse_diff_receipt_sha256"] = "0" * 64
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "reuse lap disagrees"):
+            self.renderer.validate_manifest(drifted)
+
     def test_every_projection_marker_is_registered(self):
         self.renderer.validate_projection_registration()
         original = self.renderer.POINTER_FILES

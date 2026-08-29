@@ -368,6 +368,15 @@ public static class LabBatchRequestPolicy {
         error = "blueprint_diff_arguments_invalid";
         return false;
       }
+      if (buildMode == "at") {
+        if (replace || (!string.IsNullOrWhiteSpace(selection) && selection != "lab")
+            || !(BoundedWorldCoordinate(worldX) && BoundedWorldCoordinate(worldY)
+                && BoundedWorldCoordinate(worldZ) && BoundedYaw(yawDegrees))) {
+          error = "blueprint_diff_at_transform_invalid";
+          return false;
+        }
+        return true;
+      }
       if (hasPlacement) {
         error = "request_argument_not_allowed";
         return false;

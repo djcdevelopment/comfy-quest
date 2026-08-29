@@ -227,6 +227,39 @@ public static class LabCaptureContract {
                                     IEnumerable<LabCapturePiece> actual) {
     List<LabCapturePiece> left = NormalizeAndSort(expected);
     List<LabCapturePiece> right = NormalizeAndSort(actual);
+    return CompareCanonical(left, right);
+  }
+
+  /// <summary>Compare a normalized architectural capture with pieces built at one exact
+  /// world transform. Unlike ordinary Diff, this verifies translation as well as yaw:
+  /// live world records are brought back through the inverse placement transform before
+  /// their portable signatures are compared.</summary>
+  public static LabCaptureDiff DiffAt(
+      IEnumerable<LabCapturePiece> expected,
+      IEnumerable<LabCapturePiece> actual,
+      double worldX,
+      double worldY,
+      double worldZ,
+      double yawDegrees) {
+    if (!Finite(worldX) || !Finite(worldY) || !Finite(worldZ) || !Finite(yawDegrees)) {
+      throw new ArgumentOutOfRangeException("placement", "placement must be finite");
+    }
+    double radians = yawDegrees * Math.PI / 180d;
+    double sine = Math.Sin(radians);
+    double cosine = Math.Cos(radians);
+    double halfSine = Math.Sin(radians / 2d);
+    double halfCosine = Math.Cos(radians / 2d);
+    var local = (actual ?? new LabCapturePiece[0])
+        .Where(piece => piece != null)
+        .Select(piece => InversePlacement(piece, worldX, worldY, worldZ,
+            sine, cosine, halfSine, halfCosine));
+    List<LabCapturePiece> left = CanonicalizeAndSort(expected, translateToMinimum: false);
+    List<LabCapturePiece> right = CanonicalizeAndSort(local, translateToMinimum: false);
+    return CompareCanonical(left, right);
+  }
+
+  static LabCaptureDiff CompareCanonical(
+      List<LabCapturePiece> left, List<LabCapturePiece> right) {
     var result = new LabCaptureDiff { ExpectedCount = left.Count, ActualCount = right.Count };
     var counts = new Dictionary<string, int>(StringComparer.Ordinal);
     foreach (LabCapturePiece p in left) {
@@ -250,9 +283,16 @@ public static class LabCaptureContract {
   }
 
   public static List<LabCapturePiece> NormalizeAndSort(IEnumerable<LabCapturePiece> source) {
+    return CanonicalizeAndSort(source, translateToMinimum: true);
+  }
+
+  static List<LabCapturePiece> CanonicalizeAndSort(
+      IEnumerable<LabCapturePiece> source, bool translateToMinimum) {
     var pieces = (source ?? new LabCapturePiece[0]).Where(p => p != null).Select(Clone).ToList();
     if (pieces.Count == 0) return pieces;
-    float minX = pieces.Min(p => p.X), minY = pieces.Min(p => p.Y), minZ = pieces.Min(p => p.Z);
+    float minX = translateToMinimum ? pieces.Min(p => p.X) : 0f;
+    float minY = translateToMinimum ? pieces.Min(p => p.Y) : 0f;
+    float minZ = translateToMinimum ? pieces.Min(p => p.Z) : 0f;
     foreach (LabCapturePiece p in pieces) {
       p.X = Round(p.X - minX, 4); p.Y = Round(p.Y - minY, 4); p.Z = Round(p.Z - minZ, 4);
       CanonicalQuaternion(p);
@@ -265,6 +305,30 @@ public static class LabCaptureContract {
     }
     pieces.Sort((a, b) => string.CompareOrdinal(Signature(a), Signature(b)));
     return pieces;
+  }
+
+  static LabCapturePiece InversePlacement(
+      LabCapturePiece source,
+      double worldX,
+      double worldY,
+      double worldZ,
+      double sine,
+      double cosine,
+      double halfSine,
+      double halfCosine) {
+    LabCapturePiece piece = Clone(source);
+    double dx = source.X - worldX;
+    double dz = source.Z - worldZ;
+    piece.X = (float)(cosine * dx - sine * dz);
+    piece.Y = (float)(source.Y - worldY);
+    piece.Z = (float)(sine * dx + cosine * dz);
+
+    // qLocal = inverse(qYaw) * qWorld. The yaw quaternion is (0,s,0,c).
+    piece.Qx = (float)(halfCosine * source.Qx - halfSine * source.Qz);
+    piece.Qy = (float)(halfCosine * source.Qy - halfSine * source.Qw);
+    piece.Qz = (float)(halfCosine * source.Qz + halfSine * source.Qx);
+    piece.Qw = (float)(halfCosine * source.Qw + halfSine * source.Qy);
+    return piece;
   }
 
   public static string ComputePiecesSha256(IEnumerable<LabCapturePiece> pieces) {
@@ -357,6 +421,7 @@ public static class LabCaptureContract {
   }
 
   static bool Finite(float value) { return !float.IsNaN(value) && !float.IsInfinity(value); }
+  static bool Finite(double value) { return !double.IsNaN(value) && !double.IsInfinity(value); }
 
   static float Round(float value, int digits) {
     float rounded = (float)Math.Round(value, digits, MidpointRounding.AwayFromZero);

@@ -150,6 +150,44 @@ visible machine-only client work belongs on AM4 while OMEN remains released.
 
 ## 4. What happens next, in order
 
+### Completed ruthless slice — architectural capsule → Studio Build → Quest Lab staging
+
+The baseline `tn0304` envelope now exports an immutable, SHA-256-pinned
+`creator-os-architectural-build-capsule/v0`. Studio imports it into the separate Build
+workspace, shows the solved architectural intent beside the canonical 40-piece game
+adaptation, permits only `x/y/z/yaw` placement intent, and stages the exact capture/blueprint
+pair. The acceptance receipt must retain the `7.953375 × 7.4676 m` footprint, `2.2225 m`
+wall datum, `5.8166 m` ridge, `43.907838°` pitch, `−0.029171 m` reconciliation, and
+`16/16/8` piece split. AM4 accepted capsule
+`f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9` and staged capture
+`5d466cdaa5a213ef958d07636325b9398eee9a74584019da8dc16a5603654251` plus blueprint
+`02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f` while Valheim stayed
+stopped and world/character bytes remained unchanged. The immutable evidence index is
+`docs/evidence/architectural-build-tn0304-20260829-r1.json`. This stops before Creator Session,
+mailbox, check/build/diff/clear, or world mutation; the following attack consumes this exact
+staged pair and saved placement intent.
+
+### Completed live proof — exact staged pair → apply → diff → clear → restore
+
+The unattended AM4 harness consumed that exact pair without regeneration. It entered the pinned
+`ComfyQuestDemo` world as `questyfour`, passed Lab check, placed all 40 pieces at the Studio-saved
+`x=12.5, y=1.25, z=-3.75, yaw=22.5` transform, observed the exact `16/16/8` prefab split, and
+returned `MATCH` for 40 selected pieces with zero missing and zero extra. It then cleared all 40
+marked pieces, disabled creator build mode, stopped Valheim gracefully, and restored the exact
+prior Lab plugin, runtime, world, and character bytes. The canonical staged capture and blueprint
+remain on AM4 for the next deliberate creator lap. The immutable evidence index is
+`docs/evidence/architectural-live-tn0304-20260829-r1.json`; a retained world build remains gated on
+human spatial and aesthetic review of the saved placement.
+
+For continuing R&D, AM4 now uses a warm-lap contract rather than replaying that disposable
+acceptance transaction. The first warm lap installed the pinned Lab candidate and created the
+exact build once. The second lap reattached to the running client, reused the same 40 marked
+pieces, and ran only `status → check → count → diff → status`; it did not deploy, enter, build,
+clear, stop, or restore. Valheim remains running, the proved structure remains standing, and
+creator build mode is off. Identity drift fails closed. Full rollback is retained as the explicit
+`Invoke-ArchitecturalWarmLap.ps1 -Close` operation, not paid on every loop. The active-state
+evidence index is `docs/evidence/architectural-warm-tn0304-20260829-r1.json`.
+
 ### Step 1 — Completed: installed vertical slice `queue.full-width-journey`
 
 The first step that cannot be taken without Valheim installed. Its authoritative journey is

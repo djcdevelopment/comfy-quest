@@ -207,6 +207,12 @@ public class LabBatchContractTests {
         "blueprint_build", "human-hall", null, null, false, "ground", out _));
     Assert.True(LabBatchRequestPolicy.ValidateBlueprint(
         "blueprint_clear", "human-hall", null, null, false, null, out _));
+    Assert.True(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_build", "human-hall", null, null, false, "at",
+        "12.5", "1.25", "-3.75", "22.5", out _));
+    Assert.True(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_diff", "human-hall", "20", "lab", false, "at",
+        "12.5", "1.25", "-3.75", "22.5", out _));
 
     Assert.False(LabBatchRequestPolicy.ValidateBlueprint(
         "blueprint_capture", "../escape", "20", "mine", false, null,
@@ -224,6 +230,18 @@ public class LabBatchContractTests {
         "blueprint_clear", "human-hall", null, null, true, null,
         out string extraError));
     Assert.Equal("request_argument_not_allowed", extraError);
+    Assert.False(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_build", "human-hall", null, null, false, "at",
+        "12.5", null, "-3.75", "22.5", out string partialPlacementError));
+    Assert.Equal("blueprint_build_at_transform_invalid", partialPlacementError);
+    Assert.False(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_diff", "human-hall", "20", "mine", false, "at",
+        "12.5", "1.25", "-3.75", "22.5", out string diffSelectionError));
+    Assert.Equal("blueprint_diff_at_transform_invalid", diffSelectionError);
+    Assert.False(LabBatchRequestPolicy.ValidateBlueprint(
+        "blueprint_diff", "human-hall", "20", "lab", false, "at",
+        "NaN", "1.25", "-3.75", "22.5", out string nonFinitePlacementError));
+    Assert.Equal("blueprint_diff_at_transform_invalid", nonFinitePlacementError);
   }
 
   [Fact]

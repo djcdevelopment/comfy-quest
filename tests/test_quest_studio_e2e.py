@@ -132,7 +132,8 @@ class QuestStudioE2ETests(unittest.TestCase):
             "COMFY_QUEST_E2E_DOTNET",
             "COMFY_QUEST_E2E_HOST_DLL",
             "COMFY_QUEST_E2E_KEEP_ARTIFACTS",
-            "dotnetExe publish",
+            "'publish', $hostProject",
+            "& $dotnetExe @publishArguments",
             "quest-studio-e2e\\host",
         ):
             self.assertIn(expected, source)
