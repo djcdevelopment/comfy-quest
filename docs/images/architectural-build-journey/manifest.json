@@ -1,0 +1,48 @@
+{
+  "schema": "comfy-quest-architectural-journey-imagery/v1",
+  "recorded_on": "2026-08-29",
+  "fixture": "tn0304",
+  "build_id": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+  "evidence": {
+    "build": "docs/evidence/architectural-build-tn0304-20260829-r1.json",
+    "warm": "docs/evidence/architectural-warm-tn0304-20260829-r1.json",
+    "demo": "docs/evidence/architectural-demo-tn0304-20260829-r1.json",
+    "architectural_browser_receipt_sha256": "1502b6e9e3aed7c7f331c10fc3cc4b7e2761c8f2fab7eac9cd26c399e7bdddd9"
+  },
+  "images": [
+    {
+      "name": "studio-architecture.png",
+      "role": "Studio Architecture view",
+      "source_kind": "read-only documentation capture",
+      "source": "already-running standalone Studio host, immutable build deep link, Architecture view",
+      "width": 1600,
+      "height": 1000,
+      "bytes": 85589,
+      "sha256": "485aad73271ed2914bdd89cdbe3e174d4fa127f377094907e272d98f963869a4",
+      "world_mutation_performed": false
+    },
+    {
+      "name": "studio-game-pieces.png",
+      "role": "Studio Game pieces view",
+      "source_kind": "read-only documentation capture",
+      "source": "already-running standalone Studio host, immutable build deep link, Game pieces view",
+      "width": 1600,
+      "height": 1000,
+      "bytes": 72194,
+      "sha256": "6ba70bc2883dcd7972e49b58864aecc75c0ba0fecf9b1301de9b0c216dd5c5e4",
+      "world_mutation_performed": false
+    },
+    {
+      "name": "valheim-standing-build.png",
+      "role": "Exact Valheim window showing the retained standing build",
+      "source_kind": "accepted warm-lap evidence",
+      "source": "artifacts/architectural-warm/laps/20260829T132117Z/architectural-live-applied.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 2325800,
+      "sha256": "5d4665915c71248265e1940d5e03a73f792f574b9c477f91c2acf7abac47a29c",
+      "evidence_field": "second_lap.screenshot_sha256",
+      "world_mutation_performed": false
+    }
+  ]
+}

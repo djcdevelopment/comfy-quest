@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="architectural-journey-schema" content="comfy-quest-architectural-journey/v1">
+  <meta name="description" content="How one architectural capsule became a verified 40-piece Valheim build, and why the team stopped rebuilding it for every R&amp;D lap.">
+  <title>The Build We Stopped Rebuilding — Creator OS R&amp;D Field Note</title>
+  <style>
+    :root {
+      --ink: #edf4ff;
+      --muted: #9aabc4;
+      --quiet: #70819d;
+      --night: #050911;
+      --navy: #09101e;
+      --panel: #0d1627;
+      --panel-2: #111d30;
+      --line: #24344e;
+      --line-soft: rgba(133, 160, 198, 0.16);
+      --gold: #f4ad34;
+      --gold-soft: #ffd985;
+      --cyan: #91def2;
+      --green: #80d6a0;
+      --red: #ef8e8e;
+      --serif: Georgia, "Times New Roman", serif;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --measure: 72rem;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 82% 10%, rgba(50, 116, 153, 0.18), transparent 28rem),
+        radial-gradient(circle at 4% 27%, rgba(244, 173, 52, 0.09), transparent 24rem),
+        var(--night);
+      font-family: var(--sans);
+      font-size: 17px;
+      line-height: 1.68;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: var(--cyan); text-underline-offset: 0.18em; }
+    a:hover { color: #c6f2ff; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      color: #c9ecf7;
+      overflow-wrap: anywhere;
+    }
+    .skip-link {
+      position: fixed;
+      z-index: 20;
+      top: 0.8rem;
+      left: 0.8rem;
+      padding: 0.6rem 0.9rem;
+      color: #08101c;
+      background: var(--gold-soft);
+      border-radius: 0.4rem;
+      transform: translateY(-180%);
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .masthead {
+      border-bottom: 1px solid var(--line-soft);
+      background: rgba(5, 9, 17, 0.82);
+    }
+    .masthead-inner {
+      width: min(var(--measure), calc(100% - 2rem));
+      min-height: 4.25rem;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .wordmark-mark {
+      width: 2rem;
+      height: 2rem;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(244, 173, 52, 0.52);
+      border-radius: 0.5rem;
+      color: var(--gold);
+      background: rgba(244, 173, 52, 0.09);
+      font-family: var(--serif);
+      font-size: 1.15rem;
+    }
+    .masthead nav { display: flex; gap: 1rem; font-size: 0.82rem; }
+    .masthead nav a { color: var(--muted); text-decoration: none; }
+    .masthead nav a:hover { color: var(--ink); }
+
+    main { overflow: hidden; }
+    article { padding-bottom: 4rem; }
+    .wrap {
+      width: min(var(--measure), calc(100% - 2rem));
+      margin-inline: auto;
+    }
+    .prose { width: min(45rem, 100%); margin-inline: auto; }
+    .section {
+      padding: clamp(4rem, 8vw, 7rem) 0;
+      border-top: 1px solid var(--line-soft);
+    }
+    .eyebrow {
+      display: block;
+      margin-bottom: 0.7rem;
+      color: var(--gold);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 {
+      margin: 0;
+      font-family: var(--serif);
+      font-weight: 700;
+      line-height: 1.04;
+      text-wrap: balance;
+    }
+    h1 { max-width: 13ch; font-size: clamp(3.35rem, 9vw, 7.6rem); letter-spacing: -0.055em; }
+    h2 { font-size: clamp(2.2rem, 5vw, 4rem); letter-spacing: -0.035em; }
+    h3 { font-size: 1.45rem; letter-spacing: -0.015em; }
+    .lede {
+      max-width: 43rem;
+      margin: 1.6rem 0 0;
+      color: #c8d5e8;
+      font-size: clamp(1.13rem, 2.25vw, 1.45rem);
+      line-height: 1.55;
+    }
+    .section-intro { margin: 1.2rem 0 2.2rem; color: var(--muted); font-size: 1.12rem; }
+
+    .hero {
+      padding: clamp(4.8rem, 10vw, 8.5rem) 0 3rem;
+    }
+    .hero-meta {
+      margin-top: 2.2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.5rem;
+      color: var(--quiet);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .hero-meta strong { color: var(--green); }
+    .hero-figure {
+      width: min(86rem, calc(100% - 2rem));
+      margin: 3.7rem auto 0;
+    }
+    figure { margin: 0; }
+    .frame {
+      overflow: hidden;
+      border: 1px solid #31435f;
+      border-radius: 0.8rem;
+      background: #03070d;
+      box-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.44);
+    }
+    .frame img { width: 100%; height: auto; }
+    figcaption {
+      margin-top: 0.8rem;
+      color: var(--quiet);
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    figcaption strong { color: var(--muted); }
+
+    .pullquote {
+      position: relative;
+      margin: 0;
+      padding: 1.4rem 0 1.4rem 2rem;
+      color: #d9e5f5;
+      border-left: 3px solid var(--gold);
+      font-family: var(--serif);
+      font-size: clamp(1.55rem, 3vw, 2.35rem);
+      line-height: 1.32;
+    }
+    .pullquote footer {
+      margin-top: 1rem;
+      color: var(--muted);
+      font-family: var(--sans);
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .metric-grid {
+      margin-top: 2.5rem;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.7rem;
+    }
+    .metric {
+      min-height: 8.5rem;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid var(--line);
+      border-radius: 0.7rem;
+      background: linear-gradient(145deg, rgba(17, 29, 48, 0.9), rgba(8, 15, 27, 0.88));
+    }
+    .metric small { color: var(--quiet); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .metric strong { color: var(--ink); font-family: var(--mono); font-size: clamp(1rem, 2vw, 1.2rem); line-height: 1.25; }
+    .metric.repair strong { color: var(--gold-soft); }
+
+    .flow-figure { margin-top: 3rem; }
+    .flow-shell {
+      padding: clamp(1rem, 3vw, 2rem);
+      border: 1px solid var(--line);
+      border-radius: 0.8rem;
+      background: rgba(8, 15, 27, 0.88);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(18rem, 0.75fr);
+      gap: clamp(2.5rem, 7vw, 6rem);
+      align-items: start;
+    }
+    .copy p { color: #bdcadc; }
+    .copy p:first-of-type { margin-top: 1.4rem; }
+    .capsule-card {
+      padding: 1.5rem;
+      border: 1px solid rgba(145, 222, 242, 0.24);
+      border-radius: 0.8rem;
+      background: linear-gradient(155deg, rgba(26, 54, 70, 0.38), rgba(9, 16, 28, 0.92));
+    }
+    .capsule-card h3 { color: var(--cyan); }
+    .capsule-card ul { margin: 1.2rem 0 0; padding-left: 1.2rem; color: var(--muted); }
+    .capsule-card li + li { margin-top: 0.6rem; }
+
+    .screens {
+      margin-top: 3rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.2rem;
+    }
+    .screens .frame { border-radius: 0.65rem; }
+
+    .boundary {
+      margin-top: 3rem;
+      padding: clamp(1.5rem, 4vw, 2.7rem);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.25rem;
+      align-items: start;
+      border: 1px solid rgba(128, 214, 160, 0.38);
+      border-radius: 0.8rem;
+      background: rgba(24, 75, 49, 0.16);
+    }
+    .boundary-mark {
+      width: 2.8rem;
+      height: 2.8rem;
+      display: grid;
+      place-items: center;
+      color: #062012;
+      background: var(--green);
+      border-radius: 50%;
+      font-weight: 900;
+    }
+    .boundary p { margin: 0.45rem 0 0; color: #bad6c4; }
+
+    .lap-grid {
+      margin-top: 2.8rem;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .lap {
+      position: relative;
+      padding: 1.45rem;
+      border: 1px solid var(--line);
+      border-radius: 0.75rem;
+      background: var(--panel);
+    }
+    .lap::before {
+      content: attr(data-step);
+      width: 2rem;
+      height: 2rem;
+      margin-bottom: 1.2rem;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+    .lap.warm { border-color: rgba(128, 214, 160, 0.35); }
+    .lap.warm::before { color: #092214; background: var(--green); border-color: var(--green); }
+    .lap h3 { margin-bottom: 0.8rem; }
+    .lap p { margin: 0; color: var(--muted); font-size: 0.94rem; }
+
+    .verdict {
+      margin-top: 1.3rem;
+      padding: clamp(1.5rem, 4vw, 3rem);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 2rem;
+      align-items: center;
+      border: 1px solid rgba(244, 173, 52, 0.42);
+      border-radius: 0.85rem;
+      background:
+        linear-gradient(130deg, rgba(244, 173, 52, 0.12), transparent 52%),
+        var(--panel);
+    }
+    .verdict strong { color: var(--gold-soft); font-family: var(--serif); font-size: clamp(1.8rem, 4vw, 3rem); line-height: 1.1; }
+    .verdict p { max-width: 38rem; margin: 0.7rem 0 0; color: var(--muted); }
+    .sequence {
+      padding: 0.8rem 1rem;
+      color: var(--cyan);
+      border: 1px solid rgba(145, 222, 242, 0.25);
+      border-radius: 0.55rem;
+      background: rgba(4, 11, 19, 0.74);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    .scar-grid {
+      margin-top: 2.6rem;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+      counter-reset: scars;
+    }
+    .scar {
+      padding: 1.5rem;
+      border-top: 2px solid var(--gold);
+      background: linear-gradient(180deg, rgba(17, 29, 48, 0.78), rgba(9, 16, 28, 0.7));
+      counter-increment: scars;
+    }
+    .scar::before {
+      content: "0" counter(scars);
+      display: block;
+      margin-bottom: 1.5rem;
+      color: var(--gold);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+    .scar h3 { margin-bottom: 0.8rem; }
+    .scar p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+
+    .truth-grid {
+      margin-top: 2.6rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .truth {
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      background: var(--panel);
+    }
+    .truth.proven { border: 1px solid rgba(128, 214, 160, 0.35); }
+    .truth.open { border: 1px solid rgba(239, 142, 142, 0.3); }
+    .truth h3 { margin-bottom: 1rem; }
+    .truth.proven h3 { color: var(--green); }
+    .truth.open h3 { color: #f3b2b2; }
+    .truth ul { margin: 0; padding-left: 1.2rem; color: var(--muted); }
+    .truth li + li { margin-top: 0.65rem; }
+
+    details {
+      margin-top: 2.5rem;
+      border: 1px solid var(--line);
+      border-radius: 0.75rem;
+      background: rgba(9, 16, 28, 0.72);
+    }
+    summary {
+      padding: 1.2rem 1.4rem;
+      cursor: pointer;
+      color: var(--ink);
+      font-weight: 700;
+    }
+    .evidence-body { padding: 0 1.4rem 1.5rem; }
+    .evidence-body p { color: var(--muted); }
+    .evidence-links { display: flex; flex-wrap: wrap; gap: 0.7rem 1.2rem; }
+    .evidence-links a { font-size: 0.88rem; }
+    .hash-table {
+      width: 100%;
+      margin-top: 1.5rem;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .hash-table th, .hash-table td {
+      padding: 0.75rem 0.6rem;
+      text-align: left;
+      vertical-align: top;
+      border-top: 1px solid var(--line-soft);
+    }
+    .hash-table th { width: 10rem; color: var(--muted); font-weight: 600; }
+    .hash-table td { color: var(--quiet); }
+    .commits {
+      margin-top: 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.7rem;
+    }
+    .commit {
+      padding: 1rem;
+      border: 1px solid var(--line-soft);
+      border-radius: 0.55rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .commit code { display: block; margin-bottom: 0.3rem; color: var(--gold-soft); }
+
+    .closing {
+      padding: clamp(4.5rem, 10vw, 8rem) 0;
+      text-align: center;
+    }
+    .closing h2 { max-width: 18ch; margin-inline: auto; }
+    .closing p { max-width: 40rem; margin: 1.4rem auto 0; color: var(--muted); font-size: 1.1rem; }
+    .footer {
+      padding: 1.4rem 0;
+      border-top: 1px solid var(--line-soft);
+      color: var(--quiet);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+    }
+    .footer-inner {
+      width: min(var(--measure), calc(100% - 2rem));
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    @media (max-width: 880px) {
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric:last-child { grid-column: 1 / -1; }
+      .split, .verdict { grid-template-columns: 1fr; }
+      .screens, .lap-grid, .scar-grid { grid-template-columns: 1fr; }
+      .sequence { white-space: normal; }
+      .commits { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      body { font-size: 16px; }
+      .masthead nav { display: none; }
+      .metric-grid, .truth-grid { grid-template-columns: 1fr; }
+      .metric:last-child { grid-column: auto; }
+      .boundary { grid-template-columns: 1fr; }
+      .hero-figure { width: calc(100% - 1rem); }
+      .frame { border-radius: 0.45rem; }
+      .hash-table, .hash-table tbody, .hash-table tr, .hash-table th, .hash-table td { display: block; }
+      .hash-table th { width: auto; padding-bottom: 0.15rem; }
+      .hash-table td { padding-top: 0; border-top: 0; }
+      .hash-table tr { padding: 0.55rem 0; border-top: 1px solid var(--line-soft); }
+      .footer-inner { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+    @media print {
+      :root { --ink: #111827; --muted: #374151; --quiet: #4b5563; --line: #cbd5e1; --line-soft: #dbe2ea; }
+      body { color: #111827; background: #fff; font-size: 11pt; }
+      .masthead { position: static; background: #fff; }
+      .masthead nav, .skip-link { display: none; }
+      .section { padding: 2rem 0; }
+      .frame, .metric, .capsule-card, .lap, .truth, details, .verdict, .flow-shell { box-shadow: none; background: #fff; }
+      .hero { padding-top: 3rem; }
+      a { color: #1d4ed8; }
+      details { break-inside: avoid; }
+      details > * { display: block; }
+      figure, .scar, .lap, .metric { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#story">Skip to the story</a>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <a class="wordmark" href="#top" aria-label="Creator OS field note, back to top">
+        <span class="wordmark-mark" aria-hidden="true">Q</span>
+        <span>Creator OS · Field Note</span>
+      </a>
+      <nav aria-label="Article sections">
+        <a href="#handoff">Handoff</a>
+        <a href="#studio">Studio</a>
+        <a href="#rnd">R&amp;D lap</a>
+        <a href="#evidence">Evidence</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="story">
+    <article id="top">
+      <header class="hero wrap">
+        <span class="eyebrow">tn0304 · Architectural capsule · 29 August 2026</span>
+        <h1>The build we stopped rebuilding.</h1>
+        <p class="lede">A measured building crossed from architectural intent into 40 exact Valheim pieces. The most useful decision came afterward: leave the accepted structure standing, keep AM4 warm, and spend the remaining laps learning instead of reconstructing.</p>
+        <div class="hero-meta">
+          <span><strong>Match</strong> canonical diff</span>
+          <span><strong>40 / 40</strong> standing pieces</span>
+          <span><strong>Zero</strong> writes on the final lap</span>
+        </div>
+      </header>
+
+      <figure class="hero-figure">
+        <a class="frame" href="images/architectural-build-journey/valheim-standing-build.png" aria-label="Open the full-resolution Valheim evidence image">
+          <img src="images/architectural-build-journey/valheim-standing-build.png" width="1920" height="1080" alt="Exact Valheim game window beneath the retained timber structure, with its floor, wall, and roof pieces still standing after the warm verification lap">
+        </a>
+        <figcaption><strong>The retained build, not a render.</strong> Exact 1920×1080 Valheim-window evidence from the final warm lap; the image hash is pinned in the acceptance receipt.</figcaption>
+      </figure>
+
+      <section class="section">
+        <div class="prose">
+          <blockquote class="pullquote">
+            The slice was not done when Studio could draw it. It was done when the same 40 canonical pieces could stand in the game, survive another lap, and still diff cleanly.
+            <footer>Review verdict after the final operator pass</footer>
+          </blockquote>
+        </div>
+      </section>
+
+      <section id="handoff" class="section">
+        <div class="wrap">
+          <div class="prose">
+            <span class="eyebrow">01 · Freeze the architectural truth</span>
+            <h2>Start with the envelope, not a pile of prefabs.</h2>
+            <p class="section-intro">The baseline probe solved one accepted interpretation of <code>tn0304</code>, then exported that interpretation as an immutable, hash-verified capsule. That boundary mattered: Studio could inspect and place the result, but it could not quietly reinterpret the architecture.</p>
+          </div>
+
+          <div class="metric-grid" aria-label="Accepted architectural measurements">
+            <div class="metric"><small>Footprint</small><strong>7.953375 × 7.4676 m</strong></div>
+            <div class="metric"><small>Wall datum</small><strong>2.2225 m</strong></div>
+            <div class="metric"><small>True ridge</small><strong>5.8166 m</strong></div>
+            <div class="metric"><small>Roof pitch</small><strong>43.907838°</strong></div>
+            <div class="metric repair"><small>Ridge reconciliation</small><strong>−0.029171 m</strong></div>
+          </div>
+
+          <figure class="flow-figure">
+            <div class="flow-shell">
+              <svg viewBox="0 0 1160 260" role="img" aria-labelledby="flow-title flow-desc">
+                <title id="flow-title">The architectural build transaction</title>
+                <desc id="flow-desc">Accepted constraints become an immutable capsule, Studio derives and stages a canonical artifact pair, one retained world build is applied, and later warm laps inspect it without rebuilding.</desc>
+                <defs>
+                  <linearGradient id="rail" x1="0" x2="1">
+                    <stop offset="0" stop-color="#f4ad34"/>
+                    <stop offset="0.62" stop-color="#91def2"/>
+                    <stop offset="1" stop-color="#80d6a0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M102 110H1052" stroke="url(#rail)" stroke-width="4" stroke-linecap="round"/>
+                <g font-family="Inter,Segoe UI,sans-serif" text-anchor="middle">
+                  <g transform="translate(105 110)">
+                    <circle r="32" fill="#211a0c" stroke="#f4ad34" stroke-width="3"/>
+                    <text y="6" fill="#ffd985" font-size="18" font-weight="700">01</text>
+                    <text y="64" fill="#edf4ff" font-size="18" font-weight="700">Constraints</text>
+                    <text y="88" fill="#70819d" font-size="13">accepted envelope</text>
+                  </g>
+                  <g transform="translate(340 110)">
+                    <circle r="32" fill="#14202d" stroke="#d9bf74" stroke-width="3"/>
+                    <text y="6" fill="#f3d58a" font-size="18" font-weight="700">02</text>
+                    <text y="64" fill="#edf4ff" font-size="18" font-weight="700">Capsule</text>
+                    <text y="88" fill="#70819d" font-size="13">immutable + pinned</text>
+                  </g>
+                  <g transform="translate(575 110)">
+                    <circle r="32" fill="#10222c" stroke="#91def2" stroke-width="3"/>
+                    <text y="6" fill="#b8effc" font-size="18" font-weight="700">03</text>
+                    <text y="64" fill="#edf4ff" font-size="18" font-weight="700">Studio Build</text>
+                    <text y="88" fill="#70819d" font-size="13">inspect + stage</text>
+                  </g>
+                  <g transform="translate(810 110)">
+                    <circle r="32" fill="#10272a" stroke="#78ced3" stroke-width="3"/>
+                    <text y="6" fill="#b6eef0" font-size="18" font-weight="700">04</text>
+                    <text y="64" fill="#edf4ff" font-size="18" font-weight="700">One apply</text>
+                    <text y="88" fill="#70819d" font-size="13">40 marked pieces</text>
+                  </g>
+                  <g transform="translate(1045 110)">
+                    <circle r="32" fill="#11261a" stroke="#80d6a0" stroke-width="3"/>
+                    <text y="6" fill="#a9edc0" font-size="18" font-weight="700">05</text>
+                    <text y="64" fill="#edf4ff" font-size="18" font-weight="700">Warm reuse</text>
+                    <text y="88" fill="#70819d" font-size="13">read-only proof</text>
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <figcaption><strong>One identity across every boundary.</strong> The capsule SHA-256 becomes the Studio build identity; the capture, blueprint, placement receipt, and live diff all point back to it.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="wrap split">
+          <div class="copy">
+            <span class="eyebrow">02 · Carry enough, and only enough</span>
+            <h2>A capsule, not a second design system.</h2>
+            <p>The ZIP carried the solved graph, constraints, interpretation and compilation receipts, compiled pieces, the architectural candidate capture, and only the prefab geometry needed to render those pieces. Every member was listed, sized, and hash-pinned.</p>
+            <p>That kept the handoff ruthless. There was no general CAD solver in Studio, no dimension editing, no prefab catalog, and no imported code to execute. Rebuilding identical inputs produced byte-identical capsule bytes.</p>
+          </div>
+          <aside class="capsule-card" aria-label="Capsule contract summary">
+            <h3>Immutable by construction</h3>
+            <ul>
+              <li>Traversal, duplicate, unlisted, oversized, or tampered members fail before persistence.</li>
+              <li>Graph, receipts, capture, and piece counts must reconcile.</li>
+              <li>The accepted adaptation is exactly <strong>16 floors</strong>, <strong>16 walls</strong>, and <strong>8 roofs</strong>.</li>
+              <li>Placement remains revision-checked metadata; canonical bytes never drift.</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section id="studio" class="section">
+        <div class="wrap">
+          <div class="prose">
+            <span class="eyebrow">03 · Make the adaptation inspectable</span>
+            <h2>Studio showed both kinds of truth.</h2>
+            <p class="section-intro">Architecture mode kept the footprint, wall datum, ridge, roof planes, classifications, provenance, conflicts, and 29 mm reconciliation visible. Game pieces mode showed the exact normalized prefabs Studio would stage. The creator could compare intent with adaptation without pretending they were the same thing.</p>
+          </div>
+
+          <div class="screens">
+            <figure>
+              <a class="frame" href="images/architectural-build-journey/studio-architecture.png" aria-label="Open the full-resolution Studio Architecture view">
+                <img src="images/architectural-build-journey/studio-architecture.png" width="1600" height="1000" alt="Quest Studio Architectural Build workspace in Architecture mode, showing accepted measurements, immutable capsule identity, placement intent, staging state, footprint, and true ridge diagram">
+              </a>
+              <figcaption><strong>Architecture.</strong> The solved envelope stays legible, including the true ridge and the bounded reconciliation that game snapping required.</figcaption>
+            </figure>
+            <figure>
+              <a class="frame" href="images/architectural-build-journey/studio-game-pieces.png" aria-label="Open the full-resolution Studio Game pieces view">
+                <img src="images/architectural-build-journey/studio-game-pieces.png" width="1600" height="1000" alt="Quest Studio Architectural Build workspace in Game pieces mode, showing the canonical floor, wall, and roof piece layout for the 40-piece build">
+              </a>
+              <figcaption><strong>Game pieces.</strong> The canonical adaptation is rendered from capsule-owned prefab geometry: 40 pieces across three prefab types.</figcaption>
+            </figure>
+          </div>
+
+          <div class="boundary">
+            <span class="boundary-mark" aria-hidden="true">✓</span>
+            <div>
+              <h3>Staged, not applied</h3>
+              <p>Studio copied only the canonical capture/blueprint pair, verified the copied hashes, and saved placement intent at <code>x 12.5 · y 1.25 · z −3.75 · yaw 22.5°</code>. No Creator Session. No mailbox request. No world write.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="rnd" class="section">
+        <div class="wrap">
+          <div class="prose">
+            <span class="eyebrow">04 · Learn without reconstructing</span>
+            <h2>The useful part of R&amp;D mode was what it stopped doing.</h2>
+            <p class="section-intro">The cold acceptance replay had already done the responsible destructive test: the canonical pair was built, proved, and cleared, then the exact pre-run machine state was restored. That established reversibility. It was also the wrong loop for every remaining visual and integration question.</p>
+          </div>
+
+          <div class="lap-grid">
+            <section class="lap" data-step="01">
+              <h3>Cold acceptance</h3>
+              <p>Launch, enter, check, apply all 40 pieces, diff <code>MATCH</code>, clear all 40, stop, and restore exact plugin, Runtime, Lab, world, and character bytes.</p>
+            </section>
+            <section class="lap warm" data-step="02">
+              <h3>Warm creation</h3>
+              <p>The accepted structure was built once and deliberately left standing. Creator build mode was turned back off; rollback remained explicit and available.</p>
+            </section>
+            <section class="lap warm" data-step="03">
+              <h3>Warm inspection</h3>
+              <p>The next operator pass reused the canonical stage, control plane, running client, loaded world, and one retained build. Forty pieces still matched exactly.</p>
+            </section>
+          </div>
+
+          <div class="verdict">
+            <div>
+              <strong>Yes—R&amp;D mode helped.</strong>
+              <p>Not as a vague productivity claim. It cut the final lap to five read-only operations, preserved the accepted scene for human inspection, and made integration defects cheaper to isolate.</p>
+            </div>
+            <div class="sequence" aria-label="Final warm lap operation sequence">status → check → count → diff → status</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="wrap">
+          <div class="prose">
+            <span class="eyebrow">05 · The scars that earned the lap</span>
+            <h2>Warm reuse found seams the happy path hid.</h2>
+            <p class="section-intro">None of these were architectural failures. They were boundary failures—the exact kind a vertical slice is supposed to flush out before a demo.</p>
+          </div>
+
+          <div class="scar-grid">
+            <section class="scar">
+              <h3>The verifier expected a cold client.</h3>
+              <p>The original machine guard treated an already-running Valheim process as drift. Warm mode now requires the same process identity and command line, keeps world, character, session, and mailbox bytes strict, and permits only append-only event archive growth.</p>
+            </section>
+            <section class="scar">
+              <h3>A GET acquired an empty body.</h3>
+              <p>Windows PowerShell’s request path attached a body where the host expected none. Empty strings are now treated as no body, making the operator path agree with the API contract.</p>
+            </section>
+            <section class="scar">
+              <h3>The receipt told the wrong sequence.</h3>
+              <p>The demo index initially lifted operations from a summary instead of the detailed warm sequence. The final receipt now records the exact five operations and explicitly pins stage and control-plane reuse.</p>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="evidence" class="section">
+        <div class="wrap">
+          <div class="prose">
+            <span class="eyebrow">06 · Review after the adrenaline</span>
+            <h2>A convincing slice, with sharp edges still visible.</h2>
+            <p class="section-intro">The result is demoable because the evidence chain is coherent, not because the prototype suddenly became a product. The distinction is worth protecting.</p>
+          </div>
+
+          <div class="truth-grid">
+            <section class="truth proven">
+              <h3>What is proven</h3>
+              <ul>
+                <li>The accepted envelope exports deterministically and imports immutably.</li>
+                <li>Architectural intent and exact game adaptation can be inspected side by side.</li>
+                <li>Placement metadata does not alter canonical artifacts.</li>
+                <li>The staged pair applies as 40 buildable pieces and diffs <code>MATCH</code>.</li>
+                <li>A warm read-only lap can reuse the accepted structure without teardown.</li>
+              </ul>
+            </section>
+            <section class="truth open">
+              <h3>What is not generalized</h3>
+              <ul>
+                <li>This remains a hard-pinned <code>tn0304</code> vertical slice, not a general CAD or prefab workflow.</li>
+                <li>The harness is intentionally machine-aware and should become fixture-driven only when a second structure earns that abstraction.</li>
+                <li>The largest Studio and live-probe files should be split before broader product work.</li>
+                <li>The game capture is operational evidence, not a cinematic camera pass.</li>
+              </ul>
+            </section>
+          </div>
+
+          <details>
+            <summary>Open the immutable evidence appendix</summary>
+            <div class="evidence-body">
+              <p>The tracked receipts retain the full identities, assertions, and limitations. The selected article images are copied as exact bytes and pinned separately in the <a href="images/architectural-build-journey/manifest.json">image provenance manifest</a>.</p>
+              <div class="evidence-links">
+                <a href="evidence/architectural-build-tn0304-20260829-r1.json">Studio build receipt</a>
+                <a href="evidence/architectural-live-tn0304-20260829-r1.json">Cold replay receipt</a>
+                <a href="evidence/architectural-warm-tn0304-20260829-r1.json">Warm R&amp;D receipt</a>
+                <a href="evidence/architectural-demo-tn0304-20260829-r1.json">Operator demo receipt</a>
+              </div>
+
+              <table class="hash-table">
+                <tbody>
+                  <tr><th scope="row">Capsule / build</th><td><code>f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9</code></td></tr>
+                  <tr><th scope="row">Solved graph</th><td><code>29402c6c9d85c66d3b3760d88b6323ec64b1cb938aa29158c7501309ac0bed46</code></td></tr>
+                  <tr><th scope="row">Canonical pieces</th><td><code>0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578</code></td></tr>
+                  <tr><th scope="row">Capture</th><td><code>5d466cdaa5a213ef958d07636325b9398eee9a74584019da8dc16a5603654251</code></td></tr>
+                  <tr><th scope="row">Blueprint</th><td><code>02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f</code></td></tr>
+                  <tr><th scope="row">Final game image</th><td><code>5d4665915c71248265e1940d5e03a73f792f574b9c477f91c2acf7abac47a29c</code></td></tr>
+                </tbody>
+              </table>
+
+              <div class="commits" aria-label="Source revisions">
+                <div class="commit"><code>4842e42d</code>comfy-quest architectural capsule, Studio Build, live replay, and warm harness</div>
+                <div class="commit"><code>f2ce9a09</code>operator-ready evidence, mission control, and exact warm sequence</div>
+                <div class="commit"><code>544c0dc2</code>baseline deterministic architectural capsule export</div>
+              </div>
+              <p>Acceptance suites at handoff: <strong>411 Python</strong>, <strong>133 Studio</strong>, and <strong>371 Quest Lab</strong> tests passing.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="closing">
+        <div class="wrap">
+          <span class="eyebrow">The next honest move</span>
+          <h2>Demo the standing proof. Do not rebuild it for theatre.</h2>
+          <p>The next push should consume this exact staged pair and retained placement, then spend human attention on the experience: camera, legibility, and whether the architectural adaptation actually feels right in the world.</p>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>Creator OS architectural R&amp;D journey · tn0304</span>
+      <span>Evidence reconciled 2026-08-29</span>
+    </div>
+  </footer>
+</body>
+</html>
