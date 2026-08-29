@@ -387,9 +387,9 @@ class RoadmapSurfaceTests(unittest.TestCase):
 
     def test_architectural_build_journey_is_rendered_and_hash_pinned(self):
         attack = self.manifest["next_attack"]
-        self.assertEqual("accepted-am4-warm", attack["status"])
+        self.assertEqual("demo-ready-am4-warm", attack["status"])
         self.assertEqual("tn0304", attack["fixture"])
-        self.assertEqual(10, len(attack["journey"]))
+        self.assertEqual(11, len(attack["journey"]))
         receipt_path = REPO / attack["evidence"]["source"]
         self.assertTrue(receipt_path.is_file())
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -405,9 +405,21 @@ class RoadmapSurfaceTests(unittest.TestCase):
         self.assertEqual(40, receipt["warm_state"]["marked_pieces_retained"])
         self.assertFalse(receipt["warm_state"]["creator_build_enabled"])
         self.assertEqual("retained-not-applied", receipt["rollback_snapshot"]["state"])
+        demo_path = REPO / attack["evidence"]["demo_source"]
+        self.assertTrue(demo_path.is_file())
+        demo = json.loads(demo_path.read_text(encoding="utf-8"))
+        self.assertEqual("operator-ready-warm", demo["state"])
+        self.assertTrue(demo["operator_demo"]["canonical_stage_already_present"])
+        self.assertTrue(demo["operator_demo"]["remote_studio_reused"])
+        self.assertTrue(demo["operator_demo"]["ssh_tunnel_reused"])
+        self.assertEqual(
+            ["status", "blueprint_check", "blueprint_count", "blueprint_diff", "status"],
+            demo["operator_demo"]["operations"],
+        )
         for marker in (
             "Architectural capsule",
-            "reusable R&amp;D lap",
+            "reusable operator demo",
+            "Demo-ready on AM4",
             "built once",
             "7.953375",
             "43.907838",

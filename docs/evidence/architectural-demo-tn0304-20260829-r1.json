@@ -1,0 +1,130 @@
+{
+  "schema": "comfy-quest-architectural-demo-evidence-index/v1",
+  "recorded_on": "2026-08-29",
+  "result": "passed",
+  "state": "operator-ready-warm",
+  "work_item": "architectural-capsule-demo-ready",
+  "fixture": "tn0304",
+  "driver": "tools/quest-studio/Invoke-ArchitecturalDemo.ps1",
+  "sources": {
+    "comfy_quest_revision": "4842e42dca34bbe7660143fdd41487d9e63a21a8",
+    "baseline_revision": "544c0dc26ed3cbb556f5467ca0169705fe1172f5",
+    "lumberjacks_platform_revision": "2510553bddf1fbae6a4ea9c14ff923ca05b153d8",
+    "standalone_source_tree_sha256": "75aaae0b56c562cde209ea39406f20891ed94119489c3812db76f1b3076c7aca"
+  },
+  "identity": {
+    "machine": "am4",
+    "world": "ComfyQuestDemo",
+    "world_uid": "-7600395338659582326",
+    "character": "questyfour",
+    "capsule_sha256": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+    "build_id": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+    "stage_id": "8ea1838ec535b4a3d20b171da8f0da3ffd9c3370eaa37f6bf7d13b2b1a013dd5",
+    "blueprint_name": "tn0304-6ue2ukrad7ntjfoa7cvdmvwkcvsccusli5wrfvhq2rnkhtm2ehuq"
+  },
+  "architecture": {
+    "footprint_m": [
+      7.953375,
+      7.4676
+    ],
+    "wall_datum_m": 2.2225,
+    "ridge_m": 5.8166,
+    "pitch_degrees": 43.907838,
+    "ridge_reconciliation_m": -0.029171,
+    "pieces": {
+      "floors": 16,
+      "walls": 16,
+      "roofs": 8,
+      "total": 40
+    }
+  },
+  "placement": {
+    "revision": 2,
+    "x": 12.5,
+    "y": 1.25,
+    "z": -3.75,
+    "yaw": 22.5,
+    "prepared_not_applied_by_studio": true
+  },
+  "canonical_artifacts": {
+    "graph_sha256": "29402c6c9d85c66d3b3760d88b6323ec64b1cb938aa29158c7501309ac0bed46",
+    "canonical_pieces_sha256": "0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578",
+    "capture_sha256": "5d466cdaa5a213ef958d07636325b9398eee9a74584019da8dc16a5603654251",
+    "blueprint_sha256": "02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f",
+    "importer_sha256": "eadd147307c0540706bdfa7633c9cc887f4130ec6a2bbb67bb88a228eee0a5df"
+  },
+  "operator_demo": {
+    "completed_utc": "2026-08-29T13:21:26.9728829Z",
+    "studio_url": "http://127.0.0.1:18087/quest-studio?workspace=build&build=f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9&view=architecture",
+    "build_action": "reused",
+    "standing_piece_count": 40,
+    "diff_result": "MATCH",
+    "operations": [
+      "status",
+      "blueprint_check",
+      "blueprint_count",
+      "blueprint_diff",
+      "status"
+    ],
+    "canonical_stage_already_present": true,
+    "remote_studio_reused": true,
+    "ssh_tunnel_reused": true,
+    "valheim_left_running": true,
+    "screenshot": {
+      "capture_kind": "x11-window",
+      "window_class": "valheim.x86_64",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 2325800,
+      "sha256": "5d4665915c71248265e1940d5e03a73f792f574b9c477f91c2acf7abac47a29c"
+    }
+  },
+  "browser": {
+    "deep_linked_build_workspace": true,
+    "architecture_and_game_piece_views_proved": true,
+    "provenance_and_reconciliation_proved": true,
+    "placement_edit_and_stage_proved": true,
+    "receipt_sha256": "1502b6e9e3aed7c7f331c10fc3cc4b7e2761c8f2fab7eac9cd26c399e7bdddd9",
+    "screenshot_sha256": "94aca4fc140dfac8a39ef932108c83c5dbb66eaea6b23b2e2e7b6b0d70939c7f"
+  },
+  "safety": {
+    "game_launched": false,
+    "creator_session_opened": false,
+    "plugin_deployed": false,
+    "blueprint_built": false,
+    "blueprint_cleared": false,
+    "creator_session_started": false,
+    "mailbox_request_written": false,
+    "world_mutation_performed": false,
+    "valheim_stopped": false,
+    "state_restored": false,
+    "pending_runtime_mailbox": false,
+    "pending_lab_mailbox": false
+  },
+  "source_hashes": {
+    "tools/quest-studio/Invoke-ArchitecturalDemo.ps1": "dcb729dc25477853d633d0eed82307e93a74762c7d169c655d92ba4f0dfe6541",
+    "tools/quest-studio/Invoke-ArchitecturalWarmLap.ps1": "b5781da54ed252e5e4f2189266b75b237659914ef319479dcaed9d0163e58079",
+    "tools/quest-studio/architectural_live_probe.py": "12f07c03e2a7dcbbd7ead7063f54e3619afb10285d9c8aa4947e2a1ecd6173ce"
+  },
+  "evidence": {
+    "local_demo_root": "C:\\work\\comfy-quest\\artifacts\\architectural-demo\\runs\\20260829T132125Z",
+    "local_warm_lap_root": "C:\\work\\comfy-quest\\artifacts\\architectural-warm\\laps\\20260829T132117Z",
+    "remote_build_root": "/home/derek/valheim-capture/architectural-build/20260829T132015Z-f509aa2a201f",
+    "local_evidence_is_ignored": true,
+    "demo_receipt_sha256": "db8f575f91c58b0cf7da7c87292d331cecb19ae7f7f7e5419097e816e63084e8",
+    "warm_acceptance_receipt_sha256": "259e8feb4e6c402bc5c644aec6d82eee15f9d74ed8af481138cee487a073c3a9",
+    "warm_lap_sha256": "ba1f96adcc9a10778cc7a7cf478a7eef074c1a57fe3f723de7543905d2bf513d",
+    "diff_receipt_sha256": "5c9d46114e2d355f2bbafe7029cbb064f8ac411a5df6fa92cb3741f50cd53972"
+  },
+  "operator_commands": {
+    "open": "tools\\quest-studio\\Invoke-ArchitecturalDemo.ps1 -Action Open",
+    "status": "tools\\quest-studio\\Invoke-ArchitecturalDemo.ps1 -Action Status",
+    "stop_studio_only": "tools\\quest-studio\\Invoke-ArchitecturalDemo.ps1 -Action StopStudio",
+    "explicit_world_close": "tools\\quest-studio\\Invoke-ArchitecturalWarmLap.ps1 -Close"
+  },
+  "limitations": [
+    "The local deep link and SSH tunnel are operator-machine surfaces; rerun Open if the tunnel is no longer present.",
+    "StopStudio stops only Studio and its tunnel. The warm Valheim client and exact standing structure intentionally survive ordinary demo laps.",
+    "World teardown and byte restoration remain a separate explicit close operation."
+  ]
+}

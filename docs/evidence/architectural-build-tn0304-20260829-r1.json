@@ -5,13 +5,13 @@
   "work_item": "architectural-capsule-studio-build",
   "fixture": "tn0304",
   "driver": "tools/quest-studio/Invoke-ArchitecturalBuildJourney.ps1",
-  "local_evidence_root": "C:\\work\\comfy-quest\\artifacts\\architectural-build\\runs\\20260829T105210Z",
+  "local_evidence_root": "C:\\work\\comfy-quest\\artifacts\\architectural-build\\runs\\20260829T132015Z",
   "local_evidence_is_ignored": true,
-  "remote_evidence_root": "/home/derek/valheim-capture/architectural-build/20260829T105210Z-f509aa2a201f",
+  "remote_evidence_root": "/home/derek/valheim-capture/architectural-build/20260829T132015Z-f509aa2a201f",
   "sources": {
-    "comfy_quest_revision": "d2187c04cddb3913f47ecf502e954b05f4c7d2a0",
-    "comfy_quest_source_tree_sha256": "91e4000ac9045ca9e59e3bed81cdc179cce1504c93cb63379620a767969fd4cb",
-    "baseline_revision": "c8961ec828bf9a2b6d40aa570f4473280b503274",
+    "comfy_quest_revision": "4842e42dca34bbe7660143fdd41487d9e63a21a8",
+    "comfy_quest_source_tree_sha256": "75aaae0b56c562cde209ea39406f20891ed94119489c3812db76f1b3076c7aca",
+    "baseline_revision": "544c0dc26ed3cbb556f5467ca0169705fe1172f5",
     "lumberjacks_platform_revision": "2510553bddf1fbae6a4ea9c14ff923ca05b153d8"
   },
   "identity": {
@@ -64,27 +64,29 @@
     "compiled_pieces_sha256": "dd14abd8a969aa789df70902862bd77243ff277c2a3c83e3bd6074385f3f9890",
     "canonical_pieces_sha256": "0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578",
     "importer_sha256": "eadd147307c0540706bdfa7633c9cc887f4130ec6a2bbb67bb88a228eee0a5df",
-    "importer_bundle_sha256": "664e8ec89830248e0fbd4cccdf0608a578c36360953b582f05674c5bc31c67c1",
-    "standalone_host_sha256": "aed391a046e37d3c4138b5f4092afda7dc95feadc30ef393653bcff8966075b2"
+    "importer_bundle_sha256": "b851254868753306bf6683fbf1c4d156ccb9f0e443b66065b25a8c4c75b2d4b7",
+    "standalone_host_sha256": "e79f3f7d4a74f5888545908a60580b8fccbd92dd3aeba0a4fd6029dee13aedfe"
   },
   "safety": {
     "creator_session_started": false,
     "mailbox_request_written": false,
     "world_mutation_performed": false,
     "valheim_started": false,
+    "valheim_process_reused": true,
+    "warm_event_archive_only": true,
     "world_and_character_bytes_unchanged": true,
     "only_canonical_pair_staged": true
   },
   "evidence_sha256": {
-    "acceptance-receipt.json": "2fbc9b68ef4a6bece1689507eafa2b5647c953b39cf5a2bff775a8b3d01c2ab0",
-    "am4-proof.json": "779a145ced18a654aa26b57c1a4c46eaaf62a62a5408567fbb9cc15376f54779",
-    "latest-stage.json": "dcd4b3e0b92c5237521c98a8633d46f4820c86fb3090cf4d512e815e0fc99240",
-    "architectural-browser-receipt.json": "6419d7c67d184f2d0fbfdc67ed5e1491c6d4050606784543af6ab8535a6b8615",
-    "architectural-build-staged.png": "89ced7f2c86e6d131eb47d259e8c269045c84963c8dccc4c92574d109d349bd1"
+    "acceptance-receipt.json": "0babf1faf15180eac3aec6afdb13a74c80e0e3e4be239be18e4604f36b8e88b0",
+    "am4-proof.json": "79470bed8f514e03fee444989c8e4313388a2d6ae508eacca438d8f7214a5025",
+    "latest-stage.json": "5d130199be77046c3d53acf7cf13986f73d5b45509ef801f0d913b11f62bf4c6",
+    "architectural-browser-receipt.json": "1502b6e9e3aed7c7f331c10fc3cc4b7e2761c8f2fab7eac9cd26c399e7bdddd9",
+    "architectural-build-staged.png": "94aca4fc140dfac8a39ef932108c83c5dbb66eaea6b23b2e2e7b6b0d70939c7f"
   },
   "limitations": [
-    "This journey proves export, Studio inspection and placement intent, canonical derivation, and staging. It intentionally does not prove a live-game build.",
-    "The next attack must consume this exact staged pair and placement intent for check, apply, diff, and clear without regenerating the structure.",
+    "This journey proves export, Studio inspection and placement intent, canonical derivation, and staging while reusing the already-running AM4 client without touching its world.",
+    "The warm verifier permits only append-only event-archive growth; process identity, world and character bytes, Creator Session state, mailboxes, and every other Lab control file remain strict.",
     "The full machine evidence is retained locally and on AM4; this tracked index pins its identities, outcomes, and hashes."
   ]
 }

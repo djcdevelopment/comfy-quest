@@ -4,7 +4,7 @@
     "id": "comfy-quest-program",
     "title": "Quest Creator OS",
     "subtitle": "Drive the whole vertical slice. Automate the evidence. Spend the seat on creation.",
-    "observed_on": "2026-08-28",
+    "observed_on": "2026-08-29",
     "program_commit": "89c0a71",
     "program_commit_label": "Wait for fresh run scope before preview"
   },
@@ -694,9 +694,9 @@
     }
   ],
   "next_attack": {
-    "id": "architectural-capsule-warm-rnd",
-    "status": "accepted-am4-warm",
-    "completed_utc": "2026-08-29T11:56:37.008387Z",
+    "id": "architectural-capsule-demo-ready",
+    "status": "demo-ready-am4-warm",
+    "completed_utc": "2026-08-29T13:21:26.9728829Z",
     "journey": [
       "Export the immutable creator-os-architectural-build-capsule/v0 twice and prove byte-identical output.",
       "Import the capsule into Studio Build and inspect Architecture, Game pieces, provenance, reconciliation, and adaptations.",
@@ -707,7 +707,8 @@
       "Diff the placed structure against the canonical capture at that transform and prove MATCH with 40 selected, zero missing, and zero extra.",
       "Complete one disposable acceptance lap that clears and byte-restores the world, proving the exact rollback path.",
       "Open one warm R&D session, create and diff the 40-piece build once, disable creator build mode, and retain the running client and marked structure.",
-      "Reattach for a second lap and prove check, count, and MATCH reuse the running client and existing 40 pieces without deploy, entry, build, clear, stop, or restore."
+      "Reattach for a second lap and prove check, count, and MATCH reuse the running client and existing 40 pieces without deploy, entry, build, clear, stop, or restore.",
+      "Open the Studio Build deep link through the bounded operator harness twice and prove the canonical stage, standalone host, SSH tunnel, running client, standing build, and read-only status/check/count/diff/status sequence are all reused."
     ],
     "fixture": "tn0304",
     "acceptance": {
@@ -733,6 +734,10 @@
       "staging_receipt_schema": "comfy-quest-architectural-build-evidence-index/v1",
       "cold_acceptance_source": "docs/evidence/architectural-live-tn0304-20260829-r1.json",
       "cold_acceptance_receipt_schema": "comfy-quest-architectural-live-evidence-index/v1",
+      "demo_source": "docs/evidence/architectural-demo-tn0304-20260829-r1.json",
+      "demo_receipt_schema": "comfy-quest-architectural-demo-evidence-index/v1",
+      "demo_index_sha256": "2620362c13e93f3e101b7c7b136fdd38255f43a0f87fa188c241f6ae95019f72",
+      "demo_receipt_sha256": "db8f575f91c58b0cf7da7c87292d331cecb19ae7f7f7e5419097e816e63084e8",
       "capsule_sha256": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
       "stage_receipt_schema": "comfy-quest-studio-build-stage/v1",
       "stage_id": "8ea1838ec535b4a3d20b171da8f0da3ffd9c3370eaa37f6bf7d13b2b1a013dd5",
@@ -741,10 +746,10 @@
       "first_build_receipt_sha256": "95ae7abd69a0e0011a47d76a221169e1af0f9eec726dab68ded47c37e8781cc3",
       "first_diff_receipt_sha256": "52bbbc901906b54a7cfbd6f7c04f16a872c65775704aeaf1d3736f11a10b5c36",
       "first_warm_lap_sha256": "2092c937ad3aff17759e5731fd16fb3feb6a844936fef07dd11426937e99855e",
-      "reuse_diff_receipt_sha256": "2fda16314d9b61bdbdcdbf7121ae3167b509d519ce01ad47790bb2febd6de419",
-      "reuse_warm_lap_sha256": "b3c706f33dfacf54222124d8fa036f7b56595202036825a7507a437ec267e02e",
+      "reuse_diff_receipt_sha256": "5c9d46114e2d355f2bbafe7029cbb064f8ac411a5df6fa92cb3741f50cd53972",
+      "reuse_warm_lap_sha256": "ba1f96adcc9a10778cc7a7cf478a7eef074c1a57fe3f723de7543905d2bf513d",
       "rollback_before_sha256": "a86f04de3c825f0410923b6f21e015b771a5dd293a7c44978088df03bad3f2b7",
-      "screenshot_sha256": "a129d3690a28af7dd80f7d3932ad146758d70793c59bd1187a3b6d1bc12fbba4"
+      "screenshot_sha256": "5d4665915c71248265e1940d5e03a73f792f574b9c477f91c2acf7abac47a29c"
     },
     "safety": {
       "creator_session_started": true,
@@ -759,9 +764,16 @@
       "creator_build_disabled": true,
       "valheim_running": true,
       "rollback_snapshot_retained": true,
-      "ordinary_lap_performed_teardown": false
+      "ordinary_lap_performed_teardown": false,
+      "operator_demo_game_launched": false,
+      "operator_demo_session_opened": false,
+      "operator_demo_mailbox_request_written": false,
+      "operator_demo_world_mutation_performed": false,
+      "canonical_stage_idempotent": true,
+      "control_plane_reused": true,
+      "exact_read_only_sequence": true
     },
-    "boundary": "Warm AM4 R&D session: identity-matching laps reuse the running client and exact 40-piece build; full stop and byte restoration occur only through the explicit Invoke-ArchitecturalWarmLap.ps1 -Close operation.",
+    "boundary": "Demo-ready warm AM4 R&D session: Invoke-ArchitecturalDemo.ps1 opens the exact Studio Build and runs only status/check/count/diff/status against the retained 40-piece structure; full stop and byte restoration occur only through the separate explicit Invoke-ArchitecturalWarmLap.ps1 -Close operation.",
     "capsule_schema": "creator-os-architectural-build-capsule/v0",
     "studio_routes": [
       "GET /api/v2/quest-studio/builds",

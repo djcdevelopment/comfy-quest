@@ -161,8 +161,10 @@ wall datum, `5.8166 m` ridge, `43.907838°` pitch, `−0.029171 m` reconciliatio
 `16/16/8` piece split. AM4 accepted capsule
 `f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9` and staged capture
 `5d466cdaa5a213ef958d07636325b9398eee9a74584019da8dc16a5603654251` plus blueprint
-`02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f` while Valheim stayed
-stopped and world/character bytes remained unchanged. The immutable evidence index is
+`02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f` while reusing the same
+running Valheim process and leaving world/character bytes unchanged. Only append-only Lab event
+archives were permitted to advance; Creator Session state, mailboxes, and every other control
+file remained strict. The immutable evidence index is
 `docs/evidence/architectural-build-tn0304-20260829-r1.json`. This stops before Creator Session,
 mailbox, check/build/diff/clear, or world mutation; the following attack consumes this exact
 staged pair and saved placement intent.
@@ -187,6 +189,17 @@ clear, stop, or restore. Valheim remains running, the proved structure remains s
 creator build mode is off. Identity drift fails closed. Full rollback is retained as the explicit
 `Invoke-ArchitecturalWarmLap.ps1 -Close` operation, not paid on every loop. The active-state
 evidence index is `docs/evidence/architectural-warm-tn0304-20260829-r1.json`.
+
+The operator-facing closeout is now one bounded command:
+`tools\quest-studio\Invoke-ArchitecturalDemo.ps1 -Action Open`. It verifies the accepted source
+and AM4 identities, runs only `status → check → count → diff → status`, reuses the existing
+40-piece build, idempotently reopens the canonical Studio build and stage, and opens the direct
+Architecture workspace alongside an exact 1920×1080 Valheim-window capture. Two consecutive
+final laps proved both the standalone Studio host and SSH tunnel were reused. Neither lap launched
+the game, opened a Creator Session, wrote a mailbox, built or cleared pieces, stopped Valheim, or
+mutated/restored world state. The immutable operator-demo index is
+`docs/evidence/architectural-demo-tn0304-20260829-r1.json`. `-Action StopStudio` stops only Studio
+and the tunnel; teardown remains the separate explicit `Invoke-ArchitecturalWarmLap.ps1 -Close`.
 
 ### Step 1 — Completed: installed vertical slice `queue.full-width-journey`
 

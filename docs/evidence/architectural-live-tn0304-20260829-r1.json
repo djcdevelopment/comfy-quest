@@ -13,7 +13,7 @@
     "comfy_quest_revision": "d2187c04cddb3913f47ecf502e954b05f4c7d2a0",
     "comfy_quest_source_tree_sha256": "728ae4872c510ee96a905d6c310554db7587959f57fa3306e6818ae01b99a4e2",
     "staged_evidence": "docs/evidence/architectural-build-tn0304-20260829-r1.json",
-    "staged_evidence_sha256": "feb3cee4d69f5b75761868132eb5eb934d5d74d46bc472b82f100e32d89d64cd"
+    "staged_evidence_sha256": "3adb79b5095ede383b45e0952b84b3da25fd18d98313ba63e3811618816d43a6"
   },
   "identity": {
     "machine": "am4",

@@ -702,8 +702,8 @@ def validate_guardrail_taxonomy() -> None:
 def validate_architectural_build(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise MissionControlError("next_attack must be an object")
-    if require_text(value.get("status"), "next_attack.status") != "accepted-am4-warm":
-        raise MissionControlError("next_attack.status must be accepted-am4-warm")
+    if require_text(value.get("status"), "next_attack.status") != "demo-ready-am4-warm":
+        raise MissionControlError("next_attack.status must be demo-ready-am4-warm")
     if require_text(value.get("fixture"), "next_attack.fixture") != "tn0304":
         raise MissionControlError("next_attack.fixture must be tn0304")
     require_text(value.get("completed_utc"), "next_attack.completed_utc")
@@ -711,8 +711,8 @@ def validate_architectural_build(value: Any) -> dict[str, Any]:
         raise MissionControlError("next_attack carries an unsupported capsule schema")
 
     journey = require_list(value.get("journey"), "next_attack.journey")
-    if len(journey) != 10:
-        raise MissionControlError("next_attack.journey must contain the ten accepted stages")
+    if len(journey) != 11:
+        raise MissionControlError("next_attack.journey must contain the eleven accepted stages")
     for index, step in enumerate(journey):
         require_text(step, f"next_attack.journey[{index}]")
 
@@ -743,6 +743,14 @@ def validate_architectural_build(value: Any) -> dict[str, Any]:
         "next_attack.evidence.cold_acceptance_source"))
     if evidence.get("cold_acceptance_receipt_schema") != "comfy-quest-architectural-live-evidence-index/v1":
         raise MissionControlError("next_attack.evidence has an unsupported cold acceptance schema")
+    demo_path = source_path(require_text(
+        evidence.get("demo_source"), "next_attack.evidence.demo_source"))
+    if evidence.get("demo_receipt_schema") != "comfy-quest-architectural-demo-evidence-index/v1":
+        raise MissionControlError("next_attack.evidence has an unsupported demo evidence schema")
+    demo_index_sha = require_sha256(
+        evidence.get("demo_index_sha256"), "next_attack.evidence.demo_index_sha256")
+    demo_receipt_sha = require_sha256(
+        evidence.get("demo_receipt_sha256"), "next_attack.evidence.demo_receipt_sha256")
     if evidence.get("stage_receipt_schema") != "comfy-quest-studio-build-stage/v1":
         raise MissionControlError("next_attack.evidence has an unsupported stage receipt schema")
     capsule_sha = require_sha256(evidence.get("capsule_sha256"), "next_attack.evidence.capsule_sha256")
@@ -793,6 +801,7 @@ def validate_architectural_build(value: Any) -> dict[str, Any]:
     try:
         staging_receipt = json.loads(read_text(staging_path))
         cold_receipt = json.loads(read_text(cold_path))
+        demo_receipt = json.loads(read_text(demo_path))
     except json.JSONDecodeError as exc:
         raise MissionControlError(f"invalid architectural prerequisite evidence JSON: {exc}") from exc
     if (staging_receipt.get("schema") != evidence["staging_receipt_schema"]
@@ -801,6 +810,33 @@ def validate_architectural_build(value: Any) -> dict[str, Any]:
     if (cold_receipt.get("schema") != evidence["cold_acceptance_receipt_schema"]
             or cold_receipt.get("result") != "passed"):
         raise MissionControlError("architectural cold acceptance evidence is not a passing supported receipt")
+    if hashlib.sha256(demo_path.read_bytes()).hexdigest() != demo_index_sha:
+        raise MissionControlError("architectural demo evidence index hash disagrees with mission control")
+    if (demo_receipt.get("schema") != evidence["demo_receipt_schema"]
+            or demo_receipt.get("result") != "passed"
+            or demo_receipt.get("state") != "operator-ready-warm"):
+        raise MissionControlError("architectural demo evidence is not a passing operator-ready receipt")
+    demo_identity = demo_receipt.get("identity", {})
+    demo_artifacts = demo_receipt.get("canonical_artifacts", {})
+    demo = demo_receipt.get("operator_demo", {})
+    if (demo_identity.get("capsule_sha256") != capsule_sha
+            or demo_identity.get("stage_id") != stage_id
+            or demo_artifacts.get("capture_sha256") != capture_sha
+            or demo_artifacts.get("blueprint_sha256") != blueprint_sha
+            or demo.get("operations") != ["status", "blueprint_check", "blueprint_count",
+                                           "blueprint_diff", "status"]
+            or demo.get("build_action") != "reused"
+            or demo.get("standing_piece_count") != 40
+            or demo.get("diff_result") != "MATCH"
+            or demo.get("canonical_stage_already_present") is not True
+            or demo.get("remote_studio_reused") is not True
+            or demo.get("ssh_tunnel_reused") is not True
+            or demo.get("screenshot", {}).get("capture_kind") != "x11-window"
+            or demo.get("screenshot", {}).get("width") != 1920
+            or demo.get("screenshot", {}).get("height") != 1080
+            or demo.get("screenshot", {}).get("sha256") != screenshot_sha
+            or demo_receipt.get("evidence", {}).get("demo_receipt_sha256") != demo_receipt_sha):
+        raise MissionControlError("architectural operator demo evidence disagrees with mission control")
 
     first = receipt.get("first_lap", {})
     second = receipt.get("second_lap", {})
@@ -838,6 +874,13 @@ def validate_architectural_build(value: Any) -> dict[str, Any]:
         "valheim_running": True,
         "rollback_snapshot_retained": True,
         "ordinary_lap_performed_teardown": False,
+        "operator_demo_game_launched": False,
+        "operator_demo_session_opened": False,
+        "operator_demo_mailbox_request_written": False,
+        "operator_demo_world_mutation_performed": False,
+        "canonical_stage_idempotent": True,
+        "control_plane_reused": True,
+        "exact_read_only_sequence": True,
     }
     if safety != expected_safety:
         raise MissionControlError("next_attack.safety must retain the accepted warm-loop boundary")
@@ -1265,13 +1308,14 @@ def render(manifest: dict[str, Any]) -> str:
             ("blueprint", build_evidence["blueprint_sha256"]),
             ("first build", build_evidence["first_build_receipt_sha256"]),
             ("warm reuse diff", build_evidence["reuse_diff_receipt_sha256"]),
+            ("operator demo", build_evidence["demo_receipt_sha256"]),
             ("rollback snapshot", build_evidence["rollback_before_sha256"]),
         )
     )
     architectural_build_panel = f'''
     <div class="recovery-grid">
-      <article class="panel flow-panel"><div class="card-heading"><div><span class="eyebrow">Warm on AM4</span><h3>Architectural capsule &rarr; Studio Build &rarr; exact live build &rarr; reusable R&amp;D lap</h3></div><span class="badge badge-complete">PASS</span></div><p>The tn0304 handoff crossed the real Studio and Lab, built once, then proved a second identity-matching lap could reuse the running client and standing structure.</p><ol class="build-sequence">{build_steps}</ol><div class="revision-proof build-metrics"><span><strong>Footprint</strong>{build_acceptance["footprint_m"][0]} &times; {build_acceptance["footprint_m"][1]} m</span><span><strong>Wall datum</strong>{build_acceptance["wall_datum_m"]} m</span><span><strong>True ridge</strong>{build_acceptance["ridge_m"]} m</span><span><strong>Roof pitch</strong>{build_acceptance["pitch_degrees"]}&deg;</span><span><strong>Reconciliation</strong>&minus;0.029171 m</span><span><strong>Standing pieces</strong>40 &middot; 16 floors / 16 walls / 8 roofs</span></div><div class="guardrail"><strong>Warm boundary:</strong> {html.escape(architectural_build["boundary"])}</div></article>
-      <aside class="panel proof-panel build-proof"><span class="eyebrow">Immutable warm-state evidence</span><h3>{html.escape(build_evidence["receipt_schema"])}</h3><p>Observed {html.escape(architectural_build["completed_utc"])}. Valheim remains running, the exact 40-piece build remains standing, creator build mode is off, and the rollback snapshot is retained for explicit close.</p><ol class="proof-list">{build_artifacts}</ol>{source_link(build_evidence["source"], "Tracked warm-state index")}</aside>
+      <article class="panel flow-panel"><div class="card-heading"><div><span class="eyebrow">Demo-ready on AM4</span><h3>Architectural capsule &rarr; Studio Build &rarr; exact live build &rarr; reusable operator demo</h3></div><span class="badge badge-complete">PASS</span></div><p>The tn0304 handoff crossed the real Studio and Lab, built once, and now reopens through one bounded command while reusing the canonical stage, control plane, running client, and standing structure.</p><ol class="build-sequence">{build_steps}</ol><div class="revision-proof build-metrics"><span><strong>Footprint</strong>{build_acceptance["footprint_m"][0]} &times; {build_acceptance["footprint_m"][1]} m</span><span><strong>Wall datum</strong>{build_acceptance["wall_datum_m"]} m</span><span><strong>True ridge</strong>{build_acceptance["ridge_m"]} m</span><span><strong>Roof pitch</strong>{build_acceptance["pitch_degrees"]}&deg;</span><span><strong>Reconciliation</strong>&minus;0.029171 m</span><span><strong>Standing pieces</strong>40 &middot; 16 floors / 16 walls / 8 roofs</span></div><div class="guardrail"><strong>Warm boundary:</strong> {html.escape(architectural_build["boundary"])}</div></article>
+      <aside class="panel proof-panel build-proof"><span class="eyebrow">Immutable demo evidence</span><h3>{html.escape(build_evidence["demo_receipt_schema"])}</h3><p>Observed {html.escape(architectural_build["completed_utc"])}. The second operator lap reused Studio, its tunnel, the staged pair, Valheim, and all 40 standing pieces; it ran only status, check, count, diff, and status.</p><ol class="proof-list">{build_artifacts}</ol>{source_link(build_evidence["demo_source"], "Tracked operator-demo index")}{source_link(build_evidence["source"], "Tracked warm-state index")}</aside>
     </div>'''
 
     decision_cards = "".join(
@@ -1441,7 +1485,7 @@ def render(manifest: dict[str, Any]) -> str:
 
   <section id="strategy" class="section" aria-labelledby="strategy-title"><div class="section-head"><div><span class="eyebrow">Why and how</span><h2 id="strategy-title">{html.escape(strategy["title"])}</h2></div><p>{html.escape(strategy["summary"])}</p></div><div class="strategy-grid">{strategy_cards}</div><article class="panel readiness-panel"><div class="card-heading"><div><span class="eyebrow">Golden readiness gate</span><h3>{html.escape(strategy["readiness_title"])}</h3></div>{source_link(strategy["source"], "Operating strategy")}</div><ul class="readiness-list">{readiness_items}</ul></article></section>
 
-  <section id="build" class="section" aria-labelledby="build-title"><div class="section-head"><div><span class="eyebrow">Latest autonomous attack</span><h2 id="build-title">The architectural handoff is live and warm on AM4.</h2></div><p>The exact structure was built once; identity-matching R&amp;D laps now reuse it without paying teardown and rebuild costs.</p></div>{architectural_build_panel}</section>
+  <section id="build" class="section" aria-labelledby="build-title"><div class="section-head"><div><span class="eyebrow">Latest autonomous attack</span><h2 id="build-title">The architectural handoff is operator-demo ready on AM4.</h2></div><p>The exact structure was built once; Studio and identity-matching R&amp;D laps now reuse it without paying teardown and rebuild costs.</p></div>{architectural_build_panel}</section>
 
   <section id="recovery" class="section" aria-labelledby="recovery-title"><div class="section-head"><div><span class="eyebrow">Use only after autonomous readiness</span><h2 id="recovery-title">{html.escape(manifest["recovery"]["title"])}</h2></div><p>{html.escape(manifest["recovery"]["summary"])}</p></div>
     <div class="recovery-grid"><article class="panel flow-panel"><span class="eyebrow">Checkpoint A · exact session precondition</span><h3>Prepare the acceptance session</h3><ul class="check-list">{cold_item}</ul>
