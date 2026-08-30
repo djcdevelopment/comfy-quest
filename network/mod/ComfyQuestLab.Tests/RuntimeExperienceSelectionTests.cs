@@ -19,7 +19,7 @@ using Xunit;
 /// <para>The rule these tests exist to hold: <b>an absent selector must behave exactly as it did
 /// before the selector existed</b>, including the diagnostic it fails with.</para></summary>
 public sealed class RuntimeExperienceSelectionTests {
-  const string Hello = """{"schema":"comfy-quest-experience/v1","id":"hello","entry_stage":"start","stages":[{"id":"start","transitions":[{"id":"done","priority":1,"when":{"op":"EVENT","event":"kill","target":"Troll"},"actions":[{"id":"say","type":"message","text":"Skal!"}],"outcome":"complete"}]}],"bindings":[{"id":"default","experience_id":"hello","target_kinds":["sign"]}]}""";
+  const string Hello = """{"schema":"comfy-quest-experience/v2","id":"hello","entry_stage":"start","stages":[{"id":"start","transitions":[{"id":"done","priority":1,"when":{"op":"EVENT","event":"kill","target":"Troll"},"actions":[{"id":"say","type":"message","text":"Skal!"}],"outcome":"complete"}]}],"bindings":[{"id":"default","experience_id":"hello","target_kinds":["sign"]}]}""";
   static string Named(string id) => Hello.Replace("\"id\":\"hello\"", "\"id\":\"" + id + "\"").Replace("\"experience_id\":\"hello\"", "\"experience_id\":\"" + id + "\"");
   static HashSet<string> Events => new() { "kill" };
 
@@ -223,7 +223,7 @@ public sealed class RuntimeExperienceSelectionTests {
     using var zip = OpenTemp(("experiences/a.json", "{ not json"));
     Assert.False(ActiveExperienceResolver.TryResolve(zip.Archive, null, out _, out var error));
     Assert.Equal("active_experience_unreadable", error);
-    using var untitled = OpenTemp(("experiences/a.json", """{"schema":"comfy-quest-experience/v1"}"""));
+    using var untitled = OpenTemp(("experiences/a.json", """{"schema":"comfy-quest-experience/v2"}"""));
     Assert.False(ActiveExperienceResolver.TryResolve(untitled.Archive, null, out _, out error));
     Assert.Equal("active_experience_unreadable", error);
   }

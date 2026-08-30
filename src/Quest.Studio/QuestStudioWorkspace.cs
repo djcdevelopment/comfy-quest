@@ -394,6 +394,76 @@ internal sealed class QuestStudioWorkspace
         }
     }
 
+    public StudioSpatialAnchorImportResult ImportSpatialAnchor(string projectId, StudioSpatialAnchorImportRequest? request)
+    {
+        if (!SafeLocalId(projectId) || request is null || string.IsNullOrWhiteSpace(request.AnchorJson))
+            return StudioSpatialAnchorImportResult.Fail("anchor_import_required");
+        if (!SpatialPredicateCatalog.TryGet(request.Predicate, out _))
+            return StudioSpatialAnchorImportResult.Fail("spatial_predicate_invalid");
+        SpatialAnchorExchange anchor;
+        try { anchor = SpatialExchangeContract.ParseAnchor(request.AnchorJson); }
+        catch (SpatialContractException exception) { return StudioSpatialAnchorImportResult.Fail(exception.Code); }
+
+        lock (_gate)
+        {
+            var current = ReadDocument(DraftPath(projectId));
+            if (current is null) return StudioSpatialAnchorImportResult.Fail("project_missing");
+            if (request.ExpectedRevision != current.Revision)
+                return StudioSpatialAnchorImportResult.RevisionConflict(current);
+            var routes = (current.Nodes ?? new()).SelectMany(node => node?.Routes ?? new())
+                .Where(value => value.Id == request.RouteId).Take(2).ToArray();
+            if (routes.Length == 0) return StudioSpatialAnchorImportResult.Fail("route_missing");
+            if (routes.Length > 1) return StudioSpatialAnchorImportResult.Fail("route_ambiguous");
+            var route = routes[0];
+            var desiredId = BoundedId("area-" + anchor.AnchorId);
+            var byHash = (current.SpatialAreas ?? new()).FirstOrDefault(value =>
+                string.Equals(value.SourceAnchorSha256, anchor.ContentSha256, StringComparison.OrdinalIgnoreCase));
+            var byId = (current.SpatialAreas ?? new()).FirstOrDefault(value => value.Id == desiredId);
+            if (byHash is null && byId is not null)
+                return StudioSpatialAnchorImportResult.Fail("anchor_id_conflict");
+            var area = byHash ?? new StudioSpatialArea
+            {
+                Id = desiredId,
+                Shape = "sphere",
+                Frame = anchor.Mode == "world" ? "world" : "binding",
+                X = anchor.Mode == "world" ? anchor.Piece.Position.X : null,
+                Y = anchor.Mode == "world" ? anchor.Piece.Position.Y : null,
+                Z = anchor.Mode == "world" ? anchor.Piece.Position.Z : null,
+                RadiusMeters = anchor.RadiusMeters,
+                SourceAnchorId = anchor.AnchorId,
+                SourceAnchorSha256 = anchor.ContentSha256.ToLowerInvariant(),
+                SourceSnapshot = anchor.Snapshot,
+                SourcePiece = anchor.Piece,
+                SourceProducer = anchor.Producer
+            };
+            current.SpatialAreas ??= new List<StudioSpatialArea>();
+            var changed = byHash is null;
+            if (changed) current.SpatialAreas.Add(area);
+            route.SpatialConditions ??= new List<StudioSpatialCondition>();
+            var condition = route.SpatialConditions.FirstOrDefault(value => value.Predicate == request.Predicate);
+            if (condition is null)
+            {
+                route.SpatialConditions.Add(new StudioSpatialCondition { Predicate = request.Predicate!, AreaId = area.Id,
+                    Value = SpatialPredicateCatalog.TryGet(request.Predicate, out var predicate) && predicate.RequiresValue
+                        ? Math.Max(predicate.ValueMinimum, request.Predicate == "remained" ? 60 : 1) : null });
+                changed = true;
+            }
+            else if (!string.Equals(condition.AreaId, area.Id, StringComparison.Ordinal))
+            {
+                condition.AreaId = area.Id;
+                changed = true;
+            }
+            var certification = StudioGraphCompiler.Compile(current);
+            if (!certification.Ok)
+                return StudioSpatialAnchorImportResult.Fail("anchor_mapping_invalid", certification.Diagnostics);
+            if (!changed) return StudioSpatialAnchorImportResult.Success(current, area);
+            current.Revision++;
+            current.UpdatedUtc = DateTimeOffset.UtcNow;
+            WriteProject(current, create: false);
+            return StudioSpatialAnchorImportResult.Success(current, area);
+        }
+    }
+
     public StudioSaveResult BumpPatch(string projectId, int expectedRevision)
     {
         lock (_gate)
@@ -496,7 +566,7 @@ internal sealed class QuestStudioWorkspace
 
     public StudioRuntimeStatus RuntimeStatus(
         string projectId, StudioRuntimePackIdentity? releaseIdentity = null,
-        StudioRunStatusView? runStatus = null)
+        StudioRunStatusView? runStatus = null, int receiptLimit = 100)
     {
         var project = ReadProject(projectId);
         if (project is null) return StudioRuntimeStatus.Unavailable("project_missing");
@@ -527,7 +597,7 @@ internal sealed class QuestStudioWorkspace
         }
         catch { /* surfaced as not active */ }
         var receipts = new List<RuntimeReceipt>();
-        foreach (var path in new RuntimeReceiptStore(runtimeRoot).List(100))
+        foreach (var path in new RuntimeReceiptStore(runtimeRoot).List(receiptLimit))
         {
             try
             {
@@ -634,7 +704,8 @@ internal sealed class QuestStudioWorkspace
             DevConnected = devConnected,
             DevPublished = devPublished is not null,
             DevStatus = devStatus,
-            CurrentEvidenceReceipts = currentEvidenceReceipts
+            CurrentEvidenceReceipts = currentEvidenceReceipts,
+            ExactReceipts = orderedReceipts
         };
     }
 
@@ -1133,6 +1204,10 @@ internal sealed class QuestStudioWorkspace
     internal static bool NormalizeDocument(StudioProjectDocument project)
     {
         if (project.SchemaVersion is < 2 or > StudioProjectDocument.CurrentSchemaVersion) return false;
+        project.SpatialAreas ??= new List<StudioSpatialArea>();
+        var areaIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var area in project.SpatialAreas)
+            if (area is null || string.IsNullOrWhiteSpace(area.Id) || !areaIds.Add(area.Id)) return false;
         foreach (var route in (project.Nodes ?? new()).SelectMany(node => node?.Routes ?? new()))
         {
             route.Where ??= new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1147,6 +1222,35 @@ internal sealed class QuestStudioWorkspace
             route.Where = normalized;
             route.LegacyActorRole = null;
             route.LegacyTimerId = null;
+            route.SpatialConditions ??= new List<StudioSpatialCondition>();
+            for (var index = 0; index < route.SpatialConditions.Count; index++)
+            {
+                var condition = route.SpatialConditions[index];
+                if (condition is null) return false;
+                if (string.IsNullOrWhiteSpace(condition.AreaId))
+                {
+                    var seed = BoundedId("area-" + (route.Id ?? "route") + "-" + (index + 1));
+                    var areaId = seed;
+                    for (var suffix = 2; areaIds.Contains(areaId); suffix++)
+                    {
+                        var tail = "-" + suffix;
+                        areaId = seed[..Math.Min(seed.Length, 64 - tail.Length)] + tail;
+                    }
+                    var frame = condition.AnchorKind == "coordinates" ? "world" : condition.AnchorKind;
+                    project.SpatialAreas.Add(new StudioSpatialArea
+                    {
+                        Id = areaId,
+                        Frame = frame,
+                        X = frame == "world" ? condition.X : null,
+                        Y = frame == "world" ? condition.Y : null,
+                        Z = frame == "world" ? condition.Z : null,
+                        RadiusMeters = condition.Radius
+                    });
+                    areaIds.Add(areaId);
+                    condition.AreaId = areaId;
+                }
+                else if (!areaIds.Contains(condition.AreaId)) return false;
+            }
 
             bool MergeLegacy(string key, string? value)
             {
@@ -1220,6 +1324,48 @@ internal static class StudioGraphCompiler
             if (!SafeId(node.Id) || !nodeIds.Add(node.Id ?? string.Empty)) Add("node_id_invalid", "$.nodes", "Node IDs must be unique stable identifiers.");
             globalIds.Add(node.Id ?? string.Empty);
         }
+        // Keep certification diagnostic-driven even for a malformed in-memory document.  A
+        // direct ToDictionary here turned duplicate area ids into an unhandled exception before
+        // the normal stable-id diagnostic could explain the problem to Studio.
+        var projectAreas = (project.SpatialAreas ?? new()).Where(area => area is not null && !string.IsNullOrWhiteSpace(area.Id))
+            .GroupBy(area => area.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var compiledAreas = new List<SpatialArea>();
+        foreach (var area in project.SpatialAreas ?? new())
+        {
+            var areaPath = "$.spatial_areas." + (area?.Id ?? "area");
+            if (area is null || !SafeId(area.Id) || !globalIds.Add(area.Id ?? string.Empty))
+            {
+                Add("spatial_area_id_invalid", areaPath, "Area IDs must be globally unique stable identifiers.");
+                continue;
+            }
+            if (area.Shape != "sphere") Add("spatial_area_shape_invalid", areaPath + ".shape", "Runtime v2 supports sphere areas.");
+            if (area.Frame is not ("world" or "binding" or "player")) Add("spatial_area_frame_invalid", areaPath + ".frame", "Choose world, binding, or player.");
+            if (!double.IsFinite(area.RadiusMeters) || area.RadiusMeters is < SpatialPredicateCatalog.RadiusMinimum or > SpatialPredicateCatalog.RadiusMaximum)
+                Add("spatial_area_radius_invalid", areaPath + ".radius_meters", "Radius must be finite and 1..100 meters.");
+            SpatialContractPoint? center = null;
+            if (area.Frame == "world")
+            {
+                if (!(BoundedCoordinate(area.X) && BoundedCoordinate(area.Y) && BoundedCoordinate(area.Z)))
+                    Add("spatial_area_center_invalid", areaPath + ".center", "World spheres require complete finite X/Y/Z coordinates.");
+                else center = new SpatialContractPoint(area.X!.Value, area.Y!.Value, area.Z!.Value);
+            }
+            else if (area.X.HasValue || area.Y.HasValue || area.Z.HasValue)
+                Add("spatial_area_center_unsupported", areaPath + ".center", "Binding and player spheres use their live origin.");
+            SpatialAreaSource? source = null;
+            var hasSource = !string.IsNullOrWhiteSpace(area.SourceAnchorId) || !string.IsNullOrWhiteSpace(area.SourceAnchorSha256)
+                || area.SourceSnapshot is not null || area.SourcePiece is not null || area.SourceProducer is not null;
+            if (hasSource)
+            {
+                if (!SafeId(area.SourceAnchorId) || area.SourceAnchorSha256?.Length != 64 || area.SourceAnchorSha256.Any(ch => !Uri.IsHexDigit(ch))
+                    || area.SourceSnapshot is null || area.SourcePiece is null || area.SourceProducer is null)
+                    Add("spatial_area_source_invalid", areaPath + ".source_anchor", "Imported anchor provenance is incomplete.");
+                else source = new SpatialAreaSource { AnchorId = area.SourceAnchorId, ContentSha256 = area.SourceAnchorSha256,
+                    Snapshot = area.SourceSnapshot, Piece = area.SourcePiece, Producer = area.SourceProducer };
+            }
+            compiledAreas.Add(new SpatialArea { Id = area.Id, Shape = area.Shape, Frame = area.Frame,
+                Center = center, RadiusMeters = area.RadiusMeters, SourceAnchor = source });
+        }
         if (!nodeIds.Contains(project.EntryNodeId)) Add("entry_node_missing", "$.entry_node_id", "Choose an existing start node.");
         var spawnIds = nodes.SelectMany(node => node.Routes ?? new()).SelectMany(route => route.Actions ?? new()).Where(action => action.Type == "spawn").Select(action => action.Id).ToHashSet(StringComparer.Ordinal);
         var stages = new List<ExperienceStage>();
@@ -1291,21 +1437,13 @@ internal static class StudioGraphCompiler
                     }
                     if (!SpatialPredicateCatalog.TryGet(condition.Predicate, out var predicate)) Add("spatial_predicate_invalid", conditionPath + ".predicate", "Choose a predicate from the advanced spatial registry.");
                     else if (!seenPredicates.Add(condition.Predicate)) Add("spatial_predicate_duplicate", conditionPath + ".predicate", "Each spatial predicate may appear once per route.");
-                    var kind = condition.AnchorKind ?? string.Empty;
-                    AreaAnchor? anchor = null;
-                    if (kind is "binding" or "player") anchor = new AreaAnchor { Kind = kind };
-                    else if (kind == "coordinates")
-                    {
-                        if (!(BoundedCoordinate(condition.X) && BoundedCoordinate(condition.Y) && BoundedCoordinate(condition.Z))) Add("spatial_coordinates_invalid", conditionPath, "Coordinates must be complete, finite, and within the reviewed world bounds.");
-                        else anchor = new AreaAnchor { Kind = "coordinates", X = condition.X, Y = condition.Y, Z = condition.Z };
-                    }
-                    else Add("spatial_anchor_invalid", conditionPath + ".anchor_kind", "Choose the bound Charm, the player, or explicit coordinates.");
-                    if (kind == "player" && predicate is not null && !predicate.AllowsPlayerAnchor) Add("spatial_anchor_player_invalid", conditionPath + ".anchor_kind", "The player anchor applies only to counting objects near the player.");
-                    if (condition.Radius is < SpatialPredicateCatalog.RadiusMinimum or > SpatialPredicateCatalog.RadiusMaximum) Add("spatial_radius_invalid", conditionPath + ".radius", "Radius must be 1..100 whole meters.");
+                    projectAreas.TryGetValue(condition.AreaId ?? string.Empty, out var referencedArea);
+                    if (referencedArea is null) Add("spatial_area_missing", conditionPath + ".area_id", "Choose an existing spatial area.");
+                    if (referencedArea?.Frame == "player" && predicate is not null && !predicate.AllowsPlayerAnchor) Add("spatial_anchor_player_invalid", conditionPath + ".area_id", "A player-centered area applies only to counting objects near the player.");
                     if (predicate is not null && predicate.RequiresValue && (condition.Value is null || condition.Value < predicate.ValueMinimum || condition.Value > predicate.ValueMaximum)) Add("spatial_value_invalid", conditionPath + ".value", "Value is outside the predicate's reviewed bounds.");
                     if (predicate is not null && !predicate.RequiresValue && condition.Value is not null) Add("spatial_value_invalid", conditionPath + ".value", "This predicate does not take a value.");
-                    if (anchor is not null && predicate is not null)
-                        spatial.Add(new TriggerExpression { Op = "SPATIAL", Spatial = condition.Predicate, Anchor = anchor, Radius = condition.Radius, Value = condition.Value });
+                    if (referencedArea is not null && predicate is not null)
+                        spatial.Add(new TriggerExpression { Op = "SPATIAL", Spatial = condition.Predicate, AreaId = referencedArea.Id, Value = condition.Value });
                 }
                 var trigger = adaptive.Count == 0 && spatial.Count == 0
                     ? eventClause
@@ -1322,7 +1460,8 @@ internal static class StudioGraphCompiler
         var document = new ExperienceDocument
         {
             Schema = ExperienceSchema.Id, Id = project.ExperienceId, Title = project.Title, EntryStage = project.EntryNodeId,
-            Stages = stages, Bindings = new() { new ExperienceBinding { Id = "default", ExperienceId = project.ExperienceId, TargetKinds = EffectiveTargetKinds(project) } }
+            Stages = stages, SpatialAreas = compiledAreas.Count == 0 ? null : compiledAreas,
+            Bindings = new() { new ExperienceBinding { Id = "default", ExperienceId = project.ExperienceId, TargetKinds = EffectiveTargetKinds(project) } }
         };
         var json = JsonConvert.SerializeObject(document, Formatting.Indented);
         var contract = ExperienceCompiler.CompileProductionJson(json);
@@ -1574,7 +1713,7 @@ internal static class StudioRehearsal
                 At = evt.At, StageEnteredUtc = stageEnteredUtc, LastProgressUtc = lastProgressUtc,
                 BindingPosition = new SpatialPoint(0, 0, 0),
                 SpawnedPositions = spawns.Keys.SelectMany(action => Enumerable.Repeat(new SpatialPoint(0, 0, 0), Live(action))).ToArray(),
-                AuthoredAnchors = SpatialEvaluator.AnchorMap(document),
+                SpatialAreas = SpatialEvaluator.AreaMap(document),
                 DeathsInStage = deathsInStage,
                 SpawnsByAction = spawns.ToDictionary(pair => pair.Key, pair => new SpawnTally(pair.Value, Live(pair.Key)), StringComparer.Ordinal)
             };
@@ -1635,6 +1774,8 @@ internal static class StudioRehearsal
         limitations = new List<string>();
         availablePaths = new List<string>();
         var nodes = (project.Nodes ?? new()).Where(node => node is not null).ToDictionary(node => node.Id, StringComparer.Ordinal);
+        var areas = (project.SpatialAreas ?? new()).Where(area => area is not null && !string.IsNullOrWhiteSpace(area.Id))
+            .GroupBy(area => area.Id, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         var timerSeconds = new Dictionary<string, int>(StringComparer.Ordinal);
         var spawnedCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -1653,9 +1794,10 @@ internal static class StudioRehearsal
             var spatialConditions = (route.SpatialConditions ?? new()).Where(value => value is not null).ToArray();
             var remainedSeconds = spatialConditions.Where(value => value.Predicate == "remained").Select(value => value.Value ?? 0).DefaultIfEmpty(0).Max();
             var positioned = spatialConditions.Length > 0;
-            var coordinates = spatialConditions.FirstOrDefault(value => value.AnchorKind == "coordinates" && value.X.HasValue && value.Y.HasValue && value.Z.HasValue);
+            var selectedAreas = spatialConditions.Select(value => areas.GetValueOrDefault(value.AreaId ?? string.Empty)).Where(value => value is not null).ToArray();
+            var coordinates = selectedAreas.FirstOrDefault(value => value!.Frame == "world" && value.X.HasValue && value.Y.HasValue && value.Z.HasValue);
             var insideX = coordinates?.X ?? 0d; var insideY = coordinates?.Y ?? 0d; var insideZ = coordinates?.Z ?? 0d;
-            var maxRadius = spatialConditions.Select(value => value.Radius).DefaultIfEmpty(0).Max();
+            var maxRadius = selectedAreas.Select(value => value!.RadiusMeters).DefaultIfEmpty(0).Max();
             var outsideX = insideX + maxRadius + 25 <= SpatialPredicateCatalog.MaxWorldCoordinate ? insideX + maxRadius + 25 : insideX - maxRadius - 25;
             var needsEnter = spatialConditions.Any(value => value.Predicate == "entered");
             var needsLeave = spatialConditions.Any(value => value.Predicate == "left");
@@ -1862,36 +2004,34 @@ internal static class StudioRehearsal
 
     internal static string SpatialLiveInstruction(TriggerExpression trigger)
     {
-        var label = SpatialEvaluator.Label(trigger.Anchor);
-        var radius = trigger.Radius.GetValueOrDefault();
+        var label = string.IsNullOrWhiteSpace(trigger.AreaId) ? "the area" : trigger.AreaId;
         return trigger.Spatial switch
         {
-            "entered" => $"Enter the area {radius} m around {label}.",
-            "left" => $"Leave the area {radius} m around {label}.",
-            "remained" => $"Remain in the area {radius} m around {label} for {trigger.Value.GetValueOrDefault()} seconds.",
-            "count_in_area" => $"Keep {trigger.Value.GetValueOrDefault()} objects within {radius} m of {label}.",
-            _ => $"Stay within {radius} m of {label}."
+            "entered" => $"Enter spatial area {label}.",
+            "left" => $"Leave spatial area {label}.",
+            "remained" => $"Remain in spatial area {label} for {trigger.Value.GetValueOrDefault()} seconds.",
+            "count_in_area" => $"Keep {trigger.Value.GetValueOrDefault()} objects inside spatial area {label}.",
+            _ => $"Stay inside spatial area {label}."
         };
     }
 
     static string SpatialConditionPhrase(TriggerExpression trigger)
     {
-        var label = SpatialEvaluator.Label(trigger.Anchor);
-        var radius = trigger.Radius.GetValueOrDefault();
+        var label = string.IsNullOrWhiteSpace(trigger.AreaId) ? "the area" : trigger.AreaId;
         return trigger.Spatial switch
         {
-            "entered" => $"after entering the area {radius} m around {label}",
-            "left" => $"after leaving the area {radius} m around {label}",
-            "remained" => $"after {trigger.Value.GetValueOrDefault()} seconds in the area {radius} m around {label}",
-            "count_in_area" => $"with {trigger.Value.GetValueOrDefault()} objects within {radius} m of {label}",
-            _ => $"while within {radius} m of {label}"
+            "entered" => $"after entering spatial area {label}",
+            "left" => $"after leaving spatial area {label}",
+            "remained" => $"after {trigger.Value.GetValueOrDefault()} seconds in spatial area {label}",
+            "count_in_area" => $"with {trigger.Value.GetValueOrDefault()} objects inside spatial area {label}",
+            _ => $"while inside spatial area {label}"
         };
     }
 }
 
 public sealed class StudioProjectDocument
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string ProjectId { get; set; } = string.Empty;
     public int Revision { get; set; }
@@ -1904,7 +2044,24 @@ public sealed class StudioProjectDocument
     public string? BindingTargetKind { get; set; }
     public List<string> BindingTargetKinds { get; set; } = new();
     public string EntryNodeId { get; set; } = string.Empty;
+    public List<StudioSpatialArea> SpatialAreas { get; set; } = new();
     public List<StudioNode> Nodes { get; set; } = new();
+}
+
+public sealed class StudioSpatialArea
+{
+    public string Id { get; set; } = string.Empty;
+    public string Shape { get; set; } = "sphere";
+    public string Frame { get; set; } = "binding";
+    public double? X { get; set; }
+    public double? Y { get; set; }
+    public double? Z { get; set; }
+    public double RadiusMeters { get; set; } = 20;
+    public string? SourceAnchorId { get; set; }
+    public string? SourceAnchorSha256 { get; set; }
+    public SpatialSnapshotReference? SourceSnapshot { get; set; }
+    public SpatialPieceReference? SourcePiece { get; set; }
+    public SpatialProducerReference? SourceProducer { get; set; }
 }
 
 public sealed class StudioNode
@@ -1967,11 +2124,13 @@ public sealed class StudioAdaptiveCondition
 public sealed class StudioSpatialCondition
 {
     public string Predicate { get; set; } = "within_radius";
+    public string? AreaId { get; set; }
+    // Schema v2/v3 migration inputs. Schema v4 writes area_id and project.spatial_areas.
     public string AnchorKind { get; set; } = "binding";
     public double? X { get; set; }
     public double? Y { get; set; }
     public double? Z { get; set; }
-    public int Radius { get; set; } = 20;
+    public double Radius { get; set; } = 20;
     public int? Value { get; set; }
 }
 
@@ -1996,6 +2155,7 @@ public sealed record StudioProjectSnapshot(int SchemaVersion, string ContentHash
 public sealed record StudioSaveRequest(int ExpectedRevision, StudioProjectDocument Project);
 public sealed record StudioCreateRequest(string? TemplateId);
 public sealed record StudioImportRequest(System.Text.Json.JsonElement? Project);
+public sealed record StudioSpatialAnchorImportRequest(int ExpectedRevision, string? RouteId, string? Predicate, string? AnchorJson);
 public sealed record StudioBumpRequest(int ExpectedRevision);
 public sealed record StudioPublishRequest(int ExpectedRevision);
 public sealed record StudioSaveResult(bool Ok, bool Conflict, string? Error, StudioProjectDocument? Project)
@@ -2010,6 +2170,17 @@ public sealed record StudioImportResult(bool Ok, string? Error, StudioProjectDoc
     public static StudioImportResult Success(StudioProjectDocument project) => new(true, null, project, Array.Empty<ContractDiagnostic>());
     public static StudioImportResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
         new(false, error, null, diagnostics ?? Array.Empty<ContractDiagnostic>());
+}
+
+public sealed record StudioSpatialAnchorImportResult(bool Ok, bool Conflict, string? Error,
+    StudioProjectDocument? Project, StudioSpatialArea? Area, IReadOnlyList<ContractDiagnostic> Diagnostics)
+{
+    public static StudioSpatialAnchorImportResult Success(StudioProjectDocument project, StudioSpatialArea area) =>
+        new(true, false, null, project, area, Array.Empty<ContractDiagnostic>());
+    public static StudioSpatialAnchorImportResult RevisionConflict(StudioProjectDocument project) =>
+        new(false, true, "revision_conflict", project, null, Array.Empty<ContractDiagnostic>());
+    public static StudioSpatialAnchorImportResult Fail(string error, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
+        new(false, false, error, null, null, diagnostics ?? Array.Empty<ContractDiagnostic>());
 }
 
 public sealed record StudioCertificationResult(bool Ok, string Status, string? Error, string? ExperienceJson, string? ContentHash, ExperienceDocument? Document, IReadOnlyList<ContractDiagnostic> Diagnostics)
@@ -2072,6 +2243,7 @@ public sealed record StudioRuntimeStatus(int SchemaVersion, bool Available, stri
     public IReadOnlyDictionary<string, string> RouteLabels { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> EffectLabels { get; init; } = new Dictionary<string, string>();
     internal IReadOnlyList<RuntimeReceipt> CurrentEvidenceReceipts { get; init; } = Array.Empty<RuntimeReceipt>();
+    internal IReadOnlyList<RuntimeReceipt> ExactReceipts { get; init; } = Array.Empty<RuntimeReceipt>();
 
     public static StudioRuntimeStatus Unavailable(string phase, IReadOnlyList<ContractDiagnostic>? diagnostics = null) =>
         new(2, false, phase,

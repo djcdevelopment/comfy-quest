@@ -20,6 +20,18 @@ public static class LabSignatureHuntContract {
 
   public const string ExpectedWorldName = "ComfyQuestDemo";
   public const string ExpectedWorldUid = "-7600395338659582326";
+  public const string CreatorOsBetaWorldName = "CreatorOSBeta1";
+  public const string CreatorOsBetaWorldUid = "4257656027";
+
+  /// <summary>The fixture remains closed over two reviewed world identities. The original
+  /// authoring world keeps its proof lane; the fresh beta world is the only release seed that
+  /// may reuse the same fixed, parameter-free hunt plan.</summary>
+  public static bool SupportsWorld(string worldName, string worldUid) {
+    return string.Equals(worldName, ExpectedWorldName, StringComparison.Ordinal)
+        && string.Equals(worldUid, ExpectedWorldUid, StringComparison.Ordinal)
+      || string.Equals(worldName, CreatorOsBetaWorldName, StringComparison.Ordinal)
+        && string.Equals(worldUid, CreatorOsBetaWorldUid, StringComparison.Ordinal);
+  }
 
   public const string MarkKey = "comfyQuestLabSignatureHunt";
   public const string MarkValue = FixtureId + "/v1";

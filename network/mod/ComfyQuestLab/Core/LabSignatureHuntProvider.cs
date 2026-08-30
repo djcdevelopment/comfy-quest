@@ -12,10 +12,10 @@ using UnityEngine;
 
 /// <summary>Unity provider for exactly one reviewed fixture: Slayers Signature Hunt.
 ///
-/// It accepts no plan data. Before the first mutation it requires the exact ComfyQuestDemo
-/// identity, a local single-player host, every fixed prefab, every expected component, and a
-/// natural-terrain position for every placement. It clears and counts only ZDOs carrying this
-/// fixture's exact mark. The authored Runtime spawn registry is not involved.</summary>
+/// It accepts no plan data. Before the first mutation it requires one of the two exact reviewed
+/// world identities, a local single-player host, every fixed prefab, every expected component,
+/// and a natural-terrain position for every placement. It clears and counts only ZDOs carrying
+/// this fixture's exact mark. The authored Runtime spawn registry is not involved.</summary>
 public sealed class LabSignatureHuntProvider {
   const float DestroySettleSeconds = 5f;
   const int DestroyQuiescenceFrames = 2;
@@ -147,7 +147,8 @@ public sealed class LabSignatureHuntProvider {
       }
 
       _lastReceiptPath = receiptPath;
-      Finish("Slayers Signature Hunt ready in ComfyQuestDemo: Deathsquito and Drake occupy "
+      Finish("Slayers Signature Hunt ready in " + ZNet.instance.GetWorldName()
+          + ": Deathsquito and Drake occupy "
           + LabSignatureHuntContract.ArenaSeparationMetres.ToString("0", CultureInfo.InvariantCulture)
           + " m-separated marked arenas; four Carapace spears are staged at the start. "
           + "Captured exact live Character.m_name identities in " + receiptPath + ".", true);
@@ -228,18 +229,17 @@ public sealed class LabSignatureHuntProvider {
       }
       string worldName = ZNet.instance.GetWorldName();
       string worldUid = ZNet.instance.GetWorldUID().ToString(CultureInfo.InvariantCulture);
-      if (!string.Equals(worldName, LabSignatureHuntContract.ExpectedWorldName,
-              StringComparison.Ordinal)
-          || !string.Equals(worldUid, LabSignatureHuntContract.ExpectedWorldUid,
-              StringComparison.Ordinal)) {
-        return "signature hunt world mismatch: expected "
+      if (!LabSignatureHuntContract.SupportsWorld(worldName, worldUid)) {
+        return "signature hunt world mismatch: expected reviewed "
             + LabSignatureHuntContract.ExpectedWorldName + " UID "
-            + LabSignatureHuntContract.ExpectedWorldUid + ", found "
+            + LabSignatureHuntContract.ExpectedWorldUid + " or "
+            + LabSignatureHuntContract.CreatorOsBetaWorldName + " UID "
+            + LabSignatureHuntContract.CreatorOsBetaWorldUid + ", found "
             + (string.IsNullOrWhiteSpace(worldName) ? "unknown" : worldName) + " UID "
             + (string.IsNullOrWhiteSpace(worldUid) ? "unknown" : worldUid) + ".";
       }
       if (!ZNet.instance.IsServer() || !ZNet.IsSinglePlayer) {
-        return "signature hunt fixture requires the private local ComfyQuestDemo host; "
+        return "signature hunt fixture requires a private local reviewed-world host; "
             + "peer and open-server mutation is refused.";
       }
       return null;

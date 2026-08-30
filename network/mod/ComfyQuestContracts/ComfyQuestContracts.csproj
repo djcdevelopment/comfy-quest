@@ -32,7 +32,7 @@
 
   <PropertyGroup>
     <PackageId>Comfy.Quest.Contracts</PackageId>
-    <Version>0.6.0-local</Version>
+    <Version>0.9.2-local</Version>
     <Title>Comfy Quest Contracts</Title>
     <Authors>djcdevelopment</Authors>
     <PackageProjectUrl>https://github.com/djcdevelopment/comfy-quest</PackageProjectUrl>
@@ -48,6 +48,7 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="PACKAGE-README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\..\contracts\spatial\*.json" Pack="true" PackagePath="contracts\spatial\" />
     <None Include="ModGlue\*.cs"
           Pack="true"
           PackagePath="contentFiles\cs\any\ModGlue\%(Filename)%(Extension)"

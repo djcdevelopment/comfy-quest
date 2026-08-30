@@ -4,8 +4,6 @@ param(
     [ValidateSet('Open', 'Status', 'StopStudio')]
     [string]$Action = 'Open',
 
-    [string]$BaselineRoot = 'C:\work\baseline',
-    [string]$PlatformRoot = 'C:\work\lumberjacks-platform',
     [string]$SshTarget = 'homebase',
     [string]$RemoteValheimRoot = '/home/derek/valheim',
     [string]$ExpectedMachine = 'am4',
@@ -173,13 +171,16 @@ if (-not (Test-Path -LiteralPath $buildAcceptancePath -PathType Leaf)) {
     throw 'architectural_demo_requires_build_acceptance'
 }
 
-$comfyRevision = Assert-Repository $repoRoot 'djcdevelopment/comfy-quest'
-$baselineRevision = Assert-Repository $BaselineRoot 'djcdevelopment/baseline'
-$platformRevision = Assert-Repository $PlatformRoot 'djcdevelopment/lumberjacks-platform'
 $buildAcceptance = Read-Json $buildAcceptancePath
 if ([string]$buildAcceptance.schema -ne 'creator-os-architectural-build-journey/v1' -or
     [string]$buildAcceptance.status -ne 'PASS') {
     throw 'architectural_demo_build_acceptance_invalid'
+}
+$comfyRevision = Assert-Repository $repoRoot 'djcdevelopment/comfy-quest'
+$baselineRevision = [string]$buildAcceptance.sources.baseline_revision
+$platformRevision = [string]$buildAcceptance.sources.lumberjacks_platform_revision
+if ($baselineRevision -notmatch '^[0-9a-f]{40}$' -or $platformRevision -notmatch '^[0-9a-f]{40}$') {
+    throw 'architectural_demo_build_source_identity_invalid'
 }
 $remoteRoot = [string]$buildAcceptance.identity.remote_run_root
 Assert-RemoteRoot $remoteRoot

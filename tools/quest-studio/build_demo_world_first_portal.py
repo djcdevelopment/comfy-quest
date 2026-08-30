@@ -49,10 +49,10 @@ def render() -> tuple[bytes, bytes]:
     experience = json.loads(EXPERIENCE.read_text(encoding="utf-8"))
     expected = json.loads(EXPECTED.read_text(encoding="utf-8"))
     bundle_manifest = json.loads(BUNDLE_MANIFEST.read_text(encoding="utf-8"))
-    if source.get("schema_version") != 3:
-        raise ValueError("Studio source must be schema version 3")
-    if experience.get("schema") != "comfy-quest-experience/v1":
-        raise ValueError("Compiled experience must use comfy-quest-experience/v1")
+    if source.get("schema_version") != 4:
+        raise ValueError("Studio source must be schema version 4")
+    if experience.get("schema") != "comfy-quest-experience/v2":
+        raise ValueError("Compiled experience must use comfy-quest-experience/v2")
     if expected.get("tutorial_id") != "demo-world-first-portal":
         raise ValueError("Expected behavior belongs to the wrong tutorial")
     if bundle_manifest.get("schema") != "comfy-quest-tutorial-bundle/v1":

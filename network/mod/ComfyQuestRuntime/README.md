@@ -1,6 +1,6 @@
 # ComfyQuestRuntime
 
-Small gameplay-side consumer for certified `comfy-quest-experience/v1` documents. It owns explicit
+Small gameplay-side consumer for certified `comfy-quest-experience/v2` documents. It owns explicit
 inbox checking and atomic activation; it does not watch files and never executes schema-1 quests.
 The current shell exposes an always-present overhead creator bar, explicit F10 Check and F11 Load latest,
 immutable JSON receipts, and a configurable loopback Open Studio button (default
@@ -100,3 +100,30 @@ Shout, listen-host sign placement, and local sign inscription. OMEN explicitly a
 peer-Shout adapter was not replayed a second time; its expectation is inherited from the direct 1.6 proof.
 
 Inbox: `BepInEx/config/comfy-quest-runtime/inbox/*.questpack`.
+
+### Dedicated-server personal progression (beta)
+
+Native Valheim networking remains the transport. A remote client may opt into durable,
+per-character progression without asking the server or a listen host to mutate quest state by
+pinning one exact world UID and one exact active pack content hash:
+
+```ini
+[DedicatedPersonalProgression]
+Enabled = true
+WorldUid = -7600395338659582326
+ContentHash = <64 lowercase hex characters from active-set.json>
+```
+
+This profile fails closed unless the player is a peer, the loaded world UID and active content
+hash match exactly, and every campaign trigger/action stays inside the beta policy. The only live
+progression witness admitted is a kill attributed to the local player; the synthetic
+`experience_started` event may initialize a run. Every entry or transition action must be
+`message`. Grants, spawns, timers, cleanup, and every other shared-world mutation are rejected.
+Bindings are read from the replicated world as exact, read-only references: the peer does not
+inscribe, continue, or otherwise rewrite their ZDOs. Run state, action claims, continuation
+lineage, receipts, and messages remain local to the player and are keyed by world, character,
+binding, campaign experience, and content hash.
+
+Leaving `Enabled = false` preserves the existing host-authoritative behavior. Treat the three
+values as one release pin; changing a world or campaign requires distributing a new reviewed
+configuration rather than relaxing the match.

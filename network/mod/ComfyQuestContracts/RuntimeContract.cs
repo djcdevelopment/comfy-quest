@@ -37,12 +37,13 @@ public sealed class TriggerEvaluationContext {
   public DateTimeOffset? LastProgressUtc { get; set; }
   public SpatialPoint? BindingPosition { get; set; }
   public IReadOnlyList<SpatialPoint> SpawnedPositions { get; set; }
-  public IReadOnlyDictionary<string,SpatialPoint> AuthoredAnchors { get; set; }
+  public IReadOnlyDictionary<string,SpatialArea> SpatialAreas { get; set; }
   public int? DeathsInStage { get; set; }
   public IReadOnlyDictionary<string,SpawnTally> SpawnsByAction { get; set; }
   public bool TryMeasure(string name,out double value)=>TryMeasure(name,null,out value);
   public bool TryMeasure(string name,string actionId,out double value){value=0;if(string.Equals(name,AdaptiveMeasureCatalog.DeathsMeasure,StringComparison.Ordinal)){if(!DeathsInStage.HasValue)return false;value=DeathsInStage.Value;return true;}var remaining=string.Equals(name,AdaptiveMeasureCatalog.RemainingMeasure,StringComparison.Ordinal);if(remaining||string.Equals(name,AdaptiveMeasureCatalog.ClearedMeasure,StringComparison.Ordinal)){if(string.IsNullOrWhiteSpace(actionId)||SpawnsByAction==null||!SpawnsByAction.TryGetValue(actionId,out var tally)||tally==null)return false;value=remaining?tally.Live:tally.Cleared;return true;}if(!At.HasValue)return false;DateTimeOffset? origin=null;if(string.Equals(name,"time_since_stage_entered",StringComparison.Ordinal))origin=StageEnteredUtc;else if(string.Equals(name,"time_since_progress",StringComparison.Ordinal))origin=LastProgressUtc;else return false;if(!origin.HasValue)return false;value=(At.Value-origin.Value).TotalSeconds;return true;}
-  public bool TryResolveAnchor(AreaAnchor anchor,RuntimeEvent trigger,out SpatialPoint point){point=default;var kind=anchor?.Kind??"";if(string.Equals(kind,"coordinates",StringComparison.Ordinal)){if(!(anchor.X.HasValue&&anchor.Y.HasValue&&anchor.Z.HasValue))return false;point=new SpatialPoint(anchor.X.Value,anchor.Y.Value,anchor.Z.Value);return true;}if(string.Equals(kind,"authored",StringComparison.Ordinal))return anchor.AnchorId!=null&&AuthoredAnchors!=null&&AuthoredAnchors.TryGetValue(anchor.AnchorId,out point);if(string.Equals(kind,"binding",StringComparison.Ordinal)){if(!BindingPosition.HasValue)return false;point=BindingPosition.Value;return true;}if(string.Equals(kind,"player",StringComparison.Ordinal))return SpatialEvaluator.TryPosition(trigger,out point);return false;}
+  public SpatialArea FindArea(string areaId){if(string.IsNullOrWhiteSpace(areaId)||SpatialAreas==null||!SpatialAreas.TryGetValue(areaId,out var area))return null;return area;}
+  public bool TryResolveArea(string areaId,RuntimeEvent trigger,out SpatialPoint point){point=default;var area=FindArea(areaId);if(area==null)return false;if(string.Equals(area.Frame,"world",StringComparison.Ordinal)){if(area.Center==null)return false;point=new SpatialPoint(area.Center.X,area.Center.Y,area.Center.Z);return true;}if(string.Equals(area.Frame,"binding",StringComparison.Ordinal)){if(!BindingPosition.HasValue)return false;point=BindingPosition.Value;return true;}if(string.Equals(area.Frame,"player",StringComparison.Ordinal))return SpatialEvaluator.TryPosition(trigger,out point);return false;}
 }
 
 public sealed class TriggerWhereTrace {
@@ -64,6 +65,13 @@ public sealed class TriggerClauseTrace {
   [JsonProperty("where")] public List<TriggerWhereTrace> Where { get; set; } = new();
   [JsonProperty("children")] public List<TriggerClauseTrace> Children { get; set; } = new();
   [JsonProperty("truncated", NullValueHandling=NullValueHandling.Ignore)] public bool? Truncated { get; set; }
+  [JsonProperty("area_id", NullValueHandling=NullValueHandling.Ignore)] public string AreaId { get; set; }
+  [JsonProperty("spatial", NullValueHandling=NullValueHandling.Ignore)] public string Spatial { get; set; }
+  [JsonProperty("anchor_sha256", NullValueHandling=NullValueHandling.Ignore)] public string AnchorSha256 { get; set; }
+  [JsonProperty("resolved_center", NullValueHandling=NullValueHandling.Ignore)] public SpatialContractPoint ResolvedCenter { get; set; }
+  [JsonProperty("radius_meters", NullValueHandling=NullValueHandling.Ignore)] public double? RadiusMeters { get; set; }
+  [JsonProperty("observed_position", NullValueHandling=NullValueHandling.Ignore)] public SpatialContractPoint ObservedPosition { get; set; }
+  [JsonProperty("distance_meters", NullValueHandling=NullValueHandling.Ignore)] public double? DistanceMeters { get; set; }
 }
 
 public sealed class RejectedTransitionEvidence {
@@ -176,6 +184,10 @@ public static class TriggerEvaluator {
     if(op=="SPATIAL") {
       var observation=SpatialEvaluator.Observe(x,h,context);
       trace.Current=observation.Current;trace.Required=observation.Required;
+      trace.AreaId=observation.AreaId;trace.Spatial=x.Spatial;trace.AnchorSha256=observation.AnchorSha256;trace.RadiusMeters=observation.RadiusMeters;
+      if(observation.ResolvedCenter.HasValue){var p=observation.ResolvedCenter.Value;trace.ResolvedCenter=new SpatialContractPoint(p.X,p.Y,p.Z);}
+      if(observation.ObservedPosition.HasValue){var p=observation.ObservedPosition.Value;trace.ObservedPosition=new SpatialContractPoint(p.X,p.Y,p.Z);}
+      trace.DistanceMeters=observation.DistanceMeters;
       trace.Where.Add(new TriggerWhereTrace{Field=Trim(x.Spatial,maxCharacters,ref stringsTruncated),Expected=Trim(observation.Expected,maxCharacters,ref stringsTruncated),Actual=Trim(observation.Actual,maxCharacters,ref stringsTruncated),Satisfied=trace.Satisfied});
       if(stringsTruncated)trace.Truncated=true;return trace;
     }

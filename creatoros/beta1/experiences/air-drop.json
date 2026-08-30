@@ -1,0 +1,53 @@
+{
+  "schema": "comfy-quest-experience/v2",
+  "id": "slayers-air-drop",
+  "title": "Air Drop",
+  "entry_stage": "hunt",
+  "successor_experience_ids": [
+    "slayers-cold-shot"
+  ],
+  "stages": [
+    {
+      "id": "hunt",
+      "entry_actions": [
+        {
+          "id": "message-briefing",
+          "type": "message",
+          "text": "Air Drop: bring down the Deathsquito with a thrown spear."
+        }
+      ],
+      "transitions": [
+        {
+          "id": "deathsquito-thrown-spear",
+          "priority": 100,
+          "when": {
+            "op": "EVENT",
+            "event": "kill",
+            "target": "$enemy_deathsquito",
+            "where": {
+              "weapon_skill": "Spears",
+              "projectile": "true"
+            }
+          },
+          "actions": [
+            {
+              "id": "message-complete",
+              "type": "message",
+              "text": "Air Drop answered. Cold Shot is now yours to hunt."
+            }
+          ],
+          "outcome": "complete"
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "id": "default",
+      "experience_id": "slayers-air-drop",
+      "target_kinds": [
+        "sign"
+      ]
+    }
+  ]
+}

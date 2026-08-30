@@ -319,6 +319,15 @@ public static class QuestStudioEndpoints
             var result = studio.Rehearse(projectId, body);
             return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
         });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/spatial-anchors/import", (string projectId, HttpRequest request, HttpResponse response, StudioSpatialAnchorImportRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.ImportSpatialAnchor(projectId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict || result.Error == "anchor_id_conflict" ? StatusCodes.Status409Conflict
+                : result.Error is "project_missing" or "route_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        }).WithMetadata(new RequestSizeLimitAttribute(MaxImportRequestBytes));
         app.MapPost("/api/v2/quest-studio/projects/{projectId}/publish", async (string projectId, HttpRequest request, HttpResponse response, StudioPublishRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
         {
             NoStore(response);
@@ -410,6 +419,12 @@ public static class QuestStudioEndpoints
             NoStore(response);
             if (!host.Authorize(request)) return Forbidden(host);
             return Download(response, studio.DownloadQuestpack(projectId), host);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/spatial-evidence", (string projectId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            return Download(response, studio.DownloadSpatialEvidence(projectId), host);
         });
 
         app.MapGet("/api/v2/quest-studio/usage", (HttpRequest request, HttpResponse response, QuestStudioService studio) =>

@@ -62,7 +62,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         )
         self.assertLess(
             engine.index("workflows.Begin"),
-            engine.index("Apply(active, zdo, decision, evt, correlationId);"),
+            engine.index("Apply(active, zdo, decision, evt, correlationId"),
         )
 
     def test_activation_change_reports_one_bounded_orphan_scan(self) -> None:
@@ -565,7 +565,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         engine = ENGINE.read_text(encoding="utf-8")
         ignored = engine[
             engine.index("if (decision == null) {"):
-            engine.index("Apply(active, zdo, decision, evt, correlationId);")
+            engine.index("Apply(active, zdo, decision, evt, correlationId")
         ]
         self.assertIn("TriggerEvaluator.Explain(route?.When, state?.History, evaluationContext)", ignored)
         self.assertIn("UnmetRoutes(stage, null, state?.History, evaluationContext)", ignored)

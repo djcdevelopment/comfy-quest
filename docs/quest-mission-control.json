@@ -474,6 +474,20 @@
       "source_contains": "FR-WORLD-001"
     },
     {
+      "id": "queue.steward-spatial-round-trip",
+      "state": "implemented",
+      "lane": "4B",
+      "requirements": [
+        "FR-EVID-001",
+        "FR-EVID-002",
+        "NFR-TEST-001"
+      ],
+      "title": "Close the StewardView spatial evidence round trip",
+      "detail": "Implemented locally: StewardView resolves a selected snapshot piece and exports a hash-bound world or Charm-relative sphere; Studio imports it as a first-class Runtime Experience v2 area; Runtime evaluates true 3D distance and emits anchor-correlated traces; Studio exports the exact runtime run; and StewardView verifies, token-gates, stores, and overlays that evidence from a dedicated DuckDB database. Java/.NET hash parity, tamper refusal, true-3D distance, idempotence, and persistence are contract-tested. No immutable clean-revision pair or live AM4/game round trip exists yet, so this is implementation evidence only. The separate FR-WORLD-001 live-look named-anchor lane remains gated.",
+      "source": "contracts/spatial/README.md",
+      "source_contains": "comfy-quest-spatial-anchor/v1"
+    },
+    {
       "id": "queue.guild-campaign",
       "state": "implemented",
       "lane": "4B",
@@ -488,13 +502,13 @@
         "NFR-USE-001"
       ],
       "title": "Prove Slayers Signature Hunt as a Guild creative system",
-      "detail": "The steward source/configuration, typed Signature Hunt abstraction, revision-pinned palette, two creator instances, campaign placement, evidence lens, every-campaign progression editing, and one-operation campaign-start choreography are implemented and contract-tested. For the exact two-instance shape, one Play call freezes bytes, prepares or resumes the pinned Creator Session, arms Runtime, prepares the fixed fixture, publishes and verifies exact activation, finds the fixture-owned sign, and atomically binds/starts the unique root. Before its stored receipt ends at `started`, the simulated path verifies the exact fixture request and 17/17-object receipt hash/path, correlates raw Deathsquito/Drake and matcher targets to exactly both compiled instances, carries prerequisite machine/world/session pins through candidate and bind dispatch, requires the entry's explicit successor to be the other experience, and validates the full applied binding reference. Successor emission follows explicit prerequisite edges. These are implementation and simulated-contract facts, not installed kill or campaign-completion proof. The next edge is the installed lap through both hunts, automatic successor continuation, terminal campaign evidence, reset/rerun, and owned cleanup/restoration. No such Signature Hunt live proof exists yet. Keep triggerless/manual source rows lossless and do not build a generic framework, notebook, generator, rank engine, Discord workflow, or world package.",
+      "detail": "The steward source/configuration, typed Signature Hunt abstraction, revision-pinned palette, two creator instances, campaign placement, evidence lens, every-campaign progression editing, and one-operation campaign-start choreography are implemented and contract-tested. The release-seed pass then crossed installed Valheim on fresh CreatorOSBeta1 world UID 4257656027: the 40-piece Field Lodge returned exact MATCH, all 17 fixture objects stood, raw Deathsquito and Drake identities matched both compiled instances, the exact pack was activated, the loadout sign was bound, Air Drop started, creator authority was disabled, the world saved gracefully, and AM4 byte-restored. The retained index is docs/evidence/creatoros-beta1-world-20260830-r1.json. Fixture preparation and a started entry run are not live kill or campaign-completion proof. The next edge is a clean external install and native P7 join through both hunts, automatic Cold Shot continuation, terminal evidence, reset/rerun, and owned cleanup. Keep triggerless/manual source rows lossless and do not generalize this typed slice into a framework, notebook, generator, rank engine, or Discord workflow.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "### 4B — Guild creative-system bridge"
     },
     {
       "id": "queue.world-bundle",
-      "state": "deferred",
+      "state": "implemented",
       "lane": "5",
       "requirements": [
         "FR-WORLD-003",
@@ -502,7 +516,7 @@
         "FR-WORLD-005"
       ],
       "title": "Package authored saved worlds",
-      "detail": "Do not build versioned `.db`/`.fwl` packaging, inspection, installation, or rollback during active R&D. Activate this only after repeated guild authoring stabilizes the contracts and community distribution becomes the next result.",
+      "detail": "CreatorOSBeta1 is the explicit deadline-driven exception to the earlier deferral. One fresh `.db`/`.fwl` pair now has a pinned UID, seed, pair hash, exact Field Lodge and Signature Hunt content, independent release verification, client/server installers, and graceful-save/rollback drivers. It remains implemented rather than complete until a clean frozen-source cut is activated on P7 and an external player proves install, native join, completion, evidence correlation, and restore. Do not generalize this single release into a world-packaging framework.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "This is where versioned `.db`/`.fwl` packaging"
     },
@@ -775,6 +789,16 @@
     },
     "boundary": "Demo-ready warm AM4 R&D session: Invoke-ArchitecturalDemo.ps1 opens the exact Studio Build and runs only status/check/count/diff/status against the retained 40-piece structure; full stop and byte restoration occur only through the separate explicit Invoke-ArchitecturalWarmLap.ps1 -Close operation.",
     "capsule_schema": "creator-os-architectural-build-capsule/v0",
+    "workbook": {
+      "status": "active-rnd",
+      "schema": "creator-os-composition-workbook/v1",
+      "review_schema": "creator-os-composition-review/v1",
+      "source": "docs/creator-os-composition-workbook.json",
+      "html": "docs/creator-os-composition-workbook.html",
+      "source_sha256": "0f413ff4e3c2d2e014959584b1777b46c87741afb297140d9bd2bd0787664b30",
+      "next_attack": "Connect the accepted tn0304 build to a steward-published Guild venue primitive, the two-artifact Signature Hunt campaign, exact world binding, Runtime progression, and community evidence lineage.",
+      "boundary": "The workbook accepts the architectural values and warm proof. Human input is limited to meaning, steward authority, creator freedom, composition quality, and the next R&D verdict; browser notes are never machine evidence."
+    },
     "studio_routes": [
       "GET /api/v2/quest-studio/builds",
       "POST /api/v2/quest-studio/builds/import",

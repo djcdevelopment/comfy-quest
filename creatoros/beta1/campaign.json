@@ -1,0 +1,67 @@
+{
+  "schema": "creatoros-campaign/v1",
+  "campaign_id": "slayers-signature-hunt",
+  "revision": 1,
+  "version": "1.0.0",
+  "title": "Slayers Signature Hunt",
+  "creator": "Derek",
+  "guild": "Slayers",
+  "era": 17,
+  "release_state": "immutable-beta",
+  "composition_hash": "2713aa9e1aabab2503ce21611ac1218c7fff4f39d3c1b425394098d2d69de210",
+  "pack": {
+    "path": "slayers-signature-hunt-1.0.0.questpack",
+    "content_hash": "ad94f708efa9afbb8267cae6336226fc2c59c9d86c777d2309b932842f09c734",
+    "sha256": "bb08ce34109386ea1fedab968d8ae7cde3679ac1c67b4cd928499cba9dba51a5"
+  },
+  "venue": {
+    "path": "venue.json",
+    "venue_id": "slayers-field-lodge",
+    "revision": 1,
+    "sha256": "425e816cf9dde0e963088929ea9ef583fdf7dbf5c42d0e2d3071d0c12678aef3",
+    "entry_anchor": {
+      "role": "marker-loadout-sign",
+      "target_kind": "sign",
+      "binding_id": "default"
+    }
+  },
+  "lineage": [
+    {
+      "project_id": "air-drop",
+      "source_quest_id": "air_drop",
+      "experience_id": "slayers-air-drop",
+      "experience_sha256": "d0d5759a56788e64dd6b18b6f2cf49321ff302ab1b947a740faff3129aebdb9c",
+      "prerequisite_experience_ids": [],
+      "successor_experience_ids": [
+        "slayers-cold-shot"
+      ]
+    },
+    {
+      "project_id": "cold-shot",
+      "source_quest_id": "cold_shot",
+      "experience_id": "slayers-cold-shot",
+      "experience_sha256": "a5d4b1a85876ed08f363dfca2ed06e3d79af5f0dad95f492515f421fe944108d",
+      "prerequisite_experience_ids": [
+        "slayers-air-drop"
+      ],
+      "successor_experience_ids": []
+    }
+  ],
+  "beta_policy": {
+    "network_transport": "native-valheim",
+    "progression_scope": "world-character-binding-experience-content",
+    "locally_witnessed_events": [
+      "experience_started",
+      "kill"
+    ],
+    "allowed_action_types": [
+      "message"
+    ],
+    "shared_world_mutation": "host-only-unchanged"
+  },
+  "compatibility": {
+    "built_for": "pre-valheim-1.0",
+    "valheim_1_0_release_date": "2026-09-09",
+    "post_1_0_revalidation_required": true
+  }
+}

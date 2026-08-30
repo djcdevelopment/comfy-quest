@@ -1,0 +1,224 @@
+{
+  "schema": "creator-os-composition-workbook/v1",
+  "workbook_id": "tn0304-signature-hunt-venue",
+  "revision": 1,
+  "title": "From structure to community place",
+  "subtitle": "Drive the first composition from an accepted architectural capsule into a Guild venue, creator campaign, live Runtime experience, and community evidence loop.",
+  "fixture": "tn0304",
+  "story": {
+    "venue_working_name": "The Slayers' Field Lodge",
+    "campaign": "Slayers Signature Hunt",
+    "artifacts": [
+      "Air Drop",
+      "Cold Shot"
+    ],
+    "composition": [
+      "accepted architectural capsule",
+      "Guild venue primitive",
+      "creator-authored campaign artifacts",
+      "exact world placement and binding",
+      "Runtime progression",
+      "community evidence"
+    ]
+  },
+  "proof_boundary": {
+    "proof_level": "installed-proven architectural substrate; implemented/simulated campaign substrate",
+    "accepted": [
+      "The immutable tn0304 capsule and its architectural interpretation are accepted inputs.",
+      "The canonical 40-piece adaptation is staged and has returned an exact live MATCH.",
+      "The retained AM4 build can be reopened through the bounded read-only demo path.",
+      "Guild v2 can promote a typed Signature Hunt abstraction and create two campaign artifacts.",
+      "Runtime continuation and the one-operation campaign start are implemented and simulated with exact identity correlation."
+    ],
+    "not_claimed": [
+      "The architectural build is not yet a Guild palette primitive.",
+      "The campaign is not yet bound to the structure as a venue.",
+      "No installed player lap has proved the two hunts, successor transition, campaign completion, or community evidence return.",
+      "The workbook is a decision and evidence surface; its checkmarks are never machine proof."
+    ]
+  },
+  "accepted_values": [
+    {"label": "Footprint", "value": "7.953375 × 7.4676 m"},
+    {"label": "Wall datum", "value": "2.2225 m"},
+    {"label": "True ridge", "value": "5.8166 m"},
+    {"label": "Roof pitch", "value": "43.907838°"},
+    {"label": "Reconciliation", "value": "−0.029171 m"},
+    {"label": "Canonical adaptation", "value": "40 pieces · 16 floors / 16 walls / 8 roofs"}
+  ],
+  "stages": [
+    {
+      "id": "accepted-substrate",
+      "status": "proven",
+      "title": "Accepted architectural substrate",
+      "summary": "Baseline intent, Studio interpretation, canonical Lab pair, exact live placement, MATCH, rollback, and warm reuse are pinned.",
+      "evidence": [
+        {"label": "Architectural journey", "path": "architectural-build-journey-20260829.html"},
+        {"label": "Operator demo index", "path": "evidence/architectural-demo-tn0304-20260829-r1.json"},
+        {"label": "Warm-state index", "path": "evidence/architectural-warm-tn0304-20260829-r1.json"}
+      ]
+    },
+    {
+      "id": "venue-promotion",
+      "status": "open",
+      "title": "Promote the build as a Guild venue",
+      "summary": "A steward publishes the accepted build lineage, lifecycle, evidence policy, and bounded creator freedoms as one typed palette primitive.",
+      "evidence": []
+    },
+    {
+      "id": "campaign-composition",
+      "status": "implemented",
+      "title": "Compose Signature Hunt at the venue",
+      "summary": "The two-artifact campaign substrate exists. The open seam is making the venue an owned part of that creative composition instead of an adjacent artifact.",
+      "evidence": [
+        {"label": "Program plan", "path": "PLAN.md"}
+      ]
+    },
+    {
+      "id": "world-activation",
+      "status": "open",
+      "title": "Activate one exact composition",
+      "summary": "One bounded operation must place or reuse the exact venue, bind the campaign entry anchor, activate the exact revision, and retain cleanup authority.",
+      "evidence": []
+    },
+    {
+      "id": "community-evidence",
+      "status": "open",
+      "title": "Return player evidence to the community system",
+      "summary": "Installed completion evidence must trace from player run through campaign and creator artifact back to the steward-published venue primitive and capsule.",
+      "evidence": []
+    }
+  ],
+  "screenshots": [
+    {
+      "id": "architecture",
+      "title": "The accepted architectural reading",
+      "caption": "Studio presents source-backed dimensions, reconciliations, provenance, and game-only adaptations without changing the source observation.",
+      "path": "images/architectural-build-journey/studio-architecture.png",
+      "width": 1600,
+      "height": 1000,
+      "sha256": "485aad73271ed2914bdd89cdbe3e174d4fa127f377094907e272d98f963869a4"
+    },
+    {
+      "id": "game-pieces",
+      "title": "The canonical game adaptation",
+      "caption": "Forty exact pieces are the accepted substrate. The next decision is what this object means and who may configure which aspects of it.",
+      "path": "images/architectural-build-journey/studio-game-pieces.png",
+      "width": 1600,
+      "height": 1000,
+      "sha256": "6ba70bc2883dcd7972e49b58864aecc75c0ba0fecf9b1301de9b0c216dd5c5e4"
+    },
+    {
+      "id": "standing-venue",
+      "title": "The structure standing in Valheim",
+      "caption": "This is accepted operational evidence, not yet a community place. The composition slice gives it steward meaning, creator use, Runtime behavior, and evidence lineage.",
+      "path": "images/architectural-build-journey/valheim-standing-build.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "5d4665915c71248265e1940d5e03a73f792f574b9c477f91c2acf7abac47a29c"
+    }
+  ],
+  "actions": [
+    {
+      "id": "orient",
+      "title": "Orient to the composition, not the machinery",
+      "prompt": "Read the proof boundary and connection map. Record only if the proposed composition is solving the wrong creator-level problem.",
+      "precondition": "The tracked workbook manifest and accepted evidence links load."
+    },
+    {
+      "id": "name-place",
+      "title": "Name what this place means",
+      "prompt": "Is The Slayers' Field Lodge the right community meaning? Describe the role this place plays for stewards, creators, and players.",
+      "precondition": "The accepted structure is treated as a substrate, not an unresolved building test."
+    },
+    {
+      "id": "steward-locks",
+      "title": "Draw the steward boundary",
+      "prompt": "Record what the steward must lock: source lineage, structural identity, lifecycle, evidence policy, allowed campaigns, or other invariants.",
+      "precondition": "The venue has a stated community meaning."
+    },
+    {
+      "id": "creator-freedoms",
+      "title": "Draw the creator boundary",
+      "prompt": "Record what creators may configure: name, story copy, placement intent, anchor choice, attached experiences, or a deliberately smaller set.",
+      "precondition": "The steward-owned invariants are explicit."
+    },
+    {
+      "id": "inhabit-venue",
+      "title": "Make Signature Hunt inhabit the venue",
+      "prompt": "Describe how Air Drop starts here, how Cold Shot succeeds it, what object or area anchors entry, and what completion means to the community.",
+      "precondition": "Creator freedoms are bounded enough to compile deterministically."
+    },
+    {
+      "id": "attack-seams",
+      "title": "Attack the composition seams",
+      "prompt": "Look for the first place ownership, versioning, placement, binding, cleanup, or evidence lineage becomes ambiguous. Mark every ‘can't answer why’ moment.",
+      "precondition": "The venue and campaign have one concrete proposed relationship."
+    },
+    {
+      "id": "demo-verdict",
+      "title": "Judge the one-operation demo",
+      "prompt": "Would a bounded venue → campaign → play → evidence demonstration prove the creative abstraction is real? Record what would make the demo convincing or theatrical.",
+      "precondition": "The open seams are visible and machine facts remain separate from human judgment."
+    },
+    {
+      "id": "choose-attack",
+      "title": "Choose the next machine-owned attack",
+      "prompt": "Select the verdict and next attack, preserve exact observations, then export the review packet for triage.",
+      "precondition": "The semantic, authority, composition, and demo judgments have all been considered."
+    }
+  ],
+  "verdicts": [
+    {"id": "unrecorded", "label": "No verdict yet"},
+    {"id": "promote", "label": "Promote this composition"},
+    {"id": "revise-semantics", "label": "Revise the venue meaning"},
+    {"id": "revise-authority", "label": "Revise steward / creator authority"},
+    {"id": "stop", "label": "Stop this direction"}
+  ],
+  "next_attacks": [
+    {"id": "unrecorded", "label": "No next attack selected"},
+    {"id": "connect-venue-campaign", "label": "Connect venue primitive to campaign"},
+    {"id": "revise-workbook", "label": "Revise the composition workbook"},
+    {"id": "deepen-build-loop", "label": "Deepen architectural variation instead"},
+    {"id": "hold", "label": "Hold for another product decision"}
+  ],
+  "commands": [
+    {
+      "id": "open",
+      "label": "Open the accepted demo",
+      "command": "tools\\quest-studio\\Invoke-ArchitecturalDemo.ps1 -Action Open",
+      "detail": "Runs the already-proven warm status/check/count/diff/status path, then opens Studio and the exact Valheim capture."
+    },
+    {
+      "id": "status",
+      "label": "Read demo status",
+      "command": "tools\\quest-studio\\Invoke-ArchitecturalDemo.ps1 -Action Status",
+      "detail": "Reads the bounded control-plane and warm-session status without changing the world."
+    },
+    {
+      "id": "stop-studio",
+      "label": "Stop Studio only",
+      "command": "tools\\quest-studio\\Invoke-ArchitecturalDemo.ps1 -Action StopStudio",
+      "detail": "Stops only the Studio host and SSH tunnel. The warm Valheim structure remains standing."
+    },
+    {
+      "id": "close-warm",
+      "label": "Explicitly close and restore",
+      "command": "tools\\quest-studio\\Invoke-ArchitecturalWarmLap.ps1 -Close",
+      "detail": "Stops the retained client and restores the exact pre-session plugin, Runtime, Lab, world, and character bytes."
+    }
+  ],
+  "review": {
+    "schema": "creator-os-composition-review/v1",
+    "storage_key": "comfy-quest.creator-os-composition-workbook.tn0304-signature-hunt-venue.v1",
+    "max_action_note_chars": 4000,
+    "max_panel_note_chars": 4000,
+    "max_observation_chars": 20000,
+    "max_cant_answer_chars": 8000
+  },
+  "limitations": [
+    "The workbook can copy commands but cannot execute them.",
+    "Browser checkmarks and notes are observations, not receipts or acceptance evidence.",
+    "The accepted warm state can drift outside the workbook; use the bounded status surface before any demo.",
+    "Exported review JSON is untrusted input and requires triage before it changes repository or product state."
+  ]
+}

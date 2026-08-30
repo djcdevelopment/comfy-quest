@@ -78,7 +78,7 @@ function New-WoodboundPack([string] $RuntimeRoot, [string] $Version, [string] $F
     $message1 = 'The charm wakes. Two offerings of wood, before the moment passes.'
     $message2 = 'The offering is heard. Reclaim one piece to seal the rite.'
     $experience = [ordered]@{
-        schema='comfy-quest-experience/v1';id='woodbound-selftest';title='The Woodbound Signal';entry_stage='speak'
+        schema='comfy-quest-experience/v2';id='woodbound-selftest';title='The Woodbound Signal';entry_stage='speak'
         stages=@(
             [ordered]@{id='speak';entry_actions=@();transitions=@([ordered]@{
                 id='advance-speak';priority=100;when=[ordered]@{op='EVENT';event='chat_sent';target='normal'}
@@ -99,7 +99,7 @@ function New-WoodboundPack([string] $RuntimeRoot, [string] $Version, [string] $F
 # gates keyed to the Woodbound Signal by name, so its staging proof was assembled by hand.
 function New-DefensePack([string] $RuntimeRoot, [string] $Version, [int] $WaveCount) {
     $experience = [ordered]@{
-        schema='comfy-quest-experience/v1';id='defense-selftest';title='Ten-Minute Desperate Defense';entry_stage='muster'
+        schema='comfy-quest-experience/v2';id='defense-selftest';title='Ten-Minute Desperate Defense';entry_stage='muster'
         stages=@(
             [ordered]@{id='muster';entry_actions=@();transitions=@([ordered]@{
                 id='call-the-ward';priority=100;when=[ordered]@{op='EVENT';event='chat_sent';target='normal'}

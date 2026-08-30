@@ -1,5 +1,5 @@
 {
-  "schema": "comfy-quest-experience/v1",
+  "schema": "comfy-quest-experience/v2",
   "id": "demo-world-first-portal",
   "title": "Demo World: First Portal",
   "entry_stage": "start",

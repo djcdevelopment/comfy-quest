@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/djcdevelopment/comfy-quest/contracts/spatial/comfy-quest-spatial-evidence-v1.schema.json",
+  "title": "Comfy Quest spatial evidence exchange v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "exported_utc", "project_id", "experience_id", "pack_id", "content_hash", "activation_id", "run_id", "world_uid", "records", "content_sha256"],
+  "properties": {
+    "schema": { "const": "comfy-quest-spatial-evidence/v1" },
+    "exported_utc": { "type": "string", "format": "date-time" },
+    "project_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "experience_id": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/$defs/id" },
+    "pack_id": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/$defs/id" },
+    "content_hash": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/$defs/sha256" },
+    "activation_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "world_uid": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "records": {
+      "type": "array", "minItems": 1, "maxItems": 512,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["receipt_id", "at_utc", "area_id", "predicate", "current_count", "required_count", "anchor_sha256", "snapshot", "piece", "resolved_center", "radius_meters", "observed_position", "satisfied"],
+        "properties": {
+          "receipt_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "at_utc": { "type": "string", "format": "date-time" },
+          "correlation_id": { "type": ["string", "null"], "maxLength": 160 },
+          "transition_id": { "type": ["string", "null"], "maxLength": 64 },
+          "event_name": { "type": ["string", "null"], "maxLength": 128 },
+          "area_id": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/$defs/id" },
+          "predicate": { "enum": ["within_radius", "entered", "left", "remained", "count_in_area"] },
+          "current_count": { "type": "integer", "minimum": 0 },
+          "required_count": { "type": "integer", "minimum": 1 },
+          "anchor_sha256": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/$defs/sha256" },
+          "snapshot": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/properties/snapshot" },
+          "piece": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/properties/piece" },
+          "resolved_center": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/$defs/point" },
+          "radius_meters": { "type": "number", "minimum": 1, "maximum": 100 },
+          "observed_position": {
+            "oneOf": [
+              { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/$defs/point" },
+              { "type": "null" }
+            ]
+          },
+          "distance_meters": { "type": ["number", "null"], "minimum": 0 },
+          "satisfied": { "type": "boolean" }
+        }
+      }
+    },
+    "content_sha256": { "$ref": "comfy-quest-spatial-anchor-v1.schema.json#/$defs/sha256" }
+  }
+}

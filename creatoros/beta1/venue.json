@@ -1,0 +1,60 @@
+{
+  "schema": "creatoros-guild-venue/v1",
+  "venue_id": "slayers-field-lodge",
+  "revision": 1,
+  "title": "The Slayers' Field Lodge",
+  "state": "published",
+  "steward": "AM4",
+  "meaning": "A small field lodge where a Slayer takes a reviewed hunt, equips for it, and returns with evidence tied to the same place.",
+  "source": {
+    "capsule_id": "tn0304",
+    "capsule_sha256": "f509aa2a201fdb3495c0f8aa3656ca156421524b476d12d4f0d45aa3cd9a21e9",
+    "canonical_pieces_sha256": "0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578",
+    "blueprint_sha256": "02201382e57635f4e945229836443d2fdbf75e243973281d1f9806cd770ece5f",
+    "accepted_evidence": "docs/evidence/architectural-demo-tn0304-20260829-r1.json"
+  },
+  "structure": {
+    "piece_count": 40,
+    "floors": 16,
+    "walls": 16,
+    "roofs": 8,
+    "footprint_metres": [
+      7.953375,
+      7.4676
+    ],
+    "true_ridge_metres": 5.8166,
+    "roof_pitch_degrees": 43.907838
+  },
+  "steward_locks": [
+    "source_lineage",
+    "canonical_structure_identity",
+    "entry_anchor_role",
+    "message_only_beta_policy",
+    "installed_evidence_lineage"
+  ],
+  "creator_freedoms": [
+    "story_copy",
+    "review_notes",
+    "one_of_the_reviewed_campaigns"
+  ],
+  "entry_anchor": {
+    "role": "marker-loadout-sign",
+    "target_kind": "sign",
+    "binding_id": "default"
+  },
+  "allowed_campaign_ids": [
+    "slayers-signature-hunt"
+  ],
+  "lifecycle": {
+    "release_policy": "immutable",
+    "world_mutation_authority": "server-or-listen-host-only",
+    "player_progression": "peer-local",
+    "cleanup": "exact-owned-marks-only"
+  },
+  "evidence_policy": {
+    "runtime": "required",
+    "network_sense_projection": "required",
+    "community_review": "discord-export-reviewed",
+    "machine_receipts_are_human_verdicts": false
+  }
+}

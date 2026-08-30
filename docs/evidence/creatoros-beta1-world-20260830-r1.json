@@ -1,0 +1,61 @@
+{
+  "schema": "creatoros-beta1-world-evidence-index/v1",
+  "recorded_on": "2026-08-30",
+  "result": "passed",
+  "work_item": "creatoros-beta1-release-world",
+  "driver": "tools/release/New-CreatorOsBetaWorld.ps1",
+  "local_artifact_root": "artifacts/creatoros-beta1-world/final-20260830T124559Z",
+  "local_artifacts_are_ignored": true,
+  "world": {
+    "name": "CreatorOSBeta1",
+    "uid": "4257656027",
+    "seed_name": "U929ewCLwS",
+    "seed": 746054068,
+    "pair_sha256": "1e38a245b0507de28cf02e092a1ef4e782f7b9263d62bb6e0a4e3fd0ae0985b0",
+    "db_bytes": 792048,
+    "db_sha256": "c09b3c2f467416ebb08074b91a9162e03a42e53722d82cdfdd72dd31a12531ee",
+    "fwl_bytes": 55,
+    "fwl_sha256": "9254767d9fb8f181c0d4eac11de299e8cf898869c2b414beda5f8f13ebbc70f7"
+  },
+  "venue": {
+    "id": "slayers-field-lodge",
+    "capsule_id": "tn0304",
+    "piece_count": 40,
+    "placement_mode": "ground",
+    "canonical_pieces_sha256": "0b4a62bcd3d0baa914f264081657b99649dd0f25a5973e1258b4e3920acbb578",
+    "exact_live_diff": "MATCH"
+  },
+  "campaign": {
+    "id": "slayers-signature-hunt",
+    "version": "1.0.0",
+    "content_hash": "ad94f708efa9afbb8267cae6336226fc2c59c9d86c777d2309b932842f09c734",
+    "composition_hash": "2713aa9e1aabab2503ce21611ac1218c7fff4f39d3c1b425394098d2d69de210",
+    "entry_experience": "slayers-air-drop",
+    "fixture_objects": 17,
+    "binding_anchor_zdo": "2305080404:10625",
+    "started_run_id": "run-20260830T124657955Z-5bfc6d3f"
+  },
+  "assertions": {
+    "fresh_world_entered": true,
+    "field_lodge_exact_match": true,
+    "fixture_exact_count": true,
+    "entry_anchor_bound": true,
+    "entry_experience_started": true,
+    "creator_build_disabled": true,
+    "graceful_world_saved": true,
+    "am4_byte_restored": true
+  },
+  "evidence_sha256": {
+    "world-artifact.json": "227fae3bd84e90cc62d70e0c916508e45d62055f5ed7183d5ffe5998ab9ac164",
+    "creatoros-beta1-world-seed.json": "fcaeface23acab77499ebb63dccf5e772688f83e51f40874979c7a58412c0394",
+    "signature-hunt-fixture.json": "9fde78cb6b177e379bea77e8d8ebaf8dc9331761976256dc12b865b3775bd778",
+    "Player.log": "4d0e73229c10f36192810fbe4311b86c1072cdf4e6d297033a9bc2f3ca3658d8",
+    "evidence.tar.gz": "2cc0ba53f2de88a64e8ad5733938c27d37d0c1409ecbe03ed66c80aba9591985",
+    "am4-restoration.json": "0dde20380b8709876d7dabddee8a22b4f113db4d64cd24bc52b86953782add0b"
+  },
+  "limitations": [
+    "Fixture preparation and an entry run prove the installed start boundary, not either live kill, successor continuation, or campaign completion.",
+    "The player-local Runtime state used during seeding was restored on AM4; the saved world retains the venue, fixture, and binding anchor for clean player-local runs.",
+    "The release remains a local candidate until clean source revisions are pinned and an external install/join/completion lap returns correlated evidence."
+  ]
+}

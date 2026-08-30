@@ -1,0 +1,56 @@
+{
+  "schema": "creatoros-campaign-source/v1",
+  "campaign_id": "slayers-signature-hunt",
+  "revision": 1,
+  "version": "1.0.0",
+  "title": "Slayers Signature Hunt",
+  "creator": "Derek",
+  "guild": "Slayers",
+  "era": 17,
+  "release_state": "immutable-beta",
+  "venue": {
+    "path": "venue.json",
+    "venue_id": "slayers-field-lodge",
+    "revision": 1,
+    "entry_anchor_role": "marker-loadout-sign"
+  },
+  "artifacts": [
+    {
+      "project_id": "air-drop",
+      "experience_id": "slayers-air-drop",
+      "path": "experiences/air-drop.json",
+      "source_quest_id": "air_drop",
+      "prerequisite_experience_ids": [],
+      "successor_experience_ids": [
+        "slayers-cold-shot"
+      ]
+    },
+    {
+      "project_id": "cold-shot",
+      "experience_id": "slayers-cold-shot",
+      "path": "experiences/cold-shot.json",
+      "source_quest_id": "cold_shot",
+      "prerequisite_experience_ids": [
+        "slayers-air-drop"
+      ],
+      "successor_experience_ids": []
+    }
+  ],
+  "beta_policy": {
+    "network_transport": "native-valheim",
+    "progression_scope": "world-character-binding-experience-content",
+    "locally_witnessed_events": [
+      "experience_started",
+      "kill"
+    ],
+    "allowed_action_types": [
+      "message"
+    ],
+    "shared_world_mutation": "host-only-unchanged"
+  },
+  "compatibility": {
+    "built_for": "pre-valheim-1.0",
+    "valheim_1_0_release_date": "2026-09-09",
+    "post_1_0_revalidation_required": true
+  }
+}

@@ -301,7 +301,7 @@ public sealed class QuestStudioV3ContractTests : IDisposable
 
         migrated = Save(service, migrated);
         using var canonical = JsonDocument.Parse(File.ReadAllBytes(draftPath));
-        Assert.Equal(3, canonical.RootElement.GetProperty("schema_version").GetInt32());
+        Assert.Equal(StudioProjectDocument.CurrentSchemaVersion, canonical.RootElement.GetProperty("schema_version").GetInt32());
         var canonicalNodes = canonical.RootElement.GetProperty("nodes");
         var canonicalChat = canonicalNodes[0].GetProperty("routes")[0];
         var canonicalTimer = canonicalNodes[1].GetProperty("routes")[0];

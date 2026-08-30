@@ -60,6 +60,7 @@
     <Compile Include="..\ComfyQuestRuntime\RuntimeCreatorRequestController.cs" Link="RuntimeCreatorRequestController.cs" />
     <Compile Include="..\ComfyQuestRuntime\RuntimeCreatorSessionAuthority.cs" Link="RuntimeCreatorSessionAuthority.cs" />
     <Compile Include="..\ComfyQuestRuntime\RuntimeCreatorBarLayout.cs" Link="RuntimeCreatorBarLayout.cs" />
+    <Compile Include="..\ComfyQuestRuntime\DedicatedPersonalProgressionPolicy.cs" Link="DedicatedPersonalProgressionPolicy.cs" />
   </ItemGroup>
 
 </Project>

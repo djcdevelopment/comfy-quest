@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/djcdevelopment/comfy-quest/contracts/spatial/comfy-quest-spatial-anchor-v1.schema.json",
+  "title": "Comfy Quest spatial anchor exchange v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "anchor_id", "mode", "shape", "radius_meters", "snapshot", "piece", "producer", "content_sha256"],
+  "properties": {
+    "schema": { "const": "comfy-quest-spatial-anchor/v1" },
+    "anchor_id": { "$ref": "#/$defs/id" },
+    "mode": { "enum": ["world", "binding_relative"] },
+    "shape": { "const": "sphere" },
+    "radius_meters": { "type": "number", "minimum": 1, "maximum": 100 },
+    "snapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["snapshot_id", "world_id", "file_sha256"],
+      "properties": {
+        "snapshot_id": { "type": "integer", "minimum": 1 },
+        "world_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "file_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "piece": {
+      "type": "object", "additionalProperties": false,
+      "required": ["zdo_index", "prefab", "position"],
+      "properties": {
+        "zdo_index": { "type": "integer", "minimum": 0 },
+        "prefab": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "position": { "$ref": "#/$defs/point" }
+      }
+    },
+    "producer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "revision"],
+      "properties": {
+        "repository": { "const": "ComfyStewardView" },
+        "revision": { "type": "string", "pattern": "^[0-9a-fA-F]{40}$" }
+      }
+    },
+    "content_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_$-]{1,64}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "coordinate": { "type": "number", "minimum": -10500, "maximum": 10500 },
+    "point": {
+      "type": "object", "additionalProperties": false, "required": ["x", "y", "z"],
+      "properties": { "x": { "$ref": "#/$defs/coordinate" }, "y": { "$ref": "#/$defs/coordinate" }, "z": { "$ref": "#/$defs/coordinate" } }
+    }
+  }
+}

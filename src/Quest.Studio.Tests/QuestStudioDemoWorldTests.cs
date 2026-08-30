@@ -55,7 +55,7 @@ public sealed class QuestStudioDemoWorldTests : IDisposable
     }
 
     [Fact]
-    public void Import_rejects_non_v3_and_server_side_draft_bounds()
+    public void Import_rejects_non_v4_and_server_side_draft_bounds()
     {
         var source = _service.CreateProject("demo-world-first-portal");
         var missingSchemaNode = JsonNode.Parse(JsonSerializer.Serialize(source, _host.Json))!.AsObject();
@@ -64,12 +64,12 @@ public sealed class QuestStudioDemoWorldTests : IDisposable
         Assert.False(missingSchema.Ok);
         Assert.Equal("project_schema_unsupported", missingSchema.Error);
 
-        source.SchemaVersion = 2;
+        source.SchemaVersion = 3;
         var oldSchema = _service.ImportProject(Request(source));
         Assert.False(oldSchema.Ok);
         Assert.Equal("project_schema_unsupported", oldSchema.Error);
 
-        source.SchemaVersion = 3;
+        source.SchemaVersion = StudioProjectDocument.CurrentSchemaVersion;
         source.Nodes[0].Label = new string('x', 121);
         var fieldBounds = _service.ImportProject(Request(source));
         Assert.False(fieldBounds.Ok);

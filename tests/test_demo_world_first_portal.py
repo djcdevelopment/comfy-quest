@@ -34,8 +34,8 @@ class DemoWorldFirstPortalTests(unittest.TestCase):
         source = json.loads((BUNDLE / "studio-project.json").read_text(encoding="utf-8"))
         compiled = json.loads((BUNDLE / "experience.json").read_text(encoding="utf-8"))
         expected = json.loads((BUNDLE / "expected.json").read_text(encoding="utf-8"))
-        self.assertEqual(3, source["schema_version"])
-        self.assertEqual("comfy-quest-experience/v1", compiled["schema"])
+        self.assertEqual(4, source["schema_version"])
+        self.assertEqual("comfy-quest-experience/v2", compiled["schema"])
         route = source["nodes"][0]["routes"][0]
         self.assertEqual("player_teleported", route["event"])
         self.assertIsNone(route["target"])

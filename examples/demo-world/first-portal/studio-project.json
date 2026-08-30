@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "project_id": "demo-world-first-portal-source",
   "revision": 1,
   "updated_utc": "2026-08-20T00:00:00+00:00",
@@ -10,6 +10,7 @@
   "binding_target_kind": "sign",
   "binding_target_kinds": [],
   "entry_node_id": "start",
+  "spatial_areas": [],
   "nodes": [
     {
       "id": "start",

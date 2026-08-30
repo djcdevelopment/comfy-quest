@@ -898,6 +898,38 @@ def validate_architectural_build(value: Any) -> dict[str, Any]:
     if skipped != expected_skipped:
         raise MissionControlError("architectural warm lap does not retain the no-teardown contract")
     require_text(value.get("boundary"), "next_attack.boundary")
+    workbook = value.get("workbook")
+    if not isinstance(workbook, dict):
+        raise MissionControlError("next_attack.workbook must be an object")
+    if require_text(workbook.get("status"), "next_attack.workbook.status") != "active-rnd":
+        raise MissionControlError("next_attack.workbook.status must be active-rnd")
+    if workbook.get("schema") != "creator-os-composition-workbook/v1":
+        raise MissionControlError("next_attack.workbook carries an unsupported workbook schema")
+    if workbook.get("review_schema") != "creator-os-composition-review/v1":
+        raise MissionControlError("next_attack.workbook carries an unsupported review schema")
+    workbook_source = source_path(require_text(
+        workbook.get("source"), "next_attack.workbook.source"))
+    workbook_html = source_path(require_text(
+        workbook.get("html"), "next_attack.workbook.html"))
+    workbook_sha = require_sha256(
+        workbook.get("source_sha256"), "next_attack.workbook.source_sha256")
+    if hashlib.sha256(workbook_source.read_bytes()).hexdigest() != workbook_sha:
+        raise MissionControlError("next_attack workbook source hash disagrees with mission control")
+    try:
+        workbook_manifest = json.loads(read_text(workbook_source))
+    except json.JSONDecodeError as exc:
+        raise MissionControlError(f"invalid composition workbook JSON: {exc}") from exc
+    if (workbook_manifest.get("schema") != workbook["schema"]
+            or workbook_manifest.get("review", {}).get("schema") != workbook["review_schema"]
+            or workbook_manifest.get("workbook_id") != "tn0304-signature-hunt-venue"):
+        raise MissionControlError("next_attack workbook identity disagrees with mission control")
+    workbook_page = read_text(workbook_html)
+    if (workbook_sha not in workbook_page
+            or "From structure to community place" not in workbook_page
+            or "Eight human actions" not in workbook_page):
+        raise MissionControlError("next_attack workbook HTML is stale or incomplete")
+    require_text(workbook.get("next_attack"), "next_attack.workbook.next_attack")
+    require_text(workbook.get("boundary"), "next_attack.workbook.boundary")
     for index, route in enumerate(require_list(value.get("studio_routes"), "next_attack.studio_routes")):
         require_text(route, f"next_attack.studio_routes[{index}]")
     return value
@@ -1295,6 +1327,7 @@ def render(manifest: dict[str, Any]) -> str:
     architectural_build = manifest["next_attack"]
     build_acceptance = architectural_build["acceptance"]
     build_evidence = architectural_build["evidence"]
+    composition_workbook = architectural_build["workbook"]
     build_steps = "".join(
         f'''<li><span>{index}</span><div><strong>{html.escape(step)}</strong></div></li>'''
         for index, step in enumerate(architectural_build["journey"], 1)
@@ -1313,6 +1346,7 @@ def render(manifest: dict[str, Any]) -> str:
         )
     )
     architectural_build_panel = f'''
+    <article class="panel flow-panel"><div class="card-heading"><div><span class="eyebrow">Active ruthless slice</span><h3>Accepted venue &rarr; Guild composition &rarr; community evidence</h3></div><span class="badge badge-active">R&amp;D</span></div><p>{html.escape(composition_workbook["next_attack"])}</p><div class="guardrail"><strong>Human boundary:</strong> {html.escape(composition_workbook["boundary"])}</div>{source_link(composition_workbook["html"], "Open the living composition workbook")}</article>
     <div class="recovery-grid">
       <article class="panel flow-panel"><div class="card-heading"><div><span class="eyebrow">Demo-ready on AM4</span><h3>Architectural capsule &rarr; Studio Build &rarr; exact live build &rarr; reusable operator demo</h3></div><span class="badge badge-complete">PASS</span></div><p>The tn0304 handoff crossed the real Studio and Lab, built once, and now reopens through one bounded command while reusing the canonical stage, control plane, running client, and standing structure.</p><ol class="build-sequence">{build_steps}</ol><div class="revision-proof build-metrics"><span><strong>Footprint</strong>{build_acceptance["footprint_m"][0]} &times; {build_acceptance["footprint_m"][1]} m</span><span><strong>Wall datum</strong>{build_acceptance["wall_datum_m"]} m</span><span><strong>True ridge</strong>{build_acceptance["ridge_m"]} m</span><span><strong>Roof pitch</strong>{build_acceptance["pitch_degrees"]}&deg;</span><span><strong>Reconciliation</strong>&minus;0.029171 m</span><span><strong>Standing pieces</strong>40 &middot; 16 floors / 16 walls / 8 roofs</span></div><div class="guardrail"><strong>Warm boundary:</strong> {html.escape(architectural_build["boundary"])}</div></article>
       <aside class="panel proof-panel build-proof"><span class="eyebrow">Immutable demo evidence</span><h3>{html.escape(build_evidence["demo_receipt_schema"])}</h3><p>Observed {html.escape(architectural_build["completed_utc"])}. The second operator lap reused Studio, its tunnel, the staged pair, Valheim, and all 40 standing pieces; it ran only status, check, count, diff, and status.</p><ol class="proof-list">{build_artifacts}</ol>{source_link(build_evidence["demo_source"], "Tracked operator-demo index")}{source_link(build_evidence["source"], "Tracked warm-state index")}</aside>
@@ -1500,7 +1534,7 @@ def render(manifest: dict[str, Any]) -> str:
 
   <section id="program" class="section" aria-labelledby="program-title"><div class="section-head"><div><span class="eyebrow">Five-intent program</span><h2 id="program-title">Guild dogfooding is the adoption path.</h2></div><p>Phase state is a cited program snapshot, not a live inference from checkboxes.</p></div><ol class="phase-list">{phases}</ol></section>
 
-  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">Adoption path</span><h2 id="queue-title">Execute the Guild creative-system lap, then judge and release it</h2></div><p>The installed 4A loop is proven. The 4B steward, abstraction, campaign, and one-operation start are implemented; installed kills, successor completion, terminal evidence, reset/rerun, and cleanup/restoration remain open. Standalone portability is bounded follow-up, and world packaging waits until R&amp;D stabilizes.</p></div><div class="queue-grid">{queue_cards}</div>
+  <section id="queue" class="section" aria-labelledby="queue-title"><div class="section-head"><div><span class="eyebrow">Adoption path</span><h2 id="queue-title">Finish the external CreatorOSBeta1 completion lap</h2></div><p>The installed 4A loop is proven. CreatorOSBeta1 now has a fresh saved world, exact Field Lodge, fixed Signature Hunt fixture, and an installed Air Drop start; clean P7 install/join, both live kills, Cold Shot continuation, terminal evidence, reset/rerun, and cleanup remain open. Standalone portability stays bounded follow-up.</p></div><div class="queue-grid">{queue_cards}</div>
     {phase3_panel}
   </section>
 

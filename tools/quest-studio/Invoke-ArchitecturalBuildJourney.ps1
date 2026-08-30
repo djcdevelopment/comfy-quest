@@ -1,8 +1,8 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$BaselineRoot = 'C:\work\baseline',
-    [string]$PlatformRoot = 'C:\work\lumberjacks-platform',
+    [Parameter(Mandatory = $true)][string]$BaselineRoot,
+    [Parameter(Mandatory = $true)][string]$PlatformRoot,
     [string]$SshTarget = 'homebase',
     [string]$RemoteValheimRoot = '/home/derek/valheim',
     [string]$ExpectedMachine = 'am4',
@@ -10,7 +10,7 @@ param(
     [string]$ExpectedWorldUid = '-7600395338659582326',
     [string]$ExpectedCharacter = 'questyfour',
     [int]$Port = 18086,
-    [string]$DotNet = 'C:\work\dotnet9\dotnet.exe',
+    [string]$DotNet,
     [switch]$AllowWarmClient,
     [switch]$SkipBrowserInstall
 )
@@ -19,7 +19,24 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $baseline = (Resolve-Path -LiteralPath $BaselineRoot).Path
 $platform = (Resolve-Path -LiteralPath $PlatformRoot).Path
-if (-not (Test-Path -LiteralPath $DotNet -PathType Leaf)) { throw ".NET executable missing: $DotNet" }
+if (-not $DotNet) {
+    $workspaceDotNet = Join-Path (Split-Path -Parent $repoRoot) 'dotnet9\dotnet.exe'
+    $candidates = @(
+        $env:COMFY_QUEST_DOTNET,
+        $(if ($env:DOTNET_ROOT) { Join-Path $env:DOTNET_ROOT 'dotnet.exe' }),
+        $(if (Test-Path -LiteralPath $workspaceDotNet -PathType Leaf) { $workspaceDotNet }),
+        $(if (Get-Command dotnet -ErrorAction SilentlyContinue) { (Get-Command dotnet).Source })
+    ) | Where-Object { $_ } | Select-Object -Unique
+    foreach ($candidate in $candidates) {
+        try {
+            $resolved = (Get-Item -LiteralPath $candidate -ErrorAction Stop).FullName
+            if ([int]((& $resolved --version) -split '\.')[0] -ge 9) { $DotNet = $resolved; break }
+        } catch { }
+    }
+}
+if (-not $DotNet -or -not (Test-Path -LiteralPath $DotNet -PathType Leaf)) {
+    throw '.NET 9 executable missing. Set COMFY_QUEST_DOTNET or pass -DotNet.'
+}
 if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Port must be in 1024..65535.' }
 
 function Get-Hash([string]$Path) {

@@ -13,6 +13,15 @@ public sealed class LabSignatureHuntContractTests {
     Assert.Equal("slayers-signature-hunt", LabSignatureHuntContract.FixtureId);
     Assert.Equal("ComfyQuestDemo", LabSignatureHuntContract.ExpectedWorldName);
     Assert.Equal("-7600395338659582326", LabSignatureHuntContract.ExpectedWorldUid);
+    Assert.Equal("CreatorOSBeta1", LabSignatureHuntContract.CreatorOsBetaWorldName);
+    Assert.Equal("4257656027", LabSignatureHuntContract.CreatorOsBetaWorldUid);
+    Assert.True(LabSignatureHuntContract.SupportsWorld(
+        LabSignatureHuntContract.ExpectedWorldName,
+        LabSignatureHuntContract.ExpectedWorldUid));
+    Assert.True(LabSignatureHuntContract.SupportsWorld(
+        LabSignatureHuntContract.CreatorOsBetaWorldName,
+        LabSignatureHuntContract.CreatorOsBetaWorldUid));
+    Assert.False(LabSignatureHuntContract.SupportsWorld("CreatorOSBeta1", "4257656028"));
     Assert.Equal(17, LabSignatureHuntContract.Placements.Length);
     Assert.Equal(LabSignatureHuntContract.Placements.Length,
         LabSignatureHuntContract.Placements.Select(value => value.Role).Distinct().Count());

@@ -22,6 +22,10 @@ MOD_GLUE = {
     "QuestViewLoader.cs",
     "TrackedQuest.cs",
 }
+SPATIAL_SCHEMAS = {
+    "comfy-quest-spatial-anchor-v1.schema.json",
+    "comfy-quest-spatial-evidence-v1.schema.json",
+}
 
 
 class PackageError(RuntimeError):
@@ -76,6 +80,7 @@ def validate_payload(names: set[str], kind: str, allow_signature: bool) -> None:
     if kind == "contracts":
         required.add("lib/netstandard2.0/ComfyQuestContracts.dll")
         required.update(f"contentFiles/cs/any/ModGlue/{name}" for name in MOD_GLUE)
+        required.update(f"contracts/spatial/{name}" for name in SPATIAL_SCHEMAS)
     else:
         required.add("lib/net9.0/Comfy.Quest.Studio.dll")
 

@@ -390,6 +390,12 @@ class RoadmapSurfaceTests(unittest.TestCase):
         self.assertEqual("demo-ready-am4-warm", attack["status"])
         self.assertEqual("tn0304", attack["fixture"])
         self.assertEqual(11, len(attack["journey"]))
+        workbook = attack["workbook"]
+        self.assertEqual("active-rnd", workbook["status"])
+        self.assertEqual("creator-os-composition-workbook/v1", workbook["schema"])
+        self.assertEqual("creator-os-composition-review/v1", workbook["review_schema"])
+        self.assertTrue((REPO / workbook["source"]).is_file())
+        self.assertTrue((REPO / workbook["html"]).is_file())
         receipt_path = REPO / attack["evidence"]["source"]
         self.assertTrue(receipt_path.is_file())
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -420,6 +426,9 @@ class RoadmapSurfaceTests(unittest.TestCase):
             "Architectural capsule",
             "reusable operator demo",
             "Demo-ready on AM4",
+            "Active ruthless slice",
+            "Open the living composition workbook",
+            "community evidence",
             "built once",
             "7.953375",
             "43.907838",
@@ -440,6 +449,11 @@ class RoadmapSurfaceTests(unittest.TestCase):
         drifted["next_attack"]["evidence"]["reuse_diff_receipt_sha256"] = "0" * 64
         with self.assertRaisesRegex(self.renderer.MissionControlError, "reuse lap disagrees"):
             self.renderer.validate_manifest(drifted)
+
+        workbook_drifted = copy.deepcopy(self.manifest)
+        workbook_drifted["next_attack"]["workbook"]["source_sha256"] = "0" * 64
+        with self.assertRaisesRegex(self.renderer.MissionControlError, "workbook source hash disagrees"):
+            self.renderer.validate_manifest(workbook_drifted)
 
     def test_every_projection_marker_is_registered(self):
         self.renderer.validate_projection_registration()

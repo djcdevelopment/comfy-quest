@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "player": {
+    "name": "CreatorOS Beta Tester",
+    "discord": null
+  },
+  "created_at": "2026-08-31T00:00:00Z",
+  "picker_version": 1,
+  "quests": [
+    {
+      "quest_id": "air_drop",
+      "name": "Air Drop",
+      "category": "Signature Hunt",
+      "coopable": false,
+      "requirements": "Kill a Deathsquito with a thrown spear.",
+      "reward": null,
+      "evidence": {
+        "screenshots": 0,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": "Runtime and NetworkSense produce correlated machine evidence; Discord review remains a separate human action.",
+      "bot_command": null,
+      "auto_checked": true,
+      "venue": "slayers-field-lodge",
+      "trigger": {
+        "event": "kill",
+        "target": "$enemy_deathsquito",
+        "weapon_skill": "Spears",
+        "projectile": true
+      },
+      "guild": "Slayers",
+      "era": 17
+    },
+    {
+      "quest_id": "cold_shot",
+      "name": "Cold Shot",
+      "category": "Signature Hunt",
+      "coopable": false,
+      "requirements": "Kill a Drake with a thrown spear after completing Air Drop.",
+      "reward": null,
+      "evidence": {
+        "screenshots": 0,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": "Runtime and NetworkSense produce correlated machine evidence; Discord review remains a separate human action.",
+      "bot_command": null,
+      "auto_checked": true,
+      "venue": "slayers-field-lodge",
+      "trigger": {
+        "event": "kill",
+        "target": "$enemy_drake",
+        "weapon_skill": "Spears",
+        "projectile": true
+      },
+      "guild": "Slayers",
+      "era": 17
+    }
+  ],
+  "release_lineage": {
+    "schema": "creatoros-quest-view-lineage/v1",
+    "release_id": "creatoros-beta1",
+    "campaign_id": "slayers-signature-hunt",
+    "campaign_revision": 1,
+    "composition_hash": "2713aa9e1aabab2503ce21611ac1218c7fff4f39d3c1b425394098d2d69de210",
+    "pack_content_hash": "ad94f708efa9afbb8267cae6336226fc2c59c9d86c777d2309b932842f09c734",
+    "venue_id": "slayers-field-lodge",
+    "venue_revision": 1,
+    "venue_sha256": "425e816cf9dde0e963088929ea9ef583fdf7dbf5c42d0e2d3071d0c12678aef3",
+    "experience_ids": {
+      "air_drop": "slayers-air-drop",
+      "cold_shot": "slayers-cold-shot"
+    }
+  }
+}

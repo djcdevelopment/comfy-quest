@@ -19,7 +19,10 @@ static class RuntimeEventRouter {
           witness.DedupeGroup, subjectIdentity, fingerprint, signatureId,
           UnityEngine.Time.realtimeSinceStartup);
       RuntimeObservation.StampLocalPlayer(runtimeEvent);
-      Engine?.OnEvent(runtimeEvent);
+      // Emit() is used only by patches that prove the local player performed the action before
+      // constructing the event. The dedicated personal profile relies on that exact witness;
+      // engine/network events take the separate path below and do not inherit it.
+      Engine?.OnEvent(runtimeEvent, true);
     } catch {
       // Observation is never allowed to disrupt the underlying Valheim action.
     }
@@ -34,7 +37,7 @@ static class RuntimeEventRouter {
           dedupeGroup, subjectIdentity, fingerprint, witness,
           UnityEngine.Time.realtimeSinceStartup);
       RuntimeObservation.StampLocalPlayer(runtimeEvent);
-      Engine?.OnEvent(runtimeEvent);
+      Engine?.OnEvent(runtimeEvent, false);
     } catch { }
   }
 

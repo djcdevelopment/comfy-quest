@@ -1087,6 +1087,12 @@ public sealed class QuestStudioService
         _usage.RecordProject("import", result.Ok ? "accepted" : "rejected", result.Project);
         return result;
     }
+    public StudioSpatialAnchorImportResult ImportSpatialAnchor(string projectId, StudioSpatialAnchorImportRequest? request)
+    {
+        var result = _workspace.ImportSpatialAnchor(projectId, request);
+        _usage.RecordOutcome("spatial_anchor_import", UsageOutcome(result.Ok, result.Conflict, result.Error));
+        return result;
+    }
     public StudioProjectDocument? DuplicateProject(string projectId)
     {
         var project = _workspace.Duplicate(projectId);
@@ -1262,6 +1268,109 @@ public sealed class QuestStudioService
         var result = _dataExport.BuildQuestpack(project, compiled);
         _usage.RecordOutcome("questpack_download", UsageOutcome(result.Ok, false, result.Error));
         return result;
+    }
+
+    public StudioDownloadResult DownloadSpatialEvidence(string projectId)
+    {
+        var project = _workspace.ReadProject(projectId);
+        if (project is null) return StudioDownloadResult.Fail("project_missing");
+        var compiled = _workspace.Validate(projectId);
+        if (!compiled.Ok || compiled.Document is null || string.IsNullOrWhiteSpace(compiled.ContentHash))
+            return StudioDownloadResult.Fail(compiled.Error ?? "graph_invalid");
+        var status = _workspace.RuntimeStatus(projectId, RuntimePackIdentity(projectId),
+            _runControl.Status(projectId), RuntimeReceiptStore.MaxListLimit);
+        var areas = (compiled.Document.SpatialAreas ?? new List<SpatialArea>())
+            .Where(area => area?.SourceAnchor is not null)
+            .GroupBy(area => area.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var candidates = status.ExactReceipts.Where(receipt => receipt is not null
+            && string.Equals(receipt.ExperienceId, project.ExperienceId, StringComparison.Ordinal)
+            && string.Equals(receipt.ContentHash, status.ContentHash, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(receipt.ActivationId)
+            && !string.IsNullOrWhiteSpace(receipt.RunId) && !string.IsNullOrWhiteSpace(receipt.WorldId))
+            .SelectMany(receipt => SpatialRecords(receipt).Select(record => (receipt, record)))
+            .Where(pair => pair.record.ResolvedCenter is not null
+                && (pair.record.Spatial == "count_in_area" || pair.record.ObservedPosition is not null)
+                && !string.IsNullOrWhiteSpace(pair.record.AnchorSha256)
+                && areas.TryGetValue(pair.record.AreaId ?? string.Empty, out var area)
+                && string.Equals(area.SourceAnchor.ContentSha256, pair.record.AnchorSha256, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (candidates.Length == 0) return StudioDownloadResult.Fail("spatial_evidence_missing");
+        var newest = candidates.OrderByDescending(pair => pair.receipt.AtUtc).First().receipt;
+        var selected = candidates.Where(pair => pair.receipt.ActivationId == newest.ActivationId
+            && pair.receipt.RunId == newest.RunId && pair.receipt.WorldId == newest.WorldId).ToArray();
+        // The same exact Runtime evidence set must produce the same file. Using wall-clock export
+        // time here defeated Steward's content-addressed idempotency on every repeat download.
+        var exportedUtc = newest.AtUtc;
+        var records = selected.Select(pair => new SpatialEvidenceRecord
+            {
+                ReceiptId = pair.receipt.Id,
+                AtUtc = pair.receipt.AtUtc,
+                CorrelationId = pair.receipt.CorrelationId,
+                TransitionId = pair.receipt.TransitionId,
+                EventName = pair.receipt.EventName,
+                AreaId = pair.record.AreaId,
+                Predicate = pair.record.Spatial,
+                CurrentCount = pair.record.Current,
+                RequiredCount = pair.record.Required,
+                AnchorSha256 = pair.record.AnchorSha256,
+                Snapshot = areas[pair.record.AreaId].SourceAnchor.Snapshot,
+                Piece = areas[pair.record.AreaId].SourceAnchor.Piece,
+                ResolvedCenter = pair.record.ResolvedCenter,
+                RadiusMeters = pair.record.RadiusMeters.GetValueOrDefault(),
+                ObservedPosition = pair.record.ObservedPosition,
+                DistanceMeters = pair.record.DistanceMeters,
+                Satisfied = pair.record.Satisfied
+            }).Take(512).ToArray();
+        SpatialEvidenceBundle? bundle = null;
+        byte[]? bytes = null;
+        var low = 1;
+        var high = records.Length;
+        while (low <= high)
+        {
+            var count = low + ((high - low) / 2);
+            var candidate = new SpatialEvidenceBundle
+            {
+                ExportedUtc = exportedUtc,
+                ProjectId = project.ProjectId,
+                ExperienceId = project.ExperienceId,
+                PackId = newest.PackId,
+                ContentHash = newest.ContentHash,
+                ActivationId = newest.ActivationId,
+                RunId = newest.RunId,
+                WorldUid = newest.WorldId,
+                Records = records.Take(count).ToList()
+            };
+            candidate.ContentSha256 = SpatialExchangeContract.ComputeEvidenceHash(candidate);
+            SpatialExchangeContract.ValidateEvidence(candidate, true);
+            var candidateBytes = Encoding.UTF8.GetBytes(
+                JsonConvert.SerializeObject(candidate, Formatting.Indented));
+            if (candidateBytes.Length <= SpatialExchangeSchema.MaxDocumentBytes)
+            {
+                bundle = candidate;
+                bytes = candidateBytes;
+                low = count + 1;
+            }
+            else high = count - 1;
+        }
+        if (bundle is null || bytes is null)
+            return StudioDownloadResult.Fail("spatial_evidence_document_too_large");
+        _usage.RecordOutcome("spatial_evidence_export", "accepted");
+        return StudioDownloadResult.Success(project.ProjectId + ".spatial-evidence.json",
+            "application/vnd.comfy.quest-spatial-evidence+json", bytes, bundle.ContentSha256);
+    }
+
+    static IEnumerable<TriggerClauseTrace> SpatialRecords(RuntimeReceipt receipt)
+    {
+        foreach (var trace in Walk(receipt.Evidence)) if (!string.IsNullOrWhiteSpace(trace.AreaId)) yield return trace;
+        foreach (var rejected in receipt.RejectedEvidence ?? Array.Empty<RejectedTransitionEvidence>())
+            foreach (var trace in Walk(rejected?.Evidence)) if (!string.IsNullOrWhiteSpace(trace.AreaId)) yield return trace;
+        static IEnumerable<TriggerClauseTrace> Walk(TriggerClauseTrace? trace)
+        {
+            if (trace is null) yield break;
+            yield return trace;
+            foreach (var child in trace.Children ?? new List<TriggerClauseTrace>())
+                foreach (var nested in Walk(child)) yield return nested;
+        }
     }
 
     public StudioUsageReport UsageReport() => _usage.Report();

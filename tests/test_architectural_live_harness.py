@@ -140,6 +140,22 @@ class ArchitecturalLiveHarnessTests(unittest.TestCase):
         self.assertIn('"yaw_degrees": number(self.args.yaw)', source)
         self.assertIn("canonical_artifact_drift", source)
 
+    def test_ground_mode_never_fabricates_an_exact_world_transform(self):
+        args = SimpleNamespace(
+            blueprint="field-lodge", placement_mode="ground",
+            x=12.5, y=1.25, z=-3.75, yaw=0.0,
+        )
+        driver = live.LiveDriver.__new__(live.LiveDriver)
+        driver.args = args
+        self.assertEqual(
+            {"blueprint_name": "field-lodge", "build_mode": "ground"},
+            driver.lab_fields("blueprint_build", placed=True))
+        self.assertEqual(
+            {"blueprint_name": "field-lodge", "selection": "lab"},
+            driver.lab_fields("blueprint_diff", placed=True))
+        self.assertTrue(driver.placement_matches({}))
+        self.assertFalse(driver.placement_matches({"placement": {"x": 12.5}}))
+
     def test_warm_lap_reuses_a_matching_build_and_retains_it(self):
         source = PROBE.read_text(encoding="utf-8")
         warm = source[source.index("def run_warm"):source.index("def safe_replace_tree")]

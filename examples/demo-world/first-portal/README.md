@@ -4,7 +4,7 @@ This is Comfy Quest's minimal public creator-loop tutorial: one production event
 one visible effect, and one terminal transition.
 
 `studio-project.json` is the stable Studio schema-v3 source. `experience.json` is
-the certified `comfy-quest-experience/v1` document compiled from the same graph.
+the certified `comfy-quest-experience/v2` document compiled from the same graph.
 `demo-world-first-portal-1.0.0.questpack` is the deterministic Runtime package;
 its internal manifest is `comfy-quest-pack/v2`. It is not the legacy Quest Lab
 schema-v1 format. `expected.json` pins the activation and gameplay receipts that

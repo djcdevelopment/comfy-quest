@@ -43,6 +43,7 @@ The rest of the repository:
 - OMEN Studio-to-Runtime acceptance: docs/runbooks/I2-QUESTPACK-OMEN.md
 - Demo World minimal tutorial: examples/demo-world/first-portal
 - Rendered mission-control page: docs/quest-mission-control.html
+- Living Creator OS composition workbook: docs/creator-os-composition-workbook.html
 - R&D opportunity matrix: docs/quest-rd-opportunity-matrix.md
 - Working agreements (how this repository expects to be worked on): docs/working-agreements.md
 - Retrospectives: docs/retros/
@@ -64,20 +65,22 @@ installation. Do not set ComfyCopyToPlugins during verification.
     python tools/component-packets/check_lab_patches.py
     python tools/quest-studio/build_demo_world_first_portal.py --check
     python tools/render_quest_mission_control.py --check
+    python tools/render_creator_os_composition_workbook.py --check
     python tools/verify_source_intents.py
     powershell -NoProfile -ExecutionPolicy Bypass -File tools/Assert-RepoIdentity.ps1
     python tools/assert_no_reach_in.py
     python tools/assert_no_reach_in.py --self-test
     gitleaks git --no-banner --redact --log-opts='--all' .
-    $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.6.0-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
+    $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.9.2-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
     $sdkVersion = (dotnet --version)
     $env:NUGET_PACKAGES = Join-Path $env:TEMP ("comfy-quest-verify-" + $contractsHash + "-" + $sdkVersion)
     dotnet build src/Quest.Studio/Quest.Studio.csproj -c Release
     dotnet test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release
 
-The interim Contracts package keeps a fixed local version while its bytes evolve.
-The package-and-SDK-keyed cache above prevents NuGet from silently compiling Studio
-against older bytes from another `0.6.0-local` run. Studio targets .NET 9 and therefore
+The Runtime Experience v2 cutover has its own `0.9.2-local` Contracts line. Never repack
+that version with different bytes; increment the local version before another contract
+change. The package-and-SDK-keyed cache above also prevents an older local artifact from
+masking a source change. Studio targets .NET 9 and therefore
 requires a .NET 9 SDK even when the licensed plugins are built with .NET 8.
 
 Run the sovereign, loopback-only Studio on its own port (the retired Baseline

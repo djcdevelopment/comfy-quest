@@ -25,6 +25,9 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   ConfigEntry<KeyboardShortcut> barHotkey;
   ConfigEntry<KeyboardShortcut> castHotkey;
   ConfigEntry<bool> privateWorldConfirmed;
+  ConfigEntry<bool> dedicatedPersonalProgressionEnabled;
+  ConfigEntry<string> dedicatedPersonalProgressionWorldUid;
+  ConfigEntry<string> dedicatedPersonalProgressionContentHash;
   ConfigEntry<string> studioUrl;
   ConfigEntry<float> alertAnchorX;
   ConfigEntry<float> alertAnchorY;
@@ -40,7 +43,14 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     packs=new QuestPackStore(runtimeRoot);
     receipts=new RuntimeReceiptStore(runtimeRoot);
     privateWorldConfirmed=Config.Bind("Safety","PrivateWorldConfirmed",false,"Required before Charm inscription or mutation. Enable only for a private solo/listen-host world you control.");
-    engine=new RuntimeExperienceEngine(runtimeRoot,receipts,()=>privateWorldConfirmed.Value);
+    dedicatedPersonalProgressionEnabled=Config.Bind("DedicatedPersonalProgression","Enabled",false,"Opt-in peer-local progression for the one pinned dedicated-server beta world and campaign. This never grants shared-world mutation authority.");
+    dedicatedPersonalProgressionWorldUid=Config.Bind("DedicatedPersonalProgression","WorldUid","","Exact non-zero Valheim world UID allowed to use peer-local progression.");
+    dedicatedPersonalProgressionContentHash=Config.Bind("DedicatedPersonalProgression","ContentHash","","Exact 64-hex Quest pack content hash allowed to use peer-local progression.");
+    engine=new RuntimeExperienceEngine(runtimeRoot,receipts,()=>privateWorldConfirmed.Value,()=>new DedicatedPersonalProgressionProfile {
+      Enabled=dedicatedPersonalProgressionEnabled.Value,
+      WorldUid=dedicatedPersonalProgressionWorldUid.Value,
+      ContentHash=dedicatedPersonalProgressionContentHash.Value,
+    });
     charms=new RuntimeCharmBinding(runtimeRoot,receipts,engine);
     runStatus=new RuntimeRunStatusStore(runtimeRoot);
     devChannel=new RuntimeDevChannelCoordinator(runtimeRoot,(active,correlation)=>{

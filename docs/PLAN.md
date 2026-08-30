@@ -118,15 +118,19 @@ progression; a creator must make two meaningfully distinct hunt artifacts from o
 abstraction and arrange them in a campaign; the installed player run must then produce
 correlated live evidence.
 The steward/configuration, typed-abstraction, two-instance, campaign, evidence-lens, and
-one-operation campaign-start surfaces are now implemented and contract-tested. They have not
-been driven through installed Valheim. None of that Signature Hunt live proof exists yet. This
-is the narrow 4B -> 4C bridge, not authorization for a generic abstraction framework.
+one-operation campaign-start surfaces are implemented and contract-tested. The release-seed lane
+has now driven the same exact content through installed Valheim on a fresh `CreatorOSBeta1` world:
+the 40-piece Field Lodge returned `MATCH`, all 17 fixture objects stood, Air Drop was activated,
+bound to the exact sign, and started, the world saved gracefully, and AM4 byte-restored. That is
+installed start-boundary evidence, not live kills, successor continuation, or campaign completion.
+This remains the narrow 4B -> 4C bridge, not authorization for a generic abstraction framework.
 
 | What | State | What is actually missing |
 | --- | --- | --- |
 | Portfolio hierarchy | complete for the 4A creator-owned Guild journey | installed proof of the newer steward configuration, abstraction lineage, creator artifacts, and campaign children |
 | Guild creative-system control plane | implemented and contract-tested | installed execution of the steward -> abstraction -> two instances -> campaign lineage |
-| One-operation Signature Hunt start | implemented and simulated with fixture/target and machine/world/session identity closed through the full applied binding | installed kills, successor transition, campaign completion, reset/rerun, and cleanup/restoration evidence |
+| Signature Hunt start boundary | implemented and simulated through Studio; installed-proven through the release-seed path on world UID `4257656027` with exact venue, fixture, activation, binding, and run identity | external player install/join, live kills, successor transition, campaign completion, reset/rerun, and cleanup/restoration evidence |
+| CreatorOSBeta1 saved-world release | fresh world pair and content-addressed candidate implemented; graceful save and producer-host rollback proven | clean frozen-source cut, P7 activation, cold boot, and external install/restore proof |
 | Scoped reset / rerun | installed-proven, including successor start and idempotent confirmation retry | human clarity and hundredth-use judgment in 4B |
 | Guild-scale runtime selector | installed-proven | real authored campaign breadth in 4B |
 | Receipt retention | installed-proven across its per-run bound | sustained campaign volume in 4B |
@@ -200,6 +204,22 @@ the game, opened a Creator Session, wrote a mailbox, built or cleared pieces, st
 mutated/restored world state. The immutable operator-demo index is
 `docs/evidence/architectural-demo-tn0304-20260829-r1.json`. `-Action StopStudio` stops only Studio
 and the tunnel; teardown remains the separate explicit `Invoke-ArchitecturalWarmLap.ps1 -Close`.
+
+### Active ruthless slice — accepted venue → Guild composition → community evidence
+
+The next integration surface is the living
+[`Creator OS composition workbook`](creator-os-composition-workbook.html). It accepts the
+`tn0304` architectural values, canonical 40-piece adaptation, live MATCH, rollback, and warm
+reuse as settled inputs. It drives the connection that is still missing: promote the structure
+as a steward-owned Guild venue primitive, let a creator make the two-artifact **Slayers Signature
+Hunt** inhabit it, activate the exact venue/campaign composition, and return installed player
+evidence through campaign, artifact, primitive, and capsule lineage.
+
+The workbook's eight human actions ask only for meaning, steward authority, creator freedom,
+composition quality, and the next R&D verdict. Screenshot notes and exact observations stay in
+the browser until an explicit bounded `creator-os-composition-review/v1` export. Checkmarks and
+notes are not receipts. Mechanical preparation, identity proof, world mutation, cleanup, and
+evidence collection remain machine-owned.
 
 ### Step 1 — Completed: installed vertical slice `queue.full-width-journey`
 
@@ -281,7 +301,7 @@ and the world-support correction in
 The AM4 mechanics lock is recorded separately because immutable content may move between worlds,
 but binding, run, receipt, and saved-world state may not be equated across them.
 
-### Step 3 — Implemented, awaiting installed lap: the 4B Guild creative-system bridge `queue.guild-campaign`
+### Step 3 — Installed start boundary; awaiting completion lap: the 4B Guild creative-system bridge `queue.guild-campaign`
 
 Build **Slayers Signature Hunt** through one full visible edge:
 
@@ -304,19 +324,25 @@ sign in Runtime's bounded candidates, and atomically binds and starts the first 
 stored `comfy-quest-studio-campaign-play/v1` receipt stops at state `started` and declares that
 fixture preparation is not kill/completion proof and bind/start is not campaign-completion proof.
 
-The simulated path now closes its declared identity chain before that `started` claim. It verifies
+The simulated path closes its declared identity chain before that `started` claim. It verifies
 the exact fixture request, schema, id, revision, world, 17/17-object receipt hash/path, raw
 Deathsquito/Drake targets, and matcher targets against the two compiled instances; preserves the
 prerequisite machine, world, and Creator Session pins through candidate and bind dispatch; requires
 the compiled entry's explicit successor to be the other experience; and checks the full applied
 binding reference. Campaign progression is editable on every campaign, and successor emission
 follows explicit prerequisite edges. Those are implemented and simulated contract facts, not
-installed evidence.
+installed evidence by themselves.
 
-The next R&D move is to drive this exact operation against the installed stack and retain the real
-receipt chain through both hunts, automatic successor continuation, terminal campaign evidence,
-reset/rerun, and owned cleanup/restoration. Until then, `queue.guild-campaign` is `implemented`,
-not complete.
+The release-seed pass then crossed installed Valheim on fresh world UID `4257656027`. It placed and
+exact-diffed the 40-piece Field Lodge, prepared all 17 Signature Hunt objects, captured the raw
+Deathsquito and Drake identities, activated content hash `ad94f708efa9...`, bound the exact loadout
+sign, started Air Drop, disabled creator authority, saved the world gracefully, and restored AM4.
+The retained index is
+[`docs/evidence/creatoros-beta1-world-20260830-r1.json`](evidence/creatoros-beta1-world-20260830-r1.json).
+
+The next R&D move is a clean external install and native P7 join, followed by both live kills,
+automatic Cold Shot continuation, terminal campaign evidence, reset/rerun, and owned cleanup.
+Until that chain exists, `queue.guild-campaign` is `implemented`, not complete.
 
 - **Claims:** `FR-PORT-001`, `FR-PORT-004`, `FR-PORT-005`, `FR-EVID-001`, `FR-EVID-002`,
   `FR-EVID-003`, `FR-OPT-001`, `NFR-USE-001`
@@ -358,7 +384,7 @@ Recorded so nobody re-derives them as new ideas, and so nobody quietly fixes the
 
 | | Why it is parked |
 | --- | --- |
-| Saved-world `.db`/`.fwl` packaging | Lane 5. Ordinary recoverable copies are enough for R&D (ADR 0010) |
+| Additional saved-world packaging | CreatorOSBeta1 is the deadline-driven exception: one fresh, content-addressed pair is implemented for the Valheim 1.0 beta window. Do not generalize it into a world-packaging framework. |
 | Named anchors | Only if an authored slice needs spatial references |
 | Generic pattern notebooks / generation | 4C, and only after the typed Signature Hunt bridge produces observed repetition; the one typed abstraction is the narrow active exception |
 | Audit D2, D4, D5, C5 | Real, small, tempting. Each has a ledger entry; none gets fixed as collateral |

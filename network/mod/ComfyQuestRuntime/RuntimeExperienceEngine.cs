@@ -27,6 +27,7 @@ sealed class RuntimeExperienceEngine {
   readonly RuntimeContinuationStore continuations;
   readonly RuntimeBindingCoordinator continuationBindings;
   readonly Func<bool> privateConfirmed;
+  readonly Func<DedicatedPersonalProgressionProfile> personalProfile;
   readonly Dictionary<string, DateTimeOffset> recentEventKeys =
       new(StringComparer.Ordinal);
   /// <summary>Bindings owed a bounded re-read, and how many ticks each is still owed (ADR 0006).</summary>
@@ -97,7 +98,8 @@ sealed class RuntimeExperienceEngine {
   public RuntimeExperienceEngine(
       string runtimeRoot,
       RuntimeReceiptStore receiptStore,
-      Func<bool> isPrivateConfirmed) {
+      Func<bool> isPrivateConfirmed,
+      Func<DedicatedPersonalProgressionProfile> dedicatedPersonalProfile) {
     root = runtimeRoot;
     receipts = receiptStore;
     ledger = new ActionExecutionLedger(root);
@@ -109,6 +111,7 @@ sealed class RuntimeExperienceEngine {
     continuationBindings = new RuntimeBindingCoordinator(
         root, new RuntimeBindingWorldAdapter(), runs.Registry);
     privateConfirmed = isPrivateConfirmed;
+    personalProfile = dedicatedPersonalProfile ?? (() => new DedicatedPersonalProgressionProfile());
   }
 
   public void OnEasyEvent(RuntimeEvent evt) {
@@ -260,7 +263,7 @@ sealed class RuntimeExperienceEngine {
     LastProgressUtc = state?.LastProgressUtc,
     BindingPosition = observed?.Spatial?.BindingPosition,
     SpawnedPositions = observed?.Spatial?.SpawnedPositions,
-    AuthoredAnchors = SpatialEvaluator.AnchorMap(document),
+    SpatialAreas = SpatialEvaluator.AreaMap(document),
     DeathsInStage = state?.DeathsInStage,
     SpawnsByAction = observed?.Encounter?.SpawnsByAction,
   };
@@ -286,7 +289,9 @@ sealed class RuntimeExperienceEngine {
   }
 
 
-  public void OnEvent(RuntimeEvent evt) {
+  public void OnEvent(RuntimeEvent evt) => OnEvent(evt, false);
+
+  internal void OnEvent(RuntimeEvent evt, bool locallyWitnessed) {
     evt = RuntimeEventPolicy.Normalize(evt);
     if (evt == null) return;
     Active active = null;
@@ -317,9 +322,14 @@ sealed class RuntimeExperienceEngine {
       if (!active.Subscriptions.Contains(evt.Name) || IsDuplicate(evt)) return;
       correlationId = NewCorrelationId();
       var authority = CharmPolicy.CanMutate(World());
+      var personal = false;
       if (!authority.Allowed) {
-        Write("transition", authority.Diagnostic, active, null, null, correlationId);
-        return;
+        var personalDecision = PersonalEventDecision(active, evt, locallyWitnessed);
+        if (!personalDecision.Allowed) {
+          Write("transition", personalDecision.Diagnostic, active, null, null, correlationId);
+          return;
+        }
+        personal = true;
       }
 
       var foundBinding = false;
@@ -327,15 +337,11 @@ sealed class RuntimeExperienceEngine {
         if (wear == null) continue;
         var view = wear.GetComponent<ZNetView>();
         var zdo = view == null ? null : view.GetZDO();
-        if (zdo == null || !view.IsOwner()
+        if (zdo == null || (!personal && !view.IsOwner())
             || (!string.IsNullOrWhiteSpace(evt.SourceId)
                 && evt.SourceId != zdo.m_uid.ToString())) continue;
         var reference = Read(zdo);
-        if (reference == null
-            || reference.PackId != active.PackId
-            || reference.ExperienceId != active.Document.Id
-            || reference.Version != active.Version
-            || reference.ContentHash != active.ContentHash) continue;
+        if (!ReferenceMatches(reference, active, personal)) continue;
 
         foundBinding = true;
         var identity = ResolveIdentity(zdo, active);
@@ -349,7 +355,7 @@ sealed class RuntimeExperienceEngine {
           LastProgressUtc = before?.LastProgressUtc ?? (before == null ? evt.At : (DateTimeOffset?)null),
           BindingPosition = observed.Spatial.BindingPosition,
           SpawnedPositions = observed.Spatial.SpawnedPositions,
-          AuthoredAnchors = SpatialEvaluator.AnchorMap(active.Document),
+          SpatialAreas = SpatialEvaluator.AreaMap(active.Document),
           DeathsInStage = before?.DeathsInStage,
           SpawnsByAction = observed.Encounter?.SpawnsByAction,
         };
@@ -375,7 +381,7 @@ sealed class RuntimeExperienceEngine {
           continue;
         }
         rechecks.Remove(identity.Key);
-        Apply(active, zdo, decision, evt, correlationId);
+        Apply(active, zdo, decision, evt, correlationId, personal);
       }
 
       if (!foundBinding) {
@@ -394,7 +400,8 @@ sealed class RuntimeExperienceEngine {
   /// leave the same trail. The cause is the event that earned the match — for a recheck, the last one
   /// in history, because a recheck never invents an event of its own.</summary>
   void Apply(
-      Active active, ZDO zdo, WorkflowDecision decision, RuntimeEvent cause, string correlationId) {
+      Active active, ZDO zdo, WorkflowDecision decision, RuntimeEvent cause, string correlationId,
+      bool personal = false) {
     var currentStage = active.Document.Stages.FirstOrDefault(value => value.Id == decision.StageId);
     if (currentStage == null) return;
     var currentState = workflows.Get(decision.Identity);
@@ -413,12 +420,12 @@ sealed class RuntimeExperienceEngine {
     var succeeded = true;
     foreach (var action in decision.Transition.Actions ?? new())
       succeeded &= Execute(
-          active, zdo, currentStage.Id, decision.Transition.Id, action, correlationId);
+          active, zdo, currentStage.Id, decision.Transition.Id, action, correlationId, personal);
     if (succeeded && !string.IsNullOrWhiteSpace(decision.Transition.NextStage)) {
       var next = active.Document.Stages.FirstOrDefault(
           value => value.Id == decision.Transition.NextStage);
       foreach (var action in next?.EntryActions ?? new())
-        succeeded &= Execute(active, zdo, next.Id, "entry", action, correlationId);
+        succeeded &= Execute(active, zdo, next.Id, "entry", action, correlationId, personal);
     }
     if (!succeeded) return;
     if (workflows.Complete(decision)) {
@@ -530,13 +537,15 @@ sealed class RuntimeExperienceEngine {
       if(!active.Documents.TryGetValue(handoff.SourceExperienceId,out _)
           ||!active.Documents.TryGetValue(handoff.SuccessorExperienceId,out var successor))
         throw new InvalidOperationException("continuation_experience_missing");
-      if(!TryContinuationBinding(handoff,out var wear,out var zdo,out var targetKind,out var bindingError))
+      var personal=PersonalDecision(active).Allowed;
+      if(!TryContinuationBinding(handoff,personal,out var wear,out var zdo,out var targetKind,out var bindingError))
         throw new InvalidOperationException(bindingError);
       var reference=Read(zdo);
       if(reference==null||reference.PackId!=handoff.PackId||reference.BindingId!="default"
           ||reference.Version!=handoff.Version
           ||!string.Equals(reference.ContentHash,handoff.ContentHash,StringComparison.OrdinalIgnoreCase)
-          ||reference.ExperienceId!=handoff.SourceExperienceId
+          ||personal&&!active.Documents.ContainsKey(reference.ExperienceId)
+          ||!personal&&reference.ExperienceId!=handoff.SourceExperienceId
               &&reference.ExperienceId!=handoff.SuccessorExperienceId)
         throw new InvalidOperationException("continuation_binding_changed");
       var targetSet=new ActiveSet{Schema=active.Set.Schema,PackId=handoff.PackId,
@@ -545,9 +554,11 @@ sealed class RuntimeExperienceEngine {
         ActivatedUtc=active.Set.ActivatedUtc,ActivationId=handoff.ActivationId,
         ExperienceId=handoff.SuccessorExperienceId,SourceChannel=active.Set.SourceChannel,
         PreviousActivationId=active.Set.PreviousActivationId};
-      var change=continuationBindings.Continue(zdo.m_uid.ToString(),handoff.WorldId,
-          targetSet,handoff.SourceExperienceId,successor,handoff.BindingInstanceId,targetKind,now);
-      if(change!=null)continuations.SetBindingChange(handoff.HandoffId,change.ChangeId);
+      if(!personal) {
+        var change=continuationBindings.Continue(zdo.m_uid.ToString(),handoff.WorldId,
+            targetSet,handoff.SourceExperienceId,successor,handoff.BindingInstanceId,targetKind,now);
+        if(change!=null)continuations.SetBindingChange(handoff.HandoffId,change.ChangeId);
+      }
       new QuestPackStore(root).SelectExperienceForActivation(
           handoff.ActivationId,handoff.SuccessorExperienceId);
       InvalidateActive();
@@ -573,7 +584,7 @@ sealed class RuntimeExperienceEngine {
     }
   }
 
-  bool TryContinuationBinding(RuntimeContinuationRecord handoff,out WearNTear wear,out ZDO zdo,
+  bool TryContinuationBinding(RuntimeContinuationRecord handoff,bool personal,out WearNTear wear,out ZDO zdo,
       out string targetKind,out string error) {
     wear=null;zdo=null;targetKind=null;error="continuation_binding_not_loaded";
     try {
@@ -589,7 +600,7 @@ sealed class RuntimeExperienceEngine {
       }).ToArray();
       if(matches.Length!=1){error=matches.Length==0?"continuation_binding_not_loaded":"continuation_binding_ambiguous";return false;}
       wear=matches[0];var view=wear.GetComponent<ZNetView>();zdo=view?.GetZDO();
-      if(zdo==null||!view.IsOwner()){error="continuation_binding_not_owned";return false;}
+      if(zdo==null||!personal&&!view.IsOwner()){error="continuation_binding_not_owned";return false;}
       targetKind=wear.GetComponent<Sign>()!=null?"sign":wear.GetComponent<ItemStand>()!=null
         ?"item_stand":"player_built_piece";
       return true;
@@ -684,13 +695,30 @@ sealed class RuntimeExperienceEngine {
 
   IReadOnlyList<WearNTear> Bindings(Active active) {
     var now = UnityEngine.Time.realtimeSinceStartup;
+    var personal = PersonalDecision(active).Allowed;
+    if (personal) {
+      const string personalResolution = "dedicated-personal-read-only";
+      if (!string.Equals(cachedBindingContentHash, active.ContentHash, StringComparison.Ordinal)
+          || !string.Equals(cachedBindingResolutionKey, personalResolution, StringComparison.Ordinal)
+          || now >= nextBindingRefresh) {
+        var candidates = WearNTear.GetAllInstances()
+            .Where(value => IsActiveBinding(value, active, true)).ToArray();
+        // The beta profile never guesses which shared venue is authoritative. A missing or
+        // duplicated exact reference is unavailable until the world presents exactly one.
+        cachedBindings = candidates.Length == 1 ? candidates : Array.Empty<WearNTear>();
+        cachedBindingContentHash = active.ContentHash;
+        cachedBindingResolutionKey = personalResolution;
+        nextBindingRefresh = now + 1.0;
+      }
+      return cachedBindings;
+    }
     var selection = SelectedBinding(active);
     if (!string.Equals(cachedBindingContentHash, active.ContentHash, StringComparison.Ordinal)
         || !string.Equals(cachedBindingResolutionKey, selection.ResolutionKey, StringComparison.Ordinal)
         || now >= nextBindingRefresh) {
       var candidates = selection.State == BindingSelectionState.Unavailable
           ? Array.Empty<WearNTear>()
-          : WearNTear.GetAllInstances().Where(value => IsActiveBinding(value, active)).ToArray();
+          : WearNTear.GetAllInstances().Where(value => IsActiveBinding(value, active, false)).ToArray();
       if (selection.State == BindingSelectionState.Selected) {
         var matches = candidates.Where(value => string.Equals(
             BindingInstanceIdentity(value), selection.BindingInstanceId,
@@ -710,18 +738,12 @@ sealed class RuntimeExperienceEngine {
     return cachedBindings;
   }
 
-  bool IsActiveBinding(WearNTear wear, Active active) {
+  bool IsActiveBinding(WearNTear wear, Active active, bool personal) {
     try {
       var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
       if (zdo == null || !zdo.Persistent) return false;
       var reference = Read(zdo);
-      return reference != null
-          && reference.PackId == active.PackId
-          && reference.ExperienceId == active.Document.Id
-          && reference.BindingId == "default"
-          && reference.Version == active.Version
-          && string.Equals(reference.ContentHash, active.ContentHash,
-              StringComparison.OrdinalIgnoreCase);
+      return ReferenceMatches(reference, active, personal);
     } catch { return false; }
   }
 
@@ -1075,11 +1097,14 @@ sealed class RuntimeExperienceEngine {
       string stage,
       string transition,
       ExperienceAction action,
-      string correlationId) {
+      string correlationId,
+      bool personal) {
     WorkflowIdentity identity = null;
     var zdoId = zdo.m_uid.ToString();
     string key = null;
     try {
+      if (personal && !DedicatedPersonalProgressionPolicy.Message(action))
+        throw new InvalidOperationException("dedicated_personal_progression_action_denied");
       identity = ResolveIdentity(zdo, active);
       if (identity == null) throw new InvalidOperationException("runtime_player_missing");
       key = string.Join("|", identity.Key, stage, transition, action.Id);
@@ -1680,13 +1705,16 @@ sealed class RuntimeExperienceEngine {
   bool TryCurrentBinding(WorkflowIdentity identity, Active active, out ZDO zdo) {
     zdo = null;
     if (identity == null || active?.Document == null) return false;
-    var selection = SelectedBinding(active);
-    if (selection.State == BindingSelectionState.Unavailable) return false;
-    if (selection.State == BindingSelectionState.Selected
-        && (!string.Equals(identity.BindingInstanceId, selection.BindingInstanceId,
-                StringComparison.Ordinal))) return false;
-    if (selection.State == BindingSelectionState.Legacy
-        && !string.IsNullOrWhiteSpace(identity.BindingInstanceId)) return false;
+    var personal = PersonalDecision(active).Allowed;
+    if (!personal) {
+      var selection = SelectedBinding(active);
+      if (selection.State == BindingSelectionState.Unavailable) return false;
+      if (selection.State == BindingSelectionState.Selected
+          && (!string.Equals(identity.BindingInstanceId, selection.BindingInstanceId,
+                  StringComparison.Ordinal))) return false;
+      if (selection.State == BindingSelectionState.Legacy
+          && !string.IsNullOrWhiteSpace(identity.BindingInstanceId)) return false;
+    }
     foreach (var wear in Bindings(active)) {
       var candidate = wear?.GetComponent<ZNetView>()?.GetZDO();
       if (candidate == null) continue;
@@ -1760,7 +1788,7 @@ sealed class RuntimeExperienceEngine {
           LastProgressUtc = progress.LastProgressUtc,
           BindingPosition = observed.Spatial.BindingPosition,
           SpawnedPositions = observed.Spatial.SpawnedPositions,
-          AuthoredAnchors = SpatialEvaluator.AnchorMap(active.Document),
+          SpatialAreas = SpatialEvaluator.AreaMap(active.Document),
           DeathsInStage = progress.DeathsInStage,
           SpawnsByAction = observed.Encounter?.SpawnsByAction,
         });
@@ -1894,7 +1922,7 @@ sealed class RuntimeExperienceEngine {
       At = DateTimeOffset.UtcNow,
     };
     RuntimeObservation.StampLocalPlayer(started);
-    OnEvent(started);
+    OnEvent(started, true);
     if (workflows.Get(identity) != null) return true;
     error = "experience_start_not_observed";
     return false;
@@ -1969,14 +1997,13 @@ sealed class RuntimeExperienceEngine {
 
   static string SpatialSuffix(TriggerExpression trigger) {
     var predicates = Spatials(trigger).Select(value => {
-      var label = SpatialEvaluator.Label(value.Anchor);
-      var radius = value.Radius.GetValueOrDefault();
-      if (value.Spatial == "within_radius") return "while within " + radius + " m of " + label;
-      if (value.Spatial == "entered") return "after entering the area " + radius + " m around " + label;
-      if (value.Spatial == "left") return "after leaving the area " + radius + " m around " + label;
+      var label = value.AreaId ?? "the area";
+      if (value.Spatial == "within_radius") return "while inside area " + label;
+      if (value.Spatial == "entered") return "after entering area " + label;
+      if (value.Spatial == "left") return "after leaving area " + label;
       if (value.Spatial == "remained")
-        return "after " + value.Value.GetValueOrDefault() + "s in the area " + radius + " m around " + label;
-      return "with " + value.Value.GetValueOrDefault() + " objects within " + radius + " m of " + label;
+        return "after " + value.Value.GetValueOrDefault() + "s in area " + label;
+      return "with " + value.Value.GetValueOrDefault() + " objects inside area " + label;
     }).ToArray();
     return predicates.Length == 0 ? "" : " " + string.Join(" and ", predicates);
   }
@@ -2149,6 +2176,35 @@ sealed class RuntimeExperienceEngine {
     } catch {
       // Loaded-scene diagnostics must not make otherwise valid active content unusable.
     }
+  }
+
+  PolicyDecision PersonalDecision(Active active) =>
+      DedicatedPersonalProgressionPolicy.CanUse(
+          personalProfile(), World(), CurrentWorldUid(), active?.ContentHash,
+          active?.Documents?.Values);
+
+  PolicyDecision PersonalEventDecision(
+      Active active, RuntimeEvent runtimeEvent, bool locallyWitnessed) =>
+      DedicatedPersonalProgressionPolicy.CanAcceptEvent(
+          personalProfile(), World(), CurrentWorldUid(), active?.ContentHash,
+          active?.Documents?.Values, runtimeEvent, locallyWitnessed);
+
+  static bool ReferenceMatches(CharmReference reference, Active active, bool personal) =>
+      reference != null && active?.Document != null
+      && reference.PackId == active.PackId
+      && reference.BindingId == "default"
+      && reference.Version == active.Version
+      && string.Equals(reference.ContentHash, active.ContentHash,
+          StringComparison.OrdinalIgnoreCase)
+      && (personal
+          ? active.Documents?.ContainsKey(reference.ExperienceId) == true
+          : reference.ExperienceId == active.Document.Id);
+
+  static string CurrentWorldUid() {
+    try {
+      var value = ZNet.instance?.GetWorldUID() ?? 0L;
+      return value == 0L ? null : value.ToString();
+    } catch { return null; }
   }
 
   WorldAuthority World() {

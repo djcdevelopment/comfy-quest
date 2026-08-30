@@ -1,0 +1,21 @@
+{
+  "schema": "creatoros-composition-review/v1",
+  "release_id": "creatoros-beta1",
+  "venue_id": "slayers-field-lodge",
+  "campaign_id": "slayers-signature-hunt",
+  "reviewer": "",
+  "judgments": {
+    "orient": "",
+    "name_place": "",
+    "steward_locks": "",
+    "creator_freedoms": "",
+    "inhabit_venue": "",
+    "attack_seams": "",
+    "demo_verdict": "",
+    "choose_attack": ""
+  },
+  "verdict": "unrecorded",
+  "next_attack": "unrecorded",
+  "machine_evidence_paths": [],
+  "privacy_confirmation": "No credentials, Steam numeric IDs, or machine-local absolute paths are included."
+}

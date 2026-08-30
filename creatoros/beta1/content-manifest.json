@@ -1,0 +1,24 @@
+{
+  "schema": "creatoros-beta-content/v1",
+  "release_id": "creatoros-beta1",
+  "composition_hash": "2713aa9e1aabab2503ce21611ac1218c7fff4f39d3c1b425394098d2d69de210",
+  "pack_content_hash": "ad94f708efa9afbb8267cae6336226fc2c59c9d86c777d2309b932842f09c734",
+  "venue_sha256": "425e816cf9dde0e963088929ea9ef583fdf7dbf5c42d0e2d3071d0c12678aef3",
+  "generated": [
+    {
+      "path": "campaign.json",
+      "sha256": "ccdda724c9bd6a19643fe1b5d081a1f4ba60b4d86fe20ba46c59833c44564ec0",
+      "bytes": 2053
+    },
+    {
+      "path": "quest-view.json",
+      "sha256": "decf5e62312246d75984520ebb934ab7c454b3b3c845075aebe44cdbb9d6d697",
+      "bytes": 2450
+    },
+    {
+      "path": "slayers-signature-hunt-1.0.0.questpack",
+      "sha256": "bb08ce34109386ea1fedab968d8ae7cde3679ac1c67b4cd928499cba9dba51a5",
+      "bytes": 2947
+    }
+  ]
+}

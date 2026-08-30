@@ -493,13 +493,20 @@ class LiveDriver:
         if operation == "blueprint_diff":
             fields["selection"] = "lab"
         if placed:
-            fields.update({
-                "build_mode": "at",
-                "world_x": number(self.args.x),
-                "world_y": number(self.args.y),
-                "world_z": number(self.args.z),
-                "yaw_degrees": number(self.args.yaw),
-            })
+            mode = getattr(self.args, "placement_mode", "at")
+            if mode == "ground":
+                # Normal diff infers an origin from the marked selection. Ground is supplied
+                # only to BUILD; explicit coordinates remain exclusive to the reviewed at-mode.
+                if operation == "blueprint_build":
+                    fields["build_mode"] = "ground"
+            else:
+                fields.update({
+                    "build_mode": "at",
+                    "world_x": number(self.args.x),
+                    "world_y": number(self.args.y),
+                    "world_z": number(self.args.z),
+                    "yaw_degrees": number(self.args.yaw),
+                })
         return fields
 
     def count(self, receipt: dict[str, Any]) -> int:
@@ -512,6 +519,8 @@ class LiveDriver:
         raise RuntimeError("blueprint_count_diagnostic_unrecognized")
 
     def placement_matches(self, receipt: dict[str, Any]) -> bool:
+        if getattr(self.args, "placement_mode", "at") == "ground":
+            return "placement" not in receipt
         placement = receipt.get("placement")
         return isinstance(placement, dict) and all(
             abs(float(placement.get(key, math.nan)) - expected) < 0.000001
@@ -658,9 +667,12 @@ def run_live(args: argparse.Namespace) -> dict[str, Any]:
         driver.build_attempted = True
         built = driver.request("lab", "blueprint_build",
                                driver.lab_fields("blueprint_build", placed=True))
-        if (not driver.placement_matches(built)
-                or f"placed={args.piece_count}" not in str(built.get("detail"))
-                or "failed=0" not in str(built.get("detail"))):
+        if getattr(args, "placement_mode", "at") == "ground":
+            if driver.count(built) != args.piece_count:
+                raise RuntimeError("blueprint_build_ground_count_mismatch")
+        elif (not driver.placement_matches(built)
+              or f"placed={args.piece_count}" not in str(built.get("detail"))
+              or "failed=0" not in str(built.get("detail"))):
             raise RuntimeError("blueprint_build_placement_mismatch")
         after_count = driver.count(driver.request(
             "lab", "blueprint_count", driver.lab_fields("blueprint_count")))
@@ -730,8 +742,10 @@ def run_live(args: argparse.Namespace) -> dict[str, Any]:
             "creator_session_id": args.session,
             "blueprint_name": args.blueprint,
         },
-        "placement": {"x": args.x, "y": args.y, "z": args.z,
-                      "yaw": args.yaw},
+        "placement": ({"mode": "ground"}
+                      if getattr(args, "placement_mode", "at") == "ground"
+                      else {"mode": "at", "x": args.x, "y": args.y, "z": args.z,
+                            "yaw": args.yaw}),
         "piece_count": args.piece_count,
         "canonical_pieces_sha256": args.canonical_pieces_sha256,
         "canonical_pair": pair,
@@ -842,9 +856,12 @@ def run_warm(args: argparse.Namespace) -> dict[str, Any]:
             driver.build_attempted = True
             built = driver.request("lab", "blueprint_build",
                                    driver.lab_fields("blueprint_build", placed=True))
-            if (not driver.placement_matches(built)
-                    or f"placed={args.piece_count}" not in str(built.get("detail"))
-                    or "failed=0" not in str(built.get("detail"))):
+            if getattr(args, "placement_mode", "at") == "ground":
+                if driver.count(built) != args.piece_count:
+                    raise RuntimeError("blueprint_build_ground_count_mismatch")
+            elif (not driver.placement_matches(built)
+                  or f"placed={args.piece_count}" not in str(built.get("detail"))
+                  or "failed=0" not in str(built.get("detail"))):
                 raise RuntimeError("blueprint_build_placement_mismatch")
             count_receipt = driver.request(
                 "lab", "blueprint_count", driver.lab_fields("blueprint_count"))
@@ -927,8 +944,10 @@ def run_warm(args: argparse.Namespace) -> dict[str, Any]:
             "creator_session_id": args.session,
             "blueprint_name": args.blueprint,
         },
-        "placement": {"x": args.x, "y": args.y, "z": args.z,
-                      "yaw": args.yaw},
+        "placement": ({"mode": "ground"}
+                      if getattr(args, "placement_mode", "at") == "ground"
+                      else {"mode": "at", "x": args.x, "y": args.y, "z": args.z,
+                            "yaw": args.yaw}),
         "piece_count": args.piece_count,
         "standing_piece_count": standing_count,
         "canonical_pieces_sha256": args.canonical_pieces_sha256,
@@ -1167,6 +1186,7 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--y", type=float, required=True)
     run_parser.add_argument("--z", type=float, required=True)
     run_parser.add_argument("--yaw", type=float, required=True)
+    run_parser.add_argument("--placement-mode", choices=("at", "ground"), default="at")
     run_parser.add_argument("--world-timeout", type=int, default=600)
     run_parser.add_argument("--request-timeout", type=int, default=90)
 
@@ -1182,6 +1202,7 @@ def parse_args() -> argparse.Namespace:
     warm_parser.add_argument("--y", type=float, required=True)
     warm_parser.add_argument("--z", type=float, required=True)
     warm_parser.add_argument("--yaw", type=float, required=True)
+    warm_parser.add_argument("--placement-mode", choices=("at", "ground"), default="at")
     warm_parser.add_argument("--world-timeout", type=int, default=600)
     warm_parser.add_argument("--request-timeout", type=int, default=90)
 

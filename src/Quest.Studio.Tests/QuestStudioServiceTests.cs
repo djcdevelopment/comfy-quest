@@ -196,10 +196,11 @@ public sealed class QuestStudioServiceTests : IDisposable
         var migrated = Assert.Single(first.ListProjects());
         var certification = first.CertifyGraph(migrated.ProjectId);
         Assert.True(certification.Ok, certification.Error);
-        Assert.Equal("374c43056f479089fca1faf680a3a074b55db0bcc098884b5c212cce0118bab1", certification.ContentHash);
+        var migratedHash = certification.ContentHash;
 
         var reopened = new QuestStudioService(host, new QuestPackPublisher(host));
-        Assert.Single(reopened.ListProjects());
+        var reopenedProject = Assert.Single(reopened.ListProjects());
+        Assert.Equal(migratedHash, reopened.CertifyGraph(reopenedProject.ProjectId).ContentHash);
         Assert.True(File.Exists(Path.Combine(state, "project.json")));
     }
 
@@ -981,12 +982,11 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.All(predicates, value => Assert.Equal("extended", value.GetProperty("palette").GetString()));
 
         var project = service.CreateProject("blank");
+        project.SpatialAreas.Add(new StudioSpatialArea { Id = "ritual-site", Frame = "world", X = 10, Y = 30, Z = -4, RadiusMeters = 15 });
         project.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition
         {
             Predicate = "remained",
-            AnchorKind = "coordinates",
-            X = 10, Y = 30, Z = -4,
-            Radius = 15,
+            AreaId = "ritual-site",
             Value = 45
         });
         var saved = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
@@ -1000,9 +1000,14 @@ public sealed class QuestStudioServiceTests : IDisposable
             Assert.Equal("ALL", when.GetProperty("op").GetString());
             var spatial = Assert.Single(when.GetProperty("children").EnumerateArray(), value => value.GetProperty("op").GetString() == "SPATIAL");
             Assert.Equal("remained", spatial.GetProperty("spatial").GetString());
-            Assert.Equal("coordinates", spatial.GetProperty("anchor").GetProperty("kind").GetString());
-            Assert.Equal(15, spatial.GetProperty("radius").GetInt32());
+            Assert.Equal("ritual-site", spatial.GetProperty("area_id").GetString());
+            Assert.False(spatial.TryGetProperty("anchor", out _));
+            Assert.False(spatial.TryGetProperty("radius", out _));
             Assert.Equal(45, spatial.GetProperty("value").GetInt32());
+            var area = Assert.Single(document.RootElement.GetProperty("spatial_areas").EnumerateArray());
+            Assert.Equal("world", area.GetProperty("frame").GetString());
+            Assert.Equal(30, area.GetProperty("center").GetProperty("y").GetDouble());
+            Assert.Equal(15, area.GetProperty("radius_meters").GetDouble());
         }
 
         var rehearsal = service.Rehearse(project.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
@@ -1014,7 +1019,8 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal("complete", rehearsal.Outcome);
 
         var entered = service.CreateProject("blank");
-        entered.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "entered", AnchorKind = "binding", Radius = 10 });
+        entered.SpatialAreas.Add(new StudioSpatialArea { Id = "charm-area", Frame = "binding", RadiusMeters = 10 });
+        entered.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "entered", AreaId = "charm-area" });
         Assert.True(service.SaveDraft(entered.ProjectId, new StudioSaveRequest(entered.Revision, entered)).Ok);
         var enteredRun = service.Rehearse(entered.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
         Assert.True(enteredRun.Ok, enteredRun.Error);
@@ -1024,7 +1030,8 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal("complete", enteredRun.Outcome);
 
         var near = service.CreateProject("blank");
-        near.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "within_radius", AnchorKind = "binding", Radius = 20 });
+        near.SpatialAreas.Add(new StudioSpatialArea { Id = "charm-area", Frame = "binding", RadiusMeters = 20 });
+        near.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "within_radius", AreaId = "charm-area" });
         Assert.True(service.SaveDraft(near.ProjectId, new StudioSaveRequest(near.Revision, near)).Ok);
         var nearRun = service.Rehearse(near.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
         Assert.True(nearRun.Ok, nearRun.Error);
@@ -1032,7 +1039,8 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal("complete", nearRun.Outcome);
 
         var departed = service.CreateProject("blank");
-        departed.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "left", AnchorKind = "binding", Radius = 10 });
+        departed.SpatialAreas.Add(new StudioSpatialArea { Id = "charm-area", Frame = "binding", RadiusMeters = 10 });
+        departed.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "left", AreaId = "charm-area" });
         Assert.True(service.SaveDraft(departed.ProjectId, new StudioSaveRequest(departed.Revision, departed)).Ok);
         var departedRun = service.Rehearse(departed.ProjectId, new StudioRehearsalRequest { Mode = "guided" });
         Assert.True(departedRun.Ok, departedRun.Error);
@@ -1040,13 +1048,14 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal("complete", departedRun.Outcome);
 
         var counted = service.CreateProject("blank");
+        counted.SpatialAreas.Add(new StudioSpatialArea { Id = "player-area", Frame = "player", RadiusMeters = 20 });
         var opening = counted.Nodes[0].Routes[0];
         opening.Actions.Add(new StudioAction { Id = "stage-guards", Type = "spawn", Kind = "creature", Prefab = "Greyling", Count = 2, Radius = 3 });
         counted.Nodes.Add(new StudioNode
         {
             Id = "defend", Label = "Defend",
             Routes = { new StudioRoute { Id = "hold", Event = opening.Event, Target = opening.Target, Outcome = "complete",
-                SpatialConditions = { new StudioSpatialCondition { Predicate = "count_in_area", AnchorKind = "player", Radius = 20, Value = 2 } } } }
+                SpatialConditions = { new StudioSpatialCondition { Predicate = "count_in_area", AreaId = "player-area", Value = 2 } } } }
         });
         opening.DestinationNodeId = "defend";
         opening.Outcome = null;
@@ -1057,11 +1066,283 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Contains(countedRun.Limitations, value => value.Contains("counts objects"));
 
         var invalid = service.CreateProject("blank");
-        invalid.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "within_radius", AnchorKind = "player", Radius = 10 });
+        invalid.SpatialAreas.Add(new StudioSpatialArea { Id = "player-area", Frame = "player", RadiusMeters = 10 });
+        invalid.Nodes[0].Routes[0].SpatialConditions.Add(new StudioSpatialCondition { Predicate = "within_radius", AreaId = "player-area" });
         Assert.True(service.SaveDraft(invalid.ProjectId, new StudioSaveRequest(invalid.Revision, invalid)).Ok);
         var rejected = service.CertifyGraph(invalid.ProjectId);
         Assert.False(rejected.Ok);
         Assert.Contains(rejected.Diagnostics, value => value.Code == "spatial_anchor_player_invalid");
+    }
+
+    [Fact]
+    public void Steward_anchor_import_is_strict_revisioned_idempotent_and_preserves_provenance()
+    {
+        var service = CreateService();
+        var project = service.CreateProject("blank");
+        var routeId = project.Nodes[0].Routes[0].Id;
+        var anchor = Anchor("hearth-sphere", "world", 100, 32.5, -200);
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(anchor);
+
+        var imported = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, routeId, "within_radius", json));
+        Assert.True(imported.Ok, imported.Error);
+        project = imported.Project!;
+        var area = Assert.Single(project.SpatialAreas);
+        Assert.Equal("area-hearth-sphere", area.Id);
+        Assert.Equal("world", area.Frame);
+        Assert.Equal((100d, 32.5d, -200d), (area.X, area.Y, area.Z));
+        Assert.Equal(anchor.ContentSha256, area.SourceAnchorSha256);
+        Assert.Equal(42, area.SourceSnapshot!.SnapshotId);
+        Assert.Equal(17, area.SourcePiece!.ZdoIndex);
+        Assert.Equal(area.Id, Assert.Single(project.Nodes[0].Routes[0].SpatialConditions).AreaId);
+
+        var again = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, routeId, "within_radius", json));
+        Assert.True(again.Ok, again.Error);
+        Assert.Equal(project.Revision, again.Project!.Revision);
+        Assert.Equal(project.UpdatedUtc, again.Project.UpdatedUtc);
+        project = again.Project!;
+        Assert.Single(project.SpatialAreas);
+        Assert.Single(project.Nodes[0].Routes[0].SpatialConditions);
+
+        var relative = Anchor("binding-hearth", "binding_relative", 100, 32.5, -200);
+        var relativeResult = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, routeId, "entered", Newtonsoft.Json.JsonConvert.SerializeObject(relative)));
+        Assert.True(relativeResult.Ok, relativeResult.Error);
+        project = relativeResult.Project!;
+        var relativeArea = Assert.Single(project.SpatialAreas, value => value.SourceAnchorId == "binding-hearth");
+        Assert.Equal("binding", relativeArea.Frame);
+        Assert.Null(relativeArea.X);
+        Assert.Null(relativeArea.Y);
+        Assert.Null(relativeArea.Z);
+        var certification = service.CertifyGraph(project.ProjectId);
+        Assert.True(certification.Ok, certification.Error);
+        Assert.Equal(ExperienceSchema.Id, certification.Document!.Schema);
+
+        var changed = Anchor("hearth-sphere", "world", 101, 32.5, -200);
+        var conflict = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, routeId, "left", Newtonsoft.Json.JsonConvert.SerializeObject(changed)));
+        Assert.False(conflict.Ok);
+        Assert.Equal("anchor_id_conflict", conflict.Error);
+        var tampered = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, routeId, "left", json.Replace("12.5", "13.5")));
+        Assert.False(tampered.Ok);
+        Assert.Equal("anchor_hash_mismatch", tampered.Error);
+
+        project.Nodes[0].Routes.Add(Newtonsoft.Json.JsonConvert.DeserializeObject<StudioRoute>(
+            Newtonsoft.Json.JsonConvert.SerializeObject(project.Nodes[0].Routes[0]))!);
+        var savedAmbiguous = service.SaveDraft(project.ProjectId, new StudioSaveRequest(project.Revision, project));
+        Assert.True(savedAmbiguous.Ok, savedAmbiguous.Error);
+        var ambiguous = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(savedAmbiguous.Project!.Revision, routeId, "within_radius", json));
+        Assert.False(ambiguous.Ok);
+        Assert.Equal("route_ambiguous", ambiguous.Error);
+    }
+
+    [Fact]
+    public void Spatial_evidence_download_returns_the_newest_exact_run_with_snapshot_join()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var route = project.Nodes[0].Routes[0];
+        var anchor = Anchor("hearth-sphere", "world", 100, 32.5, -200);
+        var imported = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, route.Id, "within_radius", Newtonsoft.Json.JsonConvert.SerializeObject(anchor)));
+        Assert.True(imported.Ok, imported.Error);
+        project = imported.Project!;
+        var certification = service.CertifyGraph(project.ProjectId);
+        Assert.True(certification.Ok, certification.Error);
+        var area = Assert.Single(project.SpatialAreas);
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Id = "receipt-spatial", AtUtc = DateTimeOffset.Parse("2026-08-30T12:00:00Z"),
+            Operation = "event", Status = "matched", PackId = project.PackId, Version = project.Version,
+            ContentHash = certification.ContentHash, ActivationId = "activation-spatial", ExperienceId = project.ExperienceId,
+            RunId = "run-spatial", WorldId = "world-123", BindingZdo = "10:20", CorrelationId = "correlation-spatial",
+            TransitionId = route.Id, EventName = route.Event, Diagnostics = Array.Empty<ContractDiagnostic>(),
+            Evidence = new TriggerClauseTrace
+            {
+                Op = "SPATIAL", Spatial = "within_radius", Satisfied = true, Current = 1, Required = 1,
+                AreaId = area.Id, AnchorSha256 = anchor.ContentSha256,
+                ResolvedCenter = new SpatialContractPoint(100, 32.5, -200), RadiusMeters = anchor.RadiusMeters,
+                ObservedPosition = new SpatialContractPoint(103, 36.5, -200), DistanceMeters = 5
+            }
+        });
+        for (var index = 0; index < 25; index++)
+            new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+            {
+                Id = $"noise-{index:D2}", AtUtc = DateTimeOffset.Parse("2026-08-30T12:10:00Z").AddSeconds(index),
+                Operation = "event", Status = "ignored", PackId = project.PackId, Version = project.Version,
+                ContentHash = certification.ContentHash, ActivationId = "activation-spatial", ExperienceId = project.ExperienceId,
+                RunId = "run-spatial", WorldId = "world-123", BindingZdo = "10:20",
+                EventName = "chat_sent", Diagnostics = Array.Empty<ContractDiagnostic>()
+            });
+
+        Assert.DoesNotContain(service.RuntimeStatus(project.ProjectId).Receipts,
+            receipt => receipt.Id == "receipt-spatial");
+
+        var download = service.DownloadSpatialEvidence(project.ProjectId);
+        Assert.True(download.Ok, download.Error);
+        Assert.Equal("application/vnd.comfy.quest-spatial-evidence+json", download.ContentType);
+        var bundle = Newtonsoft.Json.JsonConvert.DeserializeObject<SpatialEvidenceBundle>(System.Text.Encoding.UTF8.GetString(download.Bytes!))!;
+        SpatialExchangeContract.ValidateEvidence(bundle, true);
+        Assert.Equal("activation-spatial", bundle.ActivationId);
+        Assert.Equal("run-spatial", bundle.RunId);
+        Assert.Equal("world-123", bundle.WorldUid);
+        var evidence = Assert.Single(bundle.Records);
+        Assert.Equal("within_radius", evidence.Predicate);
+        Assert.Equal(anchor.Snapshot.FileSha256, evidence.Snapshot.FileSha256);
+        Assert.Equal(anchor.Piece.ZdoIndex, evidence.Piece.ZdoIndex);
+        Assert.Equal(5, evidence.DistanceMeters);
+        var sameDownload = service.DownloadSpatialEvidence(project.ProjectId);
+        Assert.True(sameDownload.Ok, sameDownload.Error);
+        Assert.Equal(download.Sha256, sameDownload.Sha256);
+        Assert.Equal(download.Bytes!, sameDownload.Bytes!);
+
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Id = "receipt-spatial-count", AtUtc = DateTimeOffset.Parse("2026-08-30T12:00:01Z"),
+            Operation = "event", Status = "ignored", PackId = project.PackId, Version = project.Version,
+            ContentHash = certification.ContentHash, ActivationId = "activation-spatial", ExperienceId = project.ExperienceId,
+            RunId = "run-spatial", WorldId = "world-123", BindingZdo = "10:20", CorrelationId = "correlation-count",
+            TransitionId = route.Id, EventName = route.Event, Diagnostics = Array.Empty<ContractDiagnostic>(),
+            Evidence = new TriggerClauseTrace
+            {
+                Op = "SPATIAL", Spatial = "count_in_area", Satisfied = false, Current = 2, Required = 3,
+                AreaId = area.Id, AnchorSha256 = anchor.ContentSha256,
+                ResolvedCenter = new SpatialContractPoint(100, 32.5, -200), RadiusMeters = anchor.RadiusMeters
+            }
+        });
+        var countedDownload = service.DownloadSpatialEvidence(project.ProjectId);
+        Assert.True(countedDownload.Ok, countedDownload.Error);
+        var countedBundle = Newtonsoft.Json.JsonConvert.DeserializeObject<SpatialEvidenceBundle>(
+            System.Text.Encoding.UTF8.GetString(countedDownload.Bytes!))!;
+        SpatialExchangeContract.ValidateEvidence(countedBundle, true);
+        var counted = Assert.Single(countedBundle.Records, value => value.Predicate == "count_in_area");
+        Assert.Equal(2, counted.CurrentCount);
+        Assert.Equal(3, counted.RequiredCount);
+        Assert.Null(counted.ObservedPosition);
+        Assert.Null(counted.DistanceMeters);
+    }
+
+    [Fact]
+    public void Spatial_evidence_names_the_exact_campaign_release_not_the_standalone_draft()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var route = project.Nodes[0].Routes[0];
+        var anchor = Anchor("campaign-sphere", "world", 100, 32.5, -200);
+        var imported = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, route.Id, "within_radius",
+                Newtonsoft.Json.JsonConvert.SerializeObject(anchor)));
+        Assert.True(imported.Ok, imported.Error);
+        project = imported.Project!;
+        var standalone = service.CertifyGraph(project.ProjectId);
+        Assert.True(standalone.Ok, standalone.Error);
+
+        var guild = service.CreateGuild(new StudioGuildCreateRequest("Spatial Guild", "Derek"));
+        var placed = service.PlaceProject(guild.GuildId, new StudioGuildPlacementRequest(
+            guild.Revision, project.ProjectId, "quest", "questline", "main", null));
+        Assert.True(placed.Ok, placed.Error);
+        var companion = service.CreateProject("blank");
+        var placedCompanion = service.PlaceProject(guild.GuildId, new StudioGuildPlacementRequest(
+            placed.Guild!.Revision, companion.ProjectId, "quest", "standalone", null, null));
+        Assert.True(placedCompanion.Ok, placedCompanion.Error);
+        var campaign = Assert.Single(placedCompanion.Guild!.Campaigns,
+            value => value.CampaignId == "campaign-default");
+        var campaignCertification = service.CertifyCampaign(guild.GuildId, campaign.CampaignId);
+        Assert.True(campaignCertification.Ok, campaignCertification.Error);
+        Assert.NotEqual(standalone.ContentHash, campaignCertification.ContentHash);
+
+        var area = Assert.Single(project.SpatialAreas);
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Id = "receipt-campaign-spatial", AtUtc = DateTimeOffset.Parse("2026-08-30T13:00:00Z"),
+            Operation = "event", Status = "matched", PackId = campaign.PackId, Version = campaign.Version,
+            ContentHash = campaignCertification.ContentHash, ActivationId = "activation-campaign",
+            ExperienceId = project.ExperienceId, RunId = "run-campaign", WorldId = "world-123",
+            BindingZdo = "10:20", TransitionId = route.Id, EventName = route.Event,
+            Diagnostics = Array.Empty<ContractDiagnostic>(), Evidence = new TriggerClauseTrace
+            {
+                Op = "SPATIAL", Spatial = "within_radius", Satisfied = true, Current = 1, Required = 1,
+                AreaId = area.Id, AnchorSha256 = anchor.ContentSha256,
+                ResolvedCenter = new SpatialContractPoint(100, 32.5, -200), RadiusMeters = anchor.RadiusMeters,
+                ObservedPosition = new SpatialContractPoint(103, 36.5, -200), DistanceMeters = 5
+            }
+        });
+
+        var download = service.DownloadSpatialEvidence(project.ProjectId);
+        Assert.True(download.Ok, download.Error);
+        var bundle = Newtonsoft.Json.JsonConvert.DeserializeObject<SpatialEvidenceBundle>(
+            System.Text.Encoding.UTF8.GetString(download.Bytes!))!;
+        Assert.Equal(campaign.PackId, bundle.PackId);
+        Assert.Equal(campaignCertification.ContentHash, bundle.ContentHash);
+        Assert.NotEqual(standalone.ContentHash, bundle.ContentHash);
+    }
+
+    [Fact]
+    public void Spatial_evidence_download_stays_within_the_cross_repository_byte_limit()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var route = project.Nodes[0].Routes[0];
+        var anchor = Anchor("busy-sphere", "world", 100, 32.5, -200);
+        var imported = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, route.Id, "within_radius",
+                Newtonsoft.Json.JsonConvert.SerializeObject(anchor)));
+        Assert.True(imported.Ok, imported.Error);
+        project = imported.Project!;
+        var certification = service.CertifyGraph(project.ProjectId);
+        Assert.True(certification.Ok, certification.Error);
+        var area = Assert.Single(project.SpatialAreas);
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var receipts = new RuntimeReceiptStore(runtimeRoot);
+        TriggerClauseTrace Observation() => new()
+        {
+            Op = "SPATIAL", Spatial = "within_radius", Satisfied = true,
+            Current = 1, Required = 1, AreaId = area.Id,
+            AnchorSha256 = anchor.ContentSha256,
+            ResolvedCenter = new SpatialContractPoint(100, 32.5, -200),
+            RadiusMeters = anchor.RadiusMeters,
+            ObservedPosition = new SpatialContractPoint(103, 36.5, -200),
+            DistanceMeters = 5
+        };
+        for (var index = 0; index < RuntimeReceiptStore.MaxListLimit; index++)
+            receipts.Write(new RuntimeReceipt
+            {
+                Id = $"busy-{index:D3}",
+                AtUtc = DateTimeOffset.Parse("2026-08-30T14:00:00Z").AddSeconds(index),
+                Operation = "event", Status = "matched", PackId = project.PackId,
+                Version = project.Version, ContentHash = certification.ContentHash,
+                ActivationId = "activation-busy", ExperienceId = project.ExperienceId,
+                RunId = "run-busy", WorldId = "world-123", BindingZdo = "10:20",
+                CorrelationId = $"correlation-{index:D3}", TransitionId = route.Id,
+                EventName = route.Event, Diagnostics = Array.Empty<ContractDiagnostic>(),
+                Evidence = new TriggerClauseTrace
+                {
+                    Op = "ALL", Satisfied = true, Current = 3, Required = 3,
+                    Children = { Observation(), Observation(), Observation() }
+                }
+            });
+
+        var download = service.DownloadSpatialEvidence(project.ProjectId);
+        Assert.True(download.Ok, download.Error);
+        Assert.True(download.Bytes!.Length <= SpatialExchangeSchema.MaxDocumentBytes);
+        var bundle = Newtonsoft.Json.JsonConvert.DeserializeObject<SpatialEvidenceBundle>(
+            System.Text.Encoding.UTF8.GetString(download.Bytes))!;
+        SpatialExchangeContract.ValidateEvidence(bundle, true);
+        Assert.InRange(bundle.Records.Count, 1, 511);
     }
 
     [Fact]
@@ -1423,6 +1704,19 @@ public sealed class QuestStudioServiceTests : IDisposable
         using var output = new MemoryStream();
         input.CopyTo(output);
         return output.ToArray();
+    }
+
+    static SpatialAnchorExchange Anchor(string id, string mode, double x, double y, double z)
+    {
+        var value = new SpatialAnchorExchange
+        {
+            AnchorId = id, Mode = mode, RadiusMeters = 12.5,
+            Snapshot = new SpatialSnapshotReference { SnapshotId = 42, WorldId = "ComfyEra16", FileSha256 = new string('a', 64) },
+            Piece = new SpatialPieceReference { ZdoIndex = 17, Prefab = "piece_hearth", Position = new SpatialContractPoint(x, y, z) },
+            Producer = new SpatialProducerReference { Repository = "ComfyStewardView", Revision = new string('b', 40) }
+        };
+        value.ContentSha256 = SpatialExchangeContract.ComputeAnchorHash(value);
+        return value;
     }
 
     QuestStudioService CreateService()

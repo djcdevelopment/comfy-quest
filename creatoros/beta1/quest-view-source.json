@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "player": {
+    "name": "CreatorOS Beta Tester",
+    "discord": null
+  },
+  "created_at": "2026-08-31T00:00:00Z",
+  "picker_version": 1,
+  "quests": [
+    {
+      "quest_id": "air_drop",
+      "name": "Air Drop",
+      "category": "Signature Hunt",
+      "coopable": false,
+      "requirements": "Kill a Deathsquito with a thrown spear.",
+      "reward": null,
+      "evidence": {
+        "screenshots": 0,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": "Runtime and NetworkSense produce correlated machine evidence; Discord review remains a separate human action.",
+      "bot_command": null,
+      "auto_checked": true,
+      "venue": "slayers-field-lodge",
+      "trigger": {
+        "event": "kill",
+        "target": "$enemy_deathsquito",
+        "weapon_skill": "Spears",
+        "projectile": true
+      },
+      "guild": "Slayers",
+      "era": 17
+    },
+    {
+      "quest_id": "cold_shot",
+      "name": "Cold Shot",
+      "category": "Signature Hunt",
+      "coopable": false,
+      "requirements": "Kill a Drake with a thrown spear after completing Air Drop.",
+      "reward": null,
+      "evidence": {
+        "screenshots": 0,
+        "video_alternative": false,
+        "link": false,
+        "group_turnin": false,
+        "notes": false
+      },
+      "evidence_note": "Runtime and NetworkSense produce correlated machine evidence; Discord review remains a separate human action.",
+      "bot_command": null,
+      "auto_checked": true,
+      "venue": "slayers-field-lodge",
+      "trigger": {
+        "event": "kill",
+        "target": "$enemy_drake",
+        "weapon_skill": "Spears",
+        "projectile": true
+      },
+      "guild": "Slayers",
+      "era": 17
+    }
+  ]
+}

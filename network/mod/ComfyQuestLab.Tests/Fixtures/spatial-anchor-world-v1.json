@@ -1,0 +1,22 @@
+{
+  "schema": "comfy-quest-spatial-anchor/v1",
+  "anchor_id": "hearth-sphere",
+  "mode": "world",
+  "shape": "sphere",
+  "radius_meters": 12.5,
+  "snapshot": {
+    "snapshot_id": 42,
+    "world_id": "ComfyEra16",
+    "file_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "piece": {
+    "zdo_index": 17,
+    "prefab": "piece_hearth",
+    "position": { "x": 100, "y": 32.5, "z": -200 }
+  },
+  "producer": {
+    "repository": "ComfyStewardView",
+    "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "content_sha256": "0d46982b8031537cbb1b452e25713007223be885300aeba26a3f28b24ef074ca"
+}
