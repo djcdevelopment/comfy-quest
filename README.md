@@ -71,13 +71,13 @@ installation. Do not set ComfyCopyToPlugins during verification.
     python tools/assert_no_reach_in.py
     python tools/assert_no_reach_in.py --self-test
     gitleaks git --no-banner --redact --log-opts='--all' .
-    $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.9.3-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
+    $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.9.5-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
     $sdkVersion = (dotnet --version)
     $env:NUGET_PACKAGES = Join-Path $env:TEMP ("comfy-quest-verify-" + $contractsHash + "-" + $sdkVersion)
     dotnet build src/Quest.Studio/Quest.Studio.csproj -c Release
     dotnet test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release
 
-The Runtime Experience v2 cutover has its own `0.9.3-local` Contracts line. Never repack
+The Creator/DM authoring cutover has its own `0.9.5-local` Contracts line. Never repack
 that version with different bytes; increment the local version before another contract
 change. The package-and-SDK-keyed cache above also prevents an older local artifact from
 masking a source change. Studio targets .NET 9 and therefore
@@ -97,6 +97,22 @@ creator-safe Grimoire meanings, all backed by fail-closed Runtime adapters and a
 for production authoring. The three engine events stay separate from that creator
 vocabulary. The 91
 low-level assembly seams never become authoring choices.
+
+Creator/DM mode connects that same authoring surface to Steward's measured WebGPU scene and
+Runtime's live Charm candidates. Configure these process-only values before starting Studio:
+
+    $env:COMFY_QUEST_STEWARD_SCENE_URL = 'http://127.0.0.1:7081'
+    $env:COMFY_QUEST_STEWARD_VIEWER_URL = 'http://127.0.0.1:7080'
+    $env:COMFY_QUEST_STEWARD_TOKEN = '<same operator secret configured in Steward>'
+
+The browser receives the private scene but never the operator secret. Studio accepts a clicked piece
+only when it belongs to the content-addressed Steward scene, its snapshot hash matches the active
+Creator Session's pinned `.db` backup, and exactly one nearby Runtime candidate has the same prefab
+and centimetre-quantized position. **Activate rite** starts the durable authored trigger. **Quick
+Cast** invokes that route's reversible actions immediately in a companion run; **Undo Cast** retires
+the exact run, removes its owned timers/claims/spawns, and restores the prior binding. The
+`field-lodge-offering` template is the first live proof: drop Resin within 6m of the selected sign to
+show “The lodge answers the offering.” and spawn one Greyling at radius 6.
 
 Open `docs/quest-mission-control.html` directly on a second display for the current
 Creator OS lane, dogfood portfolio roadmap, fleet roles, machine-derived choreography,

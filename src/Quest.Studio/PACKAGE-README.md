@@ -9,6 +9,11 @@ responsible for loopback/browser-token authorization, durable state, and locatin
 the local Valheim installation. Studio communicates with gameplay only by creating
 validated, data-only `.questpack` files for Comfy Quest Runtime.
 
+A host may also implement `IQuestStudioStewardHost` to enable the private Creator/DM scene. The
+connection contains separate Steward scene and Viewer origins plus a server-only operator token;
+Studio never returns that credential to browser code. Measured scenes and the pinned Steward WebGPU
+renderer are exchanged as versioned artifacts, with no sibling-repository source dependency.
+
 Every Studio release depends on the exact matching
 `Comfy.Quest.Contracts` version. The source, integration boundary, release
 procedure, and package payload validator live in the

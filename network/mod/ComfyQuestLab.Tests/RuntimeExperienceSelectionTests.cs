@@ -245,7 +245,7 @@ public sealed class RuntimeExperienceSelectionTests {
 
   [Fact] public void SelectExperienceIsAllowlistedAndCarriesNoRun() {
     var now = DateTimeOffset.Parse("2026-08-25T12:00:00Z");
-    Assert.Equal(new[] { "preview_reset", "apply_reset", "select_experience", "list_binding_candidates", "bind_selected_experience", "restore_binding" },
+    Assert.Equal(new[] { "preview_reset", "apply_reset", "preview_retire", "apply_retire", "select_experience", "list_binding_candidates", "bind_selected_experience", "restore_binding" },
       RuntimeRunControlRequestPolicy.Operations);
 
     // It addresses the activated pack, not a run, as do the bounded binding operations below.

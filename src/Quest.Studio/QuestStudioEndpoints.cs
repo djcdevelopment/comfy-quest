@@ -23,6 +23,29 @@ public static class QuestStudioEndpoints
         app.MapGet("/quest-studio", () => Results.Text(QuestStudioPage.Html, "text/html", Encoding.UTF8));
         app.MapGet("/quest-studio/studio.css", () => Results.Text(QuestStudioPage.Css, "text/css", Encoding.UTF8));
         app.MapGet("/quest-studio/studio.js", () => Results.Text(QuestStudioPage.Js, "text/javascript", Encoding.UTF8));
+        app.MapGet("/quest-studio/creator-scene.js", (HttpResponse response) =>
+        {
+            response.Headers.CacheControl = "private, max-age=300";
+            response.Headers["X-Content-Type-Options"] = "nosniff";
+            response.Headers["X-Steward-Renderer-Sha256"] = QuestStudioCreatorRenderer.ArtifactSha256;
+            return Results.Text(QuestStudioCreatorRenderer.Js, "text/javascript", Encoding.UTF8);
+        });
+
+        app.MapPost("/api/v2/quest-studio/creator/scene", async (HttpRequest request,
+            HttpResponse response, StudioCreatorSceneRequest? body, QuestStudioService studio,
+            CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.FetchCreatorSceneAsync(body, cancellationToken);
+            if (!result.Ok)
+                return Results.Json(new { ok = false, error = result.Error }, host.Json,
+                    statusCode: StatusCodes.Status400BadRequest);
+            response.Headers["X-Steward-Scene-Id"] = result.SceneId;
+            response.Headers["X-Steward-Scene-Pieces"] = result.PieceCount.ToString();
+            response.Headers["X-Steward-Scene-Instances"] = result.InstanceCount.ToString();
+            return Results.File(result.Bytes!, result.ContentType!);
+        });
 
         app.MapGet("/api/v2/quest-studio/catalog", (QuestStudioService studio) => Results.Json(studio.WorkspaceCatalog(), host.Json));
         app.MapGet("/api/v2/quest-studio/builds", (HttpRequest request, HttpResponse response, [FromServices] QuestStudioBuildService builds) =>
@@ -328,6 +351,54 @@ public static class QuestStudioEndpoints
                 : result.Conflict || result.Error == "anchor_id_conflict" ? StatusCodes.Status409Conflict
                 : result.Error is "project_missing" or "route_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
         }).WithMetadata(new RequestSizeLimitAttribute(MaxImportRequestBytes));
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/creator/target", async
+            (string projectId, HttpRequest request, HttpResponse response,
+                StudioCreatorTargetRequest? body, QuestStudioService studio,
+                CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.SelectCreatorTargetAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error is "project_missing" or "route_missing" ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/creator/cast", async
+            (string projectId, HttpRequest request, HttpResponse response,
+                StudioCreatorCastRequest? body, QuestStudioService studio,
+                CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.CreatorCastAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict
+                : result.Error == "project_missing" ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest);
+        });
+        app.MapGet("/api/v2/quest-studio/projects/{projectId}/creator/cast-status",
+            (string projectId, HttpRequest request, HttpResponse response,
+                QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.CreatorCastStatus(projectId);
+            return Results.Json(result, host.Json, statusCode: result.Ok
+                ? StatusCodes.Status200OK : StatusCodes.Status404NotFound);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/creator/undo-cast", async
+            (string projectId, HttpRequest request, HttpResponse response,
+                StudioCreatorUndoCastRequest? body, QuestStudioService studio,
+                CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.UndoCreatorCastAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Error == "project_missing" ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest);
+        });
         app.MapPost("/api/v2/quest-studio/projects/{projectId}/publish", async (string projectId, HttpRequest request, HttpResponse response, StudioPublishRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
         {
             NoStore(response);
@@ -371,6 +442,20 @@ public static class QuestStudioEndpoints
             NoStore(response);
             if (!host.Authorize(request)) return Forbidden(host);
             var result = await studio.ApplyResetAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/retire-preview", async (string projectId, HttpRequest request, HttpResponse response, StudioRunRetireRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.PreviewRetireAsync(projectId, body, cancellationToken);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/retire", async (string projectId, HttpRequest request, HttpResponse response, StudioRunRetireRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = await studio.ApplyRetireAsync(projectId, body, cancellationToken);
             return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest);
         });
         app.MapPost("/api/v2/quest-studio/projects/{projectId}/runs/select-experience", async (string projectId, HttpRequest request, HttpResponse response, StudioSelectExperienceRequest? body, QuestStudioService studio, CancellationToken cancellationToken) =>

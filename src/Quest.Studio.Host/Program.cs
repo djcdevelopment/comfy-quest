@@ -61,7 +61,8 @@ static int ReadPort(string[] arguments)
     return int.TryParse(configured, out var value) && value is >= 1024 and <= 65535 ? value : 8085;
 }
 
-sealed class StandaloneQuestStudioHost : IQuestStudioHost, IQuestStudioRAndDHost, IQuestStudioArchitecturalRAndDHost
+sealed class StandaloneQuestStudioHost : IQuestStudioHost, IQuestStudioRAndDHost,
+    IQuestStudioArchitecturalRAndDHost, IQuestStudioStewardHost
 {
     readonly int _port;
     readonly byte[] _tokenBytes;
@@ -81,6 +82,20 @@ sealed class StandaloneQuestStudioHost : IQuestStudioHost, IQuestStudioRAndDHost
     public string BrowserToken { get; }
     public JsonSerializerOptions Json { get; }
     public string? RepositoryRoot { get; }
+
+    public QuestStudioStewardConnection? StewardConnection
+    {
+        get
+        {
+            var scene = Environment.GetEnvironmentVariable("COMFY_QUEST_STEWARD_SCENE_URL");
+            var viewer = Environment.GetEnvironmentVariable("COMFY_QUEST_STEWARD_VIEWER_URL");
+            var token = Environment.GetEnvironmentVariable("COMFY_QUEST_STEWARD_TOKEN");
+            return Uri.TryCreate(scene, UriKind.Absolute, out var sceneUri)
+                && Uri.TryCreate(viewer, UriKind.Absolute, out var viewerUri)
+                && !string.IsNullOrWhiteSpace(token)
+                ? new(sceneUri, viewerUri, token) : null;
+        }
+    }
 
     public QuestStudioArchitecturalImporter? ArchitecturalImporter
     {

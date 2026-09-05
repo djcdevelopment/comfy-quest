@@ -159,16 +159,17 @@
     },
     {
       "id": "FR-WORLD-001",
-      "disposition": "parked",
-      "reason": "Named anchors are out of scope for 4A unless the authored slice needs spatial references, and the build strategy places them explicitly off the critical path. queue.anchors carries the conditional work item; nothing schedules it yet.",
-      "pending_ruling": "Whether the authored slice needs spatial references. Until that is answered no lane admits anchors.",
-      "note": "docs/creator-os-phases.json, lane 4A out_of_scope."
+      "disposition": "active",
+      "lane": "4B",
+      "lane_authority": "queue-realization",
+      "note": "The Creator/DM Field Lodge rite triggered the authored spatial need. Steward now supplies content-addressed private scene identities and Studio resolves a clicked piece to one exact live Runtime candidate; the live AM4 proof remains pending."
     },
     {
       "id": "FR-WORLD-002",
-      "disposition": "parked",
-      "reason": "Anchor authoring in Studio is conditional on FR-WORLD-001 being triggered by an authored need. Same disposition, same trigger.",
-      "pending_ruling": "The same ruling as FR-WORLD-001: anchor authoring follows anchor capture."
+      "disposition": "active",
+      "lane": "4B",
+      "lane_authority": "queue-realization",
+      "note": "Studio previews the measured world in WebGPU, imports the selected Steward anchor into the existing Experience v2 spatial contract, and fails closed on missing, stale, wrong-world, absent, or ambiguous live targets. Live AM4 execution remains pending."
     },
     {
       "id": "FR-WORLD-003",

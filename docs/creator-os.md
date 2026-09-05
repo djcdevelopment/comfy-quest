@@ -304,6 +304,18 @@ The single-experience reading order remains **Author -> Rehearse -> Play -> Obse
 
 The broader dogfood order is **Steward configures -> Creator instantiates -> Author in the world and Studio -> Rehearse -> Play -> Observe -> Revise -> Reset -> Run again -> Release**. A Guild is the steward-owned creative system around configuration, palette, and progression; creators use its abstractions to make artifacts and campaigns for players. The active proof is deliberately narrower than a framework: Slayers Signature Hunt must produce two meaningfully distinct creator instances, one campaign, and correlated installed-Valheim evidence. Studio now implements that hierarchy and one bounded campaign-start operation through exact activation and bind/start of the unique root. Its receipt says `started`, not completed: the fixed fixture is preparation evidence only, and no installed Signature Hunt kill, successor, terminal campaign, reset/rerun, or cleanup/restoration proof exists yet. The requirements and exit gates are in `docs/creator-portfolio-requirements.md`.
 
+Creator/DM mode now places Steward's measured WebGPU view directly above the same Studio draft. The
+server, not the browser, holds the Steward operator token. A click carries only an identity from a
+content-addressed `SVCA` scene; Studio re-resolves its anchor, proves the snapshot file hash against
+the active Creator Session's pinned `.db` backup, and requires exactly one nearby Runtime candidate
+with the same prefab and centimetre-quantized position. **Activate rite** binds the ordinary durable
+experience. **Quick Cast** packages the chosen route's reversible actions behind the engine-owned
+`experience_started` event and holds that separate run until **Undo Cast** retires its exact owned
+state/spawns and restores the previous binding. The `field-lodge-offering` proof is Resin plus
+`within_radius` at 6m, the message “The lodge answers the offering.”, and one Greyling spawned at
+radius 6. This is implementation and contract-test evidence only until the AM4 `ComfyQuestDemo`
+scene, Field Lodge sign, activation, cast, and undo are executed live.
+
 The simulated start path now verifies the exact fixture and its 17/17-object receipt, correlates
 the Deathsquito and Drake matcher targets to the two compiled instances, carries the prerequisite
 machine/world/Creator Session pins through binding, requires the entry's explicit successor, and

@@ -106,6 +106,79 @@ public sealed class RuntimeRunTests : IDisposable
   }
 
   [Fact]
+  public void ConfirmedRetireCleansExactSpawnsAndCreatesNoSuccessor()
+  {
+    var coordinator=new RuntimeRunCoordinator(root);
+    var run=coordinator.Resolve(Scope(),now);
+    SeedRun(run,1);
+    var other=coordinator.Resolve(Scope("other-experience","other-content"),now.AddSeconds(1));
+    SeedRun(other,9);
+    var adapter=new FakeSpawnAdapter();
+    var preview=coordinator.PreviewRetire(run.RunId,now.AddSeconds(2),adapter,noticeCount:2);
+
+    Assert.Equal("comfy-quest-runtime-retire-preview/v1",preview.Schema);
+    Assert.Single(preview.Snapshot.SpawnedObjects);
+    var cleared=0;
+    var result=coordinator.ApplyRetire(run.RunId,preview.PreviewToken,now.AddSeconds(3),adapter,()=>cleared++);
+
+    Assert.Equal("completed",result.State);
+    Assert.Equal(run.RunId,result.RunId);
+    Assert.False(result.SuccessorCreated);
+    Assert.Equal(1,result.WorkflowStatesScoped);
+    Assert.Equal(1,result.TimersScoped);
+    Assert.Equal(1,result.ActionClaimsScoped);
+    Assert.Equal(1,result.SpawnRowsCleaned);
+    Assert.Equal(2,result.NoticesCleared);
+    Assert.Equal(1,cleared);
+    var registry=new RuntimeRunRegistry(root);
+    Assert.Equal("retired",registry.Find(run.RunId).Status);
+    Assert.Equal("undone",registry.Find(run.RunId).Outcome);
+    Assert.Equal(result.RetireId,registry.Find(run.RunId).RetireId);
+    Assert.Equal(2,registry.List().Count);
+    Assert.Null(new WorkflowStateStore(root).GetByKey(run.StateKey));
+    Assert.Empty(OwnedTimers(run.StateKey));
+    Assert.Empty(OwnedClaims(run.StateKey));
+    Assert.Empty(OwnedSpawns(run.StateKey));
+    Assert.NotNull(new WorkflowStateStore(root).GetByKey(other.StateKey));
+    Assert.Single(OwnedTimers(other.StateKey));
+    Assert.Single(OwnedClaims(other.StateKey));
+    Assert.Single(OwnedSpawns(other.StateKey));
+
+    var replay=coordinator.ApplyRetire(run.RunId,preview.PreviewToken,now.AddMinutes(1),adapter,()=>cleared++);
+    Assert.Equal(result.RetireId,replay.RetireId);
+    Assert.Equal(1,cleared);
+    Assert.Equal(2,registry.List().Count);
+  }
+
+  [Fact]
+  public void RetireResumesTheSameTransactionAfterEphemeraCleanupFails()
+  {
+    var coordinator=new RuntimeRunCoordinator(root);
+    var run=coordinator.Resolve(Scope(),now);
+    SeedRun(run,1);
+    var adapter=new FakeSpawnAdapter();
+    var preview=coordinator.PreviewRetire(run.RunId,now.AddSeconds(1),adapter);
+
+    var incomplete=coordinator.ApplyRetire(run.RunId,preview.PreviewToken,
+      now.AddSeconds(2),adapter,()=>throw new InvalidOperationException("ephemera_busy"));
+
+    Assert.Equal("cleanup_incomplete",incomplete.State);
+    Assert.Equal("ephemera_busy",incomplete.Detail);
+    Assert.Equal("retired",new RuntimeRunRegistry(root).Find(run.RunId).Status);
+    Assert.Null(new WorkflowStateStore(root).GetByKey(run.StateKey));
+    Assert.Empty(OwnedTimers(run.StateKey));
+    Assert.Empty(OwnedClaims(run.StateKey));
+    Assert.Empty(OwnedSpawns(run.StateKey));
+
+    var cleared=0;
+    var completed=coordinator.ApplyRetire(run.RunId,preview.PreviewToken,
+      now.AddSeconds(3),adapter,()=>cleared++);
+    Assert.Equal("completed",completed.State);
+    Assert.Equal(incomplete.RetireId,completed.RetireId);
+    Assert.Equal(1,cleared);
+  }
+
+  [Fact]
   public void SuccessorStartFailureRemainsResumableAndReusesTheExactSuccessor()
   {
     var coordinator=new RuntimeRunCoordinator(root);
@@ -312,6 +385,12 @@ public sealed class RuntimeRunTests : IDisposable
     Assert.Equal("request_time_invalid",expiry);
     valid.RequestId="..\\outside";
     Assert.False(RuntimeRunControlRequestPolicy.CanAddressReceipt(valid));
+
+    var retire=new RuntimeRunControlRequest{RequestId="request-2",Operation="apply_retire",CreatedUtc=now.ToString("O"),ExpiresUtc=now.AddMinutes(2).ToString("O"),ExpectedMachine="OMEN",ExpectedWorldUid="123",CreatorSessionId="creator-session-one",RunId="run-one",PreviewToken="retp-one",ConfirmRetire=true};
+    Assert.True(RuntimeRunControlRequestPolicy.Validate(retire,now,out var retireAccepted),retireAccepted);
+    retire.ConfirmRetire=false;
+    Assert.False(RuntimeRunControlRequestPolicy.Validate(retire,now,out var retireConfirmation));
+    Assert.Equal("retire_confirmation_required",retireConfirmation);
   }
 
   void SeedRun(RuntimeRunRecord run,uint objectId)

@@ -35,6 +35,7 @@ public sealed class RuntimeRunRecord {
   [JsonProperty("outcome",NullValueHandling=NullValueHandling.Ignore)] public string Outcome {get;set;}
   [JsonProperty("predecessor_run_id",NullValueHandling=NullValueHandling.Ignore)] public string PredecessorRunId {get;set;}
   [JsonProperty("reset_id",NullValueHandling=NullValueHandling.Ignore)] public string ResetId {get;set;}
+  [JsonProperty("retire_id",NullValueHandling=NullValueHandling.Ignore)] public string RetireId {get;set;}
   [JsonProperty("continuation_predecessor_run_id",NullValueHandling=NullValueHandling.Ignore)] public string ContinuationPredecessorRunId {get;set;}
   [JsonProperty("continuation_id",NullValueHandling=NullValueHandling.Ignore)] public string ContinuationId {get;set;}
   [JsonProperty("legacy_storage")] public bool LegacyStorage {get;set;}
@@ -70,6 +71,7 @@ public sealed class RuntimeRunRegistry {
   public IReadOnlyList<RuntimeRunRecord> List(){lock(gate){var file=Read();return file.Unreadable?Array.Empty<RuntimeRunRecord>():file.Runs.OrderByDescending(x=>x.StartedUtc).ToArray();}}
   public bool IsActive(WorkflowIdentity identity){if(identity==null)return false;lock(gate){var file=Read();if(file.Unreadable)return false;var matches=file.Runs.Where(x=>x.StateKey==identity.Key||(!string.IsNullOrWhiteSpace(identity.RunId)&&x.RunId==identity.RunId)).ToArray();return matches.Length==0&&string.IsNullOrWhiteSpace(identity.RunId)||matches.Any(x=>x.Status=="active");}}
   public RuntimeRunRecord StartSuccessor(string priorRunId,string resetId,DateTimeOffset now){lock(gate){var file=Read();if(file.Unreadable)throw new InvalidDataException("run_registry_unreadable");var prior=file.Runs.FirstOrDefault(x=>x.RunId==priorRunId);if(prior==null)throw new InvalidOperationException("run_missing");var existing=file.Runs.FirstOrDefault(x=>x.PredecessorRunId==priorRunId&&x.ResetId==resetId);if(existing!=null)return existing;if(prior.Status!="active")throw new InvalidOperationException("run_not_active");if(file.Runs.Count>=MaxRuns)throw new InvalidOperationException("run_registry_limit");prior.Status="reset";prior.EndedUtc=now;prior.ResetId=resetId;var next=new RuntimeRunRecord{RunId=NewRunId(now),ScopeId=prior.ScopeId,Scope=CloneScope(prior.Scope),StateKey=null,Status="active",StartedUtc=now,PredecessorRunId=prior.RunId,ResetId=resetId,RewardPolicy="per_run"};next.StateKey=next.RunId;file.Runs.Add(next);Write(file);return next;}}
+  public RuntimeRunRecord Retire(string runId,string retireId,DateTimeOffset now){if(!Safe(runId,96)||!Safe(retireId,96))throw new ArgumentException("retire_scope_invalid");lock(gate){var file=Read();if(file.Unreadable)throw new InvalidDataException("run_registry_unreadable");var run=file.Runs.FirstOrDefault(x=>x.RunId==runId)??throw new InvalidOperationException("run_missing");if(run.Status=="retired"&&run.RetireId==retireId)return run;if(run.Status!="active")throw new InvalidOperationException("run_not_active");run.Status="retired";run.RetireId=retireId;run.EndedUtc=now;run.Outcome="undone";Write(file);return run;}}
   /// <summary>Start, or recover, the one run pinned by a campaign handoff. Unlike a reset the
   /// completed predecessor remains intact; only the experience id changes in the exact scope.</summary>
   public RuntimeRunRecord StartContinuation(string priorRunId,string continuationId,
@@ -107,7 +109,7 @@ public sealed class RuntimeRunRegistry {
   static void Validate(RuntimeRunScope scope){if(scope==null||!Safe(scope.WorldId,80)||!Safe(scope.ExperienceId,80)||!Safe(scope.BindingZdo,80)||!OptionalSafe(scope.BindingInstanceId,80)||!Safe(scope.ContentHash,128)||scope.ParticipantIds==null||scope.ParticipantIds.Count<1||scope.ParticipantIds.Count>16||scope.ParticipantIds.Any(x=>!Safe(x,80)))throw new ArgumentException("run_scope_invalid");}
   static bool OptionalSafe(string value,int max)=>string.IsNullOrWhiteSpace(value)||Safe(value,max);
   static bool Safe(string value,int max)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=max&&value.All(c=>char.IsLetterOrDigit(c)||c=='-'||c=='_'||c==':'||c=='$');
-  State Read(){if(!File.Exists(path))return new();try{var info=new FileInfo(path);if(info.Length<=0||info.Length>MaxRegistryBytes)return new State{Unreadable=true};var value=JsonConvert.DeserializeObject<State>(File.ReadAllText(path))??new();value.Runs??=new();var ids=new HashSet<string>(StringComparer.Ordinal);var activeScopes=new HashSet<string>(StringComparer.Ordinal);var continuationIds=new HashSet<string>(StringComparer.Ordinal);if(value.Schema!="comfy-quest-runtime-run-registry/v1"||value.Runs.Count>MaxRuns)value.Unreadable=true;foreach(var run in value.Runs){var continuationEmpty=string.IsNullOrWhiteSpace(run?.ContinuationId)&&string.IsNullOrWhiteSpace(run?.ContinuationPredecessorRunId);var continuationValid=!string.IsNullOrWhiteSpace(run?.ContinuationId)&&!string.IsNullOrWhiteSpace(run?.ContinuationPredecessorRunId)&&Safe(run.ContinuationId,96)&&Safe(run.ContinuationPredecessorRunId,96)&&continuationIds.Add(run.ContinuationId);if(run==null||!Safe(run.RunId,96)||!ids.Add(run.RunId)||run.Scope==null||run.ScopeId!=run.Scope.ScopeId||string.IsNullOrWhiteSpace(run.StateKey)||run.StateKey.Length>1024||run.Status is not ("active" or "reset")||run.RewardPolicy!="per_run"||run.Status=="active"&&!activeScopes.Add(run.ScopeId)||!continuationEmpty&&!continuationValid){value.Unreadable=true;break;}try{Validate(run.Scope);}catch{value.Unreadable=true;break;}}return value;}catch{return new State{Unreadable=true};}}
+  State Read(){if(!File.Exists(path))return new();try{var info=new FileInfo(path);if(info.Length<=0||info.Length>MaxRegistryBytes)return new State{Unreadable=true};var value=JsonConvert.DeserializeObject<State>(File.ReadAllText(path))??new();value.Runs??=new();var ids=new HashSet<string>(StringComparer.Ordinal);var activeScopes=new HashSet<string>(StringComparer.Ordinal);var continuationIds=new HashSet<string>(StringComparer.Ordinal);if(value.Schema!="comfy-quest-runtime-run-registry/v1"||value.Runs.Count>MaxRuns)value.Unreadable=true;foreach(var run in value.Runs){var continuationEmpty=string.IsNullOrWhiteSpace(run?.ContinuationId)&&string.IsNullOrWhiteSpace(run?.ContinuationPredecessorRunId);var continuationValid=!string.IsNullOrWhiteSpace(run?.ContinuationId)&&!string.IsNullOrWhiteSpace(run?.ContinuationPredecessorRunId)&&Safe(run.ContinuationId,96)&&Safe(run.ContinuationPredecessorRunId,96)&&continuationIds.Add(run.ContinuationId);var retiredValid=run?.Status!="retired"||Safe(run.RetireId,96);if(run==null||!Safe(run.RunId,96)||!ids.Add(run.RunId)||run.Scope==null||run.ScopeId!=run.Scope.ScopeId||string.IsNullOrWhiteSpace(run.StateKey)||run.StateKey.Length>1024||run.Status is not ("active" or "reset" or "retired")||!retiredValid||run.RewardPolicy!="per_run"||run.Status=="active"&&!activeScopes.Add(run.ScopeId)||!continuationEmpty&&!continuationValid){value.Unreadable=true;break;}try{Validate(run.Scope);}catch{value.Unreadable=true;break;}}return value;}catch{return new State{Unreadable=true};}}
   void Write(State value){Directory.CreateDirectory(Path.GetDirectoryName(path));var json=JsonConvert.SerializeObject(value,Formatting.Indented);if(Encoding.UTF8.GetByteCount(json)>MaxRegistryBytes)throw new InvalidDataException("run_registry_too_large");var temp=path+".tmp";File.WriteAllText(temp,json);if(File.Exists(path))File.Replace(temp,path,path+".previous");else File.Move(temp,path);}
   sealed class State{[JsonProperty("schema")]public string Schema{get;set;}="comfy-quest-runtime-run-registry/v1";[JsonProperty("runs")]public List<RuntimeRunRecord> Runs{get;set;}=new();[JsonIgnore]public bool Unreadable{get;set;}}
 }
@@ -169,6 +171,34 @@ public sealed class RuntimeResetResult {
   [JsonProperty("successor_reward_policy")] public string SuccessorRewardPolicy {get;set;}="per_run";
 }
 
+public sealed class RuntimeRetirePreview {
+  [JsonProperty("schema")] public string Schema {get;set;}="comfy-quest-runtime-retire-preview/v1";
+  [JsonProperty("preview_token")] public string PreviewToken {get;set;}
+  [JsonProperty("run_id")] public string RunId {get;set;}
+  [JsonProperty("scope_id")] public string ScopeId {get;set;}
+  [JsonProperty("created_utc")] public DateTimeOffset CreatedUtc {get;set;}
+  [JsonProperty("expires_utc")] public DateTimeOffset ExpiresUtc {get;set;}
+  [JsonProperty("snapshot_hash")] public string SnapshotHash {get;set;}
+  [JsonProperty("snapshot")] public RuntimeResetSnapshot Snapshot {get;set;}
+}
+
+public sealed class RuntimeRetireResult {
+  [JsonProperty("schema")] public string Schema {get;set;}="comfy-quest-runtime-retire-result/v1";
+  [JsonProperty("retire_id")] public string RetireId {get;set;}
+  [JsonProperty("preview_token")] public string PreviewToken {get;set;}
+  [JsonProperty("state")] public string State {get;set;}
+  [JsonProperty("detail",NullValueHandling=NullValueHandling.Ignore)] public string Detail {get;set;}
+  [JsonProperty("run_id")] public string RunId {get;set;}
+  [JsonProperty("completed_utc",NullValueHandling=NullValueHandling.Ignore)] public DateTimeOffset? CompletedUtc {get;set;}
+  [JsonProperty("workflow_states_scoped")] public int WorkflowStatesScoped {get;set;}
+  [JsonProperty("timers_scoped")] public int TimersScoped {get;set;}
+  [JsonProperty("action_claims_scoped")] public int ActionClaimsScoped {get;set;}
+  [JsonProperty("spawn_rows_cleaned")] public int SpawnRowsCleaned {get;set;}
+  [JsonProperty("notices_cleared")] public int NoticesCleared {get;set;}
+  [JsonProperty("previous_rewards")] public string PreviousRewards {get;set;}="retained";
+  [JsonProperty("successor_created")] public bool SuccessorCreated {get;set;}
+}
+
 public sealed class RuntimeRunControlRequest {
   public const string CurrentSchema="comfy-quest-runtime-run-control-request/v1";
   [JsonProperty("schema")] public string Schema {get;set;}=CurrentSchema;
@@ -187,21 +217,24 @@ public sealed class RuntimeRunControlRequest {
   [JsonProperty("binding_zdo",NullValueHandling=NullValueHandling.Ignore)] public string BindingZdo {get;set;}
   [JsonProperty("binding_change_id",NullValueHandling=NullValueHandling.Ignore)] public string BindingChangeId {get;set;}
   [JsonProperty("confirm_reset")] public bool ConfirmReset {get;set;}
+  [JsonProperty("confirm_retire")] public bool ConfirmRetire {get;set;}
 }
 public static class RuntimeRunControlRequestPolicy {
   /// <summary>The allowlist. Reset operations address one exact run; selection and binding
   /// operations address the activated pack and therefore carry no run id. The operation is checked
   /// before identity because the permitted identity fields depend on it.</summary>
-  public static readonly IReadOnlyList<string> Operations=new[]{"preview_reset","apply_reset","select_experience","list_binding_candidates","bind_selected_experience","restore_binding"};
+  public static readonly IReadOnlyList<string> Operations=new[]{"preview_reset","apply_reset","preview_retire","apply_retire","select_experience","list_binding_candidates","bind_selected_experience","restore_binding"};
   public static bool Validate(RuntimeRunControlRequest request,DateTimeOffset now,out string error){
     if(request==null||request.Schema!=RuntimeRunControlRequest.CurrentSchema){error="request_schema_invalid";return false;}
     if(!Operations.Contains(request.Operation)){error="operation_not_allowlisted";return false;}
     var reset=request.Operation is "preview_reset" or "apply_reset";
+    var retire=request.Operation is "preview_retire" or "apply_retire";
+    var runOperation=reset||retire;
     var select=request.Operation=="select_experience";
     var bind=request.Operation=="bind_selected_experience";
     var restore=request.Operation=="restore_binding";
     if(!Safe(request.RequestId,80)||!Safe(request.ExpectedMachine,80)||!Safe(request.CreatorSessionId,80)
-        ||reset&&!Safe(request.RunId,96)||!reset&&!string.IsNullOrWhiteSpace(request.RunId)
+        ||runOperation&&!Safe(request.RunId,96)||!runOperation&&!string.IsNullOrWhiteSpace(request.RunId)
         ||!long.TryParse(request.ExpectedWorldUid,NumberStyles.Integer,CultureInfo.InvariantCulture,out var world)||world==0){error="request_identity_invalid";return false;}
     if((select||bind)&&!Safe(request.ExperienceId,80)){error="experience_selection_required";return false;}
     if(!(select||bind)&&!string.IsNullOrWhiteSpace(request.ExperienceId)){error="experience_selection_not_allowed";return false;}
@@ -210,7 +243,10 @@ public static class RuntimeRunControlRequestPolicy {
     if(restore&&!Safe(request.BindingChangeId,80)){error="binding_change_required";return false;}
     if(!restore&&!string.IsNullOrWhiteSpace(request.BindingChangeId)){error="binding_change_not_allowed";return false;}
     if(request.Operation=="apply_reset"&&(!request.ConfirmReset||!Safe(request.PreviewToken,80))){error="reset_confirmation_required";return false;}
-    if(request.Operation!="apply_reset"&&(request.ConfirmReset||!string.IsNullOrWhiteSpace(request.PreviewToken))){error="reset_confirmation_not_allowed";return false;}
+    if(request.Operation!="apply_reset"&&request.ConfirmReset){error="reset_confirmation_not_allowed";return false;}
+    if(request.Operation=="apply_retire"&&(!request.ConfirmRetire||!Safe(request.PreviewToken,80))){error="retire_confirmation_required";return false;}
+    if(request.Operation!="apply_retire"&&request.ConfirmRetire){error="retire_confirmation_not_allowed";return false;}
+    if(request.Operation is not ("apply_reset" or "apply_retire")&&!string.IsNullOrWhiteSpace(request.PreviewToken)){error="preview_token_not_allowed";return false;}
     if(!DateTimeOffset.TryParse(request.CreatedUtc,CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out var created)||!DateTimeOffset.TryParse(request.ExpiresUtc,CultureInfo.InvariantCulture,DateTimeStyles.RoundtripKind,out var expires)||created<now.AddMinutes(-30)||created>now.AddMinutes(1)||expires<=now||expires<=created||expires>now.AddMinutes(10)){error="request_time_invalid";return false;}
     error=null;return true;
   }
@@ -258,6 +294,8 @@ public sealed class RuntimeRunControlReceipt {
   [JsonProperty("completed_utc")] public DateTimeOffset CompletedUtc {get;set;}
   [JsonProperty("preview",NullValueHandling=NullValueHandling.Ignore)] public RuntimeResetPreview Preview {get;set;}
   [JsonProperty("result",NullValueHandling=NullValueHandling.Ignore)] public RuntimeResetResult Result {get;set;}
+  [JsonProperty("retire_preview",NullValueHandling=NullValueHandling.Ignore)] public RuntimeRetirePreview RetirePreview {get;set;}
+  [JsonProperty("retire_result",NullValueHandling=NullValueHandling.Ignore)] public RuntimeRetireResult RetireResult {get;set;}
   [JsonProperty("binding_candidates",NullValueHandling=NullValueHandling.Ignore)] public IReadOnlyList<RuntimeBindingCandidate> BindingCandidates {get;set;}
   [JsonProperty("binding_change",NullValueHandling=NullValueHandling.Ignore)] public RuntimeBindingChange BindingChange {get;set;}
 }
@@ -310,6 +348,8 @@ public sealed class RuntimeRunCoordinator {
   public RuntimeRunRecord Resolve(RuntimeRunScope scope,DateTimeOffset now){var active=registry.Active(scope);if(active!=null)return active;if(!workflows.TryGetByKey(scope.LegacyKey,out var workflow))throw new InvalidDataException("workflow_state_unreadable");if(!timers.TryForOwner(scope.LegacyKey,out var timerRows))throw new InvalidDataException("timer_state_unreadable");if(!actions.TryForOwner(scope.LegacyKey,out var claims))throw new InvalidDataException("action_state_unreadable");if(!spawned.TryForOwner(scope.LegacyKey,out var spawnRows))throw new InvalidDataException("spawn_state_unreadable");var legacy=workflow!=null||timerRows.Count>0||claims.Count>0||spawnRows.Count>0;return registry.Resolve(scope,legacy,now);}
 
   public RuntimeResetPreview Preview(string runId,DateTimeOffset now,IRuntimeSpawnResetAdapter adapter,int noticeCount=0){var run=registry.Find(runId);if(run==null)throw new InvalidOperationException("run_missing");if(run.Status!="active")throw new InvalidOperationException("run_not_active");var snapshot=Snapshot(run,adapter,noticeCount);if(snapshot.SpawnedObjects.Any(x=>x.Inspection==null||!x.Inspection.Safe))throw new InvalidOperationException("spawn_cleanup_ambiguous");var hash=RuntimeRunHash.Hex(JsonConvert.SerializeObject(snapshot,Formatting.None));var token="rstp-"+now.ToUniversalTime().ToString("yyyyMMdd'T'HHmmssfff'Z'",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N").Substring(0,12);var preview=new RuntimeResetPreview{PreviewToken=token,RunId=run.RunId,ScopeId=run.ScopeId,CreatedUtc=now,ExpiresUtc=now.AddMinutes(5),SnapshotHash=hash,Snapshot=snapshot};var directory=Path.Combine(root,"state","reset-previews");PruneExpiredPreviews(directory,now,63);WriteBounded(Path.Combine(directory,token+".json"),preview);return preview;}
+
+  public RuntimeRetirePreview PreviewRetire(string runId,DateTimeOffset now,IRuntimeSpawnResetAdapter adapter,int noticeCount=0){var run=registry.Find(runId);if(run==null)throw new InvalidOperationException("run_missing");if(run.Status!="active")throw new InvalidOperationException("run_not_active");var snapshot=Snapshot(run,adapter,noticeCount);if(snapshot.SpawnedObjects.Any(x=>x.Inspection==null||!x.Inspection.Safe))throw new InvalidOperationException("spawn_cleanup_ambiguous");var hash=RuntimeRunHash.Hex(JsonConvert.SerializeObject(snapshot,Formatting.None));var token="retp-"+now.ToUniversalTime().ToString("yyyyMMdd'T'HHmmssfff'Z'",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N").Substring(0,12);var preview=new RuntimeRetirePreview{PreviewToken=token,RunId=run.RunId,ScopeId=run.ScopeId,CreatedUtc=now,ExpiresUtc=now.AddMinutes(5),SnapshotHash=hash,Snapshot=snapshot};var directory=Path.Combine(root,"state","retire-previews");PruneExpiredRetirePreviews(directory,now,63);WriteBounded(Path.Combine(directory,token+".json"),preview);return preview;}
 
   public RuntimeResetResult Apply(string runId,string previewToken,DateTimeOffset now,
       IRuntimeSpawnResetAdapter adapter,Action clearNotices=null,
@@ -381,22 +421,82 @@ public sealed class RuntimeRunCoordinator {
     return transaction.Result;
   }
 
+  public RuntimeRetireResult ApplyRetire(string runId,string previewToken,DateTimeOffset now,
+      IRuntimeSpawnResetAdapter adapter,Action clearEphemera=null){
+    if(!SafeToken(previewToken))throw new InvalidOperationException("retire_preview_token_invalid");
+    var transactionPath=Path.Combine(root,"state","retire-transactions",previewToken+".json");
+    var transaction=Read<RetireTransaction>(transactionPath);
+    if(File.Exists(transactionPath)&&transaction==null)throw new InvalidDataException("retire_transaction_unreadable");
+    var previewPath=Path.Combine(root,"state","retire-previews",previewToken+".json");
+    var preview=Read<RuntimeRetirePreview>(previewPath);
+    if(!ValidRetirePreview(preview,previewToken,runId))throw new InvalidOperationException("retire_preview_missing");
+    var run=registry.Find(runId);
+    if(run==null||run.ScopeId!=preview.ScopeId)throw new InvalidOperationException("retire_scope_changed");
+    if(transaction!=null&&!ValidRetireTransaction(transaction,preview,run))throw new InvalidDataException("retire_transaction_scope_invalid");
+    if(transaction?.Result!=null)return transaction.Result;
+    if(transaction==null){
+      if(preview.ExpiresUtc<=now)throw new InvalidOperationException("retire_preview_expired");
+      if(run.Status!="active")throw new InvalidOperationException("retire_scope_changed");
+      var current=Snapshot(run,adapter,preview.Snapshot.NoticeCount);
+      var currentHash=RuntimeRunHash.Hex(JsonConvert.SerializeObject(current,Formatting.None));
+      if(currentHash!=preview.SnapshotHash)throw new InvalidOperationException("retire_preview_stale");
+      transaction=new RetireTransaction{RetireId="retire-"+Guid.NewGuid().ToString("N"),Preview=preview,Pending=spawned.ForOwner(run.StateKey).ToList(),Cleaned=new()};
+      WriteBounded(transactionPath,transaction);
+    }
+    foreach(var row in transaction.Pending.ToArray()){
+      var result=adapter.Cleanup(row);
+      if(result==null||!result.Safe){
+        transaction.LastError=result?.Detail??result?.State??"spawn_cleanup_failed";
+        WriteBounded(transactionPath,transaction);
+        return RetireFailed(transaction,preview,transaction.LastError);
+      }
+      spawned.Remove(new[]{row});
+      transaction.Pending.RemoveAll(x=>x.UserId==row.UserId&&x.ObjectId==row.ObjectId);
+      transaction.Cleaned.Add(row);
+      WriteBounded(transactionPath,transaction);
+    }
+    try{
+      workflows.RemoveByKey(run.StateKey);
+      timers.RemoveOwner(run.StateKey);
+      actions.RemoveOwner(run.StateKey);
+    }catch(Exception e){transaction.LastError=e.Message;WriteBounded(transactionPath,transaction);return RetireFailed(transaction,preview,e.Message);}
+    try{registry.Retire(runId,transaction.RetireId,now);}
+    catch(Exception e){transaction.LastError=e.Message;WriteBounded(transactionPath,transaction);return RetireFailed(transaction,preview,e.Message);}
+    var noticesCleared=0;
+    try{clearEphemera?.Invoke();noticesCleared=clearEphemera==null?0:preview.Snapshot.NoticeCount;}
+    catch(Exception e){transaction.LastError=e.Message;WriteBounded(transactionPath,transaction);return RetireFailed(transaction,preview,e.Message);}
+    transaction.LastError=null;
+    transaction.Result=new RuntimeRetireResult{RetireId=transaction.RetireId,PreviewToken=previewToken,
+      State="completed",RunId=runId,CompletedUtc=now,WorkflowStatesScoped=preview.Snapshot.WorkflowPresent?1:0,
+      TimersScoped=preview.Snapshot.TimerIds.Count,ActionClaimsScoped=preview.Snapshot.ActionClaimCount,
+      SpawnRowsCleaned=transaction.Cleaned.Count,NoticesCleared=noticesCleared,SuccessorCreated=false};
+    WriteBounded(transactionPath,transaction);
+    PruneCompletedRetireTransactions(Path.GetDirectoryName(transactionPath),Path.GetDirectoryName(previewPath),64);
+    return transaction.Result;
+  }
+
   RuntimeResetSnapshot Snapshot(RuntimeRunRecord run,IRuntimeSpawnResetAdapter adapter,int noticeCount){if(!workflows.TryGetByKey(run.StateKey,out var workflow))throw new InvalidDataException("workflow_state_unreadable");if(!timers.TryForOwner(run.StateKey,out var timerRows))throw new InvalidDataException("timer_state_unreadable");if(!actions.TryForOwner(run.StateKey,out var claims))throw new InvalidDataException("action_state_unreadable");if(!spawned.TryForOwner(run.StateKey,out var spawnRows))throw new InvalidDataException("spawn_state_unreadable");return new RuntimeResetSnapshot{WorkflowPresent=workflow!=null,StageId=workflow?.StageId,Outcome=workflow?.Outcome,PendingTransitionId=workflow?.PendingTransitionId,TimerIds=timerRows.Select(x=>x.TimerId).OrderBy(x=>x,StringComparer.Ordinal).ToArray(),ActionClaimCount=claims.Count,SpawnedObjects=spawnRows.OrderBy(x=>x.UserId).ThenBy(x=>x.ObjectId).Select(x=>new RuntimeResetSpawn{UserId=x.UserId,ObjectId=x.ObjectId,ActionId=x.ActionId,Inspection=adapter?.Inspect(x)??new RuntimeSpawnResetObservation{State="unavailable",Detail="spawn_adapter_unavailable"}}).ToArray(),NoticeCount=Math.Max(0,noticeCount)};}
   bool ValidTransaction(ResetTransaction value,RuntimeResetPreview preview,RuntimeRunRecord run){if(value==null||value.Schema!="comfy-quest-runtime-reset-transaction/v1"||!SafeToken(value.ResetId)||value.Preview==null||value.Preview.PreviewToken!=preview.PreviewToken||value.Preview.RunId!=preview.RunId||value.Preview.ScopeId!=preview.ScopeId||value.Preview.SnapshotHash!=preview.SnapshotHash||value.Pending==null||value.Cleaned==null||value.Pending.Count+value.Cleaned.Count>4096)return false;var ids=new HashSet<string>(StringComparer.Ordinal);if(value.Pending.Concat(value.Cleaned).Any(row=>!Owned(row,run)||!ids.Add(row.UserId+":"+row.ObjectId)))return false;if(value.Result==null)return true;var successor=registry.Find(value.Result.NewRunId);return value.Result.Schema=="comfy-quest-runtime-reset-result/v1"&&value.Result.State=="completed"&&value.Result.ResetId==value.ResetId&&value.Result.PreviewToken==preview.PreviewToken&&value.Result.PriorRunId==run.RunId&&successor!=null&&successor.PredecessorRunId==run.RunId&&successor.ResetId==value.ResetId;}
   static bool Owned(SpawnedObject row,RuntimeRunRecord run)=>row!=null&&!string.IsNullOrWhiteSpace(row.ActionKey)&&row.ActionKey.StartsWith(run.StateKey+"|",StringComparison.Ordinal)&&row.ContentHash==run.Scope.ContentHash&&(string.IsNullOrWhiteSpace(row.RunId)||row.RunId==run.RunId)&&(string.IsNullOrWhiteSpace(row.WorldId)||row.WorldId==run.Scope.WorldId)&&(string.IsNullOrWhiteSpace(row.ExperienceId)||row.ExperienceId==run.Scope.ExperienceId);
   static bool ValidPreview(RuntimeResetPreview value,string token,string runId)=>value!=null&&value.Schema=="comfy-quest-runtime-reset-preview/v1"&&value.PreviewToken==token&&value.RunId==runId&&!string.IsNullOrWhiteSpace(value.ScopeId)&&ValidSnapshot(value.Snapshot);
+  bool ValidRetireTransaction(RetireTransaction value,RuntimeRetirePreview preview,RuntimeRunRecord run){if(value==null||value.Schema!="comfy-quest-runtime-retire-transaction/v1"||!SafeToken(value.RetireId)||value.Preview==null||value.Preview.PreviewToken!=preview.PreviewToken||value.Preview.RunId!=preview.RunId||value.Preview.ScopeId!=preview.ScopeId||value.Preview.SnapshotHash!=preview.SnapshotHash||value.Pending==null||value.Cleaned==null||value.Pending.Count+value.Cleaned.Count>4096)return false;var ids=new HashSet<string>(StringComparer.Ordinal);if(value.Pending.Concat(value.Cleaned).Any(row=>!Owned(row,run)||!ids.Add(row.UserId+":"+row.ObjectId)))return false;if(value.Result==null)return true;return value.Result.Schema=="comfy-quest-runtime-retire-result/v1"&&value.Result.State=="completed"&&value.Result.RetireId==value.RetireId&&value.Result.PreviewToken==preview.PreviewToken&&value.Result.RunId==run.RunId&&run.Status=="retired"&&run.RetireId==value.RetireId&&!value.Result.SuccessorCreated;}
+  static bool ValidRetirePreview(RuntimeRetirePreview value,string token,string runId)=>value!=null&&value.Schema=="comfy-quest-runtime-retire-preview/v1"&&value.PreviewToken==token&&value.RunId==runId&&!string.IsNullOrWhiteSpace(value.ScopeId)&&ValidSnapshot(value.Snapshot);
   static bool ValidSnapshot(RuntimeResetSnapshot value)=>value!=null&&value.TimerIds!=null&&value.TimerIds.Count<=4096&&value.TimerIds.All(x=>!string.IsNullOrWhiteSpace(x))&&value.ActionClaimCount>=0&&value.ActionClaimCount<=32768&&value.SpawnedObjects!=null&&value.SpawnedObjects.Count<=4096&&value.SpawnedObjects.All(x=>x!=null&&x.Inspection!=null&&x.Inspection.Safe)&&value.NoticeCount>=0&&value.PreviousRewards=="retained"&&value.SuccessorRewardPolicy=="per_run";
   static RuntimeResetResult Failed(ResetTransaction transaction,RuntimeResetPreview preview,string detail)=>new(){ResetId=transaction.ResetId,PreviewToken=preview.PreviewToken,State="cleanup_incomplete",Detail=detail,PriorRunId=preview.RunId,WorkflowStatesScoped=preview.Snapshot.WorkflowPresent?1:0,TimersScoped=preview.Snapshot.TimerIds.Count,ActionClaimsScoped=preview.Snapshot.ActionClaimCount,SpawnRowsCleaned=transaction.Cleaned.Count,NoticesCleared=0};
   static RuntimeResetResult SuccessorStartIncomplete(ResetTransaction transaction,RuntimeResetPreview preview,RuntimeRunRecord successor,string detail)=>new(){ResetId=transaction.ResetId,PreviewToken=preview.PreviewToken,State="successor_start_incomplete",Detail=detail,PriorRunId=preview.RunId,NewRunId=successor?.RunId??transaction.Result?.NewRunId,WorkflowStatesScoped=transaction.Result?.WorkflowStatesScoped??(preview.Snapshot.WorkflowPresent?1:0),TimersScoped=transaction.Result?.TimersScoped??preview.Snapshot.TimerIds.Count,ActionClaimsScoped=transaction.Result?.ActionClaimsScoped??preview.Snapshot.ActionClaimCount,SpawnRowsCleaned=transaction.Result?.SpawnRowsCleaned??transaction.Cleaned.Count,NoticesCleared=transaction.Result?.NoticesCleared??0};
+  static RuntimeRetireResult RetireFailed(RetireTransaction transaction,RuntimeRetirePreview preview,string detail)=>new(){RetireId=transaction.RetireId,PreviewToken=preview.PreviewToken,State="cleanup_incomplete",Detail=detail,RunId=preview.RunId,WorkflowStatesScoped=preview.Snapshot.WorkflowPresent?1:0,TimersScoped=preview.Snapshot.TimerIds.Count,ActionClaimsScoped=preview.Snapshot.ActionClaimCount,SpawnRowsCleaned=transaction.Cleaned.Count,NoticesCleared=0,SuccessorCreated=false};
   static string EnsureSuccessor(RuntimeRunRecord successor,Func<RuntimeRunRecord,string> ensure){if(ensure==null)return null;if(successor==null)return "reset_successor_missing";try{var error=ensure(successor);return string.IsNullOrWhiteSpace(error)?null:error;}catch(Exception e){return "successor_start_failed:"+e.GetType().Name;}}
   static bool SafeToken(string value)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=80&&value.All(c=>char.IsLetterOrDigit(c)||c=='-'||c=='_'||c=='.');
   static void PruneExpiredPreviews(string directory,DateTimeOffset now,int keep){if(!Directory.Exists(directory))return;var retained=new List<Tuple<string,DateTimeOffset>>();foreach(var path in Directory.GetFiles(directory,"*.json")){var preview=ReadStatic<RuntimeResetPreview>(path);if(preview==null)continue;if(preview.ExpiresUtc<=now){TryDelete(path);continue;}retained.Add(Tuple.Create(path,preview.CreatedUtc));}foreach(var value in retained.OrderByDescending(x=>x.Item2).Skip(Math.Max(0,keep)))TryDelete(value.Item1);}
+  static void PruneExpiredRetirePreviews(string directory,DateTimeOffset now,int keep){if(!Directory.Exists(directory))return;var retained=new List<Tuple<string,DateTimeOffset>>();foreach(var path in Directory.GetFiles(directory,"*.json")){var preview=ReadStatic<RuntimeRetirePreview>(path);if(preview==null)continue;if(preview.ExpiresUtc<=now){TryDelete(path);continue;}retained.Add(Tuple.Create(path,preview.CreatedUtc));}foreach(var value in retained.OrderByDescending(x=>x.Item2).Skip(Math.Max(0,keep)))TryDelete(value.Item1);}
   static void PruneCompletedTransactions(string transactionDirectory,string previewDirectory,int keep){if(!Directory.Exists(transactionDirectory))return;var completed=new List<Tuple<string,string,DateTimeOffset>>();foreach(var path in Directory.GetFiles(transactionDirectory,"*.json")){var value=ReadStatic<ResetTransaction>(path);if(value?.Result?.CompletedUtc!=null)completed.Add(Tuple.Create(path,value.Preview?.PreviewToken,value.Result.CompletedUtc.Value));}foreach(var value in completed.OrderByDescending(x=>x.Item3).Skip(Math.Max(0,keep))){TryDelete(value.Item1);if(SafeToken(value.Item2))TryDelete(Path.Combine(previewDirectory,value.Item2+".json"));}}
+  static void PruneCompletedRetireTransactions(string transactionDirectory,string previewDirectory,int keep){if(!Directory.Exists(transactionDirectory))return;var completed=new List<Tuple<string,string,DateTimeOffset>>();foreach(var path in Directory.GetFiles(transactionDirectory,"*.json")){var value=ReadStatic<RetireTransaction>(path);if(value?.Result?.CompletedUtc!=null)completed.Add(Tuple.Create(path,value.Preview?.PreviewToken,value.Result.CompletedUtc.Value));}foreach(var value in completed.OrderByDescending(x=>x.Item3).Skip(Math.Max(0,keep))){TryDelete(value.Item1);if(SafeToken(value.Item2))TryDelete(Path.Combine(previewDirectory,value.Item2+".json"));}}
   static T ReadStatic<T>(string path)where T:class{try{var info=new FileInfo(path);return info.Exists&&info.Length>0&&info.Length<=1024*1024?JsonConvert.DeserializeObject<T>(File.ReadAllText(path)):null;}catch{return null;}}
   static void TryDelete(string path){try{if(!string.IsNullOrWhiteSpace(path)&&File.Exists(path))File.Delete(path);}catch{}}
   T Read<T>(string path)where T:class{try{var info=new FileInfo(path);return info.Exists&&info.Length>0&&info.Length<=1024*1024?JsonConvert.DeserializeObject<T>(File.ReadAllText(path)):null;}catch{return null;}}
   static void WriteBounded<T>(string path,T value){var json=JsonConvert.SerializeObject(value,Formatting.Indented);if(Encoding.UTF8.GetByteCount(json)>1024*1024)throw new InvalidDataException("run_control_document_too_large");Directory.CreateDirectory(Path.GetDirectoryName(path));var temp=path+".tmp";File.WriteAllText(temp,json);if(File.Exists(path))File.Replace(temp,path,path+".previous");else File.Move(temp,path);}
   sealed class ResetTransaction{[JsonProperty("schema")]public string Schema{get;set;}="comfy-quest-runtime-reset-transaction/v1";[JsonProperty("reset_id")]public string ResetId{get;set;}[JsonProperty("preview")]public RuntimeResetPreview Preview{get;set;}[JsonProperty("pending")]public List<SpawnedObject> Pending{get;set;}=new();[JsonProperty("cleaned")]public List<SpawnedObject> Cleaned{get;set;}=new();[JsonProperty("last_error",NullValueHandling=NullValueHandling.Ignore)]public string LastError{get;set;}[JsonProperty("result",NullValueHandling=NullValueHandling.Ignore)]public RuntimeResetResult Result{get;set;}}
+  sealed class RetireTransaction{[JsonProperty("schema")]public string Schema{get;set;}="comfy-quest-runtime-retire-transaction/v1";[JsonProperty("retire_id")]public string RetireId{get;set;}[JsonProperty("preview")]public RuntimeRetirePreview Preview{get;set;}[JsonProperty("pending")]public List<SpawnedObject> Pending{get;set;}=new();[JsonProperty("cleaned")]public List<SpawnedObject> Cleaned{get;set;}=new();[JsonProperty("last_error",NullValueHandling=NullValueHandling.Ignore)]public string LastError{get;set;}[JsonProperty("result",NullValueHandling=NullValueHandling.Ignore)]public RuntimeRetireResult Result{get;set;}}
 }
 
 internal static class RuntimeRunHash {

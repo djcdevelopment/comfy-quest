@@ -173,6 +173,7 @@ internal sealed class QuestStudioWorkspace
         actions = effects,
         templates = new object[]
         {
+            new { id = "field-lodge-offering", label = "Field Lodge offering", note = "DM proof: offer Resin within 6m of the lodge sign, hear its answer, and call one Greyling." },
             new { id = "demo-world-first-portal", label = "Demo World: First Portal", note = "Minimal tutorial: take one portal, see one message, and complete.", minimal_tutorial = true },
             new { id = "guild-journey", label = "Guild journey step", note = "Begins when bound; useful for composing prerequisite chains." },
             new { id = "blank", label = "Blank local quest", note = "One low-friction local beat." },
@@ -264,6 +265,7 @@ internal sealed class QuestStudioWorkspace
             var suffix = projectId[^6..];
             var project = (templateId ?? "blank") switch
             {
+                "field-lodge-offering" => FieldLodgeOfferingTemplate(projectId, suffix),
                 "demo-world-first-portal" => DemoWorldFirstPortalTemplate(projectId, suffix),
                 "guild-journey" => GuildJourneyTemplate(projectId, suffix),
                 "signal-circuit" => SignalCircuitTemplate(projectId, suffix),
@@ -890,6 +892,57 @@ internal sealed class QuestStudioWorkspace
                     Actions = new() { new StudioAction { Id = "message-finish", Type = "message", Text = "The Charm answers." } } }
             } }
         }
+    };
+
+    internal static StudioProjectDocument FieldLodgeOfferingTemplate(string projectId, string suffix) => new()
+    {
+        ProjectId = projectId, Revision = 1, UpdatedUtc = DateTimeOffset.UtcNow,
+        PackId = "field-lodge-offering-" + suffix, Version = "1.0.0",
+        ExperienceId = "field-lodge-offering-" + suffix,
+        Title = "Field Lodge Offering", BindingTargetKind = "sign", EntryNodeId = "offering",
+        SpatialAreas = new()
+        {
+            new StudioSpatialArea
+            {
+                Id = "field-lodge-sphere", Shape = "sphere", Frame = "binding",
+                RadiusMeters = 6,
+            },
+        },
+        Nodes = new()
+        {
+            new StudioNode
+            {
+                Id = "offering", Label = "Offer Resin at the Field Lodge", X = 120, Y = 160,
+                Routes = new()
+                {
+                    new StudioRoute
+                    {
+                        Id = "answer-offering", Priority = 100,
+                        Event = "item_dropped", Target = "Resin", Outcome = "complete",
+                        SpatialConditions = new()
+                        {
+                            new StudioSpatialCondition
+                            {
+                                Predicate = "within_radius", AreaId = "field-lodge-sphere",
+                            },
+                        },
+                        Actions = new()
+                        {
+                            new StudioAction
+                            {
+                                Id = "lodge-answers", Type = "message",
+                                Text = "The lodge answers the offering.",
+                            },
+                            new StudioAction
+                            {
+                                Id = "lodge-greyling", Type = "spawn", Kind = "creature",
+                                Prefab = "Greyling", Count = 1, Radius = 6,
+                            },
+                        },
+                    },
+                },
+            },
+        },
     };
 
     internal static StudioProjectDocument DemoWorldFirstPortalTemplate(string projectId, string suffix) => new()

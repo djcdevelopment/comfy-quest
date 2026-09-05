@@ -35,6 +35,18 @@ public interface IQuestStudioHost
     JsonSerializerOptions Json { get; }
 }
 
+/// <summary>Host-owned connection to Steward's private authoring surface. The operator
+/// credential stays in the server process and is never returned by a Studio endpoint.</summary>
+public sealed record QuestStudioStewardConnection(
+    Uri SceneOrigin,
+    Uri ViewerOrigin,
+    string OperatorToken);
+
+public interface IQuestStudioStewardHost
+{
+    QuestStudioStewardConnection? StewardConnection { get; }
+}
+
 /// <summary>Optional sovereign-repository capability used only by the local R&amp;D campaign lap.
 /// Package hosts that do not own the comfy-quest checkout simply omit it; Studio never reaches
 /// into a sibling repository or guesses a source root.</summary>

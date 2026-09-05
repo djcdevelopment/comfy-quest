@@ -89,6 +89,18 @@ public sealed class ActionExecutionLedger {
     }
   }
 
+  public int RemoveOwner(string ownerKey){
+    if(string.IsNullOrWhiteSpace(ownerKey))return 0;
+    lock(gate){
+      var state=Readable();
+      var prefix=ownerKey+"|";
+      var completed=state.Keys.RemoveWhere(x=>x.StartsWith(prefix,StringComparison.Ordinal));
+      var pending=state.Pending.RemoveWhere(x=>x.StartsWith(prefix,StringComparison.Ordinal));
+      if(completed+pending>0)Write(state);
+      return completed+pending;
+    }
+  }
+
   static void ValidateKey(string key){
     if(string.IsNullOrWhiteSpace(key)||key.Length>1024)
       throw new ArgumentException("Stable action key is required.",nameof(key));

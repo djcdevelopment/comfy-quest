@@ -4,7 +4,7 @@
     "id": "comfy-quest-program",
     "title": "Quest Creator OS",
     "subtitle": "Drive the whole vertical slice. Automate the evidence. Spend the seat on creation.",
-    "observed_on": "2026-08-29",
+    "observed_on": "2026-09-04",
     "program_commit": "89c0a71",
     "program_commit_label": "Wait for fresh run scope before preview"
   },
@@ -462,14 +462,14 @@
     },
     {
       "id": "queue.anchors",
-      "state": "gated",
-      "lane": "4A",
+      "state": "implemented",
+      "lane": "4B",
       "requirements": [
         "FR-WORLD-001",
         "FR-WORLD-002"
       ],
       "title": "Add named anchors when authorship needs them",
-      "detail": "Capture point, radius, region, or allowed object anchors through the bounded live-game contract when the first real guild slice needs spatial references. Anchors are not a standalone infrastructure milestone.",
+      "detail": "The Field Lodge DM rite triggered the spatial need. Implemented locally: Studio loads a token-gated, content-addressed Steward SVCA scene, renders and GPU-picks its exact ZDO identity, proves the snapshot against the active Creator Session's pinned world backup, resolves exactly one nearby Runtime candidate by prefab plus centimetre-quantized position, and imports the resulting binding-relative sphere into Experience v2. Missing, stale, wrong-world, absent, and ambiguous targets fail closed. The AM4 Field Lodge execution is not yet live proof.",
       "source": "docs/creator-portfolio-requirements.md",
       "source_contains": "FR-WORLD-001"
     },
@@ -483,7 +483,7 @@
         "NFR-TEST-001"
       ],
       "title": "Close the StewardView spatial evidence round trip",
-      "detail": "Implemented locally: StewardView resolves a selected snapshot piece and exports a hash-bound world or Charm-relative sphere; Studio imports it as a first-class Runtime Experience v2 area; Runtime evaluates true 3D distance and emits anchor-correlated traces; Studio exports the exact runtime run; and StewardView verifies, token-gates, stores, and overlays that evidence from a dedicated DuckDB database. Java/.NET hash parity, tamper refusal, true-3D distance, idempotence, and persistence are contract-tested. No immutable clean-revision pair or live AM4/game round trip exists yet, so this is implementation evidence only. The separate FR-WORLD-001 live-look named-anchor lane remains gated.",
+      "detail": "Implemented locally: StewardView resolves a selected snapshot piece and exports a hash-bound world or Charm-relative sphere; Studio now also pulls the private measured scene server-side, GPU-picks exact membership, proves its world link, and resolves the matching live Runtime binding; Runtime evaluates true 3D distance and emits anchor-correlated traces; Studio exports the exact runtime run; and StewardView verifies, token-gates, stores, and overlays that evidence. Quick Cast packages the selected route as an immediate reversible companion run, while Activate preserves its authored trigger; Undo Cast retires only the exact run and restores the prior binding. Contract and Studio tests cover the new boundaries. No clean-revision or live AM4 Field Lodge execution exists yet, so this is implementation evidence only.",
       "source": "contracts/spatial/README.md",
       "source_contains": "comfy-quest-spatial-anchor/v1"
     },

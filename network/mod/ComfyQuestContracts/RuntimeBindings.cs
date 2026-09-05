@@ -14,6 +14,14 @@ public sealed class RuntimeBindingCandidate {
   [JsonProperty("target_kind")] public string TargetKind {get;set;}
   [JsonProperty("label")] public string Label {get;set;}
   [JsonProperty("distance_metres")] public double DistanceMetres {get;set;}
+  [JsonProperty("prefab",NullValueHandling=NullValueHandling.Ignore)] public string Prefab {get;set;}
+  [JsonProperty("position",NullValueHandling=NullValueHandling.Ignore)] public RuntimeBindingPosition Position {get;set;}
+}
+
+public sealed class RuntimeBindingPosition {
+  [JsonProperty("x")] public double X {get;set;}
+  [JsonProperty("y")] public double Y {get;set;}
+  [JsonProperty("z")] public double Z {get;set;}
 }
 
 /// <summary>Applies the wire bound without allowing one dense target kind to hide every
@@ -110,12 +118,19 @@ public sealed class RuntimeBindingCoordinator {
           ||string.IsNullOrWhiteSpace(value.Label)||value.Label.Length>120||value.Label.Any(char.IsControl)
           ||double.IsNaN(value.DistanceMetres)||double.IsInfinity(value.DistanceMetres)
           ||value.DistanceMetres<0||value.DistanceMetres>MaxCandidateDistanceMetres
+          ||!OptionalPrefab(value.Prefab)||!OptionalPosition(value.Position)
           ||!seen.Add(value.BindingZdo))throw new InvalidDataException("binding_candidate_invalid");
     }
     return values.OrderBy(value=>value.DistanceMetres)
       .ThenBy(value=>value.TargetKind,StringComparer.Ordinal)
       .ThenBy(value=>value.BindingZdo,StringComparer.Ordinal).ToArray();
   }
+  static bool OptionalPrefab(string value)=>string.IsNullOrWhiteSpace(value)
+    ||value.Length<=256&&!value.Any(char.IsControl);
+  static bool OptionalPosition(RuntimeBindingPosition value)=>value==null
+    ||Finite(value.X)&&Finite(value.Y)&&Finite(value.Z)
+      &&Math.Abs(value.X)<=10500&&Math.Abs(value.Y)<=10500&&Math.Abs(value.Z)<=10500;
+  static bool Finite(double value)=>!double.IsNaN(value)&&!double.IsInfinity(value);
 
   public RuntimeBindingChange Bind(string bindingZdo,string worldId,ActiveSet active,
       ExperienceDocument document,DateTimeOffset now){

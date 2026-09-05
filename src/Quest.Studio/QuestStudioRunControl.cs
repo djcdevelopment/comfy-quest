@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 namespace Comfy.Quest.Studio;
 
 public sealed record StudioRunResetRequest(string RunId, string? PreviewToken = null, bool ConfirmReset = false);
+public sealed record StudioRunRetireRequest(string RunId, string? PreviewToken = null, bool ConfirmRetire = false);
 public sealed record StudioSelectExperienceRequest(string? ExperienceId);
 public sealed record StudioBindExperienceRequest(string? ExperienceId, string? BindingZdo);
 public sealed record StudioRestoreBindingRequest(string? BindingZdo, string? BindingChangeId);
@@ -39,7 +40,9 @@ internal sealed class QuestStudioRunControl
         _workspace = workspace;
     }
 
-    public StudioRunStatusView Status(string projectId)
+    public StudioRunStatusView Status(string projectId) => StatusForExperience(projectId, null);
+
+    internal StudioRunStatusView StatusForExperience(string projectId, string? experienceId)
     {
         var project = _workspace.ReadProject(projectId);
         if (project is null) return new(1, false, false, "project_missing", null, null, Array.Empty<RuntimeRunStatusEntry>());
@@ -60,7 +63,8 @@ internal sealed class QuestStudioRunControl
                 || string.IsNullOrWhiteSpace(value.ScopeId)
                 || string.IsNullOrWhiteSpace(value.ExperienceId)))
             return new(1, true, false, "runtime_run_status_invalid", status.Machine, status.WorldUid, Array.Empty<RuntimeRunStatusEntry>());
-        var runs = reported.Where(value => string.Equals(value.ExperienceId, project.ExperienceId, StringComparison.Ordinal)).ToArray();
+        var selectedExperience = experienceId ?? project.ExperienceId;
+        var runs = reported.Where(value => string.Equals(value.ExperienceId, selectedExperience, StringComparison.Ordinal)).ToArray();
         if (runs.GroupBy(value => value.RunId, StringComparer.Ordinal).Any(group => group.Count() != 1))
             return new(1, true, false, "runtime_run_status_ambiguous", status.Machine, status.WorldUid, Array.Empty<RuntimeRunStatusEntry>());
         var fresh = status.ObservedUtc >= DateTimeOffset.UtcNow.AddSeconds(-3) && status.ObservedUtc <= DateTimeOffset.UtcNow.AddSeconds(1);
@@ -112,6 +116,12 @@ internal sealed class QuestStudioRunControl
 
     public Task<StudioRunControlResult> ApplyAsync(string projectId, StudioRunResetRequest? request, CancellationToken cancellationToken) =>
         SendAsync(projectId, request, "apply_reset", cancellationToken);
+
+    public Task<StudioRunControlResult> PreviewRetireAsync(string projectId, StudioRunRetireRequest? request, CancellationToken cancellationToken) =>
+        SendRetireAsync(projectId, request, "preview_retire", cancellationToken);
+
+    public Task<StudioRunControlResult> ApplyRetireAsync(string projectId, StudioRunRetireRequest? request, CancellationToken cancellationToken) =>
+        SendRetireAsync(projectId, request, "apply_retire", cancellationToken);
 
     /// <summary>Bind one experience of the activated pack. A guild ships several experiences in one
     /// pack and Runtime will not guess between them, so this is how the creator says which one is
@@ -172,12 +182,49 @@ internal sealed class QuestStudioRunControl
             request.BindingZdo, null, identity, cancellationToken);
     }
 
+    internal Task<StudioRunControlResult> BindExperiencePinnedAsync(
+        string projectId, StudioBindExperienceRequest? request, string expectedExperienceId,
+        StudioRuntimeIdentity identity, CancellationToken cancellationToken)
+    {
+        if (_workspace.ReadProject(projectId) is null)
+            return Task.FromResult(new StudioRunControlResult(false, false, "project_missing", null));
+        if (request is null || !string.Equals(request.ExperienceId, expectedExperienceId, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(request.BindingZdo))
+            return Task.FromResult(new StudioRunControlResult(false, false, "binding_selection_required", null));
+        return SendPackAsync(projectId, "bind_selected_experience", request.ExperienceId,
+            request.BindingZdo, null, identity, cancellationToken);
+    }
+
     public Task<StudioRunControlResult> RestoreBindingAsync(string projectId, StudioRestoreBindingRequest? request, CancellationToken cancellationToken)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.BindingZdo) || string.IsNullOrWhiteSpace(request.BindingChangeId))
             return Task.FromResult(new StudioRunControlResult(false, false, "binding_restore_identity_required", null));
         return SendPackAsync(projectId, "restore_binding", null, request.BindingZdo, request.BindingChangeId, null, cancellationToken);
     }
+
+    internal Task<StudioRunControlResult> RestoreBindingPinnedAsync(string projectId,
+        StudioRestoreBindingRequest? request, StudioRuntimeIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.BindingZdo)
+            || string.IsNullOrWhiteSpace(request.BindingChangeId))
+            return Task.FromResult(new StudioRunControlResult(false, false,
+                "binding_restore_identity_required", null));
+        return SendPackAsync(projectId, "restore_binding", null, request.BindingZdo,
+            request.BindingChangeId, identity, cancellationToken);
+    }
+
+    internal Task<StudioRunControlResult> PreviewRetirePinnedAsync(string projectId,
+        string runId, string experienceId, StudioRuntimeIdentity identity,
+        CancellationToken cancellationToken) =>
+        SendRetirePinnedAsync(projectId, new(runId), experienceId, identity,
+            "preview_retire", cancellationToken);
+
+    internal Task<StudioRunControlResult> ApplyRetirePinnedAsync(string projectId,
+        string runId, string previewToken, string experienceId, StudioRuntimeIdentity identity,
+        CancellationToken cancellationToken) =>
+        SendRetirePinnedAsync(projectId, new(runId, previewToken, true), experienceId,
+            identity, "apply_retire", cancellationToken);
 
     Task<StudioRunControlResult> SendPackAsync(string projectId, string operation, string? experienceId,
         string? bindingZdo, string? bindingChangeId, StudioRuntimeIdentity? expectedIdentity,
@@ -237,7 +284,8 @@ internal sealed class QuestStudioRunControl
                 || receipt.CreatorSessionId != expectedIdentity.CreatorSessionId
                 || receipt.Operation != expectedOperation))
             return new(false, false, "run_control_receipt_identity_mismatch", null, requestId);
-        var receiptRun = receipt!.Preview?.RunId ?? receipt.Result?.PriorRunId;
+        var receiptRun = receipt!.Preview?.RunId ?? receipt.Result?.PriorRunId
+            ?? receipt.RetirePreview?.RunId ?? receipt.RetireResult?.RunId;
         if (receiptRun is not null && receiptRun != runId) return new(false, false, "run_control_scope_mismatch", null, requestId);
         var ok = receipt.State is "previewed" or "completed";
         return new(ok, false, ok ? null : receipt.Detail ?? receipt.State, receipt, requestId);
@@ -268,6 +316,65 @@ internal sealed class QuestStudioRunControl
             RunId = request.RunId,
             PreviewToken = request.PreviewToken,
             ConfirmReset = request.ConfirmReset,
+        }, cancellationToken);
+    }
+
+    async Task<StudioRunControlResult> SendRetireAsync(string projectId, StudioRunRetireRequest? request, string operation, CancellationToken cancellationToken)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.RunId)) return new(false, false, "run_required", null);
+        if (operation == "apply_retire" && (!request.ConfirmRetire || string.IsNullOrWhiteSpace(request.PreviewToken)))
+            return new(false, false, "retire_confirmation_required", null);
+        var status = Status(projectId);
+        if (!status.Available || !status.Connected) return new(false, false, status.Error ?? "runtime_disconnected", null);
+        var run = status.Runs.SingleOrDefault(value => value.RunId == request.RunId);
+        if (run is null) return new(false, false, "run_scope_not_loaded", null);
+        var root = RuntimeRoot()!;
+        var creatorSessionId = ReadCreatorSessionId(root, status.Machine!, status.WorldUid!);
+        if (creatorSessionId is null) return new(false, false, "creator_session_unavailable", null);
+        var now = DateTimeOffset.UtcNow;
+        return await DispatchAsync(root, new RuntimeRunControlRequest
+        {
+            RequestId = RequestId(operation, now),
+            Operation = operation,
+            CreatedUtc = now.ToString("O"),
+            ExpiresUtc = now.AddMinutes(2).ToString("O"),
+            ExpectedMachine = status.Machine!,
+            ExpectedWorldUid = status.WorldUid!,
+            CreatorSessionId = creatorSessionId,
+            RunId = request.RunId,
+            PreviewToken = request.PreviewToken,
+            ConfirmRetire = request.ConfirmRetire,
+        }, cancellationToken);
+    }
+
+    async Task<StudioRunControlResult> SendRetirePinnedAsync(string projectId,
+        StudioRunRetireRequest request, string experienceId, StudioRuntimeIdentity identity,
+        string operation, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.RunId)) return new(false, false, "run_required", null);
+        if (operation == "apply_retire" && (!request.ConfirmRetire
+            || string.IsNullOrWhiteSpace(request.PreviewToken)))
+            return new(false, false, "retire_confirmation_required", null);
+        var status = StatusForExperience(projectId, experienceId);
+        if (!status.Available || !status.Connected)
+            return new(false, false, status.Error ?? "runtime_disconnected", null);
+        if (!string.Equals(status.Machine, identity.Machine, StringComparison.OrdinalIgnoreCase)
+            || status.WorldUid != identity.WorldUid)
+            return new(false, false, "runtime_identity_changed", null);
+        var run = status.Runs.SingleOrDefault(value => value.RunId == request.RunId);
+        if (run is null) return new(false, false, "run_scope_not_loaded", null);
+        var root = RuntimeRoot()!;
+        var session = ReadCreatorSessionId(root, status.Machine!, status.WorldUid!);
+        if (session != identity.CreatorSessionId)
+            return new(false, false, "runtime_identity_changed", null);
+        var now = DateTimeOffset.UtcNow;
+        return await DispatchAsync(root, new RuntimeRunControlRequest
+        {
+            RequestId = RequestId(operation, now), Operation = operation,
+            CreatedUtc = now.ToString("O"), ExpiresUtc = now.AddMinutes(2).ToString("O"),
+            ExpectedMachine = identity.Machine, ExpectedWorldUid = identity.WorldUid,
+            CreatorSessionId = identity.CreatorSessionId, RunId = request.RunId,
+            PreviewToken = request.PreviewToken, ConfirmRetire = request.ConfirmRetire,
         }, cancellationToken);
     }
 

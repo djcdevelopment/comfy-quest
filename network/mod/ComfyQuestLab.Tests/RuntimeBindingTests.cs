@@ -95,10 +95,13 @@ public sealed class RuntimeBindingTests {
   public void CandidateListIsDeterministicBoundedAndClosed() {
     Run(root=>{
       var adapter=new FakeAdapter(
-        new RuntimeBindingCandidate{BindingZdo="10:2",TargetKind="sign",Label="Far",DistanceMetres=8},
+        new RuntimeBindingCandidate{BindingZdo="10:2",TargetKind="sign",Label="Far",DistanceMetres=8,
+          Prefab="sign",Position=new RuntimeBindingPosition{X=1,Y=2,Z=3}},
         new RuntimeBindingCandidate{BindingZdo="10:1",TargetKind="player_built_piece",Label="Near",DistanceMetres=2});
       var values=new RuntimeBindingCoordinator(root,adapter).Candidates();
       Assert.Equal(new[]{"10:1","10:2"},values.Select(value=>value.BindingZdo));
+      Assert.Equal("sign",values[1].Prefab);
+      Assert.Equal(2,values[1].Position.Y);
       adapter.Candidates=Enumerable.Range(0,RuntimeBindingCoordinator.MaxCandidates+1).Select(index=>new RuntimeBindingCandidate{BindingZdo="10:"+(index+1),TargetKind="sign",Label="Sign",DistanceMetres=1}).ToList();
       Assert.Equal("binding_candidate_limit",Assert.Throws<InvalidOperationException>(()=>new RuntimeBindingCoordinator(root,adapter).Candidates()).Message);
     });

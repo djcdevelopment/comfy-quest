@@ -22,6 +22,8 @@ public sealed class QuestStudioService
     readonly QuestStudioWorkspace _workspace;
     readonly QuestStudioPortfolioStore _portfolio;
     readonly QuestStudioRunControl _runControl;
+    readonly QuestStudioCreator _creator;
+    readonly QuestStudioCreatorCast _creatorCast;
     readonly QuestStudioDataExport _dataExport;
     readonly QuestStudioUsageInsights _usage;
     readonly string _creativeEvidenceRoot;
@@ -44,6 +46,8 @@ public sealed class QuestStudioService
         _workspace = new QuestStudioWorkspace(host, publisher);
         _portfolio = new QuestStudioPortfolioStore(host);
         _runControl = new QuestStudioRunControl(host, _workspace);
+        _creator = new QuestStudioCreator(host, _workspace, _runControl);
+        _creatorCast = new QuestStudioCreatorCast(host, publisher, _workspace, _runControl, _creator);
         _dataExport = new QuestStudioDataExport(host);
         _usage = new QuestStudioUsageInsights(host);
         _creativeEvidenceRoot = Path.Combine(root, "creative-evidence");
@@ -52,6 +56,20 @@ public sealed class QuestStudioService
     }
 
     public object WorkspaceCatalog() => _workspace.Catalog();
+    public Task<StudioCreatorSceneResult> FetchCreatorSceneAsync(
+        StudioCreatorSceneRequest? request, CancellationToken cancellationToken) =>
+        _creator.FetchSceneAsync(request, cancellationToken);
+    public Task<StudioCreatorTargetResult> SelectCreatorTargetAsync(string projectId,
+        StudioCreatorTargetRequest? request, CancellationToken cancellationToken) =>
+        _creator.SelectTargetAsync(projectId, request, cancellationToken);
+    public Task<StudioCreatorCastResult> CreatorCastAsync(string projectId,
+        StudioCreatorCastRequest? request, CancellationToken cancellationToken) =>
+        _creatorCast.CastAsync(projectId, request, cancellationToken);
+    public StudioCreatorCastResult CreatorCastStatus(string projectId) =>
+        _creatorCast.Status(projectId);
+    public Task<StudioCreatorCastResult> UndoCreatorCastAsync(string projectId,
+        StudioCreatorUndoCastRequest? request, CancellationToken cancellationToken) =>
+        _creatorCast.UndoAsync(projectId, request, cancellationToken);
     public StudioPortfolioDocument Portfolio() => _portfolio.ReadPortfolio();
     public StudioPortfolioSaveResult SavePortfolio(StudioPortfolioSaveRequest? request) => _portfolio.SavePortfolio(request);
     public IReadOnlyList<StudioGuildSummary> ListGuilds() => _portfolio.ListGuilds();
@@ -1033,6 +1051,10 @@ public sealed class QuestStudioService
         _runControl.PreviewAsync(projectId, request, cancellationToken);
     public Task<StudioRunControlResult> ApplyResetAsync(string projectId, StudioRunResetRequest? request, CancellationToken cancellationToken) =>
         _runControl.ApplyAsync(projectId, request, cancellationToken);
+    public Task<StudioRunControlResult> PreviewRetireAsync(string projectId, StudioRunRetireRequest? request, CancellationToken cancellationToken) =>
+        _runControl.PreviewRetireAsync(projectId, request, cancellationToken);
+    public Task<StudioRunControlResult> ApplyRetireAsync(string projectId, StudioRunRetireRequest? request, CancellationToken cancellationToken) =>
+        _runControl.ApplyRetireAsync(projectId, request, cancellationToken);
     public Task<StudioRunControlResult> SelectExperienceAsync(string projectId, StudioSelectExperienceRequest? request, CancellationToken cancellationToken) =>
         _runControl.SelectExperienceAsync(projectId, request, cancellationToken);
     public Task<StudioRunControlResult> BindingCandidatesAsync(string projectId, CancellationToken cancellationToken) =>
