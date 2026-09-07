@@ -1201,6 +1201,10 @@ public sealed class QuestStudioService
 
     StudioRuntimePackIdentity? RuntimePackIdentity(string projectId)
     {
+        var project = _workspace.ReadProject(projectId);
+        var creatorIdentity = project is null ? null
+            : _creatorCast.DurableRuntimePackIdentity(projectId, project.Revision);
+        if (creatorIdentity is not null) return creatorIdentity;
         var placement = _portfolio.Placements()
             .SingleOrDefault(value => value.ProjectId == projectId);
         if (placement is null) return null;

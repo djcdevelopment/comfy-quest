@@ -836,6 +836,45 @@ public sealed class QuestStudioServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Runtime_cockpit_keeps_terminal_proof_after_the_run_leaves_active_status()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var published = await service.PublishGraphAsync(
+            project.ProjectId, project.Revision, CancellationToken.None);
+        Assert.True(published.Ok, published.Error);
+
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var store = new QuestPackStore(runtimeRoot);
+        var candidate = store.LoadLatest();
+        var activationId = store.ReadActive()!.ActivationId;
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Operation = "transition", Status = "complete", StageId = "start",
+            TransitionId = project.Nodes[0].Routes[0].Id,
+            PackId = candidate.Manifest.PackId, Version = candidate.Manifest.Version,
+            ContentHash = candidate.ContentHash, ActivationId = activationId,
+            ExperienceId = project.ExperienceId, RunId = "run-complete",
+            WorldId = "123", BindingZdo = "10:20",
+            BindingInstanceId = "binding-instance-complete",
+            Diagnostics = Array.Empty<ContractDiagnostic>()
+        });
+        new RuntimeRunStatusStore(runtimeRoot).Write(new RuntimeRunStatusDocument
+        {
+            ObservedUtc = DateTimeOffset.UtcNow, Machine = "OMEN", WorldUid = "123",
+            Runs = Array.Empty<RuntimeRunStatusEntry>()
+        });
+
+        var status = service.RuntimeStatus(project.ProjectId);
+
+        Assert.Equal("complete", status.Phase);
+        Assert.Equal("The live Runtime reports this quest complete.", status.NextInstruction);
+    }
+
+    [Fact]
     public async Task Published_content_is_immutable_and_new_iteration_bumps_the_patch()
     {
         var valheim = Path.Combine(_root, "Valheim");
@@ -1286,6 +1325,112 @@ public sealed class QuestStudioServiceTests : IDisposable
         Assert.Equal(campaign.PackId, bundle.PackId);
         Assert.Equal(campaignCertification.ContentHash, bundle.ContentHash);
         Assert.NotEqual(standalone.ContentHash, bundle.ContentHash);
+    }
+
+    [Fact]
+    public void Spatial_evidence_prefers_the_current_durable_creator_cast_pack()
+    {
+        var valheim = Path.Combine(_root, "Valheim");
+        Directory.CreateDirectory(valheim);
+        var host = new FakeHost(_root, valheim);
+        var service = new QuestStudioService(host, new QuestPackPublisher(host));
+        var project = service.CreateProject("blank");
+        var route = project.Nodes[0].Routes[0];
+        var anchor = Anchor("creator-sphere", "world", 100, 32.5, -200);
+        var imported = service.ImportSpatialAnchor(project.ProjectId,
+            new StudioSpatialAnchorImportRequest(project.Revision, route.Id, "within_radius",
+                Newtonsoft.Json.JsonConvert.SerializeObject(anchor)));
+        Assert.True(imported.Ok, imported.Error);
+        project = imported.Project!;
+        var standalone = service.CertifyGraph(project.ProjectId);
+        Assert.True(standalone.Ok, standalone.Error);
+
+        var creatorHash = new string('c', 64);
+        var cast = new StudioCreatorCastReceipt
+        {
+            CastId = "cast-durable-spatial",
+            State = "activated",
+            Mode = "activate",
+            StartedUtc = DateTimeOffset.Parse("2026-08-30T13:30:00Z"),
+            CompletedUtc = DateTimeOffset.Parse("2026-08-30T13:30:01Z"),
+            ProjectId = project.ProjectId,
+            ProjectRevision = project.Revision,
+            TargetId = "target-durable-spatial",
+            RouteId = route.Id,
+            BindingZdo = "10:20",
+            ExperienceId = project.ExperienceId,
+            PackId = project.PackId,
+            Version = project.Version,
+            ContentHash = creatorHash,
+            CreatorSessionId = "session-durable-spatial",
+            Machine = "am4",
+            WorldUid = "world-123",
+            ActivationId = "activation-durable-spatial",
+            BindingChangeId = "binding-durable-spatial",
+            RunId = "run-durable-spatial",
+        };
+        var castRoot = Path.Combine(_root, "quest-studio", "creator", "casts");
+        Directory.CreateDirectory(castRoot);
+        File.WriteAllText(Path.Combine(castRoot, cast.CastId + ".json"),
+            System.Text.Json.JsonSerializer.Serialize(cast, host.Json));
+
+        var area = Assert.Single(project.SpatialAreas);
+        var runtimeRoot = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-runtime");
+        var activeRoot = Path.Combine(runtimeRoot, "active");
+        Directory.CreateDirectory(activeRoot);
+        File.WriteAllText(Path.Combine(activeRoot, "active-set.json"),
+            Newtonsoft.Json.JsonConvert.SerializeObject(new ActiveSet
+            {
+                Schema = "comfy-quest-active-set/v1",
+                PackId = cast.PackId,
+                Version = cast.Version,
+                ContentHash = cast.ContentHash,
+                PackageSha256 = new string('d', 64),
+                Source = "creator-cast.questpack",
+                ActivatedUtc = cast.StartedUtc,
+                ActivationId = cast.ActivationId,
+                ExperienceId = cast.ExperienceId,
+                SourceChannel = "dev"
+            }, Newtonsoft.Json.Formatting.Indented));
+        new RuntimeReceiptStore(runtimeRoot).Write(new RuntimeReceipt
+        {
+            Id = "receipt-creator-spatial", AtUtc = DateTimeOffset.Parse("2026-08-30T13:31:00Z"),
+            Operation = "event", Status = "matched", PackId = project.PackId,
+            Version = project.Version, ContentHash = creatorHash,
+            ActivationId = cast.ActivationId, ExperienceId = project.ExperienceId,
+            RunId = cast.RunId, WorldId = cast.WorldUid, BindingZdo = cast.BindingZdo,
+            TransitionId = route.Id, EventName = route.Event,
+            Diagnostics = Array.Empty<ContractDiagnostic>(), Evidence = new TriggerClauseTrace
+            {
+                Op = "SPATIAL", Spatial = "within_radius", Satisfied = true,
+                Current = 1, Required = 1, AreaId = area.Id,
+                AnchorSha256 = anchor.ContentSha256,
+                ResolvedCenter = new SpatialContractPoint(100, 32.5, -200),
+                RadiusMeters = anchor.RadiusMeters,
+                ObservedPosition = new SpatialContractPoint(103, 36.5, -200),
+                DistanceMeters = 5
+            }
+        });
+
+        var download = service.DownloadSpatialEvidence(project.ProjectId);
+
+        Assert.True(download.Ok, download.Error);
+        var bundle = Newtonsoft.Json.JsonConvert.DeserializeObject<SpatialEvidenceBundle>(
+            System.Text.Encoding.UTF8.GetString(download.Bytes!))!;
+        Assert.Equal(creatorHash, bundle.ContentHash);
+        Assert.Equal(cast.ActivationId, bundle.ActivationId);
+        Assert.Equal(cast.RunId, bundle.RunId);
+        Assert.NotEqual(standalone.ContentHash, bundle.ContentHash);
+
+        var otherActive = Newtonsoft.Json.JsonConvert.DeserializeObject<ActiveSet>(
+            File.ReadAllText(Path.Combine(activeRoot, "active-set.json")))!;
+        otherActive.ContentHash = new string('e', 64);
+        File.WriteAllText(Path.Combine(activeRoot, "active-set.json"),
+            Newtonsoft.Json.JsonConvert.SerializeObject(
+                otherActive, Newtonsoft.Json.Formatting.Indented));
+        var staleCast = service.DownloadSpatialEvidence(project.ProjectId);
+        Assert.False(staleCast.Ok);
+        Assert.Equal("spatial_evidence_missing", staleCast.Error);
     }
 
     [Fact]

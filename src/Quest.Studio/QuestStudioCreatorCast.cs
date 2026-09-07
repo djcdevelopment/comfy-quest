@@ -304,6 +304,41 @@ internal sealed class QuestStudioCreatorCast
             : Success(cast, project);
     }
 
+    internal StudioRuntimePackIdentity? DurableRuntimePackIdentity(string projectId,
+        int projectRevision)
+    {
+        try
+        {
+            if (!Directory.Exists(_castRoot)) return null;
+            var cast = new DirectoryInfo(_castRoot).GetFiles("*.json")
+                .OrderByDescending(value => value.LastWriteTimeUtc)
+                .ThenBy(value => value.Name, StringComparer.Ordinal)
+                .Select(value => Read(projectId, Path.GetFileNameWithoutExtension(value.Name)))
+                .FirstOrDefault(value => value is { Mode: "activate", State: "activated" }
+                    && value.ProjectRevision == projectRevision
+                    && !string.IsNullOrWhiteSpace(value.ActivationId)
+                    && !string.IsNullOrWhiteSpace(value.RunId)
+                    && !string.IsNullOrWhiteSpace(value.PackId)
+                    && !string.IsNullOrWhiteSpace(value.Version)
+                    && value.ContentHash.Length == 64
+                    && value.ContentHash.All(Uri.IsHexDigit));
+            if (cast is null) return null;
+            var valheim = _host.FindValheim();
+            if (valheim is null) return null;
+            var active = new QuestPackStore(Path.Combine(Path.GetFullPath(valheim), "BepInEx",
+                "config", "comfy-quest-runtime")).ReadActive();
+            return active is not null
+                && string.Equals(active.PackId, cast.PackId, StringComparison.Ordinal)
+                && string.Equals(active.Version, cast.Version, StringComparison.Ordinal)
+                && string.Equals(active.ContentHash, cast.ContentHash, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(active.ActivationId, cast.ActivationId, StringComparison.Ordinal)
+                ? new StudioRuntimePackIdentity(
+                    cast.PackId, cast.Version, cast.ContentHash.ToLowerInvariant(), true)
+                : null;
+        }
+        catch { return null; }
+    }
+
     internal static ExperienceDocument BuildQuickExperience(StudioProjectDocument project,
         ExperienceTransition route, string quickId) => new()
     {

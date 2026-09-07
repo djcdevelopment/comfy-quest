@@ -753,13 +753,14 @@ internal sealed class QuestStudioWorkspace
             && (receipt.Status == "rebound" || receipt.Error == "already_current");
 
     static bool RequiresFreshRunEvidence(RuntimeReceipt receipt) =>
-        IsSuccessfulBindingEvidence(receipt)
+        !(receipt.Operation == "transition" && receipt.Status is "complete" or "fail")
+        && (IsSuccessfulBindingEvidence(receipt)
         || receipt.Operation == "dev_rebind"
         || !string.IsNullOrWhiteSpace(receipt.RunId)
         || !string.IsNullOrWhiteSpace(receipt.BindingInstanceId)
         || !string.IsNullOrWhiteSpace(receipt.StageId)
         || !string.IsNullOrWhiteSpace(receipt.TransitionId)
-        || !string.IsNullOrWhiteSpace(receipt.ActionId);
+        || !string.IsNullOrWhiteSpace(receipt.ActionId));
 
     static string DescribeLiveTrigger(TriggerExpression? trigger)
     {
