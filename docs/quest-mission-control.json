@@ -4,9 +4,9 @@
     "id": "comfy-quest-program",
     "title": "Quest Creator OS",
     "subtitle": "Drive the whole vertical slice. Automate the evidence. Spend the seat on creation.",
-    "observed_on": "2026-09-04",
-    "program_commit": "89c0a71",
-    "program_commit_label": "Wait for fresh run scope before preview"
+    "observed_on": "2026-09-06",
+    "program_commit": "cce78f3",
+    "program_commit_label": "Steward-backed Creator casting; installed proof pending"
   },
   "source_intents": {
     "repository": "djcdevelopment/baseline",
@@ -166,6 +166,13 @@
     }
   ],
   "environment": [
+    {
+      "id": "env.creator-dm",
+      "label": "Steward-backed Creator casting",
+      "state": "implemented",
+      "detail": "The recovered Creator/DM integration is committed in Quest at cce78f3 and Steward at f033493. Studio implements authenticated scene selection, snapshot-linked spatial targets, Activate, Quick Cast, owned Undo and evidence export. The Linux recovery boundary verifies release bytes and preserves the original install, world and character separately from the saved scene checkpoint. Installed AM4 proof and publication of packages built from clean source are pending; contract tests alone do not establish the live journey.",
+      "fact_kind": "repo-and-contract-tests"
+    },
     {
       "id": "env.repo",
       "label": "Repository baseline",

@@ -170,7 +170,7 @@ class QuestRuntimeValidationLapTests(unittest.TestCase):
         # The interim package version is fixed while its bytes evolve, so the Studio
         # gates must never trust NuGet's immutable-version global cache.
         source = HARNESS.read_text(encoding="utf-8")
-        self.assertIn("packages-local\\Comfy.Quest.Contracts.0.9.5-local.nupkg", source)
+        self.assertIn("packages-local\\Comfy.Quest.Contracts.0.9.6-local.nupkg", source)
         self.assertIn(".Hash.ToLowerInvariant().Substring(0, 16)", source)
         self.assertIn(
             "SetEnvironmentVariable('NUGET_PACKAGES', $studioGateCache, 'Process')", source
