@@ -31,6 +31,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--immutable-package-base", type=Path,
+                        help="reuse the exact plugins and versioned packages from this release")
     args = parser.parse_args()
     subprocess.run(["powershell", "-NoProfile", "-File",
                     str(ROOT / "tools/Assert-RepoIdentity.ps1")], cwd=ROOT, check=True)
@@ -48,6 +50,27 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     feed, cache = out / "packages", out / "nuget-cache"
     feed.mkdir()
+    base = args.immutable_package_base.resolve() if args.immutable_package_base else None
+    base_manifest = None
+    if base is not None:
+        base_manifest = json.loads((base / "release.json").read_text(encoding="utf-8"))
+        if (base_manifest.get("schema") != "comfy-quest-creator-dm-release/v1"
+                or base_manifest.get("version") != version):
+            raise RuntimeError("immutable_package_base_invalid")
+        base_revision = base_manifest.get("source_revision", "")
+        if (not base_revision or subprocess.run(
+                ["git", "diff", "--quiet", base_revision, "--", "network/mod"],
+                cwd=ROOT).returncode != 0):
+            raise RuntimeError("immutable_package_base_plugin_sources_changed")
+        for section in ("plugins", "packages"):
+            for entry in base_manifest.get(section, []):
+                source = base / entry["path"]
+                if (not source.is_file() or sha(source) != entry["sha256"]
+                        or source.stat().st_size != entry["bytes"]):
+                    raise RuntimeError("immutable_package_base_hash_mismatch:" + entry["path"])
+                target = out / entry["path"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
     config = out / "nuget.config"
     document = ET.Element("configuration")
     sources = ET.SubElement(document, "packageSources")
@@ -65,31 +88,36 @@ def main() -> None:
                                     stdout=log, stderr=subprocess.STDOUT)
         if result.returncode:
             raise RuntimeError(label + "_failed; see release build log")
-    build("contracts", ["pack", str(contracts), "-o", str(feed)])
-    build("runtime", ["build", "network/mod/ComfyQuestRuntime/ComfyQuestRuntime.csproj"])
-    build("lab", ["build", "network/mod/ComfyQuestLab/ComfyQuestLab.csproj"])
-    build("studio-package", ["pack", str(studio), "-o", str(feed)])
+    if base_manifest is None:
+        build("contracts", ["pack", str(contracts), "-o", str(feed)])
+        build("runtime", ["build", "network/mod/ComfyQuestRuntime/ComfyQuestRuntime.csproj"])
+        build("lab", ["build", "network/mod/ComfyQuestLab/ComfyQuestLab.csproj"])
+        build("studio-package", ["pack", str(studio), "-o", str(feed)])
     build("studio-linux", ["publish", "src/Quest.Studio.Host/Quest.Studio.Host.csproj",
                            "-r", "linux-x64", "--self-contained", "true",
                            "-o", str(out / "studio")])
     packages = []
     for name, kind in (("Contracts", "contracts"), ("Studio", "studio")):
         package = feed / f"Comfy.Quest.{name}.{version}.nupkg"
-        validate_package(package, kind, version, expected_commit=revision)
+        package_revision = (base_manifest or {}).get("source_revision", revision)
+        validate_package(package, kind, version, expected_commit=package_revision)
         packages.append({"path": package.relative_to(out).as_posix(),
                          "sha256": sha(package), "bytes": package.stat().st_size})
     plugins = out / "plugins"
-    plugins.mkdir()
+    plugins.mkdir(exist_ok=True)
     entries = []
     for name in ("ComfyQuestContracts.dll", "ComfyQuestRuntime.dll", "ComfyQuestLab.dll",
                  "Newtonsoft.Json.dll"):
-        project = "ComfyQuestLab" if name == "ComfyQuestLab.dll" else "ComfyQuestRuntime"
-        directory = ROOT / "network/mod" / project / "bin/Release"
-        candidates = list(directory.rglob(name))
-        if len(candidates) != 1:
-            raise RuntimeError("plugin_output_not_unique:" + name)
         target = plugins / name
-        shutil.copy2(candidates[0], target)
+        if base_manifest is None:
+            project = "ComfyQuestLab" if name == "ComfyQuestLab.dll" else "ComfyQuestRuntime"
+            directory = ROOT / "network/mod" / project / "bin/Release"
+            candidates = list(directory.rglob(name))
+            if len(candidates) != 1:
+                raise RuntimeError("plugin_output_not_unique:" + name)
+            shutil.copy2(candidates[0], target)
+        elif not target.is_file():
+            raise RuntimeError("immutable_package_base_plugin_missing:" + name)
         entries.append({"name": name, "path": target.relative_to(out).as_posix(),
                         "sha256": sha(target), "bytes": target.stat().st_size})
     probe = out / "probe"
@@ -116,6 +144,8 @@ def main() -> None:
                 "studio": {"path": archive.name, "sha256": sha(archive),
                            "bytes": archive.stat().st_size},
                 "proof_level": "release-artifacts; installed live proof is recorded separately"}
+    if base_manifest is not None:
+        manifest["immutable_artifact_base_revision"] = base_manifest["source_revision"]
     (out / "release.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"source_revision": revision, "version": version,
                       "manifest": str(out / "release.json")}), flush=True)
