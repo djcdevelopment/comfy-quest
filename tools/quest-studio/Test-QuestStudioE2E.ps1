@@ -55,7 +55,7 @@ $contractsPackageWasExplicit = -not [string]::IsNullOrWhiteSpace($ContractsPacka
 $contractsPackage = if ($contractsPackageWasExplicit) {
     (Resolve-Path -LiteralPath $ContractsPackage).Path
 } else {
-    Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.9.6-local.nupkg'
+    Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.9.7-local.nupkg'
 }
 $packageCacheKey = if (Test-Path -LiteralPath $contractsPackage) {
     (Get-FileHash -LiteralPath $contractsPackage -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0, 16)

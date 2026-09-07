@@ -131,7 +131,7 @@ Invoke-Checked $DotNetPath @('build', (Join-Path $root 'network\mod\ComfyQuestRu
 
 $studioRoot = Join-Path $OutDir 'creator-kit\studio'
 New-Item -ItemType Directory -Force -Path $studioRoot | Out-Null
-$contractsPackage = Join-Path $root 'packages-local\Comfy.Quest.Contracts.0.9.6-local.nupkg'
+$contractsPackage = Join-Path $root 'packages-local\Comfy.Quest.Contracts.0.9.7-local.nupkg'
 if (-not (Test-Path -LiteralPath $contractsPackage -PathType Leaf)) {
     throw "Pinned Contracts package is missing: $contractsPackage"
 }

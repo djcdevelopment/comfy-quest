@@ -125,7 +125,7 @@ public sealed class LabSignatureHuntProvider {
         Machine = Environment.MachineName,
         PluginVersion = ComfyQuestLab.PluginVersion,
         ReleaseId = ComfyQuestLab.ReleaseId,
-        WorldName = ZNet.instance.GetWorldName(),
+        WorldName = CanonicalWorldFileName(),
         WorldUid = ZNet.instance.GetWorldUID().ToString(CultureInfo.InvariantCulture),
         ExpectedObjectCount = LabSignatureHuntContract.Placements.Length,
         StandingObjectCount = standing,
@@ -227,7 +227,7 @@ public sealed class LabSignatureHuntProvider {
           || ZoneSystem.instance == null || Player.m_localPlayer == null) {
         return "signature hunt fixture requires a loaded local world.";
       }
-      string worldName = ZNet.instance.GetWorldName();
+      string worldName = CanonicalWorldFileName();
       string worldUid = ZNet.instance.GetWorldUID().ToString(CultureInfo.InvariantCulture);
       if (!LabSignatureHuntContract.SupportsWorld(worldName, worldUid)) {
         return "signature hunt world mismatch: expected reviewed "
@@ -246,6 +246,18 @@ public sealed class LabSignatureHuntProvider {
     } catch (Exception ex) {
       return "signature hunt world identity unreadable: " + ex.GetType().Name + ".";
     }
+  }
+
+  static string CanonicalWorldFileName() {
+    // The reviewed identity is a save filename. GetWorldName() returns the
+    // editable display label ("Comfy Quest Demo" on the installed AM4 world).
+    long uid = ZNet.instance.GetWorldUID();
+    string display = ZNet.instance.GetWorldName();
+    string[] names = SaveSystem.GetWorldList()
+        .Where(world => world != null && world.m_uid == uid
+            && string.Equals(world.m_name, display, StringComparison.Ordinal))
+        .Select(world => world.m_fileName).Distinct(StringComparer.Ordinal).ToArray();
+    return names.Length == 1 ? names[0] : null;
   }
 
   static bool TryResolvePlan(

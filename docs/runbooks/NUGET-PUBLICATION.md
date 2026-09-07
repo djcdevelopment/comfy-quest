@@ -7,8 +7,8 @@ inactive until the repository's `nuget-production` environment has a
 The committed development state remains:
 
 - `Comfy.Quest.Contracts` and `Comfy.Quest.Studio` producer version
-  `0.9.6-local`;
-- every Contracts consumer pinned exactly to `[0.9.6-local]`; and
+  `0.9.7-local`;
+- every Contracts consumer pinned exactly to `[0.9.7-local]`; and
 - `packages-local` first in `nuget.config`.
 
 Verify that state at any time:
