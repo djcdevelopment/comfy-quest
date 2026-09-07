@@ -4,7 +4,7 @@ namespace Comfy.Quest.Studio;
 
 internal static class QuestStudioCreatorRenderer
 {
-    public const string ArtifactSha256 = "362d1259476d902192a72c0368ee771f381a5c02c08ff212c53a2a52cc84682e";
+    public const string ArtifactSha256 = "a31e36330c35325ccd40f4e0e36fa26636692f970a2e6872dda7da37460a0eb4";
     static readonly Lazy<string> Source = new(() =>
     {
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(
