@@ -83,6 +83,13 @@ def validate_payload(names: set[str], kind: str, allow_signature: bool) -> None:
         required.update(f"contracts/spatial/{name}" for name in SPATIAL_SCHEMAS)
     else:
         required.add("lib/net9.0/Comfy.Quest.Studio.dll")
+        # Older immutable Studio packages predate the installed Linux runner.
+        # A package containing campaign support must carry the entire bounded set.
+        if any(name.startswith("contentFiles/any/any/campaign/") for name in names):
+            required.update("contentFiles/any/any/campaign/" + name for name in (
+                "architectural_live_probe.py", "campaign_play_prerequisites.py",
+                "creator_connected_lap.py", "creator_dm_live_probe.py",
+                "creator_live_input.py", "creator_raw_input.py"))
 
     missing = required - names
     if missing:
@@ -93,7 +100,7 @@ def validate_payload(names: set[str], kind: str, allow_signature: bool) -> None:
         name
         for name in names
         if re.fullmatch(
-            r"package/services/metadata/core-properties/[0-9a-f]{32}\.psmdcp",
+            r"package/services/metadata/core-properties/(?:[0-9a-f]{32}|nuget)\.psmdcp",
             name,
         )
     }

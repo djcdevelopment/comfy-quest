@@ -33,23 +33,33 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--immutable-package-base", type=Path,
                         help="reuse the exact plugins and versioned packages from this release")
+    parser.add_argument("--finish-source-revision",
+                        help="finalize already built bytes after a validation-tool repair; never repack")
     args = parser.parse_args()
     subprocess.run(["powershell", "-NoProfile", "-File",
                     str(ROOT / "tools/Assert-RepoIdentity.ps1")], cwd=ROOT, check=True)
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT).strip():
         raise RuntimeError("release_requires_clean_source")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    finishing = args.finish_source_revision is not None
+    if finishing:
+        revision = subprocess.check_output(["git", "rev-parse", args.finish_source_revision], cwd=ROOT, text=True).strip()
+        if args.immutable_package_base or subprocess.run(
+                ["git", "diff", "--quiet", revision, "--", "src", "network/mod", "tools/quest-studio"], cwd=ROOT).returncode:
+            raise RuntimeError("cannot_finalize_changed_producer_sources")
     contracts = ROOT / "network/mod/ComfyQuestContracts/ComfyQuestContracts.csproj"
     studio = ROOT / "src/Quest.Studio/Quest.Studio.csproj"
     version = ET.parse(contracts).findtext("./PropertyGroup/Version")
     if not version or ET.parse(studio).findtext("./PropertyGroup/Version") != version:
         raise RuntimeError("producer_versions_differ")
     out = args.output.resolve()
-    if out.exists() and any(out.iterdir()):
+    if out.exists() and any(out.iterdir()) and not finishing:
         raise RuntimeError("release_output_must_be_empty")
+    if finishing and (not out.is_dir() or (out / "release.json").exists()):
+        raise RuntimeError("only_unfinished_build_can_be_finalized")
     out.mkdir(parents=True, exist_ok=True)
     feed, cache = out / "packages", out / "nuget-cache"
-    feed.mkdir()
+    feed.mkdir(exist_ok=finishing)
     base = args.immutable_package_base.resolve() if args.immutable_package_base else None
     base_manifest = None
     if base is not None:
@@ -88,14 +98,15 @@ def main() -> None:
                                     stdout=log, stderr=subprocess.STDOUT)
         if result.returncode:
             raise RuntimeError(label + "_failed; see release build log")
-    if base_manifest is None:
+    if base_manifest is None and not finishing:
         build("contracts", ["pack", str(contracts), "-o", str(feed)])
         build("runtime", ["build", "network/mod/ComfyQuestRuntime/ComfyQuestRuntime.csproj"])
         build("lab", ["build", "network/mod/ComfyQuestLab/ComfyQuestLab.csproj"])
         build("studio-package", ["pack", str(studio), "-o", str(feed)])
-    build("studio-linux", ["publish", "src/Quest.Studio.Host/Quest.Studio.Host.csproj",
-                           "-r", "linux-x64", "--self-contained", "true",
-                           "-o", str(out / "studio")])
+    if not finishing:
+        build("studio-linux", ["publish", "src/Quest.Studio.Host/Quest.Studio.Host.csproj",
+                               "-r", "linux-x64", "--self-contained", "true",
+                               "-o", str(out / "studio")])
     packages = []
     for name, kind in (("Contracts", "contracts"), ("Studio", "studio")):
         package = feed / f"Comfy.Quest.{name}.{version}.nupkg"
