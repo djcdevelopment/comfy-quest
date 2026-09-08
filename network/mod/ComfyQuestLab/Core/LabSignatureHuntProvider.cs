@@ -32,7 +32,7 @@ public sealed class LabSignatureHuntProvider {
   public bool IsRunning { get { return _running; } }
   public bool LastLifecycleSucceeded { get { return _lastSucceeded; } }
   public string LastResult { get { return _lastResult; } }
-  public string LastReceiptPath { get { return _lastReceiptPath; } }
+  public string LastReceiptPath { get { RecoverStandingReceipt(); return _lastReceiptPath; } }
 
   static string ReceiptDirectory {
     get {
@@ -195,6 +195,7 @@ public sealed class LabSignatureHuntProvider {
   public string Status() {
     string precondition = WorldPrecondition();
     if (precondition != null) return precondition;
+    RecoverStandingReceipt();
     int standing = StandingObjectCount();
     if (standing < 0) return "signature hunt fixture ownership table could not be read.";
     string receipt = string.IsNullOrWhiteSpace(_lastReceiptPath)
@@ -213,6 +214,20 @@ public sealed class LabSignatureHuntProvider {
   public int StandingObjectCount() {
     if (!TryCollectOwned(out List<ZDO> owned, out string _)) return -1;
     return owned.Count;
+  }
+
+  // A saved fixture outlives the plugin process. Its durable preparation marks,
+  // rather than an in-memory last-operation pointer, identify its original receipt.
+  void RecoverStandingReceipt() {
+    if (!TryCollectOwned(out List<ZDO> owned, out string _) || owned.Count == 0) return;
+    string[] preparations = owned.Select(zdo => zdo.GetString(
+        LabSignatureHuntContract.PreparationMarkKey, string.Empty)).Distinct().ToArray();
+    if (preparations.Length != 1 || !SafeToken(preparations[0])) {
+      _lastReceiptPath = null;
+      return;
+    }
+    string path = Path.Combine(ReceiptDirectory, preparations[0] + ".json");
+    _lastReceiptPath = File.Exists(path) ? path : null;
   }
 
   void Finish(string result, bool succeeded) {

@@ -52,6 +52,10 @@ The rest of the repository:
 
 ## Local verification
 
+The [connected campaign handoff](docs/creator-connected-campaign.md) records the
+installed DMos/Studio/Lab slice, API probes, recovery boundary, and remaining human
+two-hunt lap. Live control success and synthetic rehearsal are recorded separately.
+
 The mod build requires the licensed Valheim/BepInEx assemblies from a local game
 installation. Do not set ComfyCopyToPlugins during verification.
 
@@ -71,13 +75,13 @@ installation. Do not set ComfyCopyToPlugins during verification.
     python tools/assert_no_reach_in.py
     python tools/assert_no_reach_in.py --self-test
     gitleaks git --no-banner --redact --log-opts='--all' .
-    $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.9.9-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
+    $contractsHash = (Get-FileHash packages-local/Comfy.Quest.Contracts.0.9.10-local.nupkg -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0,16)
     $sdkVersion = (dotnet --version)
     $env:NUGET_PACKAGES = Join-Path $env:TEMP ("comfy-quest-verify-" + $contractsHash + "-" + $sdkVersion)
     dotnet build src/Quest.Studio/Quest.Studio.csproj -c Release
     dotnet test src/Quest.Studio.Tests/Quest.Studio.Tests.csproj -c Release
 
-The Creator/DM authoring cutover has its own `0.9.9-local` Contracts line. Never repack
+The Creator/DM authoring cutover has its own `0.9.10-local` Contracts line. Never repack
 that version with different bytes; increment the local version before another contract
 change. The package-and-SDK-keyed cache above also prevents an older local artifact from
 masking a source change. Studio targets .NET 9 and therefore

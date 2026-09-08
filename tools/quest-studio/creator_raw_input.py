@@ -1,0 +1,119 @@
+"""Guarded, temporary raw Left Ctrl device for one AM4 Creator-DM lap."""
+import argparse
+import fcntl
+import json
+import os
+import signal
+import struct
+import time
+from pathlib import Path
+
+GAME = Path('/home/derek/valheim')
+parser = argparse.ArgumentParser()
+parser.add_argument('--run-root', type=Path, required=True)
+parser.add_argument('--session', required=True)
+args = parser.parse_args()
+RUN = args.run_root.resolve()
+assert RUN.parent == Path('/home/derek/valheim-capture/creator-dm/runs')
+CONTROL = RUN / 'uinput-control'
+WORLD_UID = '-7600395338659582326'
+SCHEMA = 'creator-dm-uinput-status/v1'
+
+assert os.geteuid() == 0
+session = json.loads((RUN / 'creator-session.json').read_text())
+assert session['state'] == 'active' and session['session_id'] == args.session
+assert session['world_uid'] == WORLD_UID and CONTROL.is_dir()
+
+def iow(type_code, number, size=4):
+    return (1 << 30) | (size << 16) | (ord(type_code) << 8) | number
+
+UI_SET_EVBIT = iow('U', 100)
+UI_SET_KEYBIT = iow('U', 101)
+UI_SET_RELBIT = iow('U', 102)
+UI_DEV_CREATE = (ord('U') << 8) | 1
+UI_DEV_DESTROY = (ord('U') << 8) | 2
+EV_SYN, EV_KEY, EV_REL, SYN_REPORT = 0, 1, 2, 0
+REL_X, REL_Y, KEY_LEFTCTRL, BTN_LEFT = 0, 1, 29, 272
+running = True
+
+def atomic_json(path, value):
+    temporary = path.with_name(path.name + '.tmp-' + str(os.getpid()))
+    temporary.write_text(json.dumps(value, sort_keys=True) + '\n')
+    os.replace(temporary, path)
+
+def emit(device, event_type, code, value):
+    device.write(struct.pack('llHHi', 0, 0, event_type, code, value))
+    device.flush()
+
+def stop(_signal, _frame):
+    global running
+    running = False
+
+signal.signal(signal.SIGTERM, stop)
+signal.signal(signal.SIGINT, stop)
+
+with open('/dev/uinput', 'wb', buffering=0) as device:
+    for event_type in (EV_SYN, EV_KEY, EV_REL):
+        fcntl.ioctl(device, UI_SET_EVBIT, event_type)
+    for code in (KEY_LEFTCTRL, BTN_LEFT):
+        fcntl.ioctl(device, UI_SET_KEYBIT, code)
+    for code in (REL_X, REL_Y):
+        fcntl.ioctl(device, UI_SET_RELBIT, code)
+    descriptor = struct.pack('80sHHHHI', b'creator-connected-keyboard', 0x03, 0x1209, 0x0002, 1, 0)
+    descriptor += struct.pack('256i', *([0] * 256))
+    device.write(descriptor)
+    fcntl.ioctl(device, UI_DEV_CREATE)
+    try:
+        time.sleep(2.0)
+        atomic_json(CONTROL / 'status.json', {
+            'schema': SCHEMA, 'state': 'ready', 'pid': os.getpid(), 'world_uid': WORLD_UID,
+        })
+        handled = None
+        expires = time.monotonic() + 7200
+        while running and time.monotonic() < expires:
+            stop_path = CONTROL / 'stop.json'
+            if stop_path.exists():
+                request = json.loads(stop_path.read_text())
+                if request.get('operation') == 'stop' and request.get('pid') == os.getpid():
+                    atomic_json(CONTROL / 'status.json', {
+                        'schema': SCHEMA, 'state': 'stopping', 'pid': os.getpid(),
+                        'world_uid': WORLD_UID,
+                    })
+                    break
+            request_path = CONTROL / 'request.json'
+            if request_path.exists():
+                request = json.loads(request_path.read_text())
+                request_id = request.get('request_id')
+                if (request.get('schema') == 'creator-dm-uinput-request/v1'
+                        and request.get('operation') == 'hold-left-control'
+                        and request_id and request_id != handled):
+                    entry = json.loads((GAME / 'BepInEx/config/comfy-quest-runtime/status/world-entry.json').read_text())
+                    assert entry['state'] == 'entered' and entry['creator_session_id'] == args.session
+                    assert entry['world_uid'] == WORLD_UID
+                    lease = json.loads((GAME / 'BepInEx/config/creator-dm-install.lock.json').read_text())
+                    assert lease == {'session_id': args.session, 'run_root': str(RUN)}
+                    handled = request_id
+                    emit(device, EV_KEY, KEY_LEFTCTRL, 1); emit(device, EV_SYN, SYN_REPORT, 0)
+                    atomic_json(CONTROL / 'status.json', {
+                        'schema': SCHEMA, 'state': 'holding', 'pid': os.getpid(),
+                        'world_uid': WORLD_UID, 'request_id': request_id,
+                    })
+                    time.sleep(.5)
+                    emit(device, EV_KEY, BTN_LEFT, 1); emit(device, EV_SYN, SYN_REPORT, 0)
+                    time.sleep(.15)
+                    emit(device, EV_KEY, BTN_LEFT, 0); emit(device, EV_SYN, SYN_REPORT, 0)
+                    time.sleep(.5)
+                    emit(device, EV_KEY, KEY_LEFTCTRL, 0); emit(device, EV_SYN, SYN_REPORT, 0)
+                    atomic_json(CONTROL / 'status.json', {
+                        'schema': SCHEMA, 'state': 'released', 'pid': os.getpid(),
+                        'world_uid': WORLD_UID, 'request_id': request_id,
+                    })
+            time.sleep(.05)
+    finally:
+        emit(device, EV_KEY, KEY_LEFTCTRL, 0); emit(device, EV_SYN, SYN_REPORT, 0)
+        emit(device, EV_KEY, BTN_LEFT, 0); emit(device, EV_SYN, SYN_REPORT, 0)
+        fcntl.ioctl(device, UI_DEV_DESTROY)
+
+atomic_json(CONTROL / 'status.json', {
+    'schema': SCHEMA, 'state': 'stopped', 'pid': os.getpid(), 'world_uid': WORLD_UID,
+})

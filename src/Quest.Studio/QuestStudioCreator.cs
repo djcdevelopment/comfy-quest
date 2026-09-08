@@ -176,7 +176,7 @@ internal sealed class QuestStudioCreator
                     .SequenceEqual((request.Biomes ?? Array.Empty<string>())
                         .OrderBy(value => value, StringComparer.Ordinal), StringComparer.Ordinal))
                 return StudioCreatorSceneResult.Fail("steward_scene_scope_mismatch");
-            StoreScene(parsed.Receipt!);
+            StoreScene(parsed.Receipt!, bytes);
             return new(true, null, bytes, parsed.Receipt!.SceneId, SceneContentType,
                 parsed.Receipt.PieceCount, parsed.Receipt.InstanceCount);
         }
@@ -278,6 +278,52 @@ internal sealed class QuestStudioCreator
                 && value.WorldLink?.Schema == "comfy-quest-steward-world-link/v1" ? value : null;
         }
         catch { return null; }
+    }
+
+    internal StudioCreatorTargetReceipt? LatestTarget(string projectId, int revision)
+    {
+        if (!SafeLocalId(projectId) || !Directory.Exists(_targetRoot)) return null;
+        return Directory.EnumerateFiles(_targetRoot, "*.json")
+            .Select(path => ReadTarget(projectId, Path.GetFileNameWithoutExtension(path)))
+            .Where(value => value is not null && value.ProjectRevision == revision)
+            .OrderByDescending(value => value!.CreatedUtc)
+            .ThenBy(value => value!.TargetId, StringComparer.Ordinal).FirstOrDefault();
+    }
+
+    internal StudioCreatorSceneReceipt? LatestScene(string snapshotHash)
+    {
+        if (!Directory.Exists(_sceneRoot)) return null;
+        return Directory.EnumerateFiles(_sceneRoot, "*.json").Take(MaxReceipts)
+            .Select(path => ReadScene(Path.GetFileNameWithoutExtension(path)))
+            .Where(value => value is not null && value.SnapshotFileSha256 == snapshotHash
+                && File.Exists(Path.Combine(_sceneRoot, value.SceneId + ".svca")))
+            .OrderByDescending(value => value!.FetchedUtc).FirstOrDefault();
+    }
+
+    internal StudioCreatorSceneReceipt? LinkedScene(string sceneId, StudioRunStatusView status)
+    {
+        if (!Sha(sceneId)) return null;
+        var scene = ReadScene(sceneId);
+        return scene is not null && ReadWorldLink(scene, status).Link is not null ? scene : null;
+    }
+
+    internal StudioCreatorSceneResult RetainedScene(string sceneId)
+    {
+        if (!Sha(sceneId)) return StudioCreatorSceneResult.Fail("creator_scene_id_invalid");
+        try
+        {
+            var path = Path.Combine(_sceneRoot, sceneId + ".svca");
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length is <= 0 or > MaxSceneBytes)
+                return StudioCreatorSceneResult.Fail("creator_scene_bytes_missing");
+            var bytes = File.ReadAllBytes(path);
+            if (Hash(bytes) != sceneId) return StudioCreatorSceneResult.Fail("creator_scene_hash_mismatch");
+            var parsed = ParseScene(bytes);
+            return parsed.Error is not null ? StudioCreatorSceneResult.Fail(parsed.Error)
+                : new(true, null, bytes, sceneId, SceneContentType,
+                    parsed.Receipt!.PieceCount, parsed.Receipt.InstanceCount);
+        }
+        catch (IOException) { return StudioCreatorSceneResult.Fail("creator_scene_unreadable"); }
     }
 
     async Task<(SpatialAnchorExchange? Anchor, string? Json, string? Error)> FetchAnchorAsync(
@@ -387,6 +433,50 @@ internal sealed class QuestStudioCreator
             && !value.OperatorToken.Any(char.IsControl) ? value : null;
     }
 
+    public object? SpatialSyncStatus(string projectId)
+    {
+        if (!SafeLocalId(projectId)) return null;
+        var path = Path.Combine(_host.StateDirectory, "quest-studio", "creator", "spatial-sync", projectId + ".json");
+        if (!File.Exists(path)) return null;
+        using var document = JsonDocument.Parse(File.ReadAllBytes(path));
+        return document.RootElement.Clone();
+    }
+
+    public async Task<object> SyncSpatialEvidenceAsync(string projectId, StudioDownloadResult bundle,
+        CancellationToken cancellationToken)
+    {
+        var connection = Connection();
+        if (connection is null || !bundle.Ok || bundle.Bytes is null || !SafeLocalId(projectId))
+            return new { ok = false, error = bundle.Error ?? "steward_connection_unavailable" };
+        using var source = JsonDocument.Parse(bundle.Bytes);
+        using var message = new HttpRequestMessage(HttpMethod.Post,
+            new Uri(connection.ViewerOrigin, "/api/v1/quest/evidence/import"));
+        message.Headers.TryAddWithoutValidation("X-Steward-Quest-Token", connection.OperatorToken);
+        message.Content = new ByteArrayContent(bundle.Bytes);
+        message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var bytes = await ReadBoundedAsync(response.Content, 64 * 1024, cancellationToken);
+        if (!response.IsSuccessStatusCode || bytes is null)
+            return new { ok = false, error = "steward_evidence_import_rejected", status = (int)response.StatusCode };
+        using var imported = JsonDocument.Parse(bytes);
+        var receipt = imported.RootElement;
+        if (receipt.GetProperty("schema").GetString() != "comfy-steward-quest-evidence-import/v1"
+            || receipt.GetProperty("contentSha256").GetString() != source.RootElement.GetProperty("content_sha256").GetString())
+            return new { ok = false, error = "steward_evidence_receipt_mismatch" };
+        var result = new { schema = "comfy-quest-creator-spatial-sync/v1", ok = true, project_id = projectId,
+            run_id = source.RootElement.GetProperty("run_id").GetString(),
+            content_sha256 = receipt.GetProperty("contentSha256").GetString(),
+            record_count = receipt.GetProperty("recordCount").GetInt32(),
+            already_present = receipt.GetProperty("alreadyPresent").GetBoolean(),
+            imported_utc = DateTimeOffset.UtcNow };
+        var path = Path.Combine(_host.StateDirectory, "quest-studio", "creator", "spatial-sync", projectId + ".json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+        try { File.WriteAllBytes(temporary, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(result, _host.Json)); File.Move(temporary, path, true); }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        return result;
+    }
+
     static bool SafeOrigin(Uri value) => value.IsAbsoluteUri && string.IsNullOrEmpty(value.UserInfo)
         && string.IsNullOrEmpty(value.Query) && string.IsNullOrEmpty(value.Fragment)
         && (value.Scheme == Uri.UriSchemeHttps || value.Scheme == Uri.UriSchemeHttp && value.IsLoopback);
@@ -477,11 +567,20 @@ internal sealed class QuestStudioCreator
         }, null);
     }
 
-    void StoreScene(StudioCreatorSceneReceipt receipt)
+    void StoreScene(StudioCreatorSceneReceipt receipt, byte[] bytes)
     {
         lock (_gate)
         {
             Directory.CreateDirectory(_sceneRoot);
+            var binary = Path.Combine(_sceneRoot, receipt.SceneId + ".svca");
+            var temporary = binary + ".tmp-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                { stream.Write(bytes); stream.Flush(flushToDisk: true); }
+                File.Move(temporary, binary, overwrite: true);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
             WriteAtomic(Path.Combine(_sceneRoot, receipt.SceneId + ".json"), receipt);
             Prune(_sceneRoot);
         }
@@ -529,7 +628,11 @@ internal sealed class QuestStudioCreator
         foreach (var file in new DirectoryInfo(root).GetFiles("*.json")
                      .OrderByDescending(value => value.LastWriteTimeUtc).ThenBy(value => value.Name,
                          StringComparer.Ordinal).Skip(MaxReceipts))
+        {
+            var binary = Path.ChangeExtension(file.FullName, ".svca");
             file.Delete();
+            if (File.Exists(binary)) File.Delete(binary);
+        }
     }
 
     static async Task<byte[]?> ReadBoundedAsync(HttpContent content, int maximum,

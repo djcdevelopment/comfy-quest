@@ -3,7 +3,8 @@ using Newtonsoft.Json;
 
 namespace Comfy.Quest.Studio;
 
-public sealed record StudioRunResetRequest(string RunId, string? PreviewToken = null, bool ConfirmReset = false);
+public sealed record StudioRunResetRequest(string RunId, string? PreviewToken = null, bool ConfirmReset = false,
+    string? ExpectedMachine = null, string? ExpectedWorldUid = null, string? CreatorSessionId = null);
 public sealed record StudioRunRetireRequest(string RunId, string? PreviewToken = null, bool ConfirmRetire = false);
 public sealed record StudioSelectExperienceRequest(string? ExperienceId);
 public sealed record StudioBindExperienceRequest(string? ExperienceId, string? BindingZdo);
@@ -303,6 +304,10 @@ internal sealed class QuestStudioRunControl
         var root = RuntimeRoot()!;
         var creatorSessionId = ReadCreatorSessionId(root, status.Machine!, status.WorldUid!);
         if (creatorSessionId is null) return new(false, false, "creator_session_unavailable", null);
+        if ((request.ExpectedMachine is not null || request.ExpectedWorldUid is not null || request.CreatorSessionId is not null)
+            && (!string.Equals(request.ExpectedMachine, status.Machine, StringComparison.OrdinalIgnoreCase)
+                || request.ExpectedWorldUid != status.WorldUid || request.CreatorSessionId != creatorSessionId))
+            return new(false, false, "runtime_identity_changed", null);
         var now = DateTimeOffset.UtcNow;
         return await DispatchAsync(root, new RuntimeRunControlRequest
         {

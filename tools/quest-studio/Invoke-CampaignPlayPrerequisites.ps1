@@ -137,15 +137,15 @@ if ([string]$requestReceipt.state -ne 'completed' -or
     [string]$requestReceipt.operation -ne 'signature_hunt_prepare' -or
     [string]$fixture.schema -ne 'comfy-questlab-signature-hunt-fixture/v1' -or
     [string]$fixture.fixture_id -ne 'slayers-signature-hunt' -or
-    [int]$fixture.fixture_revision -ne 1 -or
+    [int]$fixture.fixture_revision -ne 2 -or
     [string]$fixture.state -ne 'ready' -or
     [string]$fixture.proof_level -ne 'fixture-preparation' -or
     [string]$fixture.request_id -ne [string]$requestReceipt.request_id -or
     [string]$fixture.machine -ne $machine -or
     [string]$fixture.world_name -ne 'ComfyQuestDemo' -or
     [string]$fixture.world_uid -ne $worldUid -or
-    [int]$fixture.objects.expected -ne 17 -or
-    [int]$fixture.objects.standing_at_capture -ne 17 -or
+    [int]$fixture.objects.expected -ne 20 -or
+    [int]$fixture.objects.standing_at_capture -ne 20 -or
     @($fixture.targets).Count -ne 2 -or
     [string]$fixture.targets[0].role -ne 'target-deathsquito' -or
     [string]$fixture.targets[0].prefab -ne 'Deathsquito' -or

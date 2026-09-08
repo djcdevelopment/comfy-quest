@@ -12,7 +12,7 @@ using System.Text;
 /// actually finds after instantiation.</summary>
 public static class LabSignatureHuntContract {
   public const string FixtureId = "slayers-signature-hunt";
-  public const int FixtureRevision = 1;
+  public const int FixtureRevision = 2;
   public const string ReceiptSchema = "comfy-questlab-signature-hunt-fixture/v1";
   public const string ProofLevel = "fixture-preparation";
   public const string Disclaimer =
@@ -54,6 +54,14 @@ public static class LabSignatureHuntContract {
   /// at preparation time and local +X follows right. Every Y is an offset from natural terrain,
   /// so none of these values is an externally supplied world coordinate.</summary>
   public static readonly LabSignatureHuntPlacement[] Placements = {
+    // Signs otherwise stand unsupported 1.2 m above terrain and collapse after loading.
+    // Place their physical supports first; retain the ownership mark so prepare replaces v1.
+    Place("marker-deathsquito-sign-post", MarkerKind, "deathsquito", "wood_pole2",
+        -20f, 0f, 22f),
+    Place("marker-drake-sign-post", MarkerKind, "drake", "wood_pole2",
+        20f, 0f, 22f),
+    Place("marker-loadout-sign-post", MarkerKind, "loadout", "wood_pole2",
+        0f, 0f, 7f),
     // Deathsquito arena: one readable sign and four boundary stakes around a 12 m square.
     Place("marker-deathsquito-sign", MarkerKind, "deathsquito", "sign",
         -20f, 1.2f, 22f, 180f, 1, "SLAYERS SIGNATURE HUNT\nDEATHSQUITO"),

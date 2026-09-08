@@ -48,6 +48,69 @@ public static class QuestStudioEndpoints
         });
 
         app.MapGet("/api/v2/quest-studio/catalog", (QuestStudioService studio) => Results.Json(studio.WorkspaceCatalog(), host.Json));
+        app.MapGet("/api/v2/quest-studio/creator-campaigns",
+            (HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            return !host.Authorize(request) ? Forbidden(host) : Results.Json(studio.CreatorCampaigns(), host.Json);
+        });
+        app.MapGet("/api/v2/quest-studio/creator-campaigns/{guildId}/{campaignId}",
+            (string guildId, string campaignId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var context = studio.CreatorCampaignContext(guildId, campaignId);
+            return context is null ? Results.NotFound() : Results.Json(context, host.Json);
+        });
+        app.MapPost("/api/v2/quest-studio/creator-campaigns/{guildId}/{campaignId}/scene",
+            (string guildId, string campaignId, StudioCreatorCampaignSceneRequest body,
+                HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            return !host.Authorize(request) ? Forbidden(host) : Results.Json(studio.LinkCreatorCampaignScene(guildId, campaignId, body), host.Json);
+        });
+        app.MapGet("/api/v2/quest-studio/creator-context/{projectId}",
+            (string projectId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var context = studio.CreatorContext(projectId);
+            return context is null ? Results.NotFound() : Results.Json(context, host.Json);
+        });
+        app.MapGet("/api/v2/quest-studio/creator/scenes/{sceneId}",
+            (string sceneId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var scene = studio.RetainedCreatorScene(sceneId);
+            if (!scene.Ok) return Results.Json(new { ok = false, error = scene.Error }, host.Json, statusCode: 404);
+            response.Headers["X-Steward-Scene-Id"] = scene.SceneId;
+            return Results.File(scene.Bytes!, scene.ContentType!);
+        });
+        app.MapPost("/api/v2/quest-studio/creator-operations",
+            (HttpRequest request, HttpResponse response, StudioCreatorOperationRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.SubmitCreatorOperation(body);
+            return Results.Json(result, host.Json, statusCode: result.StatusCode);
+        }).WithMetadata(new RequestSizeLimitAttribute(16 * 1024));
+        app.MapGet("/api/v2/quest-studio/creator-operations/{operationId}",
+            (string operationId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var operation = studio.CreatorOperation(operationId);
+            return operation is null ? Results.NotFound() : Results.Json(operation, host.Json);
+        });
+        app.MapGet("/api/v2/quest-studio/creator-evidence/{projectId}",
+            (string projectId, long? after, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var evidence = studio.CreatorEvidence(projectId, after ?? 0);
+            return evidence is null ? Results.NotFound() : Results.Json(evidence, host.Json);
+        });
         app.MapGet("/api/v2/quest-studio/builds", (HttpRequest request, HttpResponse response, [FromServices] QuestStudioBuildService builds) =>
         { NoStore(response); return !host.Authorize(request) ? Forbidden(host) : Results.Json(new { schema = "comfy-quest-studio-build-list/v1", builds = builds.List() }, host.Json); });
         app.MapPost("/api/v2/quest-studio/builds/import", async (HttpRequest request, HttpResponse response, [FromServices] QuestStudioBuildService builds, CancellationToken token) =>
@@ -504,6 +567,13 @@ public static class QuestStudioEndpoints
             NoStore(response);
             if (!host.Authorize(request)) return Forbidden(host);
             return Download(response, studio.DownloadQuestpack(projectId), host);
+        });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/creator/spatial-sync", async
+            (string projectId, HttpRequest request, HttpResponse response, QuestStudioService studio, CancellationToken token) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            return Results.Json(await studio.SyncCreatorSpatialEvidenceAsync(projectId, token), host.Json);
         });
         app.MapPost("/api/v2/quest-studio/projects/{projectId}/spatial-evidence", (string projectId, HttpRequest request, HttpResponse response, QuestStudioService studio) =>
         {

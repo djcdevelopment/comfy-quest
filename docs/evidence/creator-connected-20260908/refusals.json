@@ -1,0 +1,225 @@
+{
+  "schema": "creator-campaign-probe/v1",
+  "operation": "refusals",
+  "state": "passed",
+  "checks": [
+    {
+      "name": "same_command_replayed",
+      "passed": true,
+      "evidence": {
+        "ok": true,
+        "error": null,
+        "replayed": true,
+        "operation": {
+          "schema": "comfy-quest-creator-operation/v1",
+          "operation_id": "00d6acd5-a92a-464a-9a0f-66d886ce572d",
+          "request_sha256": "2d706f86893a1910f3ea43a8d182412a7d6d7370fc1cb618a9363738c5df4230",
+          "request": {
+            "schema": "comfy-quest-creator-operation-request/v1",
+            "command_id": "00d6acd5-a92a-464a-9a0f-66d886ce572d",
+            "operation": "campaign_reset",
+            "project_id": "project-5de507849475",
+            "expected_revision": 2,
+            "expected_machine": "am4",
+            "expected_world_uid": "-7600395338659582326",
+            "creator_session_id": "creator-connected-20260907-r1",
+            "target_id": null,
+            "cast_id": null,
+            "run_id": null,
+            "preview_token": "campaign-reset-da7e5b344f374beab6c30dd8ea84680d",
+            "confirm": true,
+            "guild_id": "guild-fb4ed5d6d9bc",
+            "campaign_id": "campaign-default",
+            "expected_campaign_revision": 4,
+            "attempt_id": "990966dd-07f9-4799-9214-70d7efa7483a"
+          },
+          "state": "completed",
+          "created_utc": "2026-09-08T20:14:55.7975262+00:00",
+          "updated_utc": "2026-09-08T20:15:02.6830167+00:00",
+          "outcome": {
+            "ok": true,
+            "error": null,
+            "runtime_state": "started",
+            "cast_id": null,
+            "run_id": null,
+            "request_id": null,
+            "receipt": {
+              "schema": "comfy-quest-creator-campaign-attempt/v1",
+              "attempt_id": "00d6acd5-a92a-464a-9a0f-66d886ce572d",
+              "prior_attempt_id": "990966dd-07f9-4799-9214-70d7efa7483a",
+              "guild_id": "guild-fb4ed5d6d9bc",
+              "campaign_id": "campaign-default",
+              "state": "started",
+              "pending_step": null,
+              "created_utc": "2026-09-08T20:14:59.774062+00:00",
+              "play": {
+                "schema": "comfy-quest-studio-campaign-play/v1",
+                "operation_id": "campaign-play-20260908T201459778Z-60005e7b",
+                "state": "started",
+                "failed_stage": null,
+                "error": null,
+                "started_utc": "2026-09-08T20:14:59.7783236+00:00",
+                "completed_utc": "2026-09-08T20:15:02.6815918+00:00",
+                "guild_id": "guild-fb4ed5d6d9bc",
+                "campaign_id": "campaign-default",
+                "campaign_revision": 4,
+                "content_hash": "bd1551e9b2d58ef79912bd78011677f7bf97fb33911f34ca75a922c51a665de0",
+                "creator_session_id": "creator-connected-20260907-r1",
+                "machine": "am4",
+                "world_uid": "-7600395338659582326",
+                "fixture_request_id": "architectural-signature-hunt-prepare-201500-2e687c9ac0",
+                "fixture_preparation_id": "signature-hunt-20260908T201501190Z-0d97515e",
+                "fixture_receipt_path": "/home/derek/valheim-capture/creator-dm/connected/20260907-weld1/studio-state/captures/campaign-play/campaign-play-20260908T201459778Z-60005e7b/fixture.json",
+                "fixture_receipt_sha256": "c70f967e901a8432baaa103b23148bbc3dbb7379fc17dabd42f558b94a23ebb6",
+                "fixture_proof_level": "fixture-preparation",
+                "fixture_disclaimer": "Fixed fixture preparation only; not live kill or completion proof.",
+                "fixture_targets": [
+                  {
+                    "role": "target-deathsquito",
+                    "matcher_target": "$enemy_deathsquito",
+                    "zdo_id": "2321532435:75327"
+                  },
+                  {
+                    "role": "target-drake",
+                    "matcher_target": "$enemy_drake",
+                    "zdo_id": "2321532435:75328"
+                  }
+                ],
+                "binding_anchor_zdo": "2321532435:75322",
+                "first_project_id": "project-5de507849475",
+                "first_experience_id": "quest-426404-fork-849475",
+                "package_sha256": "a18c2473f7075bef04e8720e39db7332a39fcd78e0609e531aa924d5b2dd8937",
+                "activation_id": "act-20260908T201501560Z-89abf059",
+                "candidate_request_id": "studio-list-binding-candidates-20260908T201501675Z-bd3139e2",
+                "bind_request_id": "studio-bind-selected-experience-20260908T201502079Z-e2d577c3",
+                "binding_change_id": "binding-20260908T201502574Z-7c07a58e",
+                "binding_instance_id": "binding-20260908T201502574Z-7c07a58e",
+                "stages": [
+                  {
+                    "stage": "certify",
+                    "state": "completed",
+                    "at_utc": "2026-09-08T20:14:59.7785177+00:00",
+                    "evidence_id": "bd1551e9b2d58ef79912bd78011677f7bf97fb33911f34ca75a922c51a665de0",
+                    "detail": "Exact campaign bytes frozen before machine mutation."
+                  },
+                  {
+                    "stage": "resume",
+                    "state": "completed",
+                    "at_utc": "2026-09-08T20:15:01.4147779+00:00",
+                    "evidence_id": "creator-connected-20260907-r1",
+                    "detail": "Pinned Creator Session was validated and entered ComfyQuestDemo."
+                  },
+                  {
+                    "stage": "arm",
+                    "state": "completed",
+                    "at_utc": "2026-09-08T20:15:01.4153404+00:00",
+                    "evidence_id": "dev-session-cb939cca53f2483e99e0366143589079",
+                    "detail": "Runtime heartbeat is fresh and armed before transfer."
+                  },
+                  {
+                    "stage": "fixture_prepare",
+                    "state": "completed",
+                    "at_utc": "2026-09-08T20:15:01.4153407+00:00",
+                    "evidence_id": "architectural-signature-hunt-prepare-201500-2e687c9ac0",
+                    "detail": "fixture-preparation"
+                  },
+                  {
+                    "stage": "publish",
+                    "state": "completed",
+                    "at_utc": "2026-09-08T20:15:01.4222648+00:00",
+                    "evidence_id": "a18c2473f7075bef04e8720e39db7332a39fcd78e0609e531aa924d5b2dd8937",
+                    "detail": "campaign-bd1551e9b2d5-r4-60005e7b.questpack"
+                  },
+                  {
+                    "stage": "activation",
+                    "state": "completed",
+                    "at_utc": "2026-09-08T20:15:01.6745475+00:00",
+                    "evidence_id": "act-20260908T201501560Z-89abf059",
+                    "detail": "guild-fb4ed5d6d9bc@0.1.0"
+                  },
+                  {
+                    "stage": "binding_candidates",
+                    "state": "completed",
+                    "at_utc": "2026-09-08T20:15:02.0789797+00:00",
+                    "evidence_id": "studio-list-binding-candidates-20260908T201501675Z-bd3139e2",
+                    "detail": "Exact fixture-owned sign is present in Runtime's bounded candidate set."
+                  },
+                  {
+                    "stage": "bind_start",
+                    "state": "completed",
+                    "at_utc": "2026-09-08T20:15:02.6808205+00:00",
+                    "evidence_id": "studio-bind-selected-experience-20260908T201502079Z-e2d577c3",
+                    "detail": "Runtime atomically selected, bound, and started quest-426404-fork-849475."
+                  }
+                ],
+                "limitations": [
+                  "Quest Lab fixture evidence proves preparation only; it is not kill or completion proof.",
+                  "Runtime bind/start evidence proves the campaign began, not that a player completed it.",
+                  "Slayers community credit remains outside this local R&D proof."
+                ]
+              },
+              "measured_scene_id": null,
+              "projects": [
+                {
+                  "project_id": "project-5de507849475",
+                  "experience_id": "quest-426404-fork-849475",
+                  "title": "Air Drop",
+                  "revision": 2
+                },
+                {
+                  "project_id": "project-4b59c7401e58",
+                  "experience_id": "quest-426404-fork-401e58",
+                  "title": "Cold Shot",
+                  "revision": 2
+                }
+              ],
+              "runs": [],
+              "continuations": [],
+              "reset_receipts": []
+            },
+            "pending": false,
+            "recovery_required": false
+          }
+        },
+        "status_code": 200
+      }
+    },
+    {
+      "name": "conflicting_command_refused",
+      "passed": true,
+      "evidence": {
+        "ok": false,
+        "error": "creator_command_id_conflict",
+        "replayed": false,
+        "operation": null,
+        "status_code": 409
+      }
+    },
+    {
+      "name": "stale_revision_refused",
+      "passed": true,
+      "evidence": {
+        "ok": false,
+        "error": "campaign_revision_conflict",
+        "replayed": false,
+        "operation": null,
+        "status_code": 409
+      }
+    },
+    {
+      "name": "prior_attempt_refused",
+      "passed": true,
+      "evidence": {
+        "ok": false,
+        "error": "campaign_attempt_changed",
+        "replayed": false,
+        "operation": null,
+        "status_code": 409
+      }
+    }
+  ],
+  "guild_id": "guild-fb4ed5d6d9bc",
+  "campaign_id": "campaign-default",
+  "attempt_id": "00d6acd5-a92a-464a-9a0f-66d886ce572d",
+  "proof_level": "installed operation journal and refusal paths; no gameplay completion"
+}

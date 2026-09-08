@@ -58,6 +58,14 @@ public sealed class QuestStudioCreatorTests : IDisposable
         var receipt = File.ReadAllText(receiptPath);
         Assert.Contains("17", receipt);
         Assert.DoesNotContain("operator-secret", receipt);
+        var retained = creator.RetainedScene(result.SceneId!);
+        Assert.True(retained.Ok, retained.Error);
+        Assert.Equal(bytes, retained.Bytes);
+        var binaryPath = Path.ChangeExtension(receiptPath, ".svca");
+        var tampered = bytes.ToArray();
+        tampered[^1] ^= 1;
+        File.WriteAllBytes(binaryPath, tampered);
+        Assert.Equal("creator_scene_hash_mismatch", creator.RetainedScene(result.SceneId!).Error);
     }
 
     [Fact]

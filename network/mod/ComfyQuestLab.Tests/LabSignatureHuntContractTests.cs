@@ -22,7 +22,7 @@ public sealed class LabSignatureHuntContractTests {
         LabSignatureHuntContract.CreatorOsBetaWorldName,
         LabSignatureHuntContract.CreatorOsBetaWorldUid));
     Assert.False(LabSignatureHuntContract.SupportsWorld("CreatorOSBeta1", "4257656028"));
-    Assert.Equal(17, LabSignatureHuntContract.Placements.Length);
+    Assert.Equal(20, LabSignatureHuntContract.Placements.Length);
     Assert.Equal(LabSignatureHuntContract.Placements.Length,
         LabSignatureHuntContract.Placements.Select(value => value.Role).Distinct().Count());
 

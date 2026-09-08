@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace Comfy.Quest.Studio;
 
-public sealed class QuestStudioService
+public sealed partial class QuestStudioService
 {
     static readonly string[] RuntimeEvents = RuntimeProductionEventCatalog.All
         .Select(definition => definition.Name)
@@ -53,6 +53,7 @@ public sealed class QuestStudioService
         _creativeEvidenceRoot = Path.Combine(root, "creative-evidence");
         _campaignPlayPrerequisites = campaignPlayPrerequisites;
         Directory.CreateDirectory(_creativeEvidenceRoot);
+        _creatorOperations = new CreatorOperationJournal(host.StateDirectory);
     }
 
     public object WorkspaceCatalog() => _workspace.Catalog();
@@ -64,12 +65,12 @@ public sealed class QuestStudioService
         _creator.SelectTargetAsync(projectId, request, cancellationToken);
     public Task<StudioCreatorCastResult> CreatorCastAsync(string projectId,
         StudioCreatorCastRequest? request, CancellationToken cancellationToken) =>
-        _creatorCast.CastAsync(projectId, request, cancellationToken);
+        SerializeCreatorControl(() => _creatorCast.CastAsync(projectId, request, cancellationToken), cancellationToken);
     public StudioCreatorCastResult CreatorCastStatus(string projectId) =>
         _creatorCast.Status(projectId);
     public Task<StudioCreatorCastResult> UndoCreatorCastAsync(string projectId,
         StudioCreatorUndoCastRequest? request, CancellationToken cancellationToken) =>
-        _creatorCast.UndoAsync(projectId, request, cancellationToken);
+        SerializeCreatorControl(() => _creatorCast.UndoAsync(projectId, request, cancellationToken), cancellationToken);
     public StudioPortfolioDocument Portfolio() => _portfolio.ReadPortfolio();
     public StudioPortfolioSaveResult SavePortfolio(StudioPortfolioSaveRequest? request) => _portfolio.SavePortfolio(request);
     public IReadOnlyList<StudioGuildSummary> ListGuilds() => _portfolio.ListGuilds();

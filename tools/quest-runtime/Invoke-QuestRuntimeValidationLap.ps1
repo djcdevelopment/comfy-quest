@@ -641,7 +641,7 @@ function Invoke-SourceGates {
     # The interim Contracts package keeps a fixed version while its bytes evolve. A cache
     # keyed by the package hash (same defense as Test-QuestStudioE2E.ps1) keeps NuGet's
     # immutable-version global cache from feeding the Studio gates stale bytes after a refresh.
-    $contractsPackage = Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.9.9-local.nupkg'
+    $contractsPackage = Join-Path $repoRoot 'packages-local\Comfy.Quest.Contracts.0.9.10-local.nupkg'
     $packageCacheKey = if (Test-Path -LiteralPath $contractsPackage -PathType Leaf) {
         (Get-FileHash -LiteralPath $contractsPackage -Algorithm SHA256).Hash.ToLowerInvariant().Substring(0, 16)
     } else {

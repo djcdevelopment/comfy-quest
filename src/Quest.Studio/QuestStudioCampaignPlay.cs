@@ -94,11 +94,14 @@ internal sealed class StudioCampaignPlayPrerequisiteRunner : IStudioCampaignPlay
 
     public async Task<StudioCampaignPlayPrerequisiteResult> EnsureAsync(string operationId, CancellationToken cancellationToken)
     {
-        var repositoryRoot = (_host as IQuestStudioRAndDHost)?.RepositoryRoot;
+        var linux = !OperatingSystem.IsWindows();
+        var repositoryRoot = linux ? AppContext.BaseDirectory : (_host as IQuestStudioRAndDHost)?.RepositoryRoot;
         if (string.IsNullOrWhiteSpace(repositoryRoot))
             return StudioCampaignPlayPrerequisiteResult.Fail("campaign_play_repository_unavailable");
         repositoryRoot = Path.GetFullPath(repositoryRoot);
-        var script = Path.GetFullPath(Path.Combine(repositoryRoot, "tools", "quest-studio", "Invoke-CampaignPlayPrerequisites.ps1"));
+        var script = Path.GetFullPath(linux
+            ? Path.Combine(repositoryRoot, "campaign", "campaign_play_prerequisites.py")
+            : Path.Combine(repositoryRoot, "tools", "quest-studio", "Invoke-CampaignPlayPrerequisites.ps1"));
         if (!script.StartsWith(repositoryRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
                 StringComparison.OrdinalIgnoreCase) || !File.Exists(script))
             return StudioCampaignPlayPrerequisiteResult.Fail("campaign_play_tool_unavailable");
@@ -108,7 +111,7 @@ internal sealed class StudioCampaignPlayPrerequisiteRunner : IStudioCampaignPlay
 
         var start = new ProcessStartInfo
         {
-            FileName = "powershell.exe",
+            FileName = linux ? "python3" : "powershell.exe",
             WorkingDirectory = repositoryRoot,
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -116,7 +119,10 @@ internal sealed class StudioCampaignPlayPrerequisiteRunner : IStudioCampaignPlay
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        foreach (var argument in new[]
+        var operationRoot = Path.GetFullPath(Path.Combine(linux ? _host.StateDirectory : repositoryRoot,
+            "captures", "campaign-play", operationId));
+        foreach (var argument in linux ? new[] { script, "--operation-id", operationId,
+            "--valheim-root", Path.GetFullPath(valheim), "--output", operationRoot } : new[]
                  {
                      "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
                      "-OperationId", operationId, "-ValheimRoot", Path.GetFullPath(valheim),
@@ -144,7 +150,6 @@ internal sealed class StudioCampaignPlayPrerequisiteRunner : IStudioCampaignPlay
                     "campaign_play_prerequisites_failed:" + BoundedDetail(error.Length > 0 ? error : output));
             var parsed = Parse(operationId, output);
             if (!parsed.Ok || parsed.Value is null) return parsed;
-            var operationRoot = Path.GetFullPath(Path.Combine(repositoryRoot, "captures", "campaign-play", operationId));
             var fixturePath = Path.GetFullPath(parsed.Value.FixtureReceiptPath);
             var prefix = operationRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             var info = new FileInfo(fixturePath);
@@ -192,15 +197,15 @@ internal sealed class StudioCampaignPlayPrerequisiteRunner : IStudioCampaignPlay
                 || !SafeHash(fixtureReceiptSha256) || !SafeToken(preparationId, 96)
                 || fixture.GetProperty("schema").GetString() != "comfy-questlab-signature-hunt-fixture/v1"
                 || fixture.GetProperty("fixture_id").GetString() != "slayers-signature-hunt"
-                || fixture.GetProperty("fixture_revision").GetInt32() != 1
+                || fixture.GetProperty("fixture_revision").GetInt32() != 2
                 || fixture.GetProperty("state").GetString() != "ready"
                 || fixture.GetProperty("proof_level").GetString() != "fixture-preparation"
                 || fixture.GetProperty("request_id").GetString() != fixtureRequestId
                 || !string.Equals(fixture.GetProperty("machine").GetString(), machine, StringComparison.OrdinalIgnoreCase)
                 || fixture.GetProperty("world_name").GetString() != "ComfyQuestDemo"
                 || fixture.GetProperty("world_uid").GetString() != worldUid
-                || objects.GetProperty("expected").GetInt32() != 17
-                || objects.GetProperty("standing_at_capture").GetInt32() != 17
+                || objects.GetProperty("expected").GetInt32() != 20
+                || objects.GetProperty("standing_at_capture").GetInt32() != 20
                 || targets.Length != 2
                 || !ExactTarget(targets[0], "target-deathsquito", "Deathsquito", "$enemy_deathsquito")
                 || !ExactTarget(targets[1], "target-drake", "Hatchling", "$enemy_drake")

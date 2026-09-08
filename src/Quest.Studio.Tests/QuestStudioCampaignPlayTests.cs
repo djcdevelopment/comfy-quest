@@ -344,7 +344,7 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
             {
                 schema = "comfy-questlab-signature-hunt-fixture/v1",
                 fixture_id = "slayers-signature-hunt",
-                fixture_revision = 1,
+                fixture_revision = 2,
                 state = "ready",
                 proof_level = "fixture-preparation",
                 disclaimer = "Fixed fixture preparation only; not live kill or completion proof.",
@@ -353,7 +353,7 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
                 machine = "TEST-MACHINE",
                 world_name = "ComfyQuestDemo",
                 world_uid = "-7600395338659582326",
-                objects = new { expected = 17, standing_at_capture = 17 },
+                objects = new { expected = 20, standing_at_capture = 20 },
                 targets = new[]
                 {
                     new { role = "target-deathsquito", prefab = "Deathsquito", raw_m_name = "$enemy_deathsquito", matcher_target = "$enemy_deathsquito", captured_from = "Character.m_name", zdo_id = "1:10" },

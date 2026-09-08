@@ -1,0 +1,143 @@
+{
+  "schema": "creator-campaign-probe/v1",
+  "operation": "rehearse",
+  "state": "passed",
+  "checks": [
+    {
+      "name": "Air Drop authored route",
+      "passed": true,
+      "evidence": {
+        "schema_version": 3,
+        "ok": true,
+        "error": null,
+        "proof_level": "rehearsal",
+        "disclaimer": "Synthetic rehearsal only; this does not prove a Valheim adapter or live mutation.",
+        "current_node_id": "start",
+        "outcome": "complete",
+        "trace": [
+          {
+            "step": 1,
+            "event_name": "kill",
+            "target": "$enemy_greydwarf",
+            "from_node_id": "start",
+            "route_id": null,
+            "effects": [],
+            "current_node_id": "start",
+            "outcome": null,
+            "status": "ignored",
+            "current_count": 0,
+            "required_count": 1,
+            "next_instruction": "Observe kill; optionally narrow it to the killed creature name seen by the matcher.",
+            "beat_route_id": "finish",
+            "beat": "Observe kill; optionally narrow it to the killed creature name seen by the matcher.",
+            "contributed": false,
+            "deadline": null
+          },
+          {
+            "step": 2,
+            "event_name": "kill",
+            "target": "$enemy_deathsquito",
+            "from_node_id": "start",
+            "route_id": "finish",
+            "effects": [
+              "message: Air Drop answered. Cold Shot is now yours to hunt."
+            ],
+            "current_node_id": "start",
+            "outcome": "complete",
+            "status": "matched",
+            "current_count": 1,
+            "required_count": 1,
+            "next_instruction": null,
+            "beat_route_id": "finish",
+            "beat": "Observe kill; optionally narrow it to the killed creature name seen by the matcher.",
+            "contributed": true,
+            "deadline": null
+          }
+        ],
+        "transcript": [
+          "Air Drop answered. Cold Shot is now yours to hunt."
+        ],
+        "inventory": {},
+        "spawns": {},
+        "timers": {},
+        "generated_steps": [],
+        "limitations": [],
+        "available_paths": []
+      }
+    },
+    {
+      "name": "Cold Shot authored route",
+      "passed": true,
+      "evidence": {
+        "schema_version": 3,
+        "ok": true,
+        "error": null,
+        "proof_level": "rehearsal",
+        "disclaimer": "Synthetic rehearsal only; this does not prove a Valheim adapter or live mutation.",
+        "current_node_id": "start",
+        "outcome": "complete",
+        "trace": [
+          {
+            "step": 1,
+            "event_name": "kill",
+            "target": "$enemy_greydwarf",
+            "from_node_id": "start",
+            "route_id": null,
+            "effects": [],
+            "current_node_id": "start",
+            "outcome": null,
+            "status": "ignored",
+            "current_count": 0,
+            "required_count": 1,
+            "next_instruction": "Observe kill; optionally narrow it to the killed creature name seen by the matcher.",
+            "beat_route_id": "finish",
+            "beat": "Observe kill; optionally narrow it to the killed creature name seen by the matcher.",
+            "contributed": false,
+            "deadline": null
+          },
+          {
+            "step": 2,
+            "event_name": "kill",
+            "target": "$enemy_drake",
+            "from_node_id": "start",
+            "route_id": "finish",
+            "effects": [
+              "message: Cold Shot answered. Both signature hunts are yours."
+            ],
+            "current_node_id": "start",
+            "outcome": "complete",
+            "status": "matched",
+            "current_count": 1,
+            "required_count": 1,
+            "next_instruction": null,
+            "beat_route_id": "finish",
+            "beat": "Observe kill; optionally narrow it to the killed creature name seen by the matcher.",
+            "contributed": true,
+            "deadline": null
+          }
+        ],
+        "transcript": [
+          "Cold Shot answered. Both signature hunts are yours."
+        ],
+        "inventory": {},
+        "spawns": {},
+        "timers": {},
+        "generated_steps": [],
+        "limitations": [],
+        "available_paths": []
+      }
+    },
+    {
+      "name": "live_attempt_unchanged",
+      "passed": true,
+      "evidence": {
+        "before": "started",
+        "after": "started"
+      }
+    }
+  ],
+  "guild_id": "guild-fb4ed5d6d9bc",
+  "campaign_id": "campaign-default",
+  "attempt_id": "a212ff9e-0f69-4f09-827a-cba64435bfeb",
+  "proof_level": "synthetic Studio rehearsal; no live game events or continuation proof"
+}
