@@ -43,6 +43,11 @@ The final `0.9.11-local` cut adds one further replay guard: the final campaign
 compilation must match the content hash approved in the preview. If a draft changes
 during retirement or fixture cleanup, replay stops for recovery before preparing
 or starting different content. The `0.9.10-local` evidence remains immutable.
+The [final release manifest](evidence/creator-connected-20260908/release-0.9.11.json)
+pins source `2b2e7dc`; its [installed host check](evidence/creator-connected-20260908/release-0.9.11-smoke.json)
+passed the same retained-context, helper, and private-measurement checks. That
+temporary connection is also stopped. The Studio, Lab/Runtime, and Python gates
+were rerun successfully against this final cut.
 
 ## Run the installed API probes
 
