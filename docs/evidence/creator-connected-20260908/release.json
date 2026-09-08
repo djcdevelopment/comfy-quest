@@ -1,0 +1,49 @@
+{
+  "schema": "comfy-quest-creator-dm-release/v1",
+  "source_revision": "ed6e098098b266a7caba75106f10f1007b09c273",
+  "version": "0.9.10-local",
+  "plugins": [
+    {
+      "name": "ComfyQuestContracts.dll",
+      "path": "plugins/ComfyQuestContracts.dll",
+      "sha256": "4a2faf86a60d5917cff99e8dd090c3d68a10a3f9cc997ee3ceed6d481fb8b126",
+      "bytes": 342016
+    },
+    {
+      "name": "ComfyQuestRuntime.dll",
+      "path": "plugins/ComfyQuestRuntime.dll",
+      "sha256": "c27caca284341463d032bcbcd371fbe2409442bd46e4016ba7e3cce341a7b0e2",
+      "bytes": 212480
+    },
+    {
+      "name": "ComfyQuestLab.dll",
+      "path": "plugins/ComfyQuestLab.dll",
+      "sha256": "b2b2ae457179ba20cdf1957c6a54f6a7e713ddcef1074fd78f2f7a8abcb61709",
+      "bytes": 879104
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "path": "plugins/Newtonsoft.Json.dll",
+      "sha256": "e1e27af7b07eeedf5ce71a9255f0422816a6fc5849a483c6714e1b472044fa9d",
+      "bytes": 711952
+    }
+  ],
+  "packages": [
+    {
+      "path": "packages/Comfy.Quest.Contracts.0.9.10-local.nupkg",
+      "sha256": "eb4b3c62bbd8da0c830721151adfa9b04210ad0dd63a7dba5fed2b8626caeaaa",
+      "bytes": 145920
+    },
+    {
+      "path": "packages/Comfy.Quest.Studio.0.9.10-local.nupkg",
+      "sha256": "397c06fd82401edcbf2a363b224bffe7670b5ebedf4f63a1a56ed458c11611d2",
+      "bytes": 542207
+    }
+  ],
+  "studio": {
+    "path": "studio-linux-x64.tar.gz",
+    "sha256": "461354214e4f6e48db2fd8f0629fefd923ea9c00b581ae50f6f92d2c44508670",
+    "bytes": 47008129
+  },
+  "proof_level": "release-artifacts; installed live proof is recorded separately"
+}

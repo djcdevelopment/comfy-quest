@@ -27,6 +27,8 @@ KNOWN_LOCAL_FILES = {
     "Comfy.Quest.Studio.0.9.9-local.nupkg",
     "Comfy.Quest.Contracts.0.9.10-local.nupkg",
     "Comfy.Quest.Studio.0.9.10-local.nupkg",
+    "Comfy.Quest.Contracts.0.9.11-local.nupkg",
+    "Comfy.Quest.Studio.0.9.11-local.nupkg",
     "README.md",
 }
 
@@ -119,7 +121,7 @@ def check_public_state(version: str) -> None:
         (LAB_PROJECT, lab),
         (STUDIO_PROJECT, studio),
     ):
-        if "0.9.10-local" in text or "packages-local" in text:
+        if "0.9.11-local" in text or "packages-local" in text:
             problems.append(f"{path.relative_to(ROOT)} retains interim package state")
 
     try:
@@ -143,13 +145,13 @@ def check_interim_state() -> None:
     contracts = read(CONTRACT_PROJECT)
     lab = read(LAB_PROJECT)
     studio = read(STUDIO_PROJECT)
-    if "<Version>0.9.10-local</Version>" not in contracts:
+    if "<Version>0.9.11-local</Version>" not in contracts:
         problems.append("Contracts interim producer version drifted")
-    if 'Version="[0.9.10-local]"' not in lab:
+    if 'Version="[0.9.11-local]"' not in lab:
         problems.append("Quest Lab interim dependency is not exact")
-    if ">[0.9.10-local]</QuestContractsVersion>" not in studio:
+    if ">[0.9.11-local]</QuestContractsVersion>" not in studio:
         problems.append("Studio interim Contracts dependency is not exact")
-    if "<Version>0.9.10-local</Version>" not in studio:
+    if "<Version>0.9.11-local</Version>" not in studio:
         problems.append("Studio interim producer version drifted")
     try:
         document = ElementTree.fromstring(read(CONFIG))
@@ -165,13 +167,7 @@ def check_interim_state() -> None:
             problems.append(f"interim NuGet sources drifted: {sources!r}")
     except ElementTree.ParseError as exc:
         problems.append(f"nuget.config is not valid XML: {exc}")
-    required_files = {
-        "Comfy.Quest.Contracts.0.9.9-local.nupkg",
-        "Comfy.Quest.Studio.0.9.9-local.nupkg",
-        "Comfy.Quest.Contracts.0.9.10-local.nupkg",
-        "Comfy.Quest.Studio.0.9.10-local.nupkg",
-        "README.md",
-    }
+    required_files = KNOWN_LOCAL_FILES
     actual_files = (
         {path.name for path in LOCAL_PACKAGES.iterdir()}
         if LOCAL_PACKAGES.is_dir()
@@ -213,7 +209,7 @@ def apply(version: str) -> None:
     contracts = read(CONTRACT_PROJECT)
     changes[CONTRACT_PROJECT] = replace_once(
         contracts,
-        "<Version>0.9.10-local</Version>",
+        "<Version>0.9.11-local</Version>",
         f"<Version>{version}</Version>",
         CONTRACT_PROJECT,
     )
@@ -221,7 +217,7 @@ def apply(version: str) -> None:
     lab = read(LAB_PROJECT)
     changes[LAB_PROJECT] = replace_once(
         lab,
-        'Version="[0.9.10-local]"',
+        'Version="[0.9.11-local]"',
         f'Version="{exact}"',
         LAB_PROJECT,
     )
@@ -229,13 +225,13 @@ def apply(version: str) -> None:
     studio = read(STUDIO_PROJECT)
     studio = replace_once(
         studio,
-        ">[0.9.10-local]</QuestContractsVersion>",
+        ">[0.9.11-local]</QuestContractsVersion>",
         f">{exact}</QuestContractsVersion>",
         STUDIO_PROJECT,
     )
     studio = replace_once(
         studio,
-        "<Version>0.9.10-local</Version>",
+        "<Version>0.9.11-local</Version>",
         f"<Version>{version}</Version>",
         STUDIO_PROJECT,
     )
@@ -284,7 +280,7 @@ def main() -> int:
             apply(args.version)
         elif args.check_interim:
             check_interim_state()
-            print("VERIFIED exact 0.9.10-local interim pins and local-first feed")
+            print("VERIFIED exact 0.9.11-local interim pins and local-first feed")
         else:
             check_public_state(args.version)
             print(

@@ -45,9 +45,9 @@ public sealed class LabSignatureHuntContractTests {
     double dz = targets[0].LocalZ - targets[1].LocalZ;
     Assert.Equal(LabSignatureHuntContract.ArenaSeparationMetres,
         Math.Sqrt(dx * dx + dz * dz), 3);
-    Assert.Equal(5, LabSignatureHuntContract.Placements.Count(value =>
+    Assert.Equal(6, LabSignatureHuntContract.Placements.Count(value =>
         value.Kind == LabSignatureHuntContract.MarkerKind && value.Area == "deathsquito"));
-    Assert.Equal(5, LabSignatureHuntContract.Placements.Count(value =>
+    Assert.Equal(6, LabSignatureHuntContract.Placements.Count(value =>
         value.Kind == LabSignatureHuntContract.MarkerKind && value.Area == "drake"));
 
     LabSignatureHuntPlacement[] loadout = LabSignatureHuntContract.Placements

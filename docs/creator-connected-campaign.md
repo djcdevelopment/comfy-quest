@@ -26,6 +26,24 @@ stopped. The separate saved checkpoint, Studio authoring state, measurements, an
 evidence remain under the named run and connection roots. No human acceptance is
 claimed. Release artifacts and installed R&D assembly deltas have separate hashes.
 
+The immutable `0.9.10-local` release is pinned to source `ed6e098` in the
+[release manifest](evidence/creator-connected-20260908/release.json). Its packaged
+Linux host passed a [separate installed check](evidence/creator-connected-20260908/release-smoke.json)
+after the game had been restored. All six bundled helpers were present, campaign
+discovery and retained context worked, and the restored game correctly lacked an
+active Creator session. That check did not mutate the game. The
+[final independent restoration check](evidence/creator-connected-20260908/restoration-verified.json)
+verified all 176 original files and closed service ports. Existing gates passed:
+149 Studio tests, 386 Lab/Runtime tests, 455 Python checks, generated-source drift,
+repository identity/boundary, full-history and staged secret scans. OMEN's Studio
+tests used .NET 10 roll-forward because the local .NET 9 runtime was absent; the
+installed Linux host carries its own .NET 9 runtime.
+
+The final `0.9.11-local` cut adds one further replay guard: the final campaign
+compilation must match the content hash approved in the preview. If a draft changes
+during retirement or fixture cleanup, replay stops for recovery before preparing
+or starting different content. The `0.9.10-local` evidence remains immutable.
+
 ## Run the installed API probes
 
 These commands ran against the leased AM4 Studio through private loopback forwards.

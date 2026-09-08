@@ -488,7 +488,7 @@ public sealed partial class QuestStudioService
 
     async Task<StudioCampaignPublishResult> PlaySignatureHuntCampaignAsync(
         StudioGuildDocument guild, StudioCampaignDocument campaign,
-        StudioCampaignPublishRequest? request, CancellationToken cancellationToken)
+        StudioCampaignPublishRequest? request, CancellationToken cancellationToken, string? expectedContentHash = null)
     {
         if (request is null || request.ExpectedRevision != campaign.Revision)
             return new(false, true, "conflict", "revision_conflict", guild, campaign, null, null,
@@ -497,6 +497,8 @@ public sealed partial class QuestStudioService
         // Freeze and validate the exact bytes before any process, install, or world side effect.
         var compiled = CompileCampaign(guild, campaign);
         if (!compiled.Ok) return CampaignFail(compiled.Error!, guild, campaign, compiled.Diagnostics);
+        if (expectedContentHash is not null && compiled.ContentHash != expectedContentHash)
+            return CampaignFail("campaign_revision_changed_during_reset", guild, campaign);
         var orderedArtifacts = CampaignArtifactsInAuthoredOrder(campaign).ToArray();
         var roots = orderedArtifacts.Where(value => (value.PrerequisiteProjectIds ?? new()).Count == 0).ToArray();
         if (roots.Length != 1)

@@ -5,8 +5,8 @@
     "title": "Quest Creator OS",
     "subtitle": "Drive the whole vertical slice. Automate the evidence. Spend the seat on creation.",
     "observed_on": "2026-09-08",
-    "program_commit": "cce78f3",
-    "program_commit_label": "Add Steward-backed Creator casting workflow"
+    "program_commit": "ed6e098",
+    "program_commit_label": "feat(creator): connect campaign operations and recoverable replay"
   },
   "source_intents": {
     "repository": "djcdevelopment/baseline",

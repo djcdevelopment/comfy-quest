@@ -261,7 +261,7 @@ public sealed partial class QuestStudioService
             attempt.State = "retired";
             attempt.PendingStep = null;
             WriteCampaignFile(attempt.AttemptId, attempt);
-            return await StartCreatorCampaignAsync(request, guild, campaign, attempt.AttemptId, token);
+            return await StartCreatorCampaignAsync(request, guild, campaign, attempt.AttemptId, token, accepted.NextContentHash);
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
@@ -272,14 +272,15 @@ public sealed partial class QuestStudioService
     }
 
     async Task<StudioCreatorOperationOutcome> StartCreatorCampaignAsync(StudioCreatorOperationRequest request,
-        StudioGuildDocument guild, StudioCampaignDocument campaign, string? priorAttempt, CancellationToken token)
+        StudioGuildDocument guild, StudioCampaignDocument campaign, string? priorAttempt, CancellationToken token,
+        string? expectedContentHash = null)
     {
         var attempt = new StudioCreatorCampaignAttempt { AttemptId = request.CommandId, PriorAttemptId = priorAttempt,
             GuildId = guild.GuildId, CampaignId = campaign.CampaignId,
             Projects = CampaignArtifactsInAuthoredOrder(campaign).Select(value => _workspace.ReadProject(value.ProjectId)!)
                 .Select(value => new StudioCreatorCampaignProject(value.ProjectId, value.ExperienceId, value.Title, value.Revision)).ToList() };
         WriteCampaignFile(attempt.AttemptId, attempt);
-        var result = await PlaySignatureHuntCampaignAsync(guild, campaign, new(campaign.Revision), token);
+        var result = await PlaySignatureHuntCampaignAsync(guild, campaign, new(campaign.Revision), token, expectedContentHash);
         attempt.Play = result.PlayReceipt;
         attempt.State = result.Ok ? "started" : "recovery_required";
         attempt.PendingStep = result.Ok ? null : result.PlayReceipt?.FailedStage;

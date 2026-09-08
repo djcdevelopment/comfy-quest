@@ -1,0 +1,18 @@
+{
+  "schema": "creator-immutable-install-smoke/v1",
+  "state": "passed",
+  "source_revision": "ed6e098098b266a7caba75106f10f1007b09c273",
+  "version": "0.9.10-local",
+  "archive_sha256": "461354214e4f6e48db2fd8f0629fefd923ea9c00b581ae50f6f92d2c44508670",
+  "studio_assembly_sha256": "d9cea7431e9373240ad6efa17f7836d56016dc0c8c7596266560842c9a5268d0",
+  "checks": [
+    "health",
+    "campaign discovery",
+    "retained campaign context",
+    "restored game has no connected Creator session",
+    "all six bundled helpers",
+    "private Steward measurement/bootstrap"
+  ],
+  "game_mutated": false,
+  "proof_level": "immutable installed host and retained snapshot; no new game session or gameplay proof"
+}
