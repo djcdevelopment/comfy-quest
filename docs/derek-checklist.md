@@ -74,8 +74,8 @@ Guild: `guild-19411f439d1d`; campaign: `campaign-cb08fddc9f54`.
 | Native response in DMos | Attempt `2462bccc-691a-4243-8fb5-b9a08faeed64`, runs `run-20260909T015208021Z-74c2e478`, `run-20260909T015247123Z-18ee3051`, `run-20260909T015254401Z-315f76c1`. Browser `2026-09-09T01-55-57-207Z-view.json` contains each real completion and executed authored response. |
 | Readable result workflow | 1080p `2026-09-09T02-10-32-907Z-view.png/json`: actual summary clicks, all three results stay open through refresh, no page errors. 4K overview `2026-09-09T02-02-10-989Z-view.png/json`; final release captures will include expanded results at both sizes. |
 
-The revised third response reads: ?Revision confirmed: a Greyling replaced the
-Draugr, and this new response came from your Studio edit.? Runtime records it only
+The revised third response reads: "Revision confirmed: a Greyling replaced the
+Draugr, and this new response came from your Studio edit." Runtime records it only
 after the message action executes; DMos does not infer it from the current draft.
 
 ## Recovery and proof limits
@@ -139,7 +139,7 @@ repositioning; the final arrival screenshot and browser captures show the refine
 release. The uncut final-release lap is retained on AM4 as `final-native-r20.mp4`.
 
 Implementation began 2026-09-08 at **15:02 PDT**. The development block used about
-**4 hours 40 minutes**, less than the proposed 6?10 hours. The completed slice is
+**4 hours 40 minutes**, less than the proposed 6-10 hours. The completed slice is
 ready for a short creator-workflow review after the operator stages the seat.
 Combat balance, atmosphere and broader historical-campaign reconciliation remain
 outside this automated acceptance. Work receipt: `br-20260908-220304-edea1309`.
