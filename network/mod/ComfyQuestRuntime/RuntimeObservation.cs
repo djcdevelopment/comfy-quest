@@ -55,7 +55,7 @@ static class RuntimeObservation {
             || string.IsNullOrWhiteSpace(record.ActionId)) continue;
         staged.TryGetValue(record.ActionId, out var stagedCount);
         staged[record.ActionId] = stagedCount + 1;
-        var zdo = ZDOMan.instance?.GetZDO(new ZDOID(record.UserId, record.ObjectId));
+        var zdo = RuntimeSpawnIdentity.Resolve(record);
         if (zdo == null
             || zdo.GetString(Prefix + "spawnedContentHash", "") != record.ContentHash
             || zdo.GetString(Prefix + "spawnedActionId", "") != record.ActionId

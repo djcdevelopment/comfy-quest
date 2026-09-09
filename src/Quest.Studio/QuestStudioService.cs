@@ -253,6 +253,64 @@ public sealed partial class QuestStudioService
         revised.Revision++;
         revised.EvidencePolicy = EvidencePolicy(request.EvidencePolicy ?? prior.EvidencePolicy);
         revised.EvidenceExplanation = Bounded(request.EvidenceExplanation, prior.EvidenceExplanation, 2000);
+        if (request.ConfigurablePractice || request.PracticeTargets?.Count > 0)
+        {
+            if (abstractionId != "slayers-signature-hunt" || !request.StageOwnedTarget)
+                return new(false, false, "abstraction_practice_target_unsupported", guild, null);
+            revised.ConfigurablePractice |= request.ConfigurablePractice;
+            foreach (var id in request.PracticeTargets ?? [])
+            {
+                if (id is not ("draugr" or "greyling" or "boar" or "lox"))
+                    return new(false, false, "abstraction_practice_target_unsupported", guild, null);
+                if (revised.TargetChoices.All(choice => choice.Id != id))
+                    revised.TargetChoices.Add(new StudioAbstractionTargetChoice
+                        { Id = id, Label = char.ToUpperInvariant(id[0]) + id[1..], RuntimeTarget = "$enemy_" + id,
+                            PracticeAttribution = "Configurable R&D encounter; outside the frozen Slayers quest source." });
+            }
+        }
+        if (request.IncludePracticeLox)
+        {
+            if (abstractionId != "slayers-signature-hunt" || !request.StageOwnedTarget)
+                return new(false, false, "abstraction_practice_target_unsupported", guild, null);
+            if (revised.TargetChoices.All(choice => choice.Id != "lox"))
+                revised.TargetChoices.Add(new StudioAbstractionTargetChoice
+                    { Id = "lox", Label = "Lox (practice)", RuntimeTarget = "$enemy_lox",
+                        PracticeAttribution = "Derek-requested R&D practice target; outside the frozen Slayers quest source." });
+        }
+        if (request.IncludePracticeDraugr)
+        {
+            if (abstractionId != "slayers-signature-hunt" || !request.StageOwnedTarget)
+                return new(false, false, "abstraction_practice_target_unsupported", guild, null);
+            if (revised.TargetChoices.All(choice => choice.Id != "draugr"))
+                revised.TargetChoices.Add(new StudioAbstractionTargetChoice
+                    { Id = "draugr", Label = "Draugr (practice)", RuntimeTarget = "$enemy_draugr",
+                        PracticeAttribution = "Derek-requested R&D practice target; outside the frozen Slayers quest source." });
+        }
+        if (request.StageOwnedTarget)
+        {
+            if (abstractionId != "slayers-signature-hunt"
+                || prior.TargetChoices.Any(choice => SignatureHuntPrefab(choice.RuntimeTarget) is null))
+                return new(false, false, "abstraction_stage_target_unsupported", guild, null);
+            var canonical = System.Text.Json.JsonSerializer.Deserialize<StudioProjectDocument>(prior.CanonicalProjectJson, _host.Json)!;
+            if (!QuestStudioWorkspace.NormalizeDocument(canonical))
+                return new(false, false, "abstraction_project_schema_invalid", guild, null);
+            var entry = canonical.Nodes.Single(value => value.Id == prior.EntryNodeId);
+            var route = canonical.Nodes.SelectMany(value => value.Routes).Single(value => value.Id == prior.RouteId);
+            if (SignatureHuntPrefab(route.Target) is not { } targetPrefab)
+                return new(false, false, "abstraction_stage_target_unsupported", guild, null);
+            revised.TargetSpawnActionId = prior.TargetSpawnActionId ?? "signature-hunt-target";
+            entry.EntryActions ??= new();
+            var spawn = entry.EntryActions.SingleOrDefault(value => value.Id == revised.TargetSpawnActionId);
+            if (spawn is null)
+            {
+                spawn = new StudioAction { Id = revised.TargetSpawnActionId, Type = "spawn", Kind = "creature", Count = 1, Radius = 12 };
+                entry.EntryActions.Add(spawn);
+            }
+            spawn.Prefab = targetPrefab;
+            revised.CanonicalProjectJson = System.Text.Json.JsonSerializer.Serialize(canonical, _host.Json);
+            revised.CanonicalProjectHash = StudioCreativeHash.Text(revised.CanonicalProjectJson);
+            revised.InvariantHash = InvariantHash(canonical, revised);
+        }
         revised.PublishedUtc = DateTimeOffset.UtcNow;
         revised.ContentHash = AbstractionHash(revised);
         var saved = _portfolio.MutateCreativeConfig(guildId, request.ExpectedRevision, value =>
@@ -280,6 +338,9 @@ public sealed partial class QuestStudioService
                 return new(false, false, "abstraction_not_in_palette", guild, null);
             var choice = abstraction.TargetChoices.SingleOrDefault(value => value.Id == request.TargetChoiceId);
             if (choice is null) return new(false, false, "abstraction_target_choice_missing", guild, null);
+            var mechanic = request.Mechanic ?? "thrown_spear";
+            if (!HuntMechanicAllowed(abstraction, mechanic))
+                return new(false, false, "hunt_mechanic_not_available", guild, null);
             using var json = JsonDocument.Parse(abstraction.CanonicalProjectJson);
             var imported = _workspace.Import(new StudioImportRequest(json.RootElement.Clone()));
             if (!imported.Ok || imported.Project is null)
@@ -290,9 +351,12 @@ public sealed partial class QuestStudioService
             entry.Label = Bounded(request.Instructions, entry.Label, 500);
             var route = project.Nodes.SelectMany(value => value.Routes).Single(value => value.Id == abstraction.RouteId);
             route.Target = choice.RuntimeTarget;
+            ApplyHuntMechanic(route, mechanic);
+            if (abstraction.TargetSpawnActionId is not null)
+                entry.EntryActions!.Single(value => value.Id == abstraction.TargetSpawnActionId).Prefab = SignatureHuntPrefab(choice.RuntimeTarget);
             var completion = abstraction.CompletionActionId is null ? null : route.Actions.Single(value => value.Id == abstraction.CompletionActionId);
             if (completion is not null) completion.Text = Bounded(request.CompletionMessage, completion.Text ?? string.Empty, 500);
-            var configurationHash = StudioCreativeHash.Parts(project.Title, choice.Id, choice.RuntimeTarget, entry.Label, completion?.Text);
+            var configurationHash = HuntConfigurationHash(abstraction, project.Title, choice, entry.Label, completion?.Text, mechanic);
             project.Derivation = new StudioProjectDerivation
             {
                 GuildId = guild.GuildId,
@@ -306,6 +370,7 @@ public sealed partial class QuestStudioService
                 TargetRuntimeValue = choice.RuntimeTarget,
                 Instructions = entry.Label,
                 CompletionMessage = completion?.Text ?? string.Empty,
+                Mechanic = abstraction.ConfigurablePractice ? mechanic : null,
                 InstantiatedUtc = DateTimeOffset.UtcNow,
             };
             if (InvariantHash(project, abstraction) != abstraction.InvariantHash)
@@ -324,6 +389,46 @@ public sealed partial class QuestStudioService
                 RequiresGuildCompliance = true,
             }));
             return new(saved.Ok, saved.Conflict, saved.Error, saved.Guild, saved.Ok ? project : null);
+        }
+    }
+
+    public StudioSaveResult ConfigureHunt(string projectId, StudioHuntConfigureRequest? request)
+    {
+        lock (_lock)
+        {
+            var project = _workspace.ReadProject(projectId);
+            if (project?.Derivation is not { Detached: false } derivation)
+                return StudioSaveResult.Fail("hunt_palette_instance_required");
+            if (request is null || request.ExpectedRevision != project.Revision)
+                return StudioSaveResult.RevisionConflict(project);
+            var guild = _portfolio.ReadGuild(derivation.GuildId);
+            var abstraction = guild?.Abstractions.SingleOrDefault(value => value.AbstractionId == derivation.AbstractionId
+                && value.Revision == derivation.AbstractionRevision && value.ContentHash == derivation.AbstractionHash);
+            if (abstraction?.TargetSpawnActionId is null || abstraction.AbstractionId != "slayers-signature-hunt")
+                return StudioSaveResult.Fail("hunt_stage_owned_palette_revision_required");
+            var mechanic = request.Mechanic ?? derivation.Mechanic ?? "thrown_spear";
+            if (!HuntMechanicAllowed(abstraction, mechanic)) return StudioSaveResult.Fail("hunt_mechanic_not_available");
+            var choice = abstraction.TargetChoices.SingleOrDefault(value => value.Id == request.TargetChoiceId);
+            if (choice is null || SignatureHuntPrefab(choice.RuntimeTarget) is not { } prefab)
+                return StudioSaveResult.Fail("abstraction_target_choice_missing");
+            if (InvariantHash(project, abstraction) != abstraction.InvariantHash)
+                return StudioSaveResult.Fail("abstraction_invariant_changed");
+            var entry = project.Nodes.Single(value => value.Id == abstraction.EntryNodeId);
+            var route = project.Nodes.SelectMany(value => value.Routes).Single(value => value.Id == abstraction.RouteId);
+            var completion = route.Actions.SingleOrDefault(value => value.Id == abstraction.CompletionActionId);
+            project.Title = Bounded(request.Title, project.Title, 120);
+            entry.Label = Bounded(request.Instructions, entry.Label, 500);
+            route.Target = choice.RuntimeTarget;
+            ApplyHuntMechanic(route, mechanic);
+            entry.EntryActions!.Single(value => value.Id == abstraction.TargetSpawnActionId).Prefab = prefab;
+            if (completion is not null) completion.Text = Bounded(request.CompletionMessage, completion.Text ?? string.Empty, 500);
+            derivation.TargetChoiceId = choice.Id;
+            derivation.TargetRuntimeValue = choice.RuntimeTarget;
+            derivation.Instructions = entry.Label;
+            derivation.CompletionMessage = completion?.Text ?? string.Empty;
+            derivation.Mechanic = abstraction.ConfigurablePractice ? mechanic : null;
+            derivation.ConfigurationHash = HuntConfigurationHash(abstraction, project.Title, choice, entry.Label, completion?.Text, mechanic);
+            return _workspace.SaveDraft(projectId, new StudioSaveRequest(project.Revision, project));
         }
     }
 
@@ -481,6 +586,10 @@ public sealed partial class QuestStudioService
     {
         var guild = _portfolio.ReadGuild(guildId);
         var campaign = guild?.Campaigns.FirstOrDefault(value => value.CampaignId == campaignId);
+        if (guild is not null && campaign is not null && !IsSignatureHuntCampaign(guild, campaign)
+            && CampaignArtifactsInAuthoredOrder(campaign).Any(artifact => guild.Artifacts.Any(member =>
+                member.ProjectId == artifact.ProjectId && member.AbstractionId == "slayers-signature-hunt")))
+            return CampaignFail("signature_hunt_campaign_shape_unsupported", guild, campaign);
         return guild is not null && campaign is not null && IsSignatureHuntCampaign(guild, campaign)
             ? await PlaySignatureHuntCampaignAsync(guild, campaign, request, cancellationToken)
             : await PublishCampaignCoreAsync(guildId, campaignId, request, play: true, cancellationToken);
@@ -516,16 +625,21 @@ public sealed partial class QuestStudioService
             return CampaignFail("signature_hunt_fixture_target_mismatch", guild, campaign, new[]
             {
                 new ContractDiagnostic("campaign.signature_hunt_fixture_target_mismatch", "$.artifacts",
-                    "The fixed Signature Hunt lap requires one $enemy_deathsquito and one $enemy_drake instance.")
+                    "Each hunt needs a supported target and its matching stage-entry spawn. Use the palette revision with stage-owned targets.")
             });
-        var otherExperience = signatureProjects.Single(value => value!.ProjectId != firstProject.ProjectId)!.ExperienceId;
-        var entryLineage = compiled.Lineage.Single(value => value.ProjectId == firstProject.ProjectId);
-        if (entryLineage.SuccessorExperienceIds.Count != 1
-            || entryLineage.SuccessorExperienceIds[0] != otherExperience)
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var next = firstProject.ExperienceId;
+        while (next is not null && visited.Add(next))
+        {
+            var item = compiled.Lineage.Single(value => value.ExperienceId == next);
+            if (item.SuccessorExperienceIds.Count > 1) break;
+            next = item.SuccessorExperienceIds.SingleOrDefault();
+        }
+        if (next is not null || visited.Count != signatureProjects.Length)
             return CampaignFail("campaign_continuation_unproven", guild, campaign, new[]
             {
                 new ContractDiagnostic("campaign.continuation_unproven", "$.artifacts",
-                    "The unique campaign entry must directly unlock the other Signature Hunt artifact.")
+                    "Play requires one linear sequence of Signature Hunts, with one successor per hunt and every hunt reachable.")
             });
 
         var operationId = "campaign-play-" + DateTimeOffset.UtcNow.ToUniversalTime().ToString("yyyyMMdd'T'HHmmssfff'Z'")
@@ -648,7 +762,7 @@ public sealed partial class QuestStudioService
     {
         var projectIds = CampaignArtifactsInAuthoredOrder(campaign)
             .Select(value => value.ProjectId).Distinct(StringComparer.Ordinal).ToArray();
-        return projectIds.Length == 2 && projectIds.All(projectId => guild.Artifacts.Any(value =>
+        return projectIds.Length is >= 1 and <= 16 && projectIds.All(projectId => guild.Artifacts.Any(value =>
             value.ProjectId == projectId
             && value.RequiresGuildCompliance
             && value.AbstractionId == "slayers-signature-hunt"));
@@ -657,7 +771,7 @@ public sealed partial class QuestStudioService
     static bool SignatureHuntTargetsMatch(
         StudioGuildDocument guild, IEnumerable<StudioProjectDocument?> projects)
     {
-        var targets = new List<string?>();
+        var count = 0;
         foreach (var project in projects)
         {
             var derivation = project?.Derivation;
@@ -668,15 +782,51 @@ public sealed partial class QuestStudioService
             var route = abstraction is null ? null : project!.Nodes.SelectMany(value => value.Routes)
                 .SingleOrDefault(value => value.Id == abstraction.RouteId);
             if (route?.Event != "kill" || route.Target != derivation!.TargetRuntimeValue
-                || !route.Where.TryGetValue("weapon_skill", out var skill) || skill != "Spears"
-                || !route.Where.TryGetValue("projectile", out var projectile)
-                || !string.Equals(projectile, "true", StringComparison.OrdinalIgnoreCase))
+                || !HuntMechanicMatches(abstraction!, derivation.Mechanic, route))
                 return false;
-            targets.Add(route?.Target);
+            if (SignatureHuntPrefab(route.Target) is not { } prefab || abstraction!.TargetSpawnActionId is null) return false;
+            var spawn = project!.Nodes.SingleOrDefault(value => value.Id == abstraction.EntryNodeId)?.EntryActions?
+                .SingleOrDefault(value => value.Id == abstraction.TargetSpawnActionId);
+            if (spawn?.Type != "spawn" || spawn.Kind != "creature" || spawn.Count != 1 || spawn.Prefab != prefab) return false;
+            count++;
         }
-        return targets.Count == 2
-            && targets.OrderBy(value => value, StringComparer.Ordinal).SequenceEqual(
-                new[] { "$enemy_deathsquito", "$enemy_drake" }, StringComparer.Ordinal);
+        return count is >= 1 and <= 16;
+    }
+
+    static string? SignatureHuntPrefab(string? target) => target switch
+    {
+        "$enemy_greyling" => "Greyling",
+        "$enemy_boar" => "Boar",
+        "$enemy_draugr" => "Draugr",
+        "$enemy_deathsquito" => "Deathsquito",
+        "$enemy_drake" => "Hatchling",
+        "$enemy_lox" => "Lox",
+        _ => null
+    };
+
+    static bool HuntMechanicAllowed(StudioGuildAbstractionDocument abstraction, string mechanic) =>
+        mechanic == "thrown_spear" || abstraction.ConfigurablePractice && mechanic == "melee";
+
+    static string HuntConfigurationHash(StudioGuildAbstractionDocument abstraction, string title,
+        StudioAbstractionTargetChoice choice, string instructions, string? completion, string mechanic) =>
+        abstraction.ConfigurablePractice
+            ? StudioCreativeHash.Parts(title, choice.Id, choice.RuntimeTarget, instructions, completion, mechanic)
+            : StudioCreativeHash.Parts(title, choice.Id, choice.RuntimeTarget, instructions, completion);
+
+    static void ApplyHuntMechanic(StudioRoute route, string mechanic)
+    {
+        route.Where["projectile"] = mechanic == "melee" ? "false" : "true";
+        if (mechanic == "melee") route.Where.Remove("weapon_skill");
+        else route.Where["weapon_skill"] = "Spears";
+    }
+
+    static bool HuntMechanicMatches(StudioGuildAbstractionDocument abstraction, string? mechanic, StudioRoute route)
+    {
+        mechanic ??= "thrown_spear";
+        return HuntMechanicAllowed(abstraction, mechanic)
+            && route.Where.TryGetValue("projectile", out var projectile)
+            && (mechanic == "melee" ? projectile == "false" && !route.Where.ContainsKey("weapon_skill")
+                : projectile == "true" && route.Where.TryGetValue("weapon_skill", out var skill) && skill == "Spears");
     }
 
     static bool ExactAppliedBinding(
@@ -948,6 +1098,9 @@ public sealed partial class QuestStudioService
             && value.Revision == derivation.AbstractionRevision && value.ContentHash == derivation.AbstractionHash);
         if (abstraction is null) return "abstraction_revision_missing";
         if (abstraction.SourceSnapshotHash != derivation.SourceSnapshotHash) return "abstraction_source_mismatch";
+        if (abstraction.ConfigurablePractice && !HuntMechanicMatches(abstraction, derivation.Mechanic,
+                project.Nodes.SelectMany(node => node.Routes).Single(route => route.Id == abstraction.RouteId)))
+            return "hunt_mechanic_configuration_mismatch";
         return InvariantHash(project, abstraction) == abstraction.InvariantHash ? null : "abstraction_invariant_changed";
     }
 
@@ -1560,6 +1713,7 @@ public sealed partial class QuestStudioService
         Label = value.Label,
         RuntimeTarget = value.RuntimeTarget,
         SourceQuestId = value.SourceQuestId,
+        PracticeAttribution = value.PracticeAttribution,
     };
     static bool CatalogContains(string catalogJson, IReadOnlyList<string> questIds)
     {
@@ -1586,16 +1740,28 @@ public sealed partial class QuestStudioService
         normalized.UpdatedUtc = default;
         normalized.Derivation = null;
         normalized.Title = "$title";
+        // Old frozen abstractions keep their original serialization identity after draft migration.
+        using var canonical = JsonDocument.Parse(abstraction.CanonicalProjectJson);
+        normalized.SchemaVersion = canonical.RootElement.GetProperty("schema_version").GetInt32();
         var entry = normalized.Nodes.Single(value => value.Id == abstraction.EntryNodeId);
         entry.Label = "$instructions";
         var route = normalized.Nodes.SelectMany(value => value.Routes).Single(value => value.Id == abstraction.RouteId);
         route.Target = "$target";
+        if (abstraction.ConfigurablePractice)
+        {
+            ApplyHuntMechanic(route, "thrown_spear");
+            route.Where = route.Where.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        }
+        if (abstraction.TargetSpawnActionId is not null)
+            entry.EntryActions!.Single(value => value.Id == abstraction.TargetSpawnActionId).Prefab = "$target-prefab";
         if (abstraction.CompletionActionId is not null)
             route.Actions.Single(value => value.Id == abstraction.CompletionActionId).Text = "$completion";
         return StudioCreativeHash.Text(System.Text.Json.JsonSerializer.Serialize(normalized, _host.Json));
     }
-    string AbstractionHash(StudioGuildAbstractionDocument value) => StudioCreativeHash.Text(
-        System.Text.Json.JsonSerializer.Serialize(new
+    string AbstractionHash(StudioGuildAbstractionDocument value)
+    {
+        var node = System.Text.Json.JsonSerializer.SerializeToNode(new
         {
             value.AbstractionId,
             value.Revision,
@@ -1612,8 +1778,12 @@ public sealed partial class QuestStudioService
             value.EntryNodeId,
             value.RouteId,
             value.CompletionActionId,
+            value.TargetSpawnActionId,
             value.TargetChoices,
-        }, _host.Json));
+        }, _host.Json)!.AsObject();
+        if (value.ConfigurablePractice) node["configurable_practice"] = true;
+        return StudioCreativeHash.Text(node.ToJsonString(_host.Json));
+    }
 
     void StoreSnapshot(QuestStudioProject project, string contentHash)
     {

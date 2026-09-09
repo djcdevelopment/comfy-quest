@@ -11,7 +11,9 @@ sealed class RuntimeSpawnResetAdapter : IRuntimeSpawnResetAdapter {
   const string Prefix="comfyQuestRuntime.";
   public RuntimeSpawnResetObservation Inspect(SpawnedObject value) {
     if(value==null)return State("mismatch","spawn_row_missing");
-    var zdo=ZDOMan.instance?.GetZDO(new ZDOID(value.UserId,value.ObjectId));
+    ZDO zdo;
+    try { zdo=RuntimeSpawnIdentity.Resolve(value); }
+    catch(Exception error) { return State("mismatch",error.Message); }
     if(zdo==null)return State("already_absent");
     if(zdo.GetString(Prefix+"spawnedContentHash","")!=value.ContentHash
         ||zdo.GetString(Prefix+"spawnedActionId","")!=value.ActionId
@@ -25,7 +27,7 @@ sealed class RuntimeSpawnResetAdapter : IRuntimeSpawnResetAdapter {
   public RuntimeSpawnResetObservation Cleanup(SpawnedObject value) {
     var inspected=Inspect(value);if(!inspected.Safe||inspected.State=="already_absent")return inspected;
     try {
-      var zdo=ZDOMan.instance?.GetZDO(new ZDOID(value.UserId,value.ObjectId));
+      var zdo=RuntimeSpawnIdentity.Resolve(value);
       if(zdo==null)return State("already_absent");
       var view=ZNetScene.instance?.FindInstance(zdo);
       if(view!=null){view.ClaimOwnership();view.Destroy();}
@@ -38,9 +40,13 @@ sealed class RuntimeSpawnResetAdapter : IRuntimeSpawnResetAdapter {
 
 /// <summary>Bounded loaded-scene adapter for machine-driven Charm selection. It exposes only
 /// nearby, locally-owned members of the existing closed target registry.</summary>
-sealed class RuntimeBindingWorldAdapter : IRuntimeBindingAdapter {
+sealed class RuntimeBindingWorldAdapter : IRuntimeBindingAdapter, IRuntimeBindingRecoveryAdapter {
   const string Prefix="comfyQuestRuntime.";
   const int MaxNearbyColliders=1024;
+  public IReadOnlyList<string> FindBindingInstances(IReadOnlyCollection<string> instanceIds) =>
+    RuntimeSpawnIdentity.AuthoritativeObjects()
+      .Where(zdo=>instanceIds.Contains(zdo.GetString(Prefix+"bindingInstanceId","")))
+      .Select(zdo=>zdo.m_uid.ToString()).Take(2).ToArray();
   public IReadOnlyList<RuntimeBindingCandidate> ListCandidates(){
     var player=Player.m_localPlayer??throw new InvalidOperationException("runtime_player_missing");
     var colliders=new UnityEngine.Collider[MaxNearbyColliders+1];

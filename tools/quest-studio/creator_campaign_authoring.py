@@ -79,14 +79,17 @@ def main():
         'evidence_explanation':'Local Runtime outcomes; community guild credit remains separate.',
         'target_choices':[{'id':'deathsquito','label':'Deathsquito','runtime_target':'$enemy_deathsquito','source_quest_id':'air_drop'},
                           {'id':'drake','label':'Drake','runtime_target':'$enemy_drake','source_quest_id':'cold_shot'}]}))
+    revised = step('stage_owned_revision',lambda:call('POST',prefix+'/abstractions/slayers-signature-hunt/revisions',{
+        'expected_revision':promoted['guild']['revision'],'stage_owned_target':True,
+        'evidence_policy':'runtime','evidence_explanation':'The active hunt owns its target spawn. Real thrown-spear finishing hits establish completion.'}))
     air = step('air',lambda:call('POST',prefix+'/abstractions/slayers-signature-hunt/instantiate',{
-        'expected_guild_revision':promoted['guild']['revision'],'abstraction_revision':1,'title':'Air Drop',
+        'expected_guild_revision':revised['guild']['revision'],'abstraction_revision':revised['abstraction']['revision'],'title':'Air Drop',
         'target_choice_id':'deathsquito','instructions':'Bring down the Deathsquito with a thrown spear.',
-        'completion_message':'Air Drop answered. Cold Shot is now yours to hunt.','creator':'Derek'}))
+        'completion_message':'Air Drop answered. Your next hunt awaits.','creator':'Derek'}))
     cold = step('cold',lambda:call('POST',prefix+'/abstractions/slayers-signature-hunt/instantiate',{
-        'expected_guild_revision':air['guild']['revision'],'abstraction_revision':1,'title':'Cold Shot',
+        'expected_guild_revision':air['guild']['revision'],'abstraction_revision':revised['abstraction']['revision'],'title':'Cold Shot',
         'target_choice_id':'drake','instructions':'Finish the Drake with a thrown spear.',
-        'completion_message':'Cold Shot answered. The Slayers campaign is complete.','creator':'Derek'}))
+        'completion_message':'Cold Shot answered. A clean throw.','creator':'Derek'}))
     campaign = next(c for c in cold['guild']['campaigns'] if c['campaign_id']=='campaign-default')
     cp = prefix + '/campaigns/' + campaign['campaign_id']
     first = step('place_air',lambda:call('POST',cp+'/place',{'expected_revision':campaign['revision'],

@@ -65,6 +65,7 @@ def main():
         driver.request('lab', 'signature_hunt_clear')
         result = {'state':'cleared', 'preparation_id':args.clear_preparation}
     else:
+        driver.request('lab', 'showcase_prepare')
         receipt = driver.request('lab', 'signature_hunt_prepare')
         fixture = read_fixture(game, receipt)
         fixture_path = output / 'fixture.json'
@@ -86,7 +87,7 @@ def read_fixture(game, receipt):
     if path.parent != parent or not path.is_file() or path.stat().st_size > 1024 * 1024:
         raise RuntimeError('campaign_fixture_receipt_unavailable')
     fixture = base.read_json(path)
-    if (fixture.get('schema') != 'comfy-questlab-signature-hunt-fixture/v1'
+    if (fixture.get('schema') not in ('comfy-questlab-signature-hunt-fixture/v1', 'comfy-questlab-signature-hunt-fixture/v2')
             or fixture.get('world_uid') != receipt['world_uid']
             or fixture.get('machine') != receipt['machine']
             or (receipt['operation'] == 'signature_hunt_prepare' and fixture.get('request_id') != receipt['request_id'])):

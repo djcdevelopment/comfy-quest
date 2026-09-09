@@ -301,6 +301,7 @@ public sealed class RuntimeRunControlReceipt {
 }
 
 public sealed class RuntimeRunStatusEntry {
+  [JsonProperty("binding_available",NullValueHandling=NullValueHandling.Ignore)] public bool? BindingAvailable {get;set;}
   [JsonProperty("run_id")] public string RunId {get;set;}
   [JsonProperty("scope_id")] public string ScopeId {get;set;}
   [JsonProperty("experience_id")] public string ExperienceId {get;set;}

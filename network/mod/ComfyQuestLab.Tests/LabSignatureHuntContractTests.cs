@@ -22,42 +22,22 @@ public sealed class LabSignatureHuntContractTests {
         LabSignatureHuntContract.CreatorOsBetaWorldName,
         LabSignatureHuntContract.CreatorOsBetaWorldUid));
     Assert.False(LabSignatureHuntContract.SupportsWorld("CreatorOSBeta1", "4257656028"));
-    Assert.Equal(20, LabSignatureHuntContract.Placements.Length);
+    Assert.Equal(3, LabSignatureHuntContract.Placements.Length);
     Assert.Equal(LabSignatureHuntContract.Placements.Length,
         LabSignatureHuntContract.Placements.Select(value => value.Role).Distinct().Count());
 
     LabSignatureHuntPlacement[] targets = LabSignatureHuntContract.Placements
         .Where(value => value.Kind == LabSignatureHuntContract.TargetKind)
         .ToArray();
-    Assert.Collection(targets,
-        deathsquito => {
-          Assert.Equal("target-deathsquito", deathsquito.Role);
-          Assert.Equal("Deathsquito", deathsquito.Prefab);
-          Assert.Equal("Deathsquito", deathsquito.CreatureLabel);
-        },
-        drake => {
-          Assert.Equal("target-drake", drake.Role);
-          Assert.Equal("Hatchling", drake.Prefab);
-          Assert.Equal("Drake", drake.CreatureLabel);
-        });
-
-    double dx = targets[0].LocalX - targets[1].LocalX;
-    double dz = targets[0].LocalZ - targets[1].LocalZ;
-    Assert.Equal(LabSignatureHuntContract.ArenaSeparationMetres,
-        Math.Sqrt(dx * dx + dz * dz), 3);
-    Assert.Equal(6, LabSignatureHuntContract.Placements.Count(value =>
-        value.Kind == LabSignatureHuntContract.MarkerKind && value.Area == "deathsquito"));
-    Assert.Equal(6, LabSignatureHuntContract.Placements.Count(value =>
-        value.Kind == LabSignatureHuntContract.MarkerKind && value.Area == "drake"));
+    Assert.Empty(targets); // Runtime creates only the current encounter's creature.
+    Assert.Single(LabSignatureHuntContract.Placements, value => value.Prefab == "sign");
+    Assert.All(LabSignatureHuntContract.Placements, value => Assert.True(value.LocalX <= -5f));
 
     LabSignatureHuntPlacement[] loadout = LabSignatureHuntContract.Placements
-        .Where(value => value.Kind == LabSignatureHuntContract.LoadoutKind)
+        .Where(value => value.Kind == LabSignatureHuntContract.SupplyKind)
         .ToArray();
-    Assert.Equal(4, loadout.Length);
-    Assert.All(loadout, value => {
-      Assert.Equal("SpearCarapace", value.Prefab);
-      Assert.Equal(1, value.Stack);
-    });
+    Assert.Equal("piece_chest_wood", Assert.Single(loadout).Prefab);
+    Assert.Equal(4, LabSignatureHuntContract.SupplyCount);
   }
 
   [Fact]

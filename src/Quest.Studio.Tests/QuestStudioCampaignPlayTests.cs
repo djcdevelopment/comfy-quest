@@ -26,7 +26,7 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
         Assert.Equal("campaign_play_fixture_evidence_invalid", wrongKind.Error);
 
         var wrongMatcher = StudioCampaignPlayPrerequisiteRunner.Parse(operationId,
-            PrerequisiteJson(operationId, "1:9", "sign").Replace("$enemy_drake", "$enemy_troll"));
+            PrerequisiteJson(operationId, "1:9", "sign", unexpectedTarget: true));
         Assert.False(wrongMatcher.Ok);
         Assert.Equal("campaign_play_fixture_evidence_invalid", wrongMatcher.Error);
     }
@@ -71,8 +71,7 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
         Assert.Equal(built.FirstExperienceId, played.PlayReceipt.FirstExperienceId);
         Assert.Equal("applied-change", played.PlayReceipt.BindingChangeId);
         Assert.Equal("binding-instance", played.PlayReceipt.BindingInstanceId);
-        Assert.Equal(new[] { "$enemy_deathsquito", "$enemy_drake" },
-            played.PlayReceipt.FixtureTargets.Select(value => value.MatcherTarget));
+        Assert.Empty(played.PlayReceipt.FixtureTargets);
         Assert.Equal(new string('a', 64), played.PlayReceipt.FixtureReceiptSha256);
         Assert.Contains("not kill or completion proof", played.PlayReceipt.Limitations[0], StringComparison.OrdinalIgnoreCase);
 
@@ -308,10 +307,20 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
                 new StudioAbstractionTargetChoice { Id = "drake", Label = "Drake", RuntimeTarget = secondTarget, SourceQuestId = "cold_shot" },
             }));
         Assert.True(promoted.Ok, promoted.Error);
+        var paletteGuild = promoted.Guild!;
+        var paletteRevision = 1;
+        if (firstTarget == "$enemy_deathsquito" && secondTarget == "$enemy_drake")
+        {
+            var staged = service.ReviseAbstraction(guild.GuildId, "slayers-signature-hunt",
+                new(paletteGuild.Revision, "runtime", "Runtime stages each encounter's target.", StageOwnedTarget: true));
+            Assert.True(staged.Ok, staged.Error);
+            paletteGuild = staged.Guild!;
+            paletteRevision = staged.Abstraction!.Revision;
+        }
         var air = service.InstantiateAbstraction(guild.GuildId, "slayers-signature-hunt", new(
-            promoted.Guild!.Revision, 1, "Air Drop", "deathsquito", "Drop it.", "Done.", "Creator"));
+            paletteGuild.Revision, paletteRevision, "Air Drop", "deathsquito", "Drop it.", "Done.", "Creator"));
         var cold = service.InstantiateAbstraction(guild.GuildId, "slayers-signature-hunt", new(
-            air.Guild!.Revision, 1, "Cold Shot", "drake", "Drop it cold.", "Done cold.", "Creator"));
+            air.Guild!.Revision, paletteRevision, "Cold Shot", "drake", "Drop it cold.", "Done cold.", "Creator"));
         Assert.True(air.Ok && cold.Ok, air.Error ?? cold.Error);
         var campaign = cold.Guild!.Campaigns.Single(value => value.CampaignId == "campaign-default");
         var placedAir = service.PlaceInCampaign(guild.GuildId, campaign.CampaignId,
@@ -327,7 +336,7 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
             air.Project.ExperienceId, cold.Project.ExperienceId);
     }
 
-    static string PrerequisiteJson(string operationId, string zdo, string kind) =>
+    static string PrerequisiteJson(string operationId, string zdo, string kind, bool unexpectedTarget = false) =>
         System.Text.Json.JsonSerializer.Serialize(new
         {
             schema = "comfy-quest-studio-campaign-play-prerequisites/v1",
@@ -342,9 +351,10 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
             fixture_receipt_sha256 = new string('a', 64),
             fixture = new
             {
-                schema = "comfy-questlab-signature-hunt-fixture/v1",
+                schema = "comfy-questlab-signature-hunt-fixture/v2",
                 fixture_id = "slayers-signature-hunt",
-                fixture_revision = 2,
+                fixture_revision = 4,
+                target_lifecycle = "runtime-stage-entry",
                 state = "ready",
                 proof_level = "fixture-preparation",
                 disclaimer = "Fixed fixture preparation only; not live kill or completion proof.",
@@ -353,12 +363,12 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
                 machine = "TEST-MACHINE",
                 world_name = "ComfyQuestDemo",
                 world_uid = "-7600395338659582326",
-                objects = new { expected = 20, standing_at_capture = 20 },
-                targets = new[]
+                objects = new { expected = 3, standing_at_capture = 3 },
+                targets = unexpectedTarget ? new object[]
                 {
                     new { role = "target-deathsquito", prefab = "Deathsquito", raw_m_name = "$enemy_deathsquito", matcher_target = "$enemy_deathsquito", captured_from = "Character.m_name", zdo_id = "1:10" },
                     new { role = "target-drake", prefab = "Hatchling", raw_m_name = "$enemy_drake", matcher_target = "$enemy_drake", captured_from = "Character.m_name", zdo_id = "1:11" },
-                },
+                } : Array.Empty<object>(),
                 binding_anchor = new { role = "marker-loadout-sign", target_kind = kind, zdo_id = zdo },
             },
         }, HostJson());
@@ -403,11 +413,7 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
                 operationId, "creator-test", false, "TEST-MACHINE", "-7600395338659582326",
                 "fixture-request", "fixture-preparation-test", "fixture.json", new string('a', 64),
                 "fixture-preparation", "Fixed fixture preparation only; not live kill or completion proof.",
-                new[]
-                {
-                    new StudioCampaignFixtureTarget { Role = "target-deathsquito", MatcherTarget = "$enemy_deathsquito", ZdoId = "1:10" },
-                    new StudioCampaignFixtureTarget { Role = "target-drake", MatcherTarget = "$enemy_drake", ZdoId = "1:11" },
-                }, "1:9")));
+                Array.Empty<StudioCampaignFixtureTarget>(), "1:9")));
         }
     }
 

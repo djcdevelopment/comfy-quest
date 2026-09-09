@@ -70,7 +70,7 @@ public sealed class QuestStudioDemoWorldTests : IDisposable
         Assert.Equal("project_schema_unsupported", oldSchema.Error);
 
         source.SchemaVersion = StudioProjectDocument.CurrentSchemaVersion;
-        source.Nodes[0].Label = new string('x', 121);
+        source.Nodes[0].Label = new string('x', 501);
         var fieldBounds = _service.ImportProject(Request(source));
         Assert.False(fieldBounds.Ok);
         Assert.Equal("draft_field_bounds", fieldBounds.Error);
@@ -185,6 +185,8 @@ public sealed class QuestStudioDemoWorldTests : IDisposable
         template.UpdatedUtc = source.UpdatedUtc;
         template.PackId = source.PackId;
         template.ExperienceId = source.ExperienceId;
+        // The frozen v4 tutorial migrates to v5 without changing its authored graph.
+        Assert.True(QuestStudioWorkspace.NormalizeDocument(source));
         Assert.True(JsonNode.DeepEquals(
             JsonSerializer.SerializeToNode(source, _host.Json),
             JsonSerializer.SerializeToNode(template, _host.Json)));

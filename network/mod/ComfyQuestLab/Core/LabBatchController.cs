@@ -24,6 +24,7 @@ public sealed class LabBatchController {
   readonly LabBlueprintBuilder _blueprints;
   readonly LabHistoryScenarioRunner _history;
   readonly LabSignatureHuntProvider _signatureHunt;
+  readonly LabShowcaseProvider _showcase = new LabShowcaseProvider();
   LabBatchSession _session;
   bool _preparing;
   string _preparedSuiteId;
@@ -470,6 +471,7 @@ public sealed class LabBatchController {
   // ---- bounded request mailbox ------------------------------------------------------
 
   public void Poll(MonoBehaviour host) {
+    _showcase.Tick();
     float now = Time.realtimeSinceStartup;
     if (now < _nextRequestPoll) {
       return;
@@ -507,6 +509,34 @@ public sealed class LabBatchController {
     string identityError = CreatorIdentityError(request);
     if (identityError != null) {
       WriteRequestReceipt(request, "rejected", identityError);
+      return;
+    }
+    if (_showcase.IsRunning && operation != LabShowcaseProvider.StatusOperation) {
+      WriteRequestReceipt(request, "rejected", "world_mutation_busy");
+      return;
+    }
+    if (LabShowcaseProvider.IsOperation(operation)) {
+      string showcaseError = LabShowcaseProvider.Precondition(request.creator_session_id);
+      if (showcaseError != null) {
+        WriteRequestReceipt(request, "rejected", showcaseError);
+        return;
+      }
+      if (operation == LabShowcaseProvider.StatusOperation) {
+        WriteRequestReceipt(request, "completed", _showcase.Status(), _showcase.StatusPath);
+      } else if (_preparing || _gallery.IsRunning || _showcase.IsRunning
+          || (_blueprints != null && _blueprints.IsRunning)
+          || (_signatureHunt != null && _signatureHunt.IsRunning)) {
+        WriteRequestReceipt(request, "rejected", "world_mutation_busy");
+      } else if (operation == LabShowcaseProvider.ReleaseOperation) {
+        _showcase.Release();
+        WriteRequestReceipt(request, "completed", _showcase.Status(), _showcase.StatusPath);
+      } else if (operation == LabShowcaseProvider.TidyOperation) {
+        host.StartCoroutine(RequestRoutine(request, _showcase.Tidy(request.creator_session_id),
+            () => _showcase.LastResult, () => _showcase.LastSucceeded, () => _showcase.LastTidyPath));
+      } else {
+        host.StartCoroutine(RequestRoutine(request, _showcase.Prepare(request.creator_session_id),
+            () => _showcase.LastResult, () => _showcase.LastSucceeded, () => _showcase.StatusPath));
+      }
       return;
     }
     if (LabSignatureHuntContract.IsOperation(operation)) {
@@ -917,6 +947,7 @@ public sealed class LabBatchController {
       error = "request_argument_not_allowed";
       return false;
     }
+    if (LabShowcaseProvider.IsOperation(request.operation)) return LabShowcaseProvider.Validate(request, out error);
     if (LabSignatureHuntContract.IsOperation(request.operation)) {
       return LabSignatureHuntContract.ValidateRequest(
           request.operation, request.suite, request.profile, request.compare_profile,
@@ -931,6 +962,8 @@ public sealed class LabBatchController {
         request.selector,
         out error);
   }
+
+  public void ReleaseShowcase() { _showcase.Release(); }
 
   static bool IsSafeToken(string value, int maxLength) {
     if (string.IsNullOrWhiteSpace(value) || value.Length > maxLength) {

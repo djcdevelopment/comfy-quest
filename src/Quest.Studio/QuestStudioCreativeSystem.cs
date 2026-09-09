@@ -51,6 +51,10 @@ public sealed class StudioGuildAbstractionDocument
     public string EntryNodeId { get; set; } = string.Empty;
     public string RouteId { get; set; } = string.Empty;
     public string? CompletionActionId { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? TargetSpawnActionId { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ConfigurablePractice { get; set; }
     public List<StudioAbstractionTargetChoice> TargetChoices { get; set; } = new();
     public DateTimeOffset PublishedUtc { get; set; }
 }
@@ -61,6 +65,8 @@ public sealed class StudioAbstractionTargetChoice
     public string Label { get; set; } = string.Empty;
     public string RuntimeTarget { get; set; } = string.Empty;
     public string SourceQuestId { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? PracticeAttribution { get; set; }
 }
 
 public sealed class StudioGuildPaletteEntry
@@ -109,6 +115,8 @@ public sealed class StudioProjectDerivation
     public string TargetRuntimeValue { get; set; } = string.Empty;
     public string Instructions { get; set; } = string.Empty;
     public string CompletionMessage { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Mechanic { get; set; }
     public bool Detached { get; set; }
     public DateTimeOffset InstantiatedUtc { get; set; }
 }
@@ -141,7 +149,12 @@ public sealed record StudioAbstractionPromoteRequest(
 public sealed record StudioAbstractionReviseRequest(
     int ExpectedRevision,
     string? EvidencePolicy,
-    string? EvidenceExplanation);
+    string? EvidenceExplanation,
+    bool StageOwnedTarget = false,
+    bool IncludePracticeLox = false,
+    bool IncludePracticeDraugr = false,
+    bool ConfigurablePractice = false,
+    IReadOnlyList<string>? PracticeTargets = null);
 
 public sealed record StudioAbstractionMutationResult(bool Ok, bool Conflict, string? Error, StudioGuildDocument? Guild, StudioGuildAbstractionDocument? Abstraction);
 
@@ -152,9 +165,13 @@ public sealed record StudioAbstractionInstantiateRequest(
     string? TargetChoiceId,
     string? Instructions,
     string? CompletionMessage,
-    string? Creator);
+    string? Creator,
+    string? Mechanic = null);
 
 public sealed record StudioAbstractionInstantiateResult(bool Ok, bool Conflict, string? Error, StudioGuildDocument? Guild, StudioProjectDocument? Project);
+
+public sealed record StudioHuntConfigureRequest(int ExpectedRevision, string? Title,
+    string? TargetChoiceId, string? Instructions, string? CompletionMessage, string? Mechanic = null);
 
 public sealed record StudioProjectDetachRequest(int ExpectedRevision);
 

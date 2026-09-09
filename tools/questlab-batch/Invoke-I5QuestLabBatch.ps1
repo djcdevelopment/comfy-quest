@@ -20,7 +20,8 @@ param(
         'gallery_clear', 'gallery_rebuild',
         'blueprint_capture', 'blueprint_inspect', 'blueprint_diff', 'blueprint_check',
         'blueprint_build', 'blueprint_count', 'blueprint_clear',
-        'signature_hunt_prepare', 'signature_hunt_status', 'signature_hunt_clear'
+        'signature_hunt_prepare', 'signature_hunt_status', 'signature_hunt_clear',
+        'showcase_prepare', 'showcase_status', 'showcase_release', 'showcase_tidy'
     )]
     [string]$Operation,
 
@@ -405,18 +406,23 @@ if (-not [string]::IsNullOrWhiteSpace([string]$receipt.evidence_path)) {
     $evidencePathNormalized = $evidencePathRaw.Replace('\', '/')
     $signatureHuntEvidence = $Operation -in @(
         'signature_hunt_prepare', 'signature_hunt_status', 'signature_hunt_clear')
-    $evidenceDirectory = if ($signatureHuntEvidence) { 'fixtures' } else { 'truth' }
+    $showcaseEvidence = $Operation -in @('showcase_prepare', 'showcase_status', 'showcase_release')
+    $tidyEvidence = $Operation -eq 'showcase_tidy'
+    $evidenceDirectory = if ($signatureHuntEvidence) { 'fixtures' } elseif ($tidyEvidence) { 'tidy' } else { 'truth' }
     $expectedEvidenceRoot = if ($Lane -eq 'i5') {
         "$i5ValheimRoot/BepInEx/config/comfy-quest-lab/receipts/$evidenceDirectory/"
     } else {
         ($omenValheimRoot.Replace('\', '/') + "/BepInEx/config/comfy-quest-lab/receipts/$evidenceDirectory/")
+    }
+    if ($showcaseEvidence) {
+        $expectedEvidenceRoot = $expectedEvidenceRoot.Replace('/receipts/truth/', '/status/')
     }
     if (-not $evidencePathNormalized.StartsWith(
             $expectedEvidenceRoot, [StringComparison]::OrdinalIgnoreCase)) {
         throw "truth evidence escaped the fixed receipt directory: $evidencePathRaw"
     }
     $evidenceLeaf = $evidencePathNormalized.Substring($expectedEvidenceRoot.Length)
-    $evidenceLeafPattern = if ($signatureHuntEvidence) {
+    $evidenceLeafPattern = if ($showcaseEvidence) { '^showcase\.json$' } elseif ($signatureHuntEvidence) {
         '^signature-hunt-[A-Za-z0-9._-]+\.json$'
     } else { '^[A-Za-z0-9._-]+\.json$' }
     if ($evidenceLeaf -notmatch $evidenceLeafPattern) {
@@ -442,13 +448,13 @@ if (-not (Test-Path -LiteralPath `$path)) { exit 4 }
         $evidenceJson = [System.IO.File]::ReadAllText($evidencePathRaw)
     }
     $evidenceObject = $evidenceJson | ConvertFrom-Json
-    $expectedEvidenceSchema = if ($signatureHuntEvidence) {
-        'comfy-questlab-signature-hunt-fixture/v1'
-    } else { 'comfy-questlab-gallery-truth/v1' }
-    if ($evidenceObject.schema -ne $expectedEvidenceSchema) {
+    $expectedEvidenceSchema = if ($showcaseEvidence) { @('comfy-questlab-showcase-readiness/v1') } elseif ($tidyEvidence) { @('comfy-questlab-practice-tidy/v1') } elseif ($signatureHuntEvidence) {
+        @('comfy-questlab-signature-hunt-fixture/v1', 'comfy-questlab-signature-hunt-fixture/v2')
+    } else { @('comfy-questlab-gallery-truth/v1') }
+    if ($evidenceObject.schema -notin $expectedEvidenceSchema) {
         throw "unexpected evidence schema: $($evidenceObject.schema)"
     }
-    $evidenceSuffix = if ($signatureHuntEvidence) { 'fixture.json' } else { 'truth.json' }
+    $evidenceSuffix = if ($showcaseEvidence) { 'readiness.json' } elseif ($tidyEvidence) { 'tidy.json' } elseif ($signatureHuntEvidence) { 'fixture.json' } else { 'truth.json' }
     $localEvidence = Join-Path $OutputDirectory "$requestId-$evidenceSuffix"
     [System.IO.File]::WriteAllText(
         $localEvidence,

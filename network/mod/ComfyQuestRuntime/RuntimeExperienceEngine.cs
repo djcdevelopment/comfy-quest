@@ -155,6 +155,16 @@ sealed class RuntimeExperienceEngine {
     nextTimerPoll = now.AddSeconds(1);
     try {
       TryLoad(out var loaded, out _);
+      // Resume the first stage after a process loss between binding and its initial effects.
+      // Existing run identity and the action ledger make this a recovery, never a fresh replay.
+      if (loaded != null && CharmPolicy.CanMutate(World()).Allowed) {
+        foreach (var wear in Bindings(loaded)) {
+          var zdo = wear?.GetComponent<ZNetView>()?.GetZDO();
+          if (zdo != null && TryActiveIdentity(zdo, loaded, out var initialIdentity, out _)
+              && workflows.Get(initialIdentity) == null)
+            EnsureStarted(loaded, zdo, initialIdentity, out _);
+        }
+      }
       foreach (var timer in timers.Due(now, identity => IsCurrentRun(identity, loaded))) {
         if (!TryCurrentBinding(timer.Identity, loaded, out var binding)) continue;
         var elapsed = new RuntimeEvent {
@@ -372,11 +382,18 @@ sealed class RuntimeExperienceEngine {
           var progress = Counted(
               trace, TriggerEvaluator.Measure(route?.When, state?.History, evaluationContext));
           var line = ProgressLine(identity.Key, state?.StageId, route, progress);
-          WriteReceipt(EventReceipt(
+          var finishHelp = string.IsNullOrWhiteSpace(state?.Outcome)
+              ? SignatureHuntFinishHelp(route, evt) : null;
+          var ignored = EventReceipt(
               "ignored", active, zdo.m_uid.ToString(), evt, state?.StageId,
               state?.StageId, progress, correlationId, trace,
-              UnmetRoutes(stage, null, state?.History, evaluationContext), identity),
-              line, CreatorEvidenceKind.Story);
+              UnmetRoutes(stage, null, state?.History, evaluationContext), identity);
+          if (finishHelp != null) {
+            ignored.Diagnostics = new[] { new ContractDiagnostic("hunt.finish_requirement", "$", finishHelp) };
+            Player.m_localPlayer?.Message(MessageHud.MessageType.Center, finishHelp);
+          }
+          WriteReceipt(ignored, finishHelp ?? line,
+              finishHelp == null ? CreatorEvidenceKind.Story : CreatorEvidenceKind.Warning);
           if (Rechecks(stage)) Arm(identity.Key);
           continue;
         }
@@ -1216,9 +1233,11 @@ sealed class RuntimeExperienceEngine {
       return false;
     }
     try {
-      WriteReceipt(ActionReceipt(
+      var executedReceipt = ActionReceipt(
           "executed", null, active, zdoId, stage, transition, action.Id,
-          correlationId, identity), ActionLine(action, "executed"));
+          correlationId, identity);
+      if (action.Type == "message") executedReceipt.DisplayMessage = Param(action, "text");
+      WriteReceipt(executedReceipt, ActionLine(action, "executed"));
     } catch { }
     return true;
   }
@@ -1310,7 +1329,7 @@ sealed class RuntimeExperienceEngine {
       var center = binding.GetPosition();
       for (var i = 0; i < count; i++) {
         var angle = (float)(i * Math.PI * 2 / Math.Max(1, count));
-        var distance = Math.Min(radius, 2 + i / 4);
+        var distance = radius;
         var position = center + new UnityEngine.Vector3(
             (float)Math.Cos(angle) * distance, 0.5f, (float)Math.Sin(angle) * distance);
         var go = UnityEngine.Object.Instantiate(
@@ -1323,6 +1342,7 @@ sealed class RuntimeExperienceEngine {
         zdo.Set(Prefix + "spawnedContentHash", active.ContentHash);
         zdo.Set(Prefix + "spawnedActionId", action.Id);
         zdo.Set(Prefix + "spawnedActionKey", key);
+        RuntimeSpawnIdentity.Mark(zdo);
         var piece = go.GetComponent<Piece>();
         if (piece != null && Player.m_localPlayer != null)
           piece.SetCreator(Player.m_localPlayer.GetPlayerID());
@@ -1409,7 +1429,7 @@ sealed class RuntimeExperienceEngine {
     try {
       if (ZDOMan.instance == null) return false;
       if ((records ?? Array.Empty<SpawnedObject>()).Any(value =>
-          ZDOMan.instance.GetZDO(new ZDOID(value.UserId, value.ObjectId)) != null)) return false;
+          RuntimeSpawnIdentity.Resolve(value) != null)) return false;
       spawned.Remove(records ?? Array.Empty<SpawnedObject>());
       return spawned.ForAction(key).Count == 0;
     } catch { return false; }
@@ -1590,7 +1610,7 @@ sealed class RuntimeExperienceEngine {
     var records = spawned.ForOwnerAction(identity.Key, targetAction);
     var removed = new List<SpawnedObject>();
     foreach (var record in records) {
-      var zdo = ZDOMan.instance?.GetZDO(new ZDOID(record.UserId, record.ObjectId));
+      var zdo = RuntimeSpawnIdentity.Resolve(record);
       if (zdo == null) {
         removed.Add(record);
         continue;
@@ -1805,6 +1825,49 @@ sealed class RuntimeExperienceEngine {
     }
   }
 
+  public string CurrentTitle() {
+    return TryLoad(out var active, out _) ? active.Document?.Title : null;
+  }
+
+  public string CurrentObjective() {
+    try {
+      if (!TryLoad(out var active, out _)) return "Open Studio to choose your next quest.";
+      var progress = DescribeProgress();
+      if (progress == "Completed.") return "Hunt complete. Open DMos to review your result or replay the campaign.";
+      if (progress == "Failed.") return "Hunt ended. Open DMos to review what happened and replay the campaign.";
+      var stage = active.Document.Stages.FirstOrDefault(value => value.Id == CurrentStageId());
+      var route = stage?.Transitions?.OrderByDescending(value => value.Priority).FirstOrDefault();
+      foreach (var wear in Bindings(active)) {
+        var zdo=wear?.GetComponent<ZNetView>()?.GetZDO();
+        if(zdo==null||!TryActiveIdentity(zdo,active,out var identity,out _))continue;
+        var state=workflows.Get(identity);
+        var lastKill=state?.History?.LastOrDefault(evt=>evt.Name=="kill" && evt.Target==EventLeaf(route?.When)?.Target);
+        var finishHelp=SignatureHuntFinishHelp(route,lastKill);
+        if(finishHelp!=null)return finishHelp;
+      }
+      var leaf = EventLeaf(route?.When);
+      if (leaf?.Event == "kill" && leaf.Where != null
+          && leaf.Where.TryGetValue("weapon_skill", out var skill) && skill == "Spears"
+          && leaf.Where.TryGetValue("projectile", out var projectile) && projectile == "true")
+        return (string.IsNullOrWhiteSpace(stage.Instructions) ? "" : stage.Instructions.Trim() + "\n")
+            + "Finish the " + (Localization.instance?.Localize(leaf.Target) ?? leaf.Target)
+            + " with a thrown spear. Middle mouse to throw; replacement spears in the lodge chest.";
+      return string.IsNullOrWhiteSpace(stage?.Instructions) ? progress : stage.Instructions;
+    } catch { return "Quest status unavailable. Open creator details for diagnostics."; }
+  }
+
+  static string SignatureHuntFinishHelp(ExperienceTransition route, RuntimeEvent evt) {
+    var leaf=EventLeaf(route?.When);
+    if(evt?.Name!="kill" || leaf?.Event!="kill" || evt.Target!=leaf.Target || leaf.Where==null
+        || !leaf.Where.TryGetValue("weapon_skill",out var expectedSkill) || expectedSkill!="Spears"
+        || !leaf.Where.TryGetValue("projectile",out var expectedProjectile) || expectedProjectile!="true")return null;
+    var spear=evt.Fields!=null && evt.Fields.TryGetValue("weapon_skill",out var skill) && skill=="Spears";
+    var thrown=evt.Fields!=null && evt.Fields.TryGetValue("projectile",out var projectile) && projectile=="true";
+    if(spear&&thrown)return null;
+    var reason=spear&&!thrown?"That was a melee finish.":"The finishing hit was not a thrown spear.";
+    return reason+" This hunt needs a thrown-spear finish. Replay the campaign in DMos for a fresh target.";
+  }
+
   /// <summary>The authored ending in the player's words. "complete" and "fail" are the contract's
   /// closed outcome vocabulary; a row that prints the token is showing machinery.</summary>
   static string Outcome(string value) =>
@@ -1914,15 +1977,24 @@ sealed class RuntimeExperienceEngine {
       error = "binding_start_identity_unavailable";
       return false;
     }
-    if (!active.Subscriptions.Contains(ExperienceSchema.ExperienceStartedEvent)) return true;
     if (workflows.Get(identity) != null) return true;
+    var entry = active.Document.Stages.FirstOrDefault(stage => stage.Id == active.Document.EntryStage);
+    if (entry == null) { error = "experience_entry_stage_missing"; return false; }
+    var correlationId = NewCorrelationId();
+    foreach (var action in entry.EntryActions ?? new()) {
+      if (!Execute(active, zdo, entry.Id, "entry", action, correlationId, false)) {
+        error = "experience_entry_action_failed";
+        return false;
+      }
+    }
     var started = new RuntimeEvent {
       Name = ExperienceSchema.ExperienceStartedEvent,
       SourceId = zdo.m_uid.ToString(),
       At = DateTimeOffset.UtcNow,
     };
     RuntimeObservation.StampLocalPlayer(started);
-    OnEvent(started, true);
+    if (active.Subscriptions.Contains(ExperienceSchema.ExperienceStartedEvent)) OnEvent(started, true);
+    else workflows.Begin(identity, active.Document, started);
     if (workflows.Get(identity) != null) return true;
     error = "experience_start_not_observed";
     return false;
@@ -1947,8 +2019,22 @@ sealed class RuntimeExperienceEngine {
       if(reference==null||reference.ContentHash!=active.ContentHash)continue;
       if(!TryActiveIdentity(zdo,active,out var identity,out var record))continue;
       var progress=workflows.Get(identity);
-      values.Add(new RuntimeRunStatusEntry{RunId=record.RunId,ScopeId=record.ScopeId,ExperienceId=active.Document.Id,BindingZdo=zdo.m_uid.ToString(),BindingInstanceId=identity.BindingInstanceId,ParticipantIds=record.Scope.ParticipantIds.ToArray(),ContentHash=identity.ContentHash,StageId=progress?.StageId??active.Document.EntryStage,Outcome=progress?.Outcome,RewardPolicy=record.RewardPolicy});
+      values.Add(new RuntimeRunStatusEntry{BindingAvailable=true,RunId=record.RunId,ScopeId=record.ScopeId,ExperienceId=active.Document.Id,BindingZdo=zdo.m_uid.ToString(),BindingInstanceId=identity.BindingInstanceId,ParticipantIds=record.Scope.ParticipantIds.ToArray(),ContentHash=identity.ContentHash,StageId=progress?.StageId??active.Document.EntryStage,Outcome=progress?.Outcome,RewardPolicy=record.RewardPolicy});
       if(values.Count>=64)break;
+    }
+    // A completed predecessor or lost anchor must remain addressable for inspection and
+    // retirement. Physical availability is separate from the durable run's existence.
+    var world=ZNet.instance?.GetWorldUID().ToString();
+    var participant=Player.m_localPlayer?.GetPlayerID().ToString();
+    foreach(var record in runs.Registry.List().Where(record=>record.Status=="active"
+        && record.Scope.WorldId==world && record.Scope.ParticipantIds.Contains(participant)
+        && !values.Any(value=>value.RunId==record.RunId)).Take(Math.Max(0,64-values.Count))){
+      var progress=workflows.Get(record.Identity());
+      values.Add(new RuntimeRunStatusEntry{BindingAvailable=false,RunId=record.RunId,
+        ScopeId=record.ScopeId,ExperienceId=record.Scope.ExperienceId,BindingZdo=record.Scope.BindingZdo,
+        BindingInstanceId=record.Scope.BindingInstanceId,ParticipantIds=record.Scope.ParticipantIds.ToArray(),
+        ContentHash=record.Scope.ContentHash,StageId=progress?.StageId,Outcome=progress?.Outcome??record.Outcome,
+        RewardPolicy=record.RewardPolicy});
     }
     return values;
   }

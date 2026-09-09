@@ -260,6 +260,14 @@ public static class QuestStudioEndpoints
                 : result.Conflict ? StatusCodes.Status409Conflict
                 : result.Error is "guild_missing" or "abstraction_revision_missing" ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
         });
+        app.MapPost("/api/v2/quest-studio/projects/{projectId}/hunt-configuration", (string projectId, HttpRequest request, HttpResponse response, StudioHuntConfigureRequest? body, QuestStudioService studio) =>
+        {
+            NoStore(response);
+            if (!host.Authorize(request)) return Forbidden(host);
+            var result = studio.ConfigureHunt(projectId, body);
+            return Results.Json(result, host.Json, statusCode: result.Ok ? StatusCodes.Status200OK
+                : result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+        });
         app.MapPost("/api/v2/quest-studio/guilds/{guildId}/campaigns", (string guildId, HttpRequest request, HttpResponse response, StudioCampaignCreateRequest? body, QuestStudioService studio) =>
         {
             NoStore(response);

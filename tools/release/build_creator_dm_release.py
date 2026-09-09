@@ -133,8 +133,20 @@ def main() -> None:
                         "sha256": sha(target), "bytes": target.stat().st_size})
     probe = out / "probe"
     probe.mkdir()
-    for name in ("architectural_live_probe.py", "creator_dm_live_probe.py"):
+    tool_entries = []
+    for name in ("architectural_live_probe.py", "creator_dm_live_probe.py",
+                 "creator_connected_lap.py", "creator_live_input.py", "creator_raw_input.py",
+                 "creator_hunt_lap.py", "creator_practice_arrival.py", "creator_practice_venue.py",
+                 "creator_retire_hunt.py", "creator_am4_candidate.py", "campaign_play_prerequisites.py"):
         shutil.copy2(ROOT / "tools/quest-studio" / name, probe / name)
+        tool_entries.append({"path": "probe/" + name, "sha256": sha(probe / name),
+                             "bytes": (probe / name).stat().st_size})
+    for source in sorted((ROOT / "tools/quest-studio/profiles").glob("*.json")):
+        target = probe / "profiles" / source.name
+        target.parent.mkdir(exist_ok=True)
+        shutil.copy2(source, target)
+        tool_entries.append({"path": target.relative_to(out).as_posix(), "sha256": sha(target),
+                             "bytes": target.stat().st_size})
     host = out / "studio/Comfy.Quest.Studio.Host"
     if not host.is_file():
         raise RuntimeError("linux_host_missing")
@@ -151,7 +163,7 @@ def main() -> None:
             with path.open("rb") as stream:
                 tar.addfile(info, stream)
     manifest = {"schema": "comfy-quest-creator-dm-release/v1", "source_revision": revision,
-                "version": version, "plugins": entries, "packages": packages,
+                "version": version, "plugins": entries, "packages": packages, "tools": tool_entries,
                 "studio": {"path": archive.name, "sha256": sha(archive),
                            "bytes": archive.stat().st_size},
                 "proof_level": "release-artifacts; installed live proof is recorded separately"}

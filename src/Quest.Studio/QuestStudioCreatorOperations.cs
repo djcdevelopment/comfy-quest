@@ -23,6 +23,15 @@ public sealed partial class QuestStudioService
     public StudioCreatorOperationRecord? CreatorOperation(string id)
     {
         var record = _creatorOperations.Get(id);
+        if (record is { State: "recovery_required", Request.Operation: "campaign_play" or "campaign_reset", Outcome: not null })
+        {
+            var attempt = ReadCampaignFile<StudioCreatorCampaignAttempt>(id);
+            if (attempt is not null && CanRetryUnboundCampaignStart(attempt))
+            {
+                _creatorOperations.ResolveKnownFailure(id, record.Outcome with { RecoveryRequired = false });
+                record = _creatorOperations.Get(id);
+            }
+        }
         if (record is not { State: "awaiting_runtime", Outcome.RequestId: not null }) return record;
         var operation = record.Request.Operation == "reset_preview" ? "preview_reset" : "apply_reset";
         var request = record.Request;

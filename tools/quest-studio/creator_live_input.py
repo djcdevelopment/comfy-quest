@@ -3,6 +3,7 @@
 import argparse
 import ctypes as C
 import json
+import os
 from pathlib import Path
 import time
 import subprocess
@@ -15,7 +16,7 @@ import creator_dm_live_probe as recovery
 parser = argparse.ArgumentParser()
 parser.add_argument('--run-root', type=Path, required=True)
 parser.add_argument('--session', required=True)
-parser.add_argument('operation', choices=('console', 'key', 'click', 'capture', 'raw-start', 'raw-drop', 'raw-stop'))
+parser.add_argument('operation', choices=('console', 'key', 'click', 'capture', 'raw-start', 'raw-drop', 'raw-stop', 'move', 'aim', 'attack', 'block', 'throw', 'equip', 'interact'))
 parser.add_argument('values', nargs='*')
 args = parser.parse_args()
 game = Path('/home/derek/valheim')
@@ -85,10 +86,43 @@ elif args.operation in ('click', 'raw-drop'):
             time.sleep(.05)
         else: raise RuntimeError('raw_input_release_timeout')
         print(json.dumps(result))
+elif args.operation in ('move', 'aim', 'attack', 'block', 'throw', 'equip', 'interact'):
+    control = args.run_root / 'uinput-control'
+    assert base.read_json(control / 'status.json')['state'] in ('ready', 'released')
+    request_id = args.operation + '-' + uuid.uuid4().hex
+    request = {'schema': 'creator-dm-uinput-request/v1', 'request_id': request_id,
+               'operation': args.operation, 'created_unix': time.time()}
+    if args.operation == 'aim':
+        assert len(args.values) == 2
+        request.update(dx=int(args.values[0]), dy=int(args.values[1]))
+        assert -1200 <= request['dx'] <= 1200 and -800 <= request['dy'] <= 800
+    elif args.operation in ('move', 'equip'):
+        assert len(args.values) == 2
+        request.update(key=args.values[0], seconds=float(args.values[1]))
+        assert request['key'] in ({'w', 'a', 's', 'd', 'space'} if args.operation == 'move' else set('12345678'))
+        assert .05 <= request['seconds'] <= 3
+    else:
+        assert len(args.values) <= 1
+        request['seconds'] = float(args.values[0]) if args.values else .15
+        assert .05 <= request['seconds'] <= 3
+    base.atomic_json(control / 'request.json', request)
+    for _ in range(200):
+        result = base.read_json(control / 'status.json')
+        if result.get('request_id') == request_id and result['state'] == 'released': break
+        time.sleep(.05)
+    else: raise RuntimeError('raw_input_release_timeout')
+    # Keep the actual input sequence as evidence, separate from quest outcomes.
+    with (args.run_root / 'game-input.jsonl').open('a') as log:
+        log.write(json.dumps({'request': request, 'result': result}) + '\n')
+    print(json.dumps(result))
 elif args.operation in ('raw-start', 'raw-stop'):
     assert not args.values
     control = args.run_root / 'uinput-control'
     if args.operation == 'raw-start':
+        if control.exists():
+            previous = base.read_json(control / 'status.json')
+            assert previous['state'] == 'stopped' and not Path('/proc/' + str(previous['pid'])).exists()
+            control.rename(args.run_root / ('uinput-stopped-' + base.utc_now().strftime('%Y%m%dT%H%M%S')))
         control.mkdir(mode=0o700)
         with (control / 'daemon.log').open('wb') as log:
             subprocess.Popen(['sudo', '-n', sys.executable, str(Path(__file__).with_name('creator_raw_input.py')),
@@ -98,6 +132,17 @@ elif args.operation in ('raw-start', 'raw-stop'):
             if (control / 'status.json').exists(): break
             time.sleep(.05)
         assert base.read_json(control / 'status.json')['state'] == 'ready'
+        # libinput defaults a wheel-less pointer to middle-button scrolling, which
+        # swallowed the real throw input in the AM4 lap. Configure only our device.
+        pointer_env = {**os.environ, 'DISPLAY': ':0'}
+        properties = subprocess.run(['xinput', 'list-props', 'creator-connected-mouse'],
+            env=pointer_env, capture_output=True, text=True, check=True).stdout
+        assert '4617, 3' in properties, 'owned_pointer_product_mismatch'
+        subprocess.run(['xinput', 'set-prop', 'creator-connected-mouse',
+            'libinput Scroll Method Enabled', '0', '0', '0'], env=pointer_env, check=True)
+        base.atomic_json(control / 'pointer-configuration.json', {
+            'device': 'creator-connected-mouse', 'product': [4617, 3],
+            'middle_button_scrolling': False, 'scope': 'temporary owned pointer only'})
     else:
         result = base.read_json(control / 'status.json')
         base.atomic_json(control / 'stop.json', {'operation': 'stop', 'pid': result['pid']})
@@ -113,4 +158,5 @@ else:
     result = base.capture_screenshot(target)
     result['directory'] = str(target)
     print(json.dumps(result))
-print(json.dumps({'operation': args.operation, 'window': window, 'input_source': 'real_x11'}))
+print(json.dumps({'operation': args.operation, 'window': window,
+    'input_source': 'linux-uinput' if args.operation in ('move', 'aim', 'attack', 'block', 'throw', 'equip', 'interact', 'raw-drop') else 'real_x11'}))

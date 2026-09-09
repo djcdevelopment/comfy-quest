@@ -78,14 +78,14 @@ public sealed class LabSignatureHuntProvider {
       string preparationId = "signature-hunt-"
           + DateTimeOffset.UtcNow.ToString("yyyyMMddTHHmmssfffZ", CultureInfo.InvariantCulture)
           + "-" + Guid.NewGuid().ToString("N").Substring(0, 8);
-      var targets = new List<LabSignatureHuntTargetEvidence>(2);
+      var targets = new List<LabSignatureHuntTargetEvidence>();
       LabSignatureHuntBindingEvidence bindingAnchor = null;
       string placementError = null;
       foreach (ResolvedPlacement item in plan) {
         if (!TryPlace(item, preparationId, targets, ref bindingAnchor, out placementError)) break;
       }
 
-      if (placementError != null || targets.Count != 2 || bindingAnchor == null) {
+      if (placementError != null || targets.Count != 0 || bindingAnchor == null) {
         int partialRemoved = DestroyOwned(out string partialClearError);
         IEnumerator partialSettle = WaitForOwnedCountZero();
         while (partialSettle.MoveNext()) yield return partialSettle.Current;
@@ -147,11 +147,9 @@ public sealed class LabSignatureHuntProvider {
       }
 
       _lastReceiptPath = receiptPath;
-      Finish("Slayers Signature Hunt ready in " + ZNet.instance.GetWorldName()
-          + ": Deathsquito and Drake occupy "
-          + LabSignatureHuntContract.ArenaSeparationMetres.ToString("0", CultureInfo.InvariantCulture)
-          + " m-separated marked arenas; four Carapace spears are staged at the start. "
-          + "Captured exact live Character.m_name identities in " + receiptPath + ".", true);
+      Finish("Field Lodge briefing, supply chest and hunting field ready in " + ZNet.instance.GetWorldName()
+          + ". Four replacement spears are in the chest. Runtime stages each target when its hunt begins. "
+          + "Static venue receipt: " + receiptPath + ".", true);
     } finally {
       _running = false;
     }
@@ -278,13 +276,25 @@ public sealed class LabSignatureHuntProvider {
   static bool TryResolvePlan(
       out List<ResolvedPlacement> resolved, out Vector3 origin, out string error) {
     resolved = new List<ResolvedPlacement>(LabSignatureHuntContract.Placements.Length);
-    origin = Player.m_localPlayer.transform.position;
+    origin = LabShowcaseProvider.Arrival;
     error = null;
     try {
+      if (ZNet.instance.GetWorldUID().ToString(CultureInfo.InvariantCulture)
+              != LabSignatureHuntContract.ExpectedWorldUid
+          || Vector3.Distance(Player.m_localPlayer.transform.position, origin) > 40f) {
+        error = "signature hunt requires the reviewed Field Lodge arrival; run showcase_prepare first";
+        return false;
+      }
       var checkedPrefabs = new HashSet<string>(StringComparer.Ordinal);
       foreach (LabSignatureHuntPlacement placement in LabSignatureHuntContract.Placements) {
         if (!checkedPrefabs.Add(placement.Prefab)) continue;
         GameObject prefab = ZNetScene.instance.GetPrefab(placement.Prefab);
+        if (placement.Kind == LabSignatureHuntContract.SupplyKind
+            && (prefab?.GetComponent<Container>() == null
+                || ObjectDB.instance.GetItemPrefab(LabShowcaseProvider.Spear)?.GetComponent<ItemDrop>() == null)) {
+          error = "signature hunt supply chest preflight failed";
+          return false;
+        }
         if (prefab == null) {
           error = "signature hunt prefab preflight failed: " + placement.Prefab
               + " is unavailable; the standing fixture was not changed.";
@@ -313,7 +323,7 @@ public sealed class LabSignatureHuntProvider {
         }
       }
 
-      Vector3 forward = Player.m_localPlayer.transform.forward;
+      Vector3 forward = Vector3.forward;
       forward.y = 0f;
       if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
       forward.Normalize();
@@ -369,6 +379,8 @@ public sealed class LabSignatureHuntProvider {
       zdo.Set(LabSignatureHuntContract.MarkKey, LabSignatureHuntContract.MarkValue);
       zdo.Set(LabSignatureHuntContract.RoleMarkKey, placement.Role);
       zdo.Set(LabSignatureHuntContract.PreparationMarkKey, preparationId);
+      var wear = placed.GetComponent<WearNTear>();
+      if (wear != null) { wear.m_noSupportWear = false; wear.m_noRoofWear = false; }
 
       Piece piece = placed.GetComponent<Piece>();
       if (piece != null && Player.m_localPlayer != null) {
@@ -401,6 +413,20 @@ public sealed class LabSignatureHuntProvider {
         }
         drop.m_itemData.m_stack = placement.Stack;
         ItemDrop.SaveToZDO(drop.m_itemData, zdo);
+      }
+
+      if (placement.Kind == LabSignatureHuntContract.SupplyKind) {
+        var inventory = placed.GetComponent<Container>()?.GetInventory();
+        if (inventory == null || inventory.GetAllItems().Count != 0) {
+          error = "signature hunt supply chest was not empty after creation";
+          return false;
+        }
+        for (int i = 0; i < LabSignatureHuntContract.SupplyCount; i++) {
+          if (inventory.AddItem(LabShowcaseProvider.Spear, 1, 4, 0, 0, "Field Lodge") == null) {
+            error = "signature hunt supply chest could not hold four spears";
+            return false;
+          }
+        }
       }
 
       if (placement.Kind == LabSignatureHuntContract.TargetKind) {

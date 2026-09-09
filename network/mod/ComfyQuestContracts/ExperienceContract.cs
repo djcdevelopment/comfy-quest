@@ -56,6 +56,7 @@ public sealed class SpatialAreaSource {
 
 public sealed class ExperienceStage {
   [JsonProperty("id")] public string Id { get; set; }
+  [JsonProperty("instructions", NullValueHandling=NullValueHandling.Ignore)] public string Instructions { get; set; }
   [JsonProperty("entry_actions")] public List<ExperienceAction> EntryActions { get; set; }
   [JsonProperty("transitions")] public List<ExperienceTransition> Transitions { get; set; }
 }
@@ -247,6 +248,7 @@ public static class ExperienceCompiler {
     foreach (var s in stages) {
       if (s == null || !TakeId(ids,s?.Id)) e.Add(new("id.duplicate", "$.stages", "Stage, transition, binding, and action ids must be unique and non-empty."));
       if (s == null) continue;
+      if (s.Instructions?.Length > 500) e.Add(new("stage.instructions.bounds", $"$.stages.{s.Id}.instructions", "Stage instructions must be at most 500 characters."));
       edges[s.Id] = new(); actions += ValidateActions(s.EntryActions, ids, e, $"$.stages.{s.Id}.entry_actions");
       foreach (var t in (s.Transitions ?? new()).OrderByDescending(x=>x.Priority).ThenBy(x=>x.Id,StringComparer.Ordinal)) {
         if (!TakeId(ids,t.Id)) e.Add(new("id.duplicate", $"$.stages.{s.Id}.transitions", "Duplicate or empty transition id."));
@@ -283,7 +285,7 @@ public static class ExperienceCompiler {
     }
     foreach(var stage in Objects(root["stages"])){
       var stagePath="$.stages."+(stage.Value<string>("id")??"stage");
-      if((found=Unknown(stage,new[]{"id","entry_actions","transitions"},stagePath))!=null)return found;
+      if((found=Unknown(stage,new[]{"id","instructions","entry_actions","transitions"},stagePath))!=null)return found;
       foreach(var action in Objects(stage["entry_actions"]))if((found=UnknownAction(action,stagePath+".entry_actions"))!=null)return found;
       foreach(var transition in Objects(stage["transitions"])){
         var transitionPath=stagePath+".transitions."+(transition.Value<string>("id")??"transition");
@@ -320,7 +322,7 @@ public static class ExperienceCompiler {
   static void RequireInt(IDictionary<string,JToken> p,string key,int min,int max,List<ContractDiagnostic> e,string path){if(!p.TryGetValue(key,out var token)||token.Type!=JTokenType.Integer||token.Value<long>()<min||token.Value<long>()>max)e.Add(new("action.parameter",path+"."+key,$"Integer must be {min}..{max}."));}
   static void RequireEnum(IDictionary<string,JToken> p,string key,IEnumerable<string> values,List<ContractDiagnostic> e,string path){if(!p.TryGetValue(key,out var token)||token.Type!=JTokenType.String||!values.Contains(token.Value<string>(),StringComparer.Ordinal))e.Add(new("action.parameter",path+"."+key,"Value is not in the closed registry."));}
   static bool Stable(string value)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=64&&value.All(c=>char.IsLetterOrDigit(c)||c=='-'||c=='_'||c=='$');
-  static bool ProductionWhereValue(string eventName,string key,string value){if(string.IsNullOrWhiteSpace(value)||value.Length>128)return false;if(string.Equals(key,"projectile",StringComparison.OrdinalIgnoreCase))return value=="true";if(string.Equals(key,"actor_role",StringComparison.OrdinalIgnoreCase))return value==CooperativeEventContract.PeerRole||value==CooperativeEventContract.ListenHostRole;if(string.Equals(key,"timer_id",StringComparison.OrdinalIgnoreCase))return Stable(value);if(string.Equals(key,"amount",StringComparison.OrdinalIgnoreCase)){return double.TryParse(value,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var amount)&&!double.IsNaN(amount)&&!double.IsInfinity(amount)&&amount>0;}if(string.Equals(key,"quantity",StringComparison.OrdinalIgnoreCase)){return int.TryParse(value,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out var quantity)&&quantity>0;}return true;}
+  static bool ProductionWhereValue(string eventName,string key,string value){if(string.IsNullOrWhiteSpace(value)||value.Length>128)return false;if(string.Equals(key,"projectile",StringComparison.OrdinalIgnoreCase))return value=="true"||value=="false";if(string.Equals(key,"actor_role",StringComparison.OrdinalIgnoreCase))return value==CooperativeEventContract.PeerRole||value==CooperativeEventContract.ListenHostRole;if(string.Equals(key,"timer_id",StringComparison.OrdinalIgnoreCase))return Stable(value);if(string.Equals(key,"amount",StringComparison.OrdinalIgnoreCase)){return double.TryParse(value,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var amount)&&!double.IsNaN(amount)&&!double.IsInfinity(amount)&&amount>0;}if(string.Equals(key,"quantity",StringComparison.OrdinalIgnoreCase)){return int.TryParse(value,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out var quantity)&&quantity>0;}return true;}
   static string ProductionTargetIssue(string eventName,string target){string policy=null,fixedTarget=null;IReadOnlyList<string> allowed=null;if(RuntimeProductionEventCatalog.TryGet(eventName,out var runtime)){policy=runtime.TargetPolicy;fixedTarget=runtime.FixedTarget;allowed=runtime.AllowedTargets;}else if(RuntimeProductionEventCatalog.TryGetEngine(eventName,out var engine)){policy=engine.TargetPolicy;fixedTarget=engine.FixedTarget;allowed=engine.AllowedTargets;}else return null;if(string.IsNullOrWhiteSpace(target))return null;if(target.Length>128)return "trigger.target_value";if(policy=="none")return "trigger.target_unsupported";if(policy=="fixed-output"&&!string.Equals(target,fixedTarget,StringComparison.OrdinalIgnoreCase))return "trigger.target_fixed";if(policy=="closed"&&!(allowed??Array.Empty<string>()).Contains(target,StringComparer.OrdinalIgnoreCase))return "trigger.target_value";return null;}
   static bool BoundedCoordinate(double value)=>!double.IsNaN(value)&&!double.IsInfinity(value)&&Math.Abs(value)<=SpatialPredicateCatalog.MaxWorldCoordinate;
   static void ValidateArea(SpatialArea area,HashSet<string> ids,HashSet<string> areaIds,List<ContractDiagnostic> e){

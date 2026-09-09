@@ -12,7 +12,7 @@ import architectural_live_probe as base
 import creator_dm_live_probe as recovery
 
 parser = argparse.ArgumentParser()
-parser.add_argument('operation', choices=('prepare', 'reload', 'checkpoint', 'enter', 'arm', 'fixture_status', 'fixture_prepare', 'capture', 'archive', 'stop', 'restore'))
+parser.add_argument('operation', choices=('prepare', 'reload', 'checkpoint', 'enter', 'arm', 'showcase_prepare', 'showcase_status', 'showcase_release', 'showcase_tidy', 'fixture_status', 'fixture_prepare', 'fixture_clear', 'capture', 'archive', 'stop', 'restore'))
 parser.add_argument('--run-root', type=Path, required=True)
 parser.add_argument('--session', required=True)
 parser.add_argument('--manifest', type=Path)
@@ -76,16 +76,24 @@ elif args.operation == 'enter':
     base.atomic_json(run / 'current-launch.json', {'directory': str(launch.run_root)})
     result = base.wait_world_entry(runtime / 'status/world-entry.json', request['request_id'], 180)
     base.atomic_json(run / 'world-entry-receipt.json', result)
-    subprocess.run([sys.executable, str(Path(__file__).with_name('creator_live_input.py')),
-        '--run-root', str(run), '--session', args.session, 'console', 'devcommands', 'god', 'ghost'], check=True)
+    driver = base.LiveDriver(argparse.Namespace(valheim_root=game, run_root=run,
+        machine='am4', world_uid=recovery.WORLD_UID, session=args.session, request_timeout=45), {})
+    preparation = driver.request('lab', 'showcase_prepare')
+    base.atomic_json(run / 'showcase-entry-receipt.json', preparation)
+    assert preparation['state'] == 'completed', preparation
+    result = {'world_entry': result, 'showcase': preparation}
 elif args.operation == 'checkpoint':
     result = session.checkpoint()
-elif args.operation in ('arm', 'fixture_status', 'fixture_prepare'):
+elif args.operation in ('arm', 'fixture_status', 'fixture_prepare', 'fixture_clear', 'showcase_prepare', 'showcase_status', 'showcase_release', 'showcase_tidy'):
     assert session.read()['state'] == 'prepared'
     driver = base.LiveDriver(argparse.Namespace(valheim_root=game, run_root=run,
-        machine='am4', world_uid=recovery.WORLD_UID, session=args.session, request_timeout=30), {})
+        machine='am4', world_uid=recovery.WORLD_UID, session=args.session, request_timeout=45), {})
+    if args.operation.startswith('showcase_'):
+        result = driver.request('lab', args.operation)
+        print(json.dumps(result, indent=2), flush=True)
+        sys.exit(0)
     result = driver.request('runtime', 'arm') if args.operation == 'arm' else driver.request('lab',
-        'signature_hunt_prepare' if args.operation == 'fixture_prepare' else 'signature_hunt_status')
+        'signature_hunt_' + args.operation.removeprefix('fixture_'))
 elif args.operation == 'capture':
     assert session.read()['state'] == 'prepared'
     capture = run / ('capture-' + base.utc_now().strftime('%H%M%S'))

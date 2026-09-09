@@ -40,6 +40,10 @@ public static class GalleryStructurePatches {
   public const string InfiniteBrazierMark = "comfyQuestLabInfiniteBrazier";
 
   public static void Apply(Harmony harmony) {
+    // A Lox stomp must not remove the hunt's binding, briefing or replacement spears.
+    // This checks the durable fixture mark at damage time, including newly placed pieces.
+    harmony.Patch(AccessTools.Method(typeof(WearNTear), "RPC_Damage"),
+        prefix: new HarmonyMethod(typeof(GalleryStructurePatches), nameof(KeepPracticeFixturePrefix)));
     try {
       var target = AccessTools.Method(typeof(WearNTear), "Awake");
       if (target == null) {
@@ -71,6 +75,17 @@ public static class GalleryStructurePatches {
       ComfyQuestLab.LogInfo("gallery ambience: could not patch Fireplace.Awake: "
           + ex.Message + ". Hanging braziers will need ordinary fuel.");
     }
+  }
+
+  public static int PracticeDamageBlocked { get; private set; }
+  static bool KeepPracticeFixturePrefix(WearNTear __instance) {
+    var zdo = __instance?.GetComponent<ZNetView>()?.GetZDO();
+    var practiceLodge = LabShowcaseProvider.ProtectedPracticeActive
+        && LabMarks.BlueprintName(zdo) == LabShowcaseProvider.LodgeBlueprint
+        && Vector3.Distance(__instance.transform.position, LabShowcaseProvider.Arrival) < 80f;
+    if (!LabMarks.IsSignatureHuntPiece(zdo) && !practiceLodge) return true;
+    PracticeDamageBlocked++;
+    return false;
   }
 
   /// <summary>Runs for every piece in the world, so it does the cheapest possible test

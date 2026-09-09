@@ -117,6 +117,11 @@ if (-not $resumed) {
 Invoke-BoundedEntryPoint $creatorScript @(
     'Arm', '-SessionId', $sessionId, '-ValheimRoot', $ValheimRoot)
 Invoke-BoundedEntryPoint $labScript @(
+    'showcase_prepare', '-Lane', 'omen', '-ExpectedMachine', $machine,
+    '-ExpectedWorldUid', $worldUid, '-CreatorSessionId', $sessionId,
+    '-OmenValheimRoot', $ValheimRoot, '-WaitSeconds', '60',
+    '-OutputDirectory', (Join-Path $operationRoot 'showcase'))
+Invoke-BoundedEntryPoint $labScript @(
     'signature_hunt_prepare',
     '-Lane', 'omen',
     '-ExpectedMachine', $machine,
@@ -135,30 +140,19 @@ $fixture = [IO.File]::ReadAllText($fixtureFiles[0].FullName) | ConvertFrom-Json
 $requestReceipt = [IO.File]::ReadAllText($requestReceiptFiles[0].FullName) | ConvertFrom-Json
 if ([string]$requestReceipt.state -ne 'completed' -or
     [string]$requestReceipt.operation -ne 'signature_hunt_prepare' -or
-    [string]$fixture.schema -ne 'comfy-questlab-signature-hunt-fixture/v1' -or
+    [string]$fixture.schema -ne 'comfy-questlab-signature-hunt-fixture/v2' -or
     [string]$fixture.fixture_id -ne 'slayers-signature-hunt' -or
-    [int]$fixture.fixture_revision -ne 2 -or
+    [int]$fixture.fixture_revision -ne 4 -or
     [string]$fixture.state -ne 'ready' -or
     [string]$fixture.proof_level -ne 'fixture-preparation' -or
     [string]$fixture.request_id -ne [string]$requestReceipt.request_id -or
     [string]$fixture.machine -ne $machine -or
     [string]$fixture.world_name -ne 'ComfyQuestDemo' -or
     [string]$fixture.world_uid -ne $worldUid -or
-    [int]$fixture.objects.expected -ne 20 -or
-    [int]$fixture.objects.standing_at_capture -ne 20 -or
-    @($fixture.targets).Count -ne 2 -or
-    [string]$fixture.targets[0].role -ne 'target-deathsquito' -or
-    [string]$fixture.targets[0].prefab -ne 'Deathsquito' -or
-    [string]$fixture.targets[0].raw_m_name -ne '$enemy_deathsquito' -or
-    [string]$fixture.targets[0].matcher_target -ne '$enemy_deathsquito' -or
-    [string]$fixture.targets[0].captured_from -ne 'Character.m_name' -or
-    [string]$fixture.targets[0].zdo_id -notmatch '^-?[0-9]+:[0-9]+$' -or
-    [string]$fixture.targets[1].role -ne 'target-drake' -or
-    [string]$fixture.targets[1].prefab -ne 'Hatchling' -or
-    [string]$fixture.targets[1].raw_m_name -ne '$enemy_drake' -or
-    [string]$fixture.targets[1].matcher_target -ne '$enemy_drake' -or
-    [string]$fixture.targets[1].captured_from -ne 'Character.m_name' -or
-    [string]$fixture.targets[1].zdo_id -notmatch '^-?[0-9]+:[0-9]+$' -or
+    [int]$fixture.objects.expected -ne 3 -or
+    [int]$fixture.objects.standing_at_capture -ne 3 -or
+    @($fixture.targets).Count -ne 0 -or
+    [string]$fixture.target_lifecycle -ne 'runtime-stage-entry' -or
     [string]$fixture.binding_anchor.role -ne 'marker-loadout-sign' -or
     [string]$fixture.binding_anchor.target_kind -ne 'sign' -or
     [string]$fixture.binding_anchor.zdo_id -notmatch '^-?[0-9]+:[0-9]+$') {

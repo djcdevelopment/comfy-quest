@@ -12,8 +12,8 @@ using System.Text;
 /// actually finds after instantiation.</summary>
 public static class LabSignatureHuntContract {
   public const string FixtureId = "slayers-signature-hunt";
-  public const int FixtureRevision = 2;
-  public const string ReceiptSchema = "comfy-questlab-signature-hunt-fixture/v1";
+  public const int FixtureRevision = 4;
+  public const string ReceiptSchema = "comfy-questlab-signature-hunt-fixture/v2";
   public const string ProofLevel = "fixture-preparation";
   public const string Disclaimer =
       "Fixed fixture preparation only; not live kill or completion proof.";
@@ -48,64 +48,17 @@ public static class LabSignatureHuntContract {
   public const string MarkerKind = "marker";
   public const string LoadoutKind = "loadout";
   public const string TargetKind = "target";
-  public const float ArenaSeparationMetres = 40f;
 
-  /// <summary>One fixed player-relative plan. Local +Z follows the player's flat forward vector
-  /// at preparation time and local +X follows right. Every Y is an offset from natural terrain,
-  /// so none of these values is an externally supplied world coordinate.</summary>
+  public const string SupplyKind = "supply";
+  public const int SupplyCount = 4;
   public static readonly LabSignatureHuntPlacement[] Placements = {
-    // Signs otherwise stand unsupported 1.2 m above terrain and collapse after loading.
-    // Place their physical supports first; retain the ownership mark so prepare replaces v1.
-    Place("marker-deathsquito-sign-post", MarkerKind, "deathsquito", "wood_pole2",
-        -20f, 0f, 22f),
-    Place("marker-drake-sign-post", MarkerKind, "drake", "wood_pole2",
-        20f, 0f, 22f),
-    Place("marker-loadout-sign-post", MarkerKind, "loadout", "wood_pole2",
-        0f, 0f, 7f),
-    // Deathsquito arena: one readable sign and four boundary stakes around a 12 m square.
-    Place("marker-deathsquito-sign", MarkerKind, "deathsquito", "sign",
-        -20f, 1.2f, 22f, 180f, 1, "SLAYERS SIGNATURE HUNT\nDEATHSQUITO"),
-    Place("marker-deathsquito-sw", MarkerKind, "deathsquito", "wood_pole2",
-        -26f, 0f, 24f),
-    Place("marker-deathsquito-se", MarkerKind, "deathsquito", "wood_pole2",
-        -14f, 0f, 24f),
-    Place("marker-deathsquito-nw", MarkerKind, "deathsquito", "wood_pole2",
-        -26f, 0f, 36f),
-    Place("marker-deathsquito-ne", MarkerKind, "deathsquito", "wood_pole2",
-        -14f, 0f, 36f),
-
-    // Drake arena. Valheim's reviewed prefab name is Hatchling; the fixture labels the creature
-    // as a Drake but never substitutes that label for the live m_name captured in its receipt.
-    Place("marker-drake-sign", MarkerKind, "drake", "sign",
-        20f, 1.2f, 22f, 180f, 1, "SLAYERS SIGNATURE HUNT\nDRAKE"),
-    Place("marker-drake-sw", MarkerKind, "drake", "wood_pole2",
-        14f, 0f, 24f),
-    Place("marker-drake-se", MarkerKind, "drake", "wood_pole2",
-        26f, 0f, 24f),
-    Place("marker-drake-nw", MarkerKind, "drake", "wood_pole2",
-        14f, 0f, 36f),
-    Place("marker-drake-ne", MarkerKind, "drake", "wood_pole2",
-        26f, 0f, 36f),
-
-    // Four non-stackable high-tier spears are staged as marked world drops. A missed throw does
-    // not turn this proof into a scavenger hunt, and the fixture never edits player inventory.
-    Place("marker-loadout-sign", MarkerKind, "loadout", "sign",
-        0f, 1.2f, 7f, 180f, 1, "SPEAR LOADOUT\n4 CARAPACE SPEARS"),
-    Place("loadout-spear-1", LoadoutKind, "loadout", "SpearCarapace",
-        -3f, 0.6f, 10f),
-    Place("loadout-spear-2", LoadoutKind, "loadout", "SpearCarapace",
-        -1f, 0.6f, 10f),
-    Place("loadout-spear-3", LoadoutKind, "loadout", "SpearCarapace",
-        1f, 0.6f, 10f),
-    Place("loadout-spear-4", LoadoutKind, "loadout", "SpearCarapace",
-        3f, 0.6f, 10f),
-
-    // Targets are placed last by the provider so every marker and spear exists before either AI
-    // can acquire the player. Their centres are exactly 40 m apart.
-    Place("target-deathsquito", TargetKind, "deathsquito", "Deathsquito",
-        -20f, 4f, 30f, 180f, 1, null, "Deathsquito"),
-    Place("target-drake", TargetKind, "drake", "Hatchling",
-        20f, 6f, 30f, 180f, 1, null, "Drake"),
+    // One briefing/binding sign beside the chest, left of the approach path.
+    // Runtime stages the active creature twelve metres east of this sign,
+    // placing it about seven metres from arrival with no poles between them.
+    Place("marker-loadout-sign-post", MarkerKind, "briefing", "wood_pole2", -5f, 0f, 2f),
+    Place("marker-loadout-sign", MarkerKind, "briefing", "sign", -5f, 1.2f, 2f, 180f, 1,
+        "FIELD LODGE\nREAD YOUR CURRENT OBJECTIVE\nPRACTICE SUPPLIES BESIDE THIS SIGN [E]"),
+    Place("supply-chest", SupplyKind, "loadout", "piece_chest_wood", -6f, .1f, 3f, 180f),
   };
 
   public static bool OwnsMark(string value) {
@@ -259,6 +212,7 @@ public sealed class LabSignatureHuntFixtureReceipt {
     Field(sb, "state", "ready", true);
     Field(sb, "proof_level", LabSignatureHuntContract.ProofLevel, true);
     Field(sb, "disclaimer", LabSignatureHuntContract.Disclaimer, true);
+    Field(sb, "target_lifecycle", "runtime-stage-entry", true);
     Field(sb, "request_id", RequestId, true);
     Field(sb, "preparation_id", PreparationId, true);
     Field(sb, "prepared_utc", PreparedUtc, true);
@@ -275,7 +229,6 @@ public sealed class LabSignatureHuntFixtureReceipt {
     Number(sb, "expected", ExpectedObjectCount, true, 4);
     Number(sb, "standing_at_capture", StandingObjectCount, false, 4);
     sb.AppendLine("  },");
-    Decimal(sb, "arena_separation_metres", LabSignatureHuntContract.ArenaSeparationMetres, true);
     sb.AppendLine("  \"origin\": {");
     Decimal(sb, "x", OriginX, true, 4);
     Decimal(sb, "y", OriginY, true, 4);
@@ -285,7 +238,7 @@ public sealed class LabSignatureHuntFixtureReceipt {
     sb.AppendLine("    {");
     Field(sb, "prefab", "SpearCarapace", true, 6);
     Number(sb, "count", 4, true, 6);
-    Field(sb, "delivery", "marked world drops", false, 6);
+    Field(sb, "delivery", "marked supply chest", false, 6);
     sb.AppendLine("    }");
     sb.AppendLine("  ],");
     LabSignatureHuntBindingEvidence anchor = BindingAnchor

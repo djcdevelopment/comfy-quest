@@ -290,11 +290,12 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         notice = (
             ROOT / "network" / "mod" / "ComfyQuestContracts" / "CreatorLoopNotice.cs"
         ).read_text(encoding="utf-8")
-        # Creator plumbing speaks TopLeft; Center belongs to the authored story and the
-        # countdown. The engine keeps exactly one Center writer: the message action.
+        # Center carries authored story and a concrete rejected-finisher explanation.
+        # Ordinary creator plumbing remains TopLeft.
         self.assertIn("MessageHud.MessageType.TopLeft", plugin)
         self.assertNotIn("MessageType.Center", plugin)
-        self.assertEqual(1, engine.count("MessageHud.MessageType.Center"))
+        self.assertEqual(2, engine.count("MessageHud.MessageType.Center"))
+        self.assertIn('new ContractDiagnostic("hunt.finish_requirement", "$", finishHelp)', engine)
         # The plugin renders CreatorLoopNotice; it composes no creator copy inline.
         for marker in (
             "CreatorLoopNotice.Check(",
@@ -455,7 +456,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         layout = (RUNTIME / "RuntimeCreatorBarLayout.cs").read_text(encoding="utf-8")
         self.assertIn("public const float SafeTop = 92f;", layout)
         self.assertIn("screenHeight - height - EdgeInset", layout)
-        self.assertIn("DrawCompactDots(workflow);", plugin)
+        self.assertIn("engine?.CurrentObjective()", plugin)
         self.assertIn("if(barExpanded) DrawExpandedBar(workflow);", plugin)
         expanded = plugin[plugin.index("void DrawExpandedBar"):plugin.index("void ExpandedRung")]
         for rung in ('"LOOK"', '"VALIDATE"', '"LOAD"', '"CONFIRM"'):
@@ -582,7 +583,7 @@ class QuestRuntimeArcaneSightTests(unittest.TestCase):
         # "we should also post it in chat … so there's history of it not just the glimpse".
         self.assertIn("static void Say(string text)", engine)
         self.assertIn("Chat.instance?.AddString(text)", engine)
-        self.assertEqual(1, engine.count("MessageHud.MessageType.Center"))
+        self.assertEqual(2, engine.count("MessageHud.MessageType.Center"))
         # An unbound quest says so once, at player altitude, instead of ignoring input in silence.
         self.assertIn("string UnboundLine(Active active)", engine)
         self.assertIn("has no Charm yet", engine)

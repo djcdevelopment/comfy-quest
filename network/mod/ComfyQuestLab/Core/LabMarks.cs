@@ -35,6 +35,11 @@ public static class LabMarks {
   /// <summary>Did any lab lane place this? The keep-standing patch keys off this, so a
   /// new lane that marks its pieces gets its cantilevers held up for free.</summary>
   public static bool IsLabBuilt(ZDO zdo) {
-    return LabGalleryBuilder.IsGalleryPiece(zdo) || IsBlueprintPiece(zdo);
+    return LabGalleryBuilder.IsGalleryPiece(zdo) || IsBlueprintPiece(zdo)
+        || IsSignatureHuntPiece(zdo);
   }
+
+  public static bool IsSignatureHuntPiece(ZDO zdo) => zdo != null
+      && zdo.GetString(LabSignatureHuntContract.MarkKey, string.Empty)
+          == LabSignatureHuntContract.MarkValue;
 }

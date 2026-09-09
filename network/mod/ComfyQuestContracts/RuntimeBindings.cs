@@ -51,6 +51,12 @@ public static class RuntimeBindingCandidateSelector {
       if(selected.Count>=maxCandidates)break;
       selected.Add(representative.Index);
     }
+    // A nearby building can contribute dozens of floors and walls. Preserve its
+    // explicit interaction anchors before filling the remaining piece choices.
+    foreach(var value in ordered.Where(value=>value.Candidate.TargetKind is "sign" or "item_stand" or "dedicated_charm")) {
+      if(selected.Count>=maxCandidates)break;
+      selected.Add(value.Index);
+    }
     foreach(var value in ordered) {
       if(selected.Count>=maxCandidates)break;
       selected.Add(value.Index);
@@ -80,6 +86,7 @@ public sealed class RuntimeBindingChange {
   [JsonProperty("state")] public string State {get;set;}="pending";
   [JsonProperty("created_utc")] public DateTimeOffset CreatedUtc {get;set;}
   [JsonProperty("completed_utc",NullValueHandling=NullValueHandling.Ignore)] public DateTimeOffset? CompletedUtc {get;set;}
+  [JsonProperty("restoration_disposition",NullValueHandling=NullValueHandling.Ignore)] public string RestorationDisposition {get;set;}
   [JsonProperty("previous")] public RuntimeBindingReference Previous {get;set;}
   [JsonProperty("applied")] public RuntimeBindingReference Applied {get;set;}
 }
@@ -89,6 +96,11 @@ public interface IRuntimeBindingAdapter {
   IReadOnlyList<RuntimeBindingCandidate> ListCandidates();
   RuntimeBindingReference Read(string bindingZdo);
   bool TryWrite(string bindingZdo,RuntimeBindingReference reference,out string error);
+}
+
+/// <summary>Optional authoritative saved-world lookup, independent of nearby selection.</summary>
+public interface IRuntimeBindingRecoveryAdapter {
+  IReadOnlyList<string> FindBindingInstances(IReadOnlyCollection<string> instanceIds);
 }
 
 public sealed class RuntimeBindingCoordinator {
@@ -266,6 +278,15 @@ public sealed class RuntimeBindingCoordinator {
         throw new InvalidDataException("binding_change_invalid");
       ValidateReference(change.Previous,true);ValidateReference(change.Applied,false);
       var resolvedBindingZdo=ResolveRestoreBinding(change,bindingZdo);
+      if(resolvedBindingZdo==null){
+        if(runs.List().Any(run=>run.Status=="active" && run.Scope.WorldId==worldId
+            && (run.Scope.BindingInstanceId==change.Applied.BindingInstanceId
+              || !string.IsNullOrWhiteSpace(change.Previous?.BindingInstanceId)
+                && run.Scope.BindingInstanceId==change.Previous.BindingInstanceId)))
+          throw new InvalidOperationException("binding_restore_active_runs");
+        change.State="restored";change.RestorationDisposition="anchor_absent";
+        change.ResolvedBindingZdo=null;change.CompletedUtc=now;Write(path,change,false);return change;
+      }
       change.ResolvedBindingZdo=resolvedBindingZdo;
       var current=adapter.Read(resolvedBindingZdo)??new RuntimeBindingReference();
       if(change.State=="restored"&&Same(current,change.Previous))return change;
@@ -286,11 +307,17 @@ public sealed class RuntimeBindingCoordinator {
 
   string ResolveRestoreBinding(RuntimeBindingChange change,string legacyBindingZdo){
     var markers=new HashSet<string>(StringComparer.Ordinal);
-    if(change.State!="restored"&&!string.IsNullOrWhiteSpace(change.Applied?.BindingInstanceId))
+    if((change.State!="restored"||change.RestorationDisposition=="anchor_absent")&&!string.IsNullOrWhiteSpace(change.Applied?.BindingInstanceId))
       markers.Add(change.Applied.BindingInstanceId);
     if(change.State!="applied"&&!string.IsNullOrWhiteSpace(change.Previous?.BindingInstanceId))
       markers.Add(change.Previous.BindingInstanceId);
     if(markers.Count==0)return legacyBindingZdo;
+    if(adapter is IRuntimeBindingRecoveryAdapter recovery){
+      var found=recovery.FindBindingInstances(markers);
+      if(found==null)throw new InvalidOperationException("binding_restore_world_unavailable");
+      if(found.Count>1)throw new InvalidOperationException("binding_restore_instance_ambiguous");
+      return found.SingleOrDefault();
+    }
     var matches=new List<string>();
     foreach(var candidate in Candidates()){
       var reference=adapter.Read(candidate.BindingZdo)??new RuntimeBindingReference();

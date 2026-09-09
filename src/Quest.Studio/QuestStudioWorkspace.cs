@@ -309,7 +309,7 @@ internal sealed class QuestStudioWorkspace
         if (!element.TryGetProperty("schema_version", out var schema)
             || schema.ValueKind != System.Text.Json.JsonValueKind.Number
             || !schema.TryGetInt32(out var schemaVersion)
-            || schemaVersion != StudioProjectDocument.CurrentSchemaVersion)
+            || schemaVersion is < 4 or > StudioProjectDocument.CurrentSchemaVersion)
             return StudioImportResult.Fail("project_schema_unsupported");
 
         StudioProjectDocument source;
@@ -1201,7 +1201,8 @@ internal sealed class QuestStudioWorkspace
         var bytes = Encoding.UTF8.GetByteCount(System.Text.Json.JsonSerializer.Serialize(project, _host.Json));
         if (bytes > MaxDraftBytes) return "draft_too_large";
         if (project.Nodes is null || project.Nodes.Count > ExperienceSchema.MaxStages) return "draft_node_bounds";
-        if (project.Nodes.Any(node => node is null || node.Id?.Length > 64 || node.Label?.Length > 120 || !double.IsFinite(node.X) || !double.IsFinite(node.Y)
+        if (project.Nodes.Any(node => node is null || node.Id?.Length > 64 || node.Label?.Length > 500 || !double.IsFinite(node.X) || !double.IsFinite(node.Y)
+            || (node.EntryActions?.Count ?? 0) > 64 || (node.EntryActions?.Any(action => action is null || action.Id?.Length > 64 || action.Text?.Length > 500) ?? false)
             || node.Routes is null || node.Routes.Count > 64 || node.Routes.Any(route => route is null || route.Id?.Length > 64 || route.Target?.Length > 120
                 || route.Where is null || route.Where.Count > 16 || route.Where.Any(pair => pair.Key.Length > 64 || pair.Value?.Length is null or > 120)
                 || route.Actions is null || route.Actions.Count > 64 || route.Actions.Any(action => action is null || action.Id?.Length > 64 || action.Text?.Length > 500))))
@@ -1421,10 +1422,12 @@ internal static class StudioGraphCompiler
                 Center = center, RadiusMeters = area.RadiusMeters, SourceAnchor = source });
         }
         if (!nodeIds.Contains(project.EntryNodeId)) Add("entry_node_missing", "$.entry_node_id", "Choose an existing start node.");
-        var spawnIds = nodes.SelectMany(node => node.Routes ?? new()).SelectMany(route => route.Actions ?? new()).Where(action => action.Type == "spawn").Select(action => action.Id).ToHashSet(StringComparer.Ordinal);
+        var spawnIds = nodes.SelectMany(node => (node.EntryActions ?? new()).Concat((node.Routes ?? new()).SelectMany(route => route.Actions ?? new())))
+            .Where(action => action.Type == "spawn").Select(action => action.Id).ToHashSet(StringComparer.Ordinal);
         var stages = new List<ExperienceStage>();
         foreach (var node in nodes)
         {
+            var entryActions = CompileActions(node.EntryActions, $"$.nodes.{node.Id}.entry_actions");
             var transitions = new List<ExperienceTransition>();
             foreach (var route in node.Routes ?? new())
             {
@@ -1445,15 +1448,7 @@ internal static class StudioGraphCompiler
                 var terminal = route.Outcome is "complete" or "fail";
                 if ((!string.IsNullOrWhiteSpace(route.DestinationNodeId) ? 1 : 0) + (terminal ? 1 : 0) != 1) Add("route_destination_invalid", path, "Choose exactly one next node or terminal outcome.");
                 if (!string.IsNullOrWhiteSpace(route.DestinationNodeId) && !nodeIds.Contains(route.DestinationNodeId)) Add("route_destination_missing", path + ".destination_node_id", "The destination node does not exist.");
-                var compiledActions = new List<ExperienceAction>();
-                foreach (var action in route.Actions ?? new())
-                {
-                    var actionPath = path + ".actions." + action.Id;
-                    if (!SafeId(action.Id) || !globalIds.Add(action.Id ?? string.Empty)) Add("action_id_invalid", actionPath, "Action IDs must be globally unique stable identifiers.");
-                    if (!Actions.Contains(action.Type ?? string.Empty)) { Add("action_unknown", actionPath, "The action is not implemented by Runtime."); continue; }
-                    if (action.Type == "clear_spawned" && (!SafeId(action.ActionId) || !spawnIds.Contains(action.ActionId ?? string.Empty))) Add("clear_spawn_reference_invalid", actionPath + ".action_id", "Cleanup must reference a spawn action in this quest.");
-                    compiledActions.Add(ToContract(action));
-                }
+                var compiledActions = CompileActions(route.Actions, path + ".actions");
                 var eventTrigger = new TriggerExpression { Op = "EVENT", Event = route.Event, Target = NullIfWhite(route.Target), Where = where.Count == 0 ? null : where };
                 var eventClause = route.RepeatCount > 1
                     ? new TriggerExpression { Op = "COUNT", Count = route.RepeatCount, WithinSeconds = (route.AdaptiveConditions?.Count ?? 0) == 0 && (route.SpatialConditions?.Count ?? 0) == 0 ? route.WithinSeconds : null, Children = new() { eventTrigger } }
@@ -1509,7 +1504,23 @@ internal static class StudioGraphCompiler
                     Actions = compiledActions, NextStage = NullIfWhite(route.DestinationNodeId), Outcome = terminal ? route.Outcome : null
                 });
             }
-            stages.Add(new ExperienceStage { Id = node.Id, EntryActions = new(), Transitions = transitions });
+            stages.Add(new ExperienceStage { Id = node.Id,
+                Instructions = node.Id == project.EntryNodeId && project.Derivation is { Detached: false }
+                    ? project.Derivation.Instructions : null,
+                EntryActions = entryActions, Transitions = transitions });
+        }
+        List<ExperienceAction> CompileActions(List<StudioAction>? actions, string path)
+        {
+            var result = new List<ExperienceAction>();
+            foreach (var action in actions ?? new())
+            {
+                var actionPath = path + "." + action.Id;
+                if (!SafeId(action.Id) || !globalIds.Add(action.Id ?? string.Empty)) Add("action_id_invalid", actionPath, "Action IDs must be globally unique stable identifiers.");
+                if (!Actions.Contains(action.Type ?? string.Empty)) { Add("action_unknown", actionPath, "The action is not implemented by Runtime."); continue; }
+                if (action.Type == "clear_spawned" && (!SafeId(action.ActionId) || !spawnIds.Contains(action.ActionId ?? string.Empty))) Add("clear_spawn_reference_invalid", actionPath + ".action_id", "Cleanup must reference a spawn action in this quest.");
+                result.Add(ToContract(action));
+            }
+            return result;
         }
         var document = new ExperienceDocument
         {
@@ -1591,12 +1602,12 @@ internal static class StudioGraphCompiler
                 }
                 return value;
             case "projectile":
-                if (!string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                if (!bool.TryParse(value, out var projectile))
                 {
-                    add("projectile_filter_invalid", path, "Projectile filtering is opt-in; use true or remove the filter.");
+                    add("projectile_filter_invalid", path, "Use true for a projectile finish, false for a melee finish, or remove the filter.");
                     return null;
                 }
-                return "true";
+                return projectile ? "true" : "false";
             case "quantity":
                 if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var quantity) || quantity is < 1 or > 1_000_000)
                 {
@@ -1697,6 +1708,26 @@ internal static class StudioRehearsal
             limitations = new List<string>();
             availablePaths = new List<string>();
         }
+        List<string> ApplyEffects(IEnumerable<ExperienceAction>? actions)
+        {
+            var effects = new List<string>();
+            foreach (var action in actions ?? Array.Empty<ExperienceAction>())
+            {
+                string P(string key) => action.Parameters is not null && action.Parameters.TryGetValue(key, out var value) ? value.ToString() : string.Empty;
+                int I(string key) => action.Parameters is not null && action.Parameters.TryGetValue(key, out var value) ? value.ToObject<int>() : 0;
+                switch (action.Type)
+                {
+                    case "message": transcript.Add(P("text")); effects.Add("message: " + P("text")); break;
+                    case "timer_start": timers[P("timer_id")] = now.AddSeconds(I("seconds")); effects.Add($"timer {P("timer_id")} +{I("seconds")}s"); break;
+                    case "timer_cancel": timers.Remove(P("timer_id")); effects.Add("cancel timer " + P("timer_id")); break;
+                    case "grant_item": inventory[P("item")] = inventory.GetValueOrDefault(P("item")) + I("quantity"); effects.Add($"grant {I("quantity")} {P("item")}"); break;
+                    case "spawn": spawns[action.Id] = spawns.GetValueOrDefault(action.Id) + I("count"); effects.Add($"spawn {I("count")} {P("prefab")}"); break;
+                    case "clear_spawned": var removed = spawns.GetValueOrDefault(P("action_id")); spawns.Remove(P("action_id")); despawned.Remove(P("action_id")); effects.Add($"clear {removed} from {P("action_id")}"); break;
+                }
+            }
+            return effects;
+        }
+        ApplyEffects(document.Stages.Single(stage => stage.Id == stageId).EntryActions);
         foreach (var input in steps)
         {
             if (outcome is not null) break;
@@ -1789,21 +1820,7 @@ internal static class StudioRehearsal
             }
             var progress = TriggerEvaluator.Measure(transition.When, history, context);
             var beat = Describe(transition.When);
-            var effects = new List<string>();
-            foreach (var action in transition.Actions ?? new())
-            {
-                string P(string key) => action.Parameters is not null && action.Parameters.TryGetValue(key, out var value) ? value.ToString() : string.Empty;
-                int I(string key) => action.Parameters is not null && action.Parameters.TryGetValue(key, out var value) ? value.ToObject<int>() : 0;
-                switch (action.Type)
-                {
-                    case "message": transcript.Add(P("text")); effects.Add("message: " + P("text")); break;
-                    case "timer_start": timers[P("timer_id")] = now.AddSeconds(I("seconds")); effects.Add($"timer {P("timer_id")} +{I("seconds")}s"); break;
-                    case "timer_cancel": timers.Remove(P("timer_id")); effects.Add("cancel timer " + P("timer_id")); break;
-                    case "grant_item": inventory[P("item")] = inventory.GetValueOrDefault(P("item")) + I("quantity"); effects.Add($"grant {I("quantity")} {P("item")}"); break;
-                    case "spawn": spawns[action.Id] = spawns.GetValueOrDefault(action.Id) + I("count"); effects.Add($"spawn {I("count")} {P("prefab")}"); break;
-                    case "clear_spawned": var removed = spawns.GetValueOrDefault(P("action_id")); spawns.Remove(P("action_id")); despawned.Remove(P("action_id")); effects.Add($"clear {removed} from {P("action_id")}"); break;
-                }
-            }
+            var effects = ApplyEffects(transition.Actions);
             var from = stageId;
             if (!string.IsNullOrWhiteSpace(transition.NextStage))
             {
@@ -1811,6 +1828,7 @@ internal static class StudioRehearsal
                 stageEnteredUtc = evt.At;
                 lastProgressUtc = evt.At;
                 deathsInStage = 0;
+                effects.AddRange(ApplyEffects(document.Stages.Single(stage => stage.Id == stageId).EntryActions));
             }
             else if (madeProgress) lastProgressUtc = evt.At;
             outcome = string.IsNullOrWhiteSpace(transition.Outcome) ? null : transition.Outcome;
@@ -1836,6 +1854,12 @@ internal static class StudioRehearsal
         var nodeId = document.EntryStage;
         while (!string.IsNullOrWhiteSpace(nodeId) && nodes.TryGetValue(nodeId, out var node) && visited.Add(nodeId))
         {
+            foreach (var action in node.EntryActions ?? new())
+            {
+                if (action.Type == "timer_start" && !string.IsNullOrWhiteSpace(action.TimerId)) timerSeconds[action.TimerId] = action.Seconds;
+                else if (action.Type == "spawn") spawnedCounts[action.Id] = spawnedCounts.GetValueOrDefault(action.Id) + action.Count;
+                else if (action.Type == "clear_spawned" && action.ActionId is not null) spawnedCounts.Remove(action.ActionId);
+            }
             var routes = (node.Routes ?? new()).OrderByDescending(route => route.Priority).ThenBy(route => route.Id, StringComparer.Ordinal).ToArray();
             if (routes.Length == 0) break;
             var route = routes[0];
@@ -2085,7 +2109,7 @@ internal static class StudioRehearsal
 
 public sealed class StudioProjectDocument
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string ProjectId { get; set; } = string.Empty;
     public int Revision { get; set; }
@@ -2124,6 +2148,8 @@ public sealed class StudioNode
     public string Label { get; set; } = string.Empty;
     public double X { get; set; }
     public double Y { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public List<StudioAction>? EntryActions { get; set; }
     public List<StudioRoute> Routes { get; set; } = new();
 }
 

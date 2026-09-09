@@ -195,20 +195,19 @@ internal sealed class StudioCampaignPlayPrerequisiteRunner : IStudioCampaignPlay
                 || worldUid != "-7600395338659582326" || !SafeToken(fixtureRequestId, 96)
                 || string.IsNullOrWhiteSpace(fixtureReceiptPath)
                 || !SafeHash(fixtureReceiptSha256) || !SafeToken(preparationId, 96)
-                || fixture.GetProperty("schema").GetString() != "comfy-questlab-signature-hunt-fixture/v1"
+                || fixture.GetProperty("schema").GetString() != "comfy-questlab-signature-hunt-fixture/v2"
                 || fixture.GetProperty("fixture_id").GetString() != "slayers-signature-hunt"
-                || fixture.GetProperty("fixture_revision").GetInt32() != 2
+                || fixture.GetProperty("fixture_revision").GetInt32() != 4
+                || fixture.GetProperty("target_lifecycle").GetString() != "runtime-stage-entry"
                 || fixture.GetProperty("state").GetString() != "ready"
                 || fixture.GetProperty("proof_level").GetString() != "fixture-preparation"
                 || fixture.GetProperty("request_id").GetString() != fixtureRequestId
                 || !string.Equals(fixture.GetProperty("machine").GetString(), machine, StringComparison.OrdinalIgnoreCase)
                 || fixture.GetProperty("world_name").GetString() != "ComfyQuestDemo"
                 || fixture.GetProperty("world_uid").GetString() != worldUid
-                || objects.GetProperty("expected").GetInt32() != 20
-                || objects.GetProperty("standing_at_capture").GetInt32() != 20
-                || targets.Length != 2
-                || !ExactTarget(targets[0], "target-deathsquito", "Deathsquito", "$enemy_deathsquito")
-                || !ExactTarget(targets[1], "target-drake", "Hatchling", "$enemy_drake")
+                || objects.GetProperty("expected").GetInt32() != 3
+                || objects.GetProperty("standing_at_capture").GetInt32() != 3
+                || targets.Length != 0
                 || anchor.GetProperty("role").GetString() != "marker-loadout-sign"
                 || anchor.GetProperty("target_kind").GetString() != "sign"
                 || !SafeZdo(zdo))

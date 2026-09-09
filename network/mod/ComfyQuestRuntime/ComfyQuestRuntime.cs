@@ -8,7 +8,7 @@ using BepInEx.Configuration;
 using ComfyQuestContracts;
 using HarmonyLib;
 
-[BepInPlugin("djcdevelopment.valheim.comfyquestruntime", "ComfyQuestRuntime", "0.1.0")]
+[BepInPlugin("djcdevelopment.valheim.comfyquestruntime", "ComfyQuestRuntime", "0.1.1")]
 public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
   QuestPackStore packs;
   RuntimeReceiptStore receipts;
@@ -142,24 +142,30 @@ public sealed class ComfyQuestRuntimePlugin : BaseUnityPlugin {
     var rect=CreatorBarRect();
     barPanelStyle??=BarStyle(windowBackground);
     UnityEngine.GUI.Box(rect,UnityEngine.GUIContent.none,barPanelStyle);
-    UnityEngine.GUILayout.BeginArea(new UnityEngine.Rect(rect.x+7f,rect.y+2f,rect.width-14f,rect.height-4f));
+    var priorMatrix=UnityEngine.GUI.matrix;
+    float scale=RuntimeCreatorBarLayout.Scale(UnityEngine.Screen.height);
+    UnityEngine.GUI.matrix=UnityEngine.Matrix4x4.TRS(new UnityEngine.Vector3(rect.x,rect.y,0),UnityEngine.Quaternion.identity,new UnityEngine.Vector3(scale,scale,1));
+    UnityEngine.GUILayout.BeginArea(new UnityEngine.Rect(10f,4f,rect.width/scale-20f,rect.height/scale-8f));
     var workflow=Workflow();
     DrawCompactBar(workflow);
     if(barExpanded) DrawExpandedBar(workflow);
     UnityEngine.GUILayout.EndArea();
+    UnityEngine.GUI.matrix=priorMatrix;
   }
 
   void DrawCompactBar(WorkflowSnapshot workflow) {
     UnityEngine.GUILayout.BeginHorizontal(UnityEngine.GUILayout.Height(32f));
-    UnityEngine.GUILayout.Label("COMFY QUEST",sectionStyle,UnityEngine.GUILayout.Width(92f),UnityEngine.GUILayout.Height(30f));
-    DrawCompactDots(workflow);
+    UnityEngine.GUILayout.Label("COMFY QUEST",sectionStyle,UnityEngine.GUILayout.Width(125f),UnityEngine.GUILayout.Height(30f));
     var active=workflow.Active;
-    var title=active==null?"Nothing playing":CreatorLoopNotice.ActiveTitle(TitleSource(),active)??active.PackId;
-    UnityEngine.GUILayout.Label(active==null?title:title+"  "+active.Version,playingStyle,UnityEngine.GUILayout.MinWidth(170f),UnityEngine.GUILayout.Height(30f));
-    UnityEngine.GUILayout.FlexibleSpace();
-    UnityEngine.GUILayout.Label(CharmState(),CharmReady()?readyStyle:stepPendingStyle,UnityEngine.GUILayout.Width(92f),UnityEngine.GUILayout.Height(28f));
+    var title=engine?.CurrentTitle()??(active==null?"Choose a quest in Studio":CreatorLoopNotice.ActiveTitle(TitleSource(),active)??"Quest loaded");
+    var titleStyle=new UnityEngine.GUIStyle(questTitleStyle){wordWrap=false,
+      alignment=UnityEngine.TextAnchor.MiddleLeft,padding=new UnityEngine.RectOffset(0,0,0,0)};
+    UnityEngine.GUILayout.Label(title,titleStyle,UnityEngine.GUILayout.ExpandWidth(true),UnityEngine.GUILayout.Height(34f));
     if(UnityEngine.GUILayout.Button((barExpanded?"MINIMIZE ":"EXPAND ")+barHotkey.Value,dimButtonStyle,UnityEngine.GUILayout.Width(132f),UnityEngine.GUILayout.Height(28f))) SetBarExpanded(!barExpanded);
     UnityEngine.GUILayout.EndHorizontal();
+    var objectiveStyle=new UnityEngine.GUIStyle(storyStyle){fontSize=17,wordWrap=true,
+      alignment=UnityEngine.TextAnchor.UpperLeft,padding=new UnityEngine.RectOffset(0,0,0,0)};
+    UnityEngine.GUILayout.Label(engine?.CurrentObjective()??"Choose a quest in Studio.",objectiveStyle,UnityEngine.GUILayout.Height(68f));
   }
 
   void DrawCompactDots(WorkflowSnapshot workflow) {

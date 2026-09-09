@@ -40,6 +40,10 @@ EXPECTED_OPERATIONS = {
     "signature_hunt_prepare",
     "signature_hunt_status",
     "signature_hunt_clear",
+    "showcase_prepare",
+    "showcase_status",
+    "showcase_release",
+    "showcase_tidy",
 }
 
 
@@ -249,7 +253,7 @@ class I5QuestLabBatchSurfaceTests(unittest.TestCase):
             self.assertNotIn("path", envelope)
 
         self.assertIn("comfy-questlab-gallery-truth/v1", self.source)
-        self.assertIn("{ 'fixtures' } else { 'truth' }", self.source)
+        self.assertIn("elseif ($tidyEvidence) { 'tidy' } else { 'truth' }", self.source)
         self.assertIn("receipts/$evidenceDirectory/", self.source)
 
     def test_blueprint_capture_envelope_is_bounded_and_identity_pinned(self) -> None:

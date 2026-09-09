@@ -691,7 +691,16 @@ internal sealed class QuestStudioPortfolioStore
                 || abstraction.TargetChoices is null || abstraction.TargetChoices.Count is < 1 or > 32
                 || abstraction.TargetChoices.Any(choice => choice is null || !SafeId(choice.Id) || string.IsNullOrWhiteSpace(choice.Label)
                     || choice.Label.Length > 120 || string.IsNullOrWhiteSpace(choice.RuntimeTarget) || choice.RuntimeTarget.Length > 120
-                    || !abstraction.SourceQuestIds.Contains(choice.SourceQuestId, StringComparer.Ordinal))
+                    || !(abstraction.SourceQuestIds.Contains(choice.SourceQuestId, StringComparer.Ordinal)
+                         && choice.PracticeAttribution is null
+                        || abstraction.AbstractionId == "slayers-signature-hunt"
+                         && (choice.Id == "lox" && choice.RuntimeTarget == "$enemy_lox"
+                             || choice.Id == "draugr" && choice.RuntimeTarget == "$enemy_draugr"
+                             || choice.Id == "greyling" && choice.RuntimeTarget == "$enemy_greyling"
+                             || choice.Id == "boar" && choice.RuntimeTarget == "$enemy_boar")
+                         && string.IsNullOrEmpty(choice.SourceQuestId)
+                         && !string.IsNullOrWhiteSpace(choice.PracticeAttribution)
+                         && choice.PracticeAttribution.Length <= 500))
                 || abstraction.TargetChoices.Select(choice => choice.Id).Distinct(StringComparer.Ordinal).Count() != abstraction.TargetChoices.Count
                 || abstraction.EvidencePolicy is not ("preserve_source" or "community" or "runtime" or "both")
                 || string.IsNullOrWhiteSpace(abstraction.CanonicalProjectJson)

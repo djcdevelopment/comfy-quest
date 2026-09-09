@@ -37,6 +37,20 @@ public sealed partial class QuestStudioService
 {
     readonly object _creatorCampaignGate = new();
 
+    bool CanRetryUnboundCampaignStart(StudioCreatorCampaignAttempt attempt) =>
+        attempt.State == "recovery_required" && attempt.Runs.Count == 0 && attempt.Continuations.Count == 0
+        && (attempt.Play is null
+            && _creatorOperations.Get(attempt.AttemptId)?.Outcome?.Error is "guild_graph_invalid" or "guild_project_missing" or "guild_experience_duplicate" or "campaign_empty"
+        || attempt.Play is not null
+        && (attempt.Play.FailedStage == "binding_candidates"
+              && attempt.Play.Error == "signature_hunt_binding_anchor_missing"
+            || attempt.Play.FailedStage == "prerequisites"
+              && string.IsNullOrWhiteSpace(attempt.Play.ActivationId))
+        && string.IsNullOrWhiteSpace(attempt.Play.BindRequestId)
+        && string.IsNullOrWhiteSpace(attempt.Play.BindingChangeId)
+        && string.IsNullOrWhiteSpace(attempt.Play.BindingInstanceId)
+        );
+
     string CampaignFile(string id, bool preview = false)
     {
         if (!CreatorOperationJournal.Safe(id)) throw new ArgumentException("campaign_identity_invalid");
@@ -104,19 +118,63 @@ public sealed partial class QuestStudioService
             context["scene_path"] = measured is null ? null : JsonValue.Create("/api/v2/quest-studio/creator/scenes/" + measured.SceneId);
         }
         var projects = CampaignArtifactsInAuthoredOrder(campaign).Select(value => _workspace.ReadProject(value.ProjectId)!).ToArray();
+        context["practice_readiness"] = JsonSerializer.SerializeToNode(ReadPracticeReadiness(), _host.Json);
         context["campaign"] = JsonSerializer.SerializeToNode(new
         {
             schema = "comfy-quest-creator-campaign-context/v1", guild_id = guildId,
             campaign.CampaignId, campaign.Title, campaign.Revision, campaign.Version,
             projects = CampaignArtifactsInAuthoredOrder(campaign).Select(value => _workspace.ReadProject(value.ProjectId))
-                .Where(value => value is not null).Select(value => new { value!.ProjectId, value.ExperienceId, value.Title, value.Revision }),
+                .Where(value => value is not null).Select(value => new { value!.ProjectId, value.ExperienceId, value.Title, value.Revision,
+                    instructions = value.Derivation?.Instructions, target = value.Derivation?.TargetChoiceId,
+                    mechanic = value.Derivation?.Mechanic ?? "thrown_spear" }),
             attempt,
+            can_retry_start = attempt is not null && CanRetryUnboundCampaignStart(attempt),
             history = attempts.Select(value => new { value.AttemptId, value.State, value.CreatedUtc, value.PriorAttemptId }),
             authoring_path = "/quest-studio?guild=" + Uri.EscapeDataString(guildId),
             has_spatial_conditions = projects.Any(project => project.Nodes.Any(node => node.Routes.Any(route => route.SpatialConditions.Count > 0))),
             evidence = CampaignEvidence(guildId, campaignId),
         }, _host.Json);
         return context;
+    }
+
+    object ReadPracticeReadiness()
+    {
+        var session = CreatorSessionIdentity();
+        var valheim = _host.FindValheim();
+        object Missing(string detail) => new { state = "unavailable", detail, proof_level = "live-starting-conditions" };
+        if (session is null || valheim is null) return Missing("Enter the practice world to check starting conditions.");
+        try
+        {
+            var path = Path.Combine(valheim, "BepInEx", "config", "comfy-quest-lab", "status", "showcase.json");
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length is <= 0 or > 512 * 1024) return Missing("Practice conditions have not been observed.");
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            var observed = root.GetProperty("observed_utc").GetDateTimeOffset();
+            if (root.GetProperty("schema").GetString() != "comfy-questlab-showcase-readiness/v1"
+                || root.GetProperty("creator_session_id").GetString() != session.CreatorSessionId
+                || root.GetProperty("world_uid").GetString() != session.WorldUid
+                || !string.Equals(root.GetProperty("machine").GetString(), session.Machine, StringComparison.OrdinalIgnoreCase)
+                || DateTimeOffset.UtcNow - observed > TimeSpan.FromSeconds(5)
+                || observed - DateTimeOffset.UtcNow > TimeSpan.FromSeconds(2))
+                return Missing("Practice observation is stale or belongs to another session.");
+            var conditions = root.GetProperty("state").GetString() == "conditions_ready";
+            var protectedPlayer = root.GetProperty("protected_player").GetBoolean();
+            var daylight = root.GetProperty("daylight").GetBoolean();
+            var raids = root.GetProperty("raids_suppressed").GetBoolean();
+            var expected = root.GetProperty("expected_weapon").GetString();
+            var equipped = root.GetProperty("equipped_prefab").GetString();
+            var lodge = root.GetProperty("lodge_pieces").GetInt32();
+            return new { state = conditions ? "practice_active" : "not_ready", observed_utc = observed,
+                profile = root.GetProperty("practice_profile").GetString(), daylight,
+                protected_player = protectedPlayer, raids_suppressed = raids,
+                weapon_equipped = expected == equipped, expected_weapon = expected,
+                lodge_pieces = lodge, lodge_expected_pieces = 40, proof_level = "live-starting-conditions",
+                detail = conditions ? "Daylight, protection and the practice loadout are active."
+                    : "Practice starting conditions need preparation." };
+        }
+        catch (Exception error) when (error is IOException or JsonException or KeyNotFoundException or InvalidOperationException)
+        { return Missing("Practice conditions are temporarily unavailable."); }
     }
 
     public object LinkCreatorCampaignScene(string guildId, string campaignId, StudioCreatorCampaignSceneRequest request)
@@ -182,7 +240,8 @@ public sealed partial class QuestStudioService
         if (roots.Length != 1 || roots[0].ProjectId != request.ProjectId) return "campaign_root_mismatch";
         var latest = CampaignAttempts(guild.GuildId, campaign.CampaignId).LastOrDefault();
         if (request.Operation == "campaign_play")
-            return latest is not null && latest.State != "retired" ? "campaign_reset_required" : null;
+            return latest is not null && latest.State != "retired" && !CanRetryUnboundCampaignStart(latest)
+                ? "campaign_reset_required" : null;
         if (latest is null || latest.AttemptId != request.AttemptId || latest.Play is null) return "campaign_attempt_changed";
         if (latest.State is not ("started" or "complete")) return "campaign_attempt_requires_recovery";
         if (latest.Play.CreatorSessionId != request.CreatorSessionId || latest.Play.WorldUid != request.ExpectedWorldUid
@@ -196,7 +255,28 @@ public sealed partial class QuestStudioService
         if (stale is not null) return new(false, stale);
         var guild = ReadGuild(request.GuildId!)!;
         var campaign = guild.Campaigns.Single(value => value.CampaignId == request.CampaignId);
-        if (request.Operation == "campaign_play") return await StartCreatorCampaignAsync(request, guild, campaign, null, token);
+        if (request.Operation == "campaign_play")
+        {
+            var prior = CampaignAttempts(guild.GuildId, campaign.CampaignId).LastOrDefault();
+            if (prior is not null && CanRetryUnboundCampaignStart(prior))
+            {
+                var original = _creatorOperations.Get(prior.AttemptId)?.Request;
+                if ((original?.CreatorSessionId ?? prior.Play!.CreatorSessionId) != request.CreatorSessionId
+                    || (original?.ExpectedWorldUid ?? prior.Play!.WorldUid) != request.ExpectedWorldUid
+                    || (original?.ExpectedMachine ?? prior.Play!.Machine) != request.ExpectedMachine)
+                    return new(false, "campaign_attempt_identity_changed");
+                if (!string.IsNullOrWhiteSpace(prior.Play?.FixturePreparationId))
+                {
+                    var clearError = await ClearCreatorCampaignFixtureAsync(request.CommandId, prior.Play.FixturePreparationId, token);
+                    if (clearError is not null) return new(false, clearError, RecoveryRequired: true);
+                }
+                prior.State = "retired";
+                prior.PendingStep = null;
+                WriteCampaignFile(prior.AttemptId, prior);
+                return await StartCreatorCampaignAsync(request, guild, campaign, prior.AttemptId, token);
+            }
+            return await StartCreatorCampaignAsync(request, guild, campaign, null, token);
+        }
         var attempt = ObserveCampaignAttempt(request.AttemptId!);
         var identity = new StudioRuntimeIdentity(request.ExpectedMachine, request.ExpectedWorldUid, request.CreatorSessionId);
         var compiled = CompileCampaign(guild, campaign);
@@ -261,6 +341,8 @@ public sealed partial class QuestStudioService
             attempt.State = "retired";
             attempt.PendingStep = null;
             WriteCampaignFile(attempt.AttemptId, attempt);
+            if (request.Operation == "campaign_retire")
+                return new(true, null, "retired", Receipt: JsonSerializer.SerializeToElement(attempt, _host.Json));
             return await StartCreatorCampaignAsync(request, guild, campaign, attempt.AttemptId, token, accepted.NextContentHash);
         }
         catch (Exception error) when (error is not OperationCanceledException)
@@ -285,7 +367,8 @@ public sealed partial class QuestStudioService
         attempt.State = result.Ok ? "started" : "recovery_required";
         attempt.PendingStep = result.Ok ? null : result.PlayReceipt?.FailedStage;
         WriteCampaignFile(attempt.AttemptId, attempt);
-        return new(result.Ok, result.Error, result.Status, Receipt: JsonSerializer.SerializeToElement(attempt, _host.Json), RecoveryRequired: !result.Ok);
+        return new(result.Ok, result.Error, result.Status, Receipt: JsonSerializer.SerializeToElement(attempt, _host.Json),
+            RecoveryRequired: !result.Ok && !CanRetryUnboundCampaignStart(attempt));
     }
 
     static string CampaignScopeHash(StudioCreatorCampaignAttempt attempt) => Convert.ToHexStringLower(SHA256.HashData(
@@ -325,13 +408,21 @@ public sealed partial class QuestStudioService
 
     async Task<string?> ClearCreatorCampaignFixtureAsync(string command, string preparation, CancellationToken token)
     {
-        if (OperatingSystem.IsWindows()) return "campaign_fixture_clear_requires_linux";
-        var script = Path.Combine(AppContext.BaseDirectory, "campaign", "campaign_play_prerequisites.py");
+        var windows = OperatingSystem.IsWindows();
+        var repository = (_host as IQuestStudioRAndDHost)?.RepositoryRoot;
+        if (windows && string.IsNullOrWhiteSpace(repository)) return "campaign_fixture_clear_repository_unavailable";
+        var script = windows
+            ? Path.Combine(repository!, "tools", "quest-studio", "Clear-CampaignFixture.ps1")
+            : Path.Combine(AppContext.BaseDirectory, "campaign", "campaign_play_prerequisites.py");
+        if (!File.Exists(script)) return "campaign_fixture_clear_tool_unavailable";
         var output = Path.Combine(_host.StateDirectory, "captures", "campaign-reset", command);
-        var start = new ProcessStartInfo("python3") { UseShellExecute = false, CreateNoWindow = true,
+        var start = new ProcessStartInfo(windows ? "powershell.exe" : "python3") { UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in new[] { script, "--operation-id", command, "--valheim-root", _host.FindValheim()!,
-            "--output", output, "--clear-preparation", preparation }) start.ArgumentList.Add(arg);
+        foreach (var arg in windows
+            ? new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
+                "-OperationId", command, "-ValheimRoot", _host.FindValheim()!, "-PreparationId", preparation }
+            : new[] { script, "--operation-id", command, "--valheim-root", _host.FindValheim()!,
+                "--output", output, "--clear-preparation", preparation }) start.ArgumentList.Add(arg);
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync(token);
         var stderr = process.StandardError.ReadToEndAsync(token);

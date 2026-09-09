@@ -53,7 +53,7 @@ internal sealed class CreatorOperationJournal
     };
     internal static readonly string[] Operations =
         ["quick_cast", "undo_cast", "activate", "reset_preview", "reset",
-         "campaign_play", "campaign_reset_preview", "campaign_reset"];
+         "campaign_play", "campaign_reset_preview", "campaign_reset", "campaign_retire"];
     readonly object _gate = new();
     readonly string _path;
     readonly Dictionary<string, StudioCreatorOperationRecord> _records;
@@ -168,6 +168,22 @@ internal sealed class CreatorOperationJournal
         }
     }
 
+    // Called only after the service has reconciled a durable failure receipt and
+    // established that its command never reached the world-binding step.
+    internal void ResolveKnownFailure(string id, StudioCreatorOperationOutcome outcome)
+    {
+        if (outcome.Ok || outcome.Pending || outcome.RecoveryRequired || string.IsNullOrWhiteSpace(outcome.Error))
+            throw new ArgumentException("resolved_failure_required");
+        lock (_gate)
+        {
+            if (!_records.TryGetValue(id, out var record) || record.State != "recovery_required") return;
+            record.Outcome = outcome;
+            record.State = "failed";
+            record.UpdatedUtc = DateTimeOffset.UtcNow;
+            Store();
+        }
+    }
+
     internal Task DrainAsync() { lock (_gate) return _work; }
 
     internal static string? Validate(StudioCreatorOperationRequest? value)
@@ -188,9 +204,9 @@ internal sealed class CreatorOperationJournal
         if (value.Operation.StartsWith("campaign_", StringComparison.Ordinal)
             && (!Safe(value.GuildId) || !Safe(value.CampaignId) || value.ExpectedCampaignRevision is null or < 0))
             return "creator_campaign_identity_required";
-        if (value.Operation is "campaign_reset_preview" or "campaign_reset" && !Safe(value.AttemptId))
+        if (value.Operation is "campaign_reset_preview" or "campaign_reset" or "campaign_retire" && !Safe(value.AttemptId))
             return "creator_campaign_attempt_required";
-        if (value.Operation == "campaign_reset" && (!value.Confirm || !Safe(value.PreviewToken)))
+        if (value.Operation is "campaign_reset" or "campaign_retire" && (!value.Confirm || !Safe(value.PreviewToken)))
             return "campaign_reset_confirmation_required";
         return null;
     }

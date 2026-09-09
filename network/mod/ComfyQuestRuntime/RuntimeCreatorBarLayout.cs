@@ -8,16 +8,19 @@ using System;
 public static class RuntimeCreatorBarLayout {
   public const float SafeTop = 92f;
   public const float EdgeInset = 8f;
-  public const float CollapsedHeight = 36f;
-  public const float ExpandedHeight = 116f;
+  public const float CollapsedHeight = 116f;
+  public const float ExpandedHeight = 196f;
+  public static float Scale(float screenHeight) => Math.Max(1f, Math.Min(2f, screenHeight / 1080f));
 
   public static RuntimeCreatorBarBounds Place(float screenWidth, float screenHeight, bool expanded) {
     screenWidth = Math.Max(0f, screenWidth);
     screenHeight = Math.Max(0f, screenHeight);
 
-    float width = Math.Min(Math.Max(720f, screenWidth - 80f), 1440f);
+    float scale = Scale(screenHeight);
+    float width = Math.Min(Math.Max(720f, screenWidth - 400f * scale), 1100f * scale);
     width = Math.Min(width, Math.Max(0f, screenWidth - EdgeInset * 2f));
-    float height = expanded ? ExpandedHeight : CollapsedHeight;
+    float height = Math.Min((expanded ? ExpandedHeight : CollapsedHeight) * scale,
+        Math.Max(0f, screenHeight - EdgeInset * 2f));
     float highestTopThatFits = Math.Max(EdgeInset, screenHeight - height - EdgeInset);
     float top = Math.Min(SafeTop, highestTopThatFits);
 
