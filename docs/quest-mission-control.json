@@ -219,7 +219,7 @@
       "id": "env.creator-dm",
       "label": "Steward-backed Creator casting",
       "state": "confirmed",
-      "detail": "The September 8 Derek checklist slice has executed on isolated AM4: protected daylight arrival outside the 40-piece Field Lodge; one briefing sign and supply chest; native two-hunt completion; creation and placement of a third hunt through Studio; then a Greyling target and response revision replayed without restarting the game. Wrong finishing-hit rejection persists a clear replay instruction. A later replay after retirement and restart completed all three ground encounters. The cleaned world snapshot d459848f3b387c7d51cdd63a60f73688fb608617f7aba568c674429423288705 produces 42 measured render instances in Studio and DMos, with 40 live lodge pieces. DMos displays exact native outcomes and authored responses per encounter. OMEN original 1266 files remain restored. Required checks, immutable release, final recovery and the executed handoff are still being finalized. See docs/derek-checklist.md; practice conditions and human readiness remain separate. Final cold-lap refinement: fixture revision 5 moves the chest off the sign approach; resupply verification now requires the observed chest target and visible inventory. The earlier failed 0.9.12 lap is retained.",
+      "detail": "The September 8 AM4 Derek checklist slice is verified and restored: protected daylight arrival outside the 40-piece lodge, one sign and a chest with a clear approach, native creation/play/revision, wrong-finisher recovery, automatic progression, and final 1080p/4K DMos results with 42 measured render instances. Release 0.9.13-local and all required checks passed. AM4 original files were verified across 26 recovery records; owned services stopped. OMEN original 1266 files remain restored. See docs/derek-checklist.md and its evidence manifest. A human review is limited to clarity and feel after operator restaging.",
       "fact_kind": "live-installed-evidence"
     }
   ],
@@ -496,7 +496,7 @@
     },
     {
       "id": "queue.guild-campaign",
-      "state": "implemented",
+      "state": "complete",
       "lane": "4B",
       "requirements": [
         "FR-PORT-001",
@@ -509,7 +509,7 @@
         "NFR-USE-001"
       ],
       "title": "Prove Slayers Signature Hunt as a Guild creative system",
-      "detail": "The AM4 create/play/create/revise slice now has native gameplay and installed browser evidence. Configurable creature and melee/thrown-spear conditions support efficient experiments; integration-melee equips the godsword, while signature-throw remains available. Sparse fixture revision 4 has one sign, one supporting post and one chest. The third hunt was created in Studio and revised from Draugr to Greyling; both attempts completed without a game restart. Wrong-finisher guidance, full-attempt retirement and replay after restart executed. DMos links the measured lodge and shows native completion messages. Final checks, versioned releases, restoration and handoff remain in progress; no human test requested. Final cold-lap refinement: fixture revision 5 moves the chest off the sign approach; resupply verification now requires the observed chest target and visible inventory. The earlier failed 0.9.12 lap is retained.",
+      "detail": "The bounded Guild creative-system integration slice is verified on AM4. Studio created and placed a third hunt, revised its creature and response, and both versions completed with native game inputs without restart. Configurable target and finishing condition support godsword ground-target experiments and later spear practice. Fixture revision 5 keeps one sign and a supply chest clear of the approach. Final cold release replay, restart, resupply, measured DMos results at 1080p/4K, immutable release, checks, archives, restoration and the executed human walkthrough are complete. Human clarity and atmosphere review remains separate from mechanical acceptance.",
       "source": "docs/derek-checklist.md",
       "source_contains": "# Derek checklist: create, play, create, revise"
     },

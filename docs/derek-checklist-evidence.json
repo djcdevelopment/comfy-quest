@@ -1,0 +1,80 @@
+{
+  "schema": "comfy-quest-derek-checklist-evidence/v1",
+  "completed_utc": "2026-09-09T02:41:39.109548+00:00",
+  "status": "am4_integration_verified_and_restored",
+  "human_scope": "Short creator workflow review; balance and atmosphere are not accepted by automation. Restaging is an operator task before human seat time.",
+  "quest_release": "0.9.13-local",
+  "quest_producer_revision": "cb54141526a248c62cdb78151e6527e7b4bc415a",
+  "dmos_revision": "1c78f7b0c34aa6799c1b7529cb1e9d9625773e54",
+  "steward_revision": "255fcbd9b1bf71c8d26b682f54228f1b0ed0fbb0",
+  "session_id": "creator-derek-20260908-r1",
+  "attempt_id": "fe3ed7f0-4495-4af6-8398-c4dd32c4a3a3",
+  "content_hash": "cad26567613489f3815b0a273301e260830d956a5af29b22dcac8b5b0b8ef679",
+  "measured_world_sha256": "3f5b1406a71957ddc5a0976d18dd470a1d816b816c983cbbca5a81b72ac512e5",
+  "scene_id": "5b59dce87b9f16907323a472e163b48169bbdde86566696b8584e9243b21ff7c",
+  "native_laps": [
+    "arrival-lap-20260909T022755Z",
+    "hunt-lap-20260909T023005Z",
+    "hunt-lap-20260909T023015Z",
+    "hunt-lap-20260909T023039Z"
+  ],
+  "restoration": {
+    "all_original_bytes_restored": true,
+    "records": 26,
+    "replayed": false,
+    "schema": "comfy-quest-creator-dm-restoration/v1",
+    "session_id": "creator-derek-20260908-r1",
+    "state": "restored"
+  },
+  "checks": {
+    "lab": {
+      "passed": 385,
+      "failed": 0
+    },
+    "studio": {
+      "passed": 149,
+      "failed": 0
+    },
+    "python": {
+      "passed": 455,
+      "failed": 0
+    },
+    "dmos_connector_safety": {
+      "passed": 11,
+      "failed": 0
+    },
+    "release_gates": "artifacts/derek-checklist/tests/release-gates.json"
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/derek-checklist/create-play-revise-highlights.mp4",
+      "sha256": "4484d2191bc11f9fa095e621902dbcbda60d2e975a3622a18a0f81bebd354a4f",
+      "bytes": 45391412
+    },
+    {
+      "path": "artifacts/derek-checklist/supplies-open-r20.jpg",
+      "sha256": "08beb0214120e0a3c60bb9ce3e775ebaa23a3db11626772d88a456c1248107b8",
+      "bytes": 968275
+    },
+    {
+      "path": "artifacts/derek-checklist/browser/2026-09-09T02-34-58-503Z-view.png",
+      "sha256": "d1eec57acba6c88d19621b8f90b118c37a4e2d5e931292c596b5a6df24e965cc",
+      "bytes": 868074
+    },
+    {
+      "path": "artifacts/derek-checklist/browser/2026-09-09T02-34-58-503Z-view-third-result.png",
+      "sha256": "115ab3389a26633917bba117a7abb764b27eba90ad37e1f37a6cb91007270391",
+      "bytes": 817173
+    },
+    {
+      "path": "artifacts/derek-checklist/browser/2026-09-09T02-34-57-725Z-view.png",
+      "sha256": "72a232beff854200faba9fa97d60b35b0aeb08074a859fd027ed28cde85dcfb3",
+      "bytes": 2554380
+    },
+    {
+      "path": "artifacts/derek-checklist/final-review-evidence.tar.gz",
+      "sha256": "82a6f6265be5c4a84ede600cffaddfd6dcb9504ac21e8dffcfdb38a516b84598",
+      "bytes": 974165
+    }
+  ]
+}

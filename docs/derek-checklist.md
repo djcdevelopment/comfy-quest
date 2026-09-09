@@ -1,10 +1,19 @@
 # Derek checklist: create, play, create, revise
 
-The AM4 integration slice has executed: clear daylight arrival, two linked hunts,
-a third created through Studio, and a target/response revision played without a
-game restart. Required source checks pass. The frozen release, final cold lap,
-short walkthrough and AM4 restoration are being finalized. OMEN is restored;
-no new OMEN playtest has been requested.
+The AM4 integration slice is verified and restored. The final release passed a
+clear daylight arrival, opening the supply chest with real inputs, all three
+encounters, restart, and matching DMos results at 1080p and 4K. Earlier native and
+browser evidence proves creation and target/response revision without a game restart.
+
+[Open the visual review](../artifacts/derek-checklist/review.html), or use the
+[one-page human walkthrough](derek-walkthrough.md). The retained campaign already
+contains three encounters; the next human review can edit the third. The recording
+shows its earlier creation from the two-encounter campaign.
+
+AM4's original files are restored and its owned services are stopped. OMEN remains
+restored. Restaging and checking a seat before inviting Derek is the operator's job.
+Machine-readable release, test and artifact pins are in
+[derek-checklist-evidence.json](derek-checklist-evidence.json).
 
 ## The experience
 
@@ -82,25 +91,55 @@ Practice status proves current daylight, protection and loadout only. Full walkt
 acceptance belongs to the evidence above and the final release record; a successful
 Play command alone never establishes a completed quest or human readiness.
 
-## Release and handoff status
+## Final release and recovery
 
-Final source uses the new immutable `0.9.13-local` Contracts/Studio version,
-Lab 0.2.2 and Runtime 0.1.1. Prior package versions and all eight development
-packages retain their original bytes; development packages are archived under
-`artifacts/derek-checklist/development-packages`.
+Contracts/Studio **0.9.13-local**, Lab **0.2.2**, Runtime **0.1.1** were built from
+`cb54141526a248c62cdb78151e6527e7b4bc415a`; DMos is
+`1c78f7b0c34aa6799c1b7529cb1e9d9625773e54`. The release is
+`artifacts/derek-checklist/release-0.9.13-local/release.json`, mirrored on AM4 at
+`/home/derek/valheim-capture/creator-dm/releases/derek-checklist-0.9.13-local`.
+All 20 release files were hash verified there, and all four installed plugin hashes
+matched. Older packages and releases retain their original bytes.
 
-Required checks completed before freeze: Lab 385/385, Studio 149/149, Python
-455/455, DMos connector/safety 11/11; generators, identity, boundary and its negative
-self-test, and full-history secret scan passed. Final release build, checks against
-its exact packages, final cold-entry lap, short video, and restored AM4 file hashes
-will be recorded here before a human handoff is declared ready.
+Fixture revision 5 puts the chest south of the sign, clear of the direct approach.
+The 0.9.12 cold lap exposed the earlier collision and sign interaction; that failed
+lap is retained. The corrected native lap `arrival-lap-20260909T022755Z` opens the
+chest in about three seconds. `supplies-open-r20.jpg` visibly confirms four spears.
 
-Implementation began 2026-09-08 at 15:02 PDT. Core integration was proven inside
-four hours. The original budget is 6?10 hours; finishing work is expected to use
-about another hour. Work receipt: `br-20260908-220304-edea1309`.
+Final attempt `fe3ed7f0-4495-4af6-8398-c4dd32c4a3a3` completed with one native attack
+per encounter, in laps `023005Z`, `023015Z` and `023039Z`. Its content hash is
+`cad26567613489f3815b0a273301e260830d956a5af29b22dcac8b5b0b8ef679`.
+A later cold restart retained all three completed outcomes and the same responses.
+An overlapping preparation/Play request was refused with `world_mutation_busy`;
+retry after preparation completed succeeded. No completion was injected.
 
-The 0.9.12 cold lap caught an obstructed supply approach: the sign lay between
-arrival and chest, and the harness interacted with the sign. That failed lap and
-release are retained. Fixture revision 5 moves the chest south of the sign; the
-harness now aims at the observed chest collider and requires the real supply
-interaction target plus an open inventory. Final native verification is pending.
+Final measured world hash:
+`3f5b1406a71957ddc5a0976d18dd470a1d816b816c983cbbca5a81b72ac512e5`.
+Scene: `5b59dce87b9f16907323a472e163b48169bbdde86566696b8584e9243b21ff7c`,
+42 exact pieces/render instances. Browser captures at `02-34-58-503Z` (1080p)
+and `02-34-57-725Z` (4K) show all three expanded results through refresh, with
+no page errors. The exact measured checkpoint remains in `played-final/measured-checkpoint`
+and the Steward measurement directory; the final later save is separate.
+
+Required checks: Lab **385/385**, Studio **149/149**, Python **455/455**, DMos
+connector/safety **11/11**. Generator drift, identity, boundary and its failing
+negative probe, and full-history secret scans passed. Studio used a package-hash
+and SDK-keyed fresh cache. There was no redundant new unit-test matrix.
+
+At **02:36:53 UTC**, the game closed gracefully. Restoration verified all **26 AM4
+recovery records**, removed the lease, and retained every matching played world and
+character save with a hash manifest. Studio, both Steward containers, the temporary
+input device, local gateway and tunnel are stopped. Native receipts are archived in
+`evidence-20260909T023653Z`; authoring history remains in the connected state directory.
+The small review bundle is `artifacts/derek-checklist/final-review-evidence.tar.gz`.
+
+The 60-second `create-play-revise-highlights.mp4` contains three labeled cuts from
+the same native create/revise session. It predates the final grave cleanup and chest
+repositioning; the final arrival screenshot and browser captures show the refined
+release. The uncut final-release lap is retained on AM4 as `final-native-r20.mp4`.
+
+Implementation began 2026-09-08 at **15:02 PDT**. The development block used about
+**4 hours 40 minutes**, less than the proposed 6?10 hours. The completed slice is
+ready for a short creator-workflow review after the operator stages the seat.
+Combat balance, atmosphere and broader historical-campaign reconciliation remain
+outside this automated acceptance. Work receipt: `br-20260908-220304-edea1309`.
