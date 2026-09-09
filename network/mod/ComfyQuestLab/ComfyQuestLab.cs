@@ -33,11 +33,11 @@ using UnityEngine;
 public sealed class ComfyQuestLab : BaseUnityPlugin {
   public const string PluginGuid = "djcdevelopment.valheim.comfyquestlab";
   public const string PluginName = "ComfyQuestLab";
-  public const string PluginVersion = "0.2.1";
+  public const string PluginVersion = "0.2.2";
 
   // Hand-set at a release cut, exactly like ComfyNetworkSense. "dev" means an uncut
   // local build, which is never a release.
-  public const string ReleaseId = "questlab-v0.2.1-20260908-derek-r1";
+  public const string ReleaseId = "questlab-v0.2.2-20260908-derek-r2";
 
   public static ComfyQuestLab Instance { get; private set; }
 

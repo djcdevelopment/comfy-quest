@@ -142,7 +142,7 @@ if ([string]$requestReceipt.state -ne 'completed' -or
     [string]$requestReceipt.operation -ne 'signature_hunt_prepare' -or
     [string]$fixture.schema -ne 'comfy-questlab-signature-hunt-fixture/v2' -or
     [string]$fixture.fixture_id -ne 'slayers-signature-hunt' -or
-    [int]$fixture.fixture_revision -ne 4 -or
+    [int]$fixture.fixture_revision -ne 5 -or
     [string]$fixture.state -ne 'ready' -or
     [string]$fixture.proof_level -ne 'fixture-preparation' -or
     [string]$fixture.request_id -ne [string]$requestReceipt.request_id -or

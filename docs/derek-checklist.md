@@ -84,8 +84,8 @@ Play command alone never establishes a completed quest or human readiness.
 
 ## Release and handoff status
 
-Source freeze uses the new immutable `0.9.12-local` Contracts/Studio version,
-Lab 0.2.1 and Runtime 0.1.1. Prior package versions and all eight development
+Final source uses the new immutable `0.9.13-local` Contracts/Studio version,
+Lab 0.2.2 and Runtime 0.1.1. Prior package versions and all eight development
 packages retain their original bytes; development packages are archived under
 `artifacts/derek-checklist/development-packages`.
 
@@ -98,3 +98,9 @@ will be recorded here before a human handoff is declared ready.
 Implementation began 2026-09-08 at 15:02 PDT. Core integration was proven inside
 four hours. The original budget is 6?10 hours; finishing work is expected to use
 about another hour. Work receipt: `br-20260908-220304-edea1309`.
+
+The 0.9.12 cold lap caught an obstructed supply approach: the sign lay between
+arrival and chest, and the harness interacted with the sign. That failed lap and
+release are retained. Fixture revision 5 moves the chest south of the sign; the
+harness now aims at the observed chest collider and requires the real supply
+interaction target plus an open inventory. Final native verification is pending.

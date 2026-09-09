@@ -197,7 +197,7 @@ internal sealed class StudioCampaignPlayPrerequisiteRunner : IStudioCampaignPlay
                 || !SafeHash(fixtureReceiptSha256) || !SafeToken(preparationId, 96)
                 || fixture.GetProperty("schema").GetString() != "comfy-questlab-signature-hunt-fixture/v2"
                 || fixture.GetProperty("fixture_id").GetString() != "slayers-signature-hunt"
-                || fixture.GetProperty("fixture_revision").GetInt32() != 4
+                || fixture.GetProperty("fixture_revision").GetInt32() != 5
                 || fixture.GetProperty("target_lifecycle").GetString() != "runtime-stage-entry"
                 || fixture.GetProperty("state").GetString() != "ready"
                 || fixture.GetProperty("proof_level").GetString() != "fixture-preparation"

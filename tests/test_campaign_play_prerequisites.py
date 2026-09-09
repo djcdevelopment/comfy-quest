@@ -50,7 +50,7 @@ class CampaignPlayPrerequisiteSurfaceTests(unittest.TestCase):
         self.assertIn("world_name -ne 'ComfyQuestDemo'", self.source)
         self.assertIn("character_profile -ne 'questyfour'", self.source)
         self.assertIn("comfy-questlab-signature-hunt-fixture/v2", self.source)
-        self.assertIn("fixture.fixture_revision -ne 4", self.source)
+        self.assertIn("fixture.fixture_revision -ne 5", self.source)
         self.assertIn("fixture.objects.expected -ne 3", self.source)
         self.assertIn("fixture.objects.standing_at_capture -ne 3", self.source)
         self.assertIn("@($fixture.targets).Count -ne 0", self.source)

@@ -244,6 +244,18 @@ light. The glow persists on the sign ZDO and returns after zone reloads, improvi
 mist readability without paying for sixty lights. Quest-detail rows use down/up chevrons
 instead of `+`/`-`, leaving those symbols unambiguously reserved for panel zoom.
 
+### 0.2.2 (2026-09-08)
+
+- Move the supply chest clear of the sign on the direct arrival path.
+- Observe its actual collider position and inventory for native resupply verification.
+
+### 0.2.1 (2026-09-08)
+
+- Add configurable protected Field Lodge practice, with daylight, equipment and food.
+- Reduce the hunt fixture to one sign, its support and one supply chest off the approach.
+- Preserve owned grave inventories before practice cleanup; expose observed starting conditions.
+- Protect the exact practice fixture and lodge during integration combat.
+
 ### 0.2.0 — 2026-08-08
 
 **Creator-event expansion.** The initial lab is now a release-cut, self-service package:

@@ -335,6 +335,15 @@ public sealed class LabShowcaseProvider {
         raids_suppressed = _events != null && _events.m_eventChance < 0f && _events.m_events.All(e => !e.m_enabled),
         equipped_prefab = weapon?.m_dropPrefab?.name, open_arrival = OpenArrival(),
         inventory_visible = InventoryGui.IsVisible(), hover_object = player?.GetHoverObject()?.name,
+        hover_supply = LabMarks.IsSignatureHuntPiece(player?.GetHoverObject()?.GetComponentInParent<Container>()?.GetComponent<ZNetView>()?.GetZDO()),
+        supplies = UnityEngine.Object.FindObjectsByType<Container>(FindObjectsSortMode.None)
+            .Where(container => LabMarks.IsSignatureHuntPiece(container.GetComponent<ZNetView>()?.GetZDO()))
+            .Select(container => {
+              var point = container.GetComponentInChildren<Collider>()?.bounds.center ?? container.transform.position;
+              return new { x = point.x, y = point.y, z = point.z,
+                  items = container.GetInventory().GetAllItems().Select(item => new {
+                    prefab = item.m_dropPrefab?.name, count = item.m_stack, quality = item.m_quality }).ToArray() };
+            }).ToArray(),
         health = player?.GetHealth(), stamina = player?.GetStamina(), armor = player?.GetBodyArmor(),
         staggering = player != null && player.IsStaggering(), attacking = player != null && player.InAttack(),
         foods = player?.GetFoods().Select(f => f.m_name).ToArray(),

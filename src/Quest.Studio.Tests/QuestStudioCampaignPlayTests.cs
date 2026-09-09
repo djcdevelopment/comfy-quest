@@ -353,7 +353,7 @@ public sealed class QuestStudioCampaignPlayTests : IDisposable
             {
                 schema = "comfy-questlab-signature-hunt-fixture/v2",
                 fixture_id = "slayers-signature-hunt",
-                fixture_revision = 4,
+                fixture_revision = 5,
                 target_lifecycle = "runtime-stage-entry",
                 state = "ready",
                 proof_level = "fixture-preparation",

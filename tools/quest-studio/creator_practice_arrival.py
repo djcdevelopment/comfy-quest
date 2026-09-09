@@ -52,23 +52,23 @@ try:
     assert not initial.get('inventory_visible'), 'close_inventory_before_lap'
     assert math.hypot(initial['player']['x']-415, initial['player']['z']-232) < 10, 'prepare_arrival_before_lap'
     base.atomic_json(out / 'before.json', initial)
-    sign = initial['signs'][0]
-    point = {'x': sign['x'] - 1, 'y': sign['y'] - .6, 'z': sign['z'] + 1}
+    assert len(initial['supplies']) == 1, 'sparse_fixture_requires_one_supply_chest'
+    point = initial['supplies'][0]
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         d = observe()
         player, camera = d['player'], d['camera']
         distance = math.hypot(point['x']-player['x'], point['z']-player['z'])
-        yaw = math.degrees(math.atan2(point['x']-player['x'], point['z']-player['z']))
-        error = (yaw-camera['yaw']+180)%360-180
         eye = camera['position']
+        yaw = math.degrees(math.atan2(point['x']-eye['x'], point['z']-eye['z']))
+        error = (yaw-camera['yaw']+180)%360-180
         pitch = -math.degrees(math.atan2(point['y']-eye['y'], math.hypot(point['x']-eye['x'],point['z']-eye['z'])))
         current_pitch = (camera['pitch']+180)%360-180
         action('aim', dx=max(-1200,min(1200,round(error/.05))), dy=max(-800,min(800,round((pitch-current_pitch)/.05))))
         time.sleep(.18)  # Wait for a fresh game observation before applying another correction.
         if abs(error) > 10:
             continue
-        if distance <= 3:
+        if observe().get('hover_supply'):
             action('interact', seconds=.15)
             for _ in range(20):
                 time.sleep(.1)

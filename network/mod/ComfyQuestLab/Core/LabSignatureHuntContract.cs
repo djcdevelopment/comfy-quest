@@ -12,7 +12,7 @@ using System.Text;
 /// actually finds after instantiation.</summary>
 public static class LabSignatureHuntContract {
   public const string FixtureId = "slayers-signature-hunt";
-  public const int FixtureRevision = 4;
+  public const int FixtureRevision = 5;
   public const string ReceiptSchema = "comfy-questlab-signature-hunt-fixture/v2";
   public const string ProofLevel = "fixture-preparation";
   public const string Disclaimer =
@@ -58,7 +58,7 @@ public static class LabSignatureHuntContract {
     Place("marker-loadout-sign-post", MarkerKind, "briefing", "wood_pole2", -5f, 0f, 2f),
     Place("marker-loadout-sign", MarkerKind, "briefing", "sign", -5f, 1.2f, 2f, 180f, 1,
         "FIELD LODGE\nREAD YOUR CURRENT OBJECTIVE\nPRACTICE SUPPLIES BESIDE THIS SIGN [E]"),
-    Place("supply-chest", SupplyKind, "loadout", "piece_chest_wood", -6f, .1f, 3f, 180f),
+    Place("supply-chest", SupplyKind, "loadout", "piece_chest_wood", -6f, .1f, -1f, 180f),
   };
 
   public static bool OwnsMark(string value) {
