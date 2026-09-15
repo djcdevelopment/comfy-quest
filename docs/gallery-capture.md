@@ -67,6 +67,21 @@ See `docs/evidence/gallery-capture-20260915.json` for candidate and evidence pin
 OMEN and AM4 game proof belongs to SelfieStick; Steward only enables downloads when
 those receipts match the exact runner. Public deployment has not been changed.
 
+## Pushed-source stage, 2026-09-15
+
+Studio `0.9.14-gallery.3` was packed from pushed Quest revision
+`dd3685b357e87d295215790fad93b65ccd044ad8`: 574,311 bytes, SHA-256
+`98dba27f4fcc0d0bbe5851220fb697f6cf318790b7aea5ba8b564b65d92c2049`.
+Its NuGet metadata names that commit, and a temporary loopback host consumed the
+package rather than a project reference. Steward staged 83 Era 11 photographs with
+the pinned SelfieStick 0.3.1 runner. Fresh OMEN and AM4 proof each passed 12 exact
+camera cases and two legacy cases with the original plugins and saves restored.
+The gallery composer and package-consuming Studio host rendered the same archived
+build and downloaded identical 109,900-byte ZIPs, SHA-256
+`e94e0145cf80c6ce757250e1812b66b2fa541a40a1c3a3d52d955fbce58ef7dc`.
+The [Baseline stage evidence](https://github.com/djcdevelopment/baseline/blob/main/docs/evidence/gallery-capture-stage-20260915.json)
+pins the full local artifacts and receipts. Public downloads remain pending.
+
 ## Why this mode and where it goes
 
 Creator/DM already owns authored gameplay targets and their exact active-session
@@ -75,10 +90,10 @@ like from this recorded build? Reusing Steward's scene and component avoids a se
 camera model in Studio. The token-gated proxy protects Studio's application boundary
 while the archive stays read-only and SelfieStick handles Valheim/save restoration.
 
-After the source landing, Studio imports the composer ZIP built from a pushed Steward
-revision, records its byte/hash pin and publishes the corresponding Studio package.
-Steward stages a clean SelfieStick runner with observed OMEN/AM4 capture receipts
-before enabling public downloads. The
+Studio now carries the composer ZIP built from pushed Steward source and its staged
+package has an exact byte/hash pin. Steward's local stage has the pushed SelfieStick
+runner and fresh OMEN/AM4 capture receipts. Public promotion remains a separate
+release action. The
 [cross-repository plan](https://github.com/djcdevelopment/baseline/blob/main/docs/gallery-capture-program-plan.md)
 tracks that release sequence. Moving-camera video belongs to a later time-sampled
 contract and game proof, separate from Creator/DM's current still Capture mode.

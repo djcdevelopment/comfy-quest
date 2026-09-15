@@ -486,7 +486,7 @@
       "lane": "4B",
       "requirements": ["FR-WORLD-001", "FR-EVID-001", "NFR-TEST-001"],
       "title": "Compose an archived-world photograph",
-      "detail": "Creator/DM Capture embeds Steward's hash-pinned shared composer and proxies its catalog, archived scene and deterministic capture download. SelfieStick owns exact camera capture and disposable saves on Windows/Linux. The composer is pinned from Steward's pushed main; fresh pushed-runner OMEN and AM4 proofs each passed 12 exact and two legacy captures with source saves unchanged and original plugins restored. Lab and Runtime now build against AM4's Valheim 1.0.12 assemblies with zero warnings. The new Studio package and gallery integration are being staged locally; public rollout remains pending. The initial OMEN save-isolation incident was invalidated and resolved as capture-only by the owner.",
+      "detail": "Creator/DM Capture embeds Steward's hash-pinned shared composer and proxies its catalog, archived scene and deterministic capture download. SelfieStick owns exact camera capture and disposable saves on Windows/Linux. The composer is pinned from Steward's pushed main; fresh pushed-runner OMEN and AM4 proofs each passed 12 exact and two legacy captures with source saves unchanged and original plugins restored. Lab and Runtime now build against AM4's Valheim 1.0.12 assemblies with zero warnings. Studio 0.9.14-gallery.3 is packed from pushed Quest source, and its package-consuming loopback host downloaded the same ZIP bytes as the gallery. Public rollout remains pending. The initial OMEN save-isolation incident was invalidated and resolved as capture-only by the owner.",
       "source": "docs/gallery-capture.md",
       "source_contains": "Creator/DM"
     },
