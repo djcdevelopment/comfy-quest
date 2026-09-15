@@ -58,5 +58,7 @@
              CopyToPublishDirectory="PreserveNewest" Pack="true" PackagePath="contentFiles/any/any/campaign/" PackageCopyToOutput="true" />
     <EmbeddedResource Include="CreatorSceneRenderer.js"
                       LogicalName="Comfy.Quest.Studio.CreatorSceneRenderer.js" />
+    <EmbeddedResource Include="CaptureComposer/*"
+                      LogicalName="Comfy.Quest.Studio.CaptureComposer.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

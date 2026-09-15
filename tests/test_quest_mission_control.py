@@ -798,7 +798,7 @@ class ProgramInvariantTests(unittest.TestCase):
 
         # `pre-lane` is for finished or blocked pre-vocabulary work, not schedulable work.
         backdated = copy.deepcopy(self.manifest)
-        self.work_item(backdated, "queue.guild-campaign")["lane"] = "pre-lane"
+        self.work_item(backdated, "queue.anchors")["lane"] = "pre-lane"
         with self.assertRaisesRegex(self.renderer.MissionControlError, r"is `pre-lane` but"):
             self.check(manifest=backdated)
 

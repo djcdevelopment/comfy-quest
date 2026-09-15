@@ -20,6 +20,7 @@ public static class QuestStudioEndpoints
 
     public static void Map(WebApplication app, IQuestStudioHost host)
     {
+        QuestStudioCapture.Map(app, host);
         app.MapGet("/quest-studio", () => Results.Text(QuestStudioPage.Html, "text/html", Encoding.UTF8));
         app.MapGet("/quest-studio/studio.css", () => Results.Text(QuestStudioPage.Css, "text/css", Encoding.UTF8));
         app.MapGet("/quest-studio/studio.js", () => Results.Text(QuestStudioPage.Js, "text/javascript", Encoding.UTF8));

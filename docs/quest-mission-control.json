@@ -481,6 +481,16 @@
       "source_contains": "FR-WORLD-001"
     },
     {
+      "id": "queue.gallery-capture",
+      "state": "implemented",
+      "lane": "4B",
+      "requirements": ["FR-WORLD-001", "FR-EVID-001", "NFR-TEST-001"],
+      "title": "Compose an archived-world photograph",
+      "detail": "Creator/DM Capture embeds Steward's hash-pinned shared composer and proxies its catalog, archived scene and deterministic capture download. Real browser execution proves mode switching, camera preservation and identical gallery/Studio downloads. SelfieStick owns exact camera capture and disposable saves on Windows/Linux. Candidates are local; public rollout remains separate. The initial OMEN save-isolation claim was invalidated; the corrected runner passed exact restore proof, and the owner confirmed the affected character and world are capture-only.",
+      "source": "docs/gallery-capture.md",
+      "source_contains": "Creator/DM"
+    },
+    {
       "id": "queue.steward-spatial-round-trip",
       "state": "implemented",
       "lane": "4B",

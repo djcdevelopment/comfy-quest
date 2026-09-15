@@ -134,6 +134,15 @@ This remains the narrow 4B -> 4C bridge, not authorization for a generic abstrac
 | Scoped reset / rerun | installed-proven, including successor start and idempotent confirmation retry | human clarity and hundredth-use judgment in 4B |
 | Guild-scale runtime selector | installed-proven | real authored campaign breadth in 4B |
 | Receipt retention | installed-proven across its per-run bound | sustained campaign volume in 4B |
+| Archived-world photography (`queue.gallery-capture`, 4B) | Steward's shared composer is mounted in Creator/DM Capture; both browser entry points and exact local SelfieStick stills were proved on OMEN/AM4 | clean pinned Steward/Studio/SelfieStick releases and proof-gated public download rollout; moving-camera capture follows the still release |
+
+Capture is a read-only photographic workspace beside Creator/DM gameplay targeting.
+It preserves the reference archive identity and exports one local still, without
+changing an active Creator Session or Runtime binding. Its verified local-candidate
+status, save-isolation retrospective and release gate are in
+[`docs/gallery-capture.md`](gallery-capture.md) and Baseline's
+[gallery capture program plan](https://github.com/djcdevelopment/baseline/blob/main/docs/gallery-capture-program-plan.md).
+This addition does not reorder the approved 4B Signature Hunt work.
 
 Lanes of the repair program: **0 closed** (the roadmap tells the truth and is machine-checked),
 **1 implemented** (multi-experience selector), **2 implemented** (evidence retention), **3 ruled

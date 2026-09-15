@@ -20,6 +20,11 @@ nuget.config text eol=lf
 *.cfg text eol=lf
 *.txt text eol=lf
 
+# These embedded browser assets are compared against byte-pinned Steward artifacts.
+# Keep their checkout bytes LF even when Windows core.autocrlf is enabled.
+src/Quest.Studio/CreatorSceneRenderer.js text eol=lf
+src/Quest.Studio/CaptureComposer/* text eol=lf
+
 # This captured external support configuration is a hash-pinned release payload.
 # Preserve its exact bytes instead of applying the repository's source-text normalization.
 tools/creator-session/world-support/ComfyNetworkSense.PortalSupport.0.5.80/djcdevelopment.valheim.comfynetworksense.cfg binary

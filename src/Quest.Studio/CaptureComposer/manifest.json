@@ -1,0 +1,42 @@
+{
+  "schema": "comfy-steward-capture-composer-artifact/v1",
+  "version": "1.0.0-preview.3",
+  "sourceRevision": "2f2f51dcf9f9569442e1f36f42c8739496d1f965",
+  "candidate": true,
+  "files": [
+    {
+      "path": "capture-composer.js",
+      "bytes": 16284,
+      "sha256": "eb7d19b7b5a5db3a36d3dc00dd690420587ebf41119122674f2318a400f52c79"
+    },
+    {
+      "path": "capture-composer.css",
+      "bytes": 3431,
+      "sha256": "7724fc915fe6d7e329bcf30fc5df3472a4f2c103a9dd52538b79d47f87b908d7"
+    },
+    {
+      "path": "camera-model.js",
+      "bytes": 3483,
+      "sha256": "2250fa71136d977c2476482ce9e0162fd2e74b96a08732751839171440261956"
+    },
+    {
+      "path": "creator-scene.js",
+      "bytes": 17375,
+      "sha256": "4998946436711a63292f984c07eda1ea143afd7e5a3aefe0e4a290455f6dd442"
+    },
+    {
+      "path": "camera-fixtures.json",
+      "bytes": 4996,
+      "sha256": "6829d076bb60667f9b612994aaf97040a6a11e32b1c5dbcd33a27405411aedea"
+    }
+  ],
+  "artifact": {
+    "path": "capture-composer-r3.zip",
+    "bytes": 15566,
+    "sha256": "c74c72ccd6d692e763cfb8236a7d1d61cb1b49123d554fba1f8d153fc3dd441e",
+    "schema": "comfy-steward-capture-composer-artifact/v1",
+    "version": "1.0.0-preview.3",
+    "sourceRevision": "2f2f51dcf9f9569442e1f36f42c8739496d1f965",
+    "candidate": true
+  }
+}

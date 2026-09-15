@@ -89,6 +89,8 @@ static class QuestStudioPage
     </section>
 
     <section id="stage-author" class="journey-stage active" data-stage-panel="author">
+      <div role="group" aria-label="Creator workspace"><button id="creator-gameplay-mode" aria-pressed="true">Creator / DM</button><button id="creator-capture-mode" aria-pressed="false" title="Compose a photograph of an archived build">▣ Capture</button></div>
+      <section id="creator-capture-workspace" hidden aria-label="Archive photography"></section>
       <section class="creator-mode panel" aria-label="Creator DM mode">
         <div class="creator-mode-head"><div><span class="eyebrow">Creator mode &middot; Steward WebGPU</span><h2>Direct the live world</h2><p>Load one measured Steward scene, click the exact world piece, then activate the durable rite or cast its effects immediately.</p></div><span id="creator-mode-state" class="readiness neutral">No scene</span></div>
         <div class="creator-scene-query">
@@ -275,7 +277,7 @@ static class QuestStudioPage
     </section>
   </main>
 </div>
-<script src="/quest-studio/studio.js"></script></body></html>
+<link rel="stylesheet" href="/quest-studio/capture/capture-composer.css"><script type="module" src="/quest-studio/capture-mode.js"></script><script src="/quest-studio/studio.js"></script></body></html>
 """;
 
     public const string Css = """

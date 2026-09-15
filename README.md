@@ -119,6 +119,15 @@ the exact run, removes its owned timers/claims/spawns, and restores the prior bi
 `field-lodge-offering` template is the first live proof: drop Resin within 6m of the selected sign to
 show “The lodge answers the offering.” and spawn one Greyling at radius 6.
 
+Creator/DM also has **Capture** mode for archived-world photography. It embeds
+Steward's byte/hash-pinned Lens/Outside composer, keeps archive geometry read-only,
+and downloads the same local SelfieStick still as the public gallery. This mode does
+not change the live gameplay target or active world. See the
+[Capture user and integration guide](docs/gallery-capture.md) and
+[local proof index](docs/evidence/gallery-capture-20260915.json). The current
+implementation is a local candidate; clean source/release pins and public rollout
+follow [the fleet plan](https://github.com/djcdevelopment/baseline/blob/main/docs/gallery-capture-program-plan.md).
+
 Open `docs/quest-mission-control.html` directly on a second display for the current
 Creator OS lane, dogfood portfolio roadmap, fleet roles, machine-derived choreography,
 proof queue, and private session notes. The functional and non-functional adoption gates
