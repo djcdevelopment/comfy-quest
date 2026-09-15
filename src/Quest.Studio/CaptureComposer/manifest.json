@@ -1,7 +1,7 @@
 {
   "schema": "comfy-steward-capture-composer-artifact/v1",
   "version": "1.0.0-preview.3",
-  "sourceRevision": "2f2f51dcf9f9569442e1f36f42c8739496d1f965",
+  "sourceRevision": "2a9197d5bd45124aa4a91982a859669ac8cd0bd3",
   "candidate": true,
   "files": [
     {
@@ -31,12 +31,12 @@
     }
   ],
   "artifact": {
-    "path": "capture-composer-r3.zip",
+    "path": "capture-composer-pushed-2a9197d.zip",
     "bytes": 15566,
-    "sha256": "c74c72ccd6d692e763cfb8236a7d1d61cb1b49123d554fba1f8d153fc3dd441e",
+    "sha256": "c7ea6bbe0e2346b50c5ee2da2bc65a161c59d39420a31a7c42acb5dde96ffe24",
     "schema": "comfy-steward-capture-composer-artifact/v1",
     "version": "1.0.0-preview.3",
-    "sourceRevision": "2f2f51dcf9f9569442e1f36f42c8739496d1f965",
+    "sourceRevision": "2a9197d5bd45124aa4a91982a859669ac8cd0bd3",
     "candidate": true
   }
 }

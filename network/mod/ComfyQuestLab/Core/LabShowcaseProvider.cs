@@ -142,7 +142,7 @@ public sealed class LabShowcaseProvider {
       yield return new WaitForSeconds(3f);
       foreach (var name in PracticeArmor) {
         var item = inventory.GetItem(name, isPrefabName: true)
-            ?? inventory.AddItem(name, 1, 4, 0, 0, "Field Lodge");
+            ?? inventory.AddItem(name, 1, 4, 0, 0, "Field Lodge", cheated: false);
         if (item != null) item.m_durability = item.GetMaxDurability();
         if (item == null || (!player.IsItemEquiped(item) && !player.EquipItem(item, false))) {
           LastResult = "showcase_practice_armor_equip_failed"; yield break;
@@ -161,7 +161,7 @@ public sealed class LabShowcaseProvider {
       }
       player.Heal(player.GetMaxHealth());
       var spear = inventory.GetItem(_practiceWeapon, isPrefabName: true)
-          ?? inventory.AddItem(_practiceWeapon, 1, 4, 0, 0, "Field Lodge");
+          ?? inventory.AddItem(_practiceWeapon, 1, 4, 0, 0, "Field Lodge", cheated: false);
       if (spear != null) spear.m_durability = spear.GetMaxDurability();
       if (spear == null || (player.GetCurrentWeapon() != spear && !player.EquipItem(spear, false))) {
           LastResult = "showcase_practice_weapon_equip_failed"; yield break;

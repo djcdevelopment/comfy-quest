@@ -193,7 +193,7 @@ sealed class RuntimeWorldEntryController {
     try {
       SaveSystem.ForceRefreshCache();
       World[] named = SaveSystem.GetWorldList()
-          .Where(world => world != null && string.Equals(world.m_fileName, request.WorldName,
+          .Where(world => world != null && string.Equals(world.m_worldName, request.WorldName,
               StringComparison.OrdinalIgnoreCase)).ToArray();
       if (named.Length == 0) {
         Write("rejected", "world_entry_world_file_not_found", null, SafeCharacterName(selected.Profile));

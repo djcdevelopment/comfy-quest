@@ -1,5 +1,11 @@
 # Changelog
 
+**Unreleased Valheim 1.0.12 build compatibility.** Lab and Runtime now reference the
+game's `Splatform` assembly and call the current creator, roof, inventory, and world-name
+APIs. The pushed source previously failed ten Lab and two Runtime compile sites against
+AM4's installed Linux assemblies; the isolated corrected source builds both plugins
+there with zero warnings or errors. This is build evidence, not a live plugin-load claim.
+
 **Unreleased fixed Slayers Signature Hunt fixture.** Quest Lab now has one reviewed,
 parameter-free proof fixture for the identity-pinned private/local `ComfyQuestDemo` world. It
 preflights and stages Deathsquito and Drake targets in separate marked arenas with four usable

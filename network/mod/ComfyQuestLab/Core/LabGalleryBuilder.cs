@@ -945,7 +945,8 @@ public sealed class LabGalleryBuilder {
       if (piece != null && Player.m_localPlayer != null) {
         // Attribute it, so the gallery shows up as the student's own work rather than
         // as ownerless scenery.
-        piece.SetCreator(Player.m_localPlayer.GetPlayerID());
+        piece.SetCreator(Player.m_localPlayer.GetPlayerID(),
+            Splatform.PlatformManager.DistributionPlatform.LocalUser.PlatformUserID);
       }
 
       var view = go.GetComponent<ZNetView>();
@@ -1408,7 +1409,8 @@ public sealed class LabGalleryBuilder {
       GameObject roof;
       // A black-marble floor centre is 0.5 m below its top. Start above the slab so the
       // sphere cast cannot count the floor itself as its own roof.
-      if (WearNTear.RoofCheck(view.transform.position + Vector3.up * 0.75f, out roof)) {
+      if (WearNTear.RoofCheck(view.transform,
+              view.transform.position + Vector3.up * 0.75f, out roof)) {
         coveredFloors++;
       }
     } catch (Exception) {

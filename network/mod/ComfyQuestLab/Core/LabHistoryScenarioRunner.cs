@@ -150,7 +150,10 @@ public sealed class LabHistoryScenarioRunner {
     if (zdo == null) return go;
     zdo.Set(Mark, "1"); zdo.Set(CorpusMark, corpus); zdo.Set(StepMark, step.ToString(CultureInfo.InvariantCulture));
     Piece piece = go.GetComponent<Piece>();
-    if (piece != null && Player.m_localPlayer != null) piece.SetCreator(Player.m_localPlayer.GetPlayerID());
+    if (piece != null && Player.m_localPlayer != null) {
+      piece.SetCreator(Player.m_localPlayer.GetPlayerID(),
+          Splatform.PlatformManager.DistributionPlatform.LocalUser.PlatformUserID);
+    }
     return go;
   }
 

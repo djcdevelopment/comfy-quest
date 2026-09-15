@@ -46,10 +46,11 @@ Steward owns the JavaScript, CSS, camera model, renderer and shared fixtures.
 package and every file before copying it into `src/Quest.Studio/CaptureComposer/`.
 The importer accepts explicit artifacts and has no sibling-checkout discovery.
 
-The pinned candidate is `1.0.0-preview.3`, 15,566 bytes, SHA-256
-`c74c72ccd6d692e763cfb8236a7d1d61cb1b49123d554fba1f8d153fc3dd441e`.
-The embedded manifest also records Steward's base revision and candidate status.
-This is a local release candidate, not a published clean-revision claim.
+The staged component is `1.0.0-preview.3`, 15,566 bytes, SHA-256
+`c7ea6bbe0e2346b50c5ee2da2bc65a161c59d39420a31a7c42acb5dde96ffe24`.
+Its manifest pins Steward's pushed revision
+`2a9197d5bd45124aa4a91982a859669ac8cd0bd3`. The artifact remains labeled
+candidate while public rollout is pending.
 The embedded asset paths are fixed to LF checkout in `.gitattributes`: their raw
 bytes are version pins, and Windows `core.autocrlf` must not change them when a
 new worktree is created. Studio's existing creator renderer has the same rule.

@@ -1345,7 +1345,8 @@ sealed class RuntimeExperienceEngine {
         RuntimeSpawnIdentity.Mark(zdo);
         var piece = go.GetComponent<Piece>();
         if (piece != null && Player.m_localPlayer != null)
-          piece.SetCreator(Player.m_localPlayer.GetPlayerID());
+          piece.SetCreator(Player.m_localPlayer.GetPlayerID(),
+              Splatform.PlatformManager.DistributionPlatform.LocalUser.PlatformUserID);
         var record = new SpawnedObject {
           ActionKey = key,
           RunId = identity.RunId,

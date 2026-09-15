@@ -269,7 +269,7 @@ public sealed class LabSignatureHuntProvider {
     string[] names = SaveSystem.GetWorldList()
         .Where(world => world != null && world.m_uid == uid
             && string.Equals(world.m_name, display, StringComparison.Ordinal))
-        .Select(world => world.m_fileName).Distinct(StringComparer.Ordinal).ToArray();
+        .Select(world => world.m_worldName).Distinct(StringComparer.Ordinal).ToArray();
     return names.Length == 1 ? names[0] : null;
   }
 
@@ -384,7 +384,8 @@ public sealed class LabSignatureHuntProvider {
 
       Piece piece = placed.GetComponent<Piece>();
       if (piece != null && Player.m_localPlayer != null) {
-        piece.SetCreator(Player.m_localPlayer.GetPlayerID());
+        piece.SetCreator(Player.m_localPlayer.GetPlayerID(),
+            Splatform.PlatformManager.DistributionPlatform.LocalUser.PlatformUserID);
       }
       if (!string.IsNullOrWhiteSpace(placement.Text)) {
         zdo.Set("text", placement.Text);
@@ -422,7 +423,8 @@ public sealed class LabSignatureHuntProvider {
           return false;
         }
         for (int i = 0; i < LabSignatureHuntContract.SupplyCount; i++) {
-          if (inventory.AddItem(LabShowcaseProvider.Spear, 1, 4, 0, 0, "Field Lodge") == null) {
+          if (inventory.AddItem(LabShowcaseProvider.Spear, 1, 4, 0, 0, "Field Lodge",
+                  cheated: false) == null) {
             error = "signature hunt supply chest could not hold four spears";
             return false;
           }

@@ -234,7 +234,8 @@ public static class LabTruthLens {
       subject.LoadedFloors++;
       try {
         GameObject roof;
-        if (WearNTear.RoofCheck(view.transform.position + Vector3.up * 0.75f, out roof)) {
+        if (WearNTear.RoofCheck(view.transform,
+                view.transform.position + Vector3.up * 0.75f, out roof)) {
           subject.RoofProtectedFloors++;
         }
       } catch (Exception) {

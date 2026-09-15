@@ -156,7 +156,7 @@ class CreatorSessionTests(unittest.TestCase):
             "profile.GetFilename()",
             "matches.Count == 0",
             "matches.Count != 1",
-            "world.m_fileName",
+            "world.m_worldName",
             "request.WorldDisplayName",
             "world.m_uid.ToString",
             "exact.Length != 1",

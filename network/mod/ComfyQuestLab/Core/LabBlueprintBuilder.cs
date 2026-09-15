@@ -611,7 +611,8 @@ public sealed class LabBlueprintBuilder {
 
       var piece = go.GetComponent<Piece>();
       if (piece != null && Player.m_localPlayer != null) {
-        piece.SetCreator(Player.m_localPlayer.GetPlayerID());
+        piece.SetCreator(Player.m_localPlayer.GetPlayerID(),
+            Splatform.PlatformManager.DistributionPlatform.LocalUser.PlatformUserID);
       }
 
       var view = go.GetComponent<ZNetView>();
