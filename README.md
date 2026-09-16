@@ -125,8 +125,9 @@ and downloads the same local SelfieStick still as the public gallery. This mode 
 not change the live gameplay target or active world. See the
 [Capture user and integration guide](docs/gallery-capture.md) and
 [local proof index](docs/evidence/gallery-capture-20260915.json). The current
-implementation is a local candidate; clean source/release pins and public rollout
-follow [the fleet plan](https://github.com/djcdevelopment/baseline/blob/main/docs/gallery-capture-program-plan.md).
+implementation is staged from pushed source; the [stage evidence](https://github.com/djcdevelopment/baseline/blob/main/docs/evidence/gallery-capture-stage-20260915.json)
+pins the package, runner, receipts and byte-identical exports. Public rollout follows
+[the fleet plan](https://github.com/djcdevelopment/baseline/blob/main/docs/gallery-capture-program-plan.md).
 
 Open `docs/quest-mission-control.html` directly on a second display for the current
 Creator OS lane, dogfood portfolio roadmap, fleet roles, machine-derived choreography,
